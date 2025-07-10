@@ -1,110 +1,193 @@
-# JSON Query for Qt
+# JSON Query for Qt (C++23 Edition)
 
-A high-performance implementation of JSONPointer and JSONPath for Qt, featuring:
+A high-performance, modern C++ implementation of JSONPointer (RFC 6901) and JSONPath for Qt.
 
-- Full RFC 6901 JSONPointer compliance
-- Standard-compliant JSONPath implementation
-- Compile-time regular expressions (CTRE) for maximum performance
-- Seamless integration between JSONPointer and JSONPath
+**Features:**
 
-## Features
+- Full **RFC 6901 JSONPointer** compliance.
+- Support for common **JSONPath** features for querying JSON structures.
+- Utilizes **Compile-Time Regular Expressions (CTRE)** for efficient parsing.
+- Robust error handling using **`std::expected`** (C++23) for object creation/parsing.
+- Modern C++23 design, prioritizing standard library types (`std::vector`, `std::string`, etc.) internally.
+- Clean integration with Qt's JSON types (`QJsonValue`, `QJsonDocument`, etc.) at the API boundary.
+
+## Detailed Features
 
 ### JSONPointer (RFC 6901)
 
-- Direct access to JSON elements using path notation
-- Support for nested objects and arrays
-- Proper escape sequence handling
-- Robust error handling
+- Direct access to JSON elements using pointer notation (e.g., `/foo/0/bar`).
+- Support for nested objects and arrays.
+- Correct handling of escape sequences (`~0` for `~`, `~1` for `/`).
+- **Robust Error Handling:** Uses `std::expected` for:
+  - **Creation/Parsing:** Indicates syntax errors via `JsonPointerParseError`.
+  - **Evaluation:** Indicates errors like key-not-found or invalid-index via `JsonPointerError`.
 
 ### JSONPath
 
-- All standard JSONPath features:
-  - Direct property access (dot and bracket notation)
-  - Array access by index
-  - Array slices with start, end, and step
-  - Wildcards for properties and arrays
-  - Recursive descent (`..`)
-  - Filter expressions
+- Standard JSONPath query features:
+  - Root object access (`$`).
+  - Direct property access (dot `.` and bracket `['...']` notation).
+  - Array access by index (`[index]`, including negative indices).
+  - Array slices (`[start:end:step]`, including defaults and negative indices/steps).
+  - Wildcards for properties (`.*`) and array elements (`[*]`).
+  - Recursive descent (`..`) to search deeply.
+  - Basic filter expressions (`[?(@.property == value)]`, `[?(@.age > 30)]`, `[?(@.name)]`).
+- **Robust Parsing:** Uses `std::expected` to report syntax errors during creation via `JsonPathParseError`.
+- **Evaluation Results:** Returns a `QJsonArray` containing all matched values (empty array if no matches found).
 
-### Performance Optimizations
+### Performance & Design
 
-- Uses compile-time regular expressions (CTRE) for parsing
-- Integration with JSONPointer for efficient direct path evaluation
-- Zero allocation for common path patterns
-- Optimized internal data structures
+- Uses **compile-time regular expressions (CTRE)** via Hana Dusíková's library for fast path parsing where applicable.
+- Internal implementation prioritizes standard C++ types (`std::string`, `std::vector`, `std::variant`, `std::optional`, `std::tuple`) for efficiency and portability.
+- Minimized allocations where possible during parsing and evaluation.
+- Consistent C++23 features (e.g., brace initialization, `const` correctness).
 
 ## Requirements
 
-- Qt 6.5.7 or newer
-- C++17 compatible compiler
-- CTRE library (included as submodule)
+- **C++23 compatible compiler:**
+  - GCC 13 or newer
+  - Clang 16 or newer
+  - MSVC VS 2022 v17.8 or newer (ensure `/std:c++latest` is enabled)
+- **Qt 6.7 or newer** (Recommended for better C++23 integration, though core features might work with 6.5+ depending on compiler).
+- **CTRE library:** Included as a submodule. Ensure you initialize and update submodules.
 
 ## Installation
 
 1. Clone the repository:
 
-```bash
-git clone https://github.com/yourusername/json-query-qt.git
-cd json-query-qt
-git submodule update --init --recursive  # To fetch CTRE
-```
+    ```bash
+    git clone [https://github.com/yourusername/json-query-qt.git](https://github.com/yourusername/json-query-qt.git)
+    cd json-query-qt
+    # Initialize and fetch the CTRE submodule
+    git submodule update --init --recursive
+    ```
 
-2. Include in your project:
+2. Include in your CMake project:
 
-```qmake
-include(path/to/json-query-qt/json-query.pri)
-```
+    ```cmake
+    # Add the subdirectory containing json-query-qt's CMakeLists.txt
+    add_subdirectory(path/to/json-query-qt)
 
-Or add the source files directly to your project.
+    # Link the library to your target
+    target_link_libraries(your_target PRIVATE json-query-qt)
+    ```
+
+    *(A basic `CMakeLists.txt` would need to be provided in the library for this to work).*
+
+    **Alternatively (Manual):**
+    Add the `.h` and `.cpp` files directly to your existing build system, ensuring the CTRE include path is correctly configured and C++23 is enabled.
 
 ## Usage
 
-### JSONPointer Basic Usage
+### JSONPointer (C++23 with `std::expected`)
 
 ```cpp
 #include "JSONPointer.h"
+#include "json_query_utils.h" // For conversions if needed elsewhere
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QDebug>
+#include <expected>
 
-// Create a JSON document
-QJsonObject obj{{"foo", QJsonObject{{"bar", 42}}}};
+// --- Create Document ---
+QJsonObject obj{{"foo", QJsonObject{{"bar", 42}, {"baz", "hello"}}}};
 QJsonDocument doc(obj);
 
-// Create and evaluate a JSONPointer
-JSONPointer pointer("/foo/bar");
-QJsonValue result = pointer.evaluate(doc);  // Returns 42
-```
+// --- Create Pointer (Handles Parsing Errors) ---
+auto pointer_exp = JSONPointer::create("/foo/bar");
 
-### JSONPath Basic Usage
+if (!pointer_exp) {
+    // Handle parsing error
+    qWarning() << "Failed to parse JSON Pointer:"
+               << utils::std_string_to_qstring(pointer_exp.error().message);
+    return;
+}
+const JSONPointer pointer = pointer_exp.value(); // or *pointer_exp
 
-```cpp
+// --- Evaluate Pointer (Handles Evaluation Errors) ---
+auto eval_result = pointer.evaluate(doc);
+
+if (eval_result) {
+    // Evaluation successful
+    QJsonValue value = eval_result.value(); // or *eval_result
+    qDebug() << "Pointer result:" << value; // Output: QJsonValue(double, 42)
+} else {
+    // Handle evaluation error
+    JsonPointerError error_code = eval_result.error();
+    qWarning() << "Failed to evaluate JSON Pointer, error code:" << static_cast<int>(error_code);
+    // Example: KeyNotFound, IndexOutOfBounds, TypeMismatch
+}
+
+// --- Example: Non-existent path ---
+auto pointer_nonexist_exp = JSONPointer::create("/foo/qux");
+if (pointer_nonexist_exp) {
+    auto eval_nonexist = pointer_nonexist_exp->evaluate(doc);
+    if (!eval_nonexist) {
+         qDebug() << "Evaluation failed as expected for non-existent path. Error:"
+                  << static_cast<int>(eval_nonexist.error()); // Likely KeyNotFound
+    }
+}
+
+// --- Example: Invalid Syntax ---
+auto pointer_invalid_exp = JSONPointer::create("foo/bar"); // Missing leading '/'
+if (!pointer_invalid_exp) {
+     qDebug() << "Pointer creation failed as expected for invalid syntax. Error:"
+              << utils::std_string_to_qstring(pointer_invalid_exp.error().message);
+}
+JSONPath (C++23 with std::expected for creation)
+
 #include "JSONPath.h"
+#include "json_query_utils.h" // For conversions if needed elsewhere
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QDebug>
+#include <expected>
 
-// Create a JSON document with an array
-QJsonArray books = QJsonArray::fromVariantList({
-    QJsonObject{{"title", "Book 1"}, {"author", "Author 1"}},
-    QJsonObject{{"title", "Book 2"}, {"author", "Author 2"}}
-});
+// --- Create Document ---
+QJsonArray books{};
+books.append(QJsonObject{{"title", "Book 1"}, {"author", "Author 1"}, {"price", 10.0}});
+books.append(QJsonObject{{"title", "Book 2"}, {"author", "Author 2"}, {"price", 25.5}});
+books.append(QJsonObject{{"title", "Book 3"}, {"author", "Author 1"}, {"price", 15.0}});
 QJsonObject store{{"books", books}};
 QJsonDocument doc(store);
 
-// Get all book titles
-JSONPath path("$.books[*].title");
-QJsonArray titles = path.evaluate(doc);  // Returns ["Book 1", "Book 2"]
+// --- Create Path (Handles Parsing Errors) ---
+auto path_exp = JSONPath::create("$.books[*].title");
 
-// Get books with complex criteria
-JSONPath filter("$.books[?(@.author == 'Author 1')]");
-QJsonArray filteredBooks = filter.evaluate(doc);
-```
+if (!path_exp) {
+    // Handle parsing error
+    qWarning() << "Failed to parse JSON Path:"
+               << utils::std_string_to_qstring(path_exp.error().message);
+    return;
+}
+const JSONPath path = path_exp.value(); // or *path_exp
 
-## Performance Comparison
+// --- Evaluate Path ---
+// Evaluate returns QJsonArray directly (empty if no matches)
+QJsonArray titles = path.evaluate(doc);
+qDebug() << "All book titles:" << titles; // Output: QJsonArray(["Book 1", "Book 2", "Book 3"])
 
-The implementation uses compile-time regular expressions (CTRE) for significant performance improvements:
+// --- Example: Filter Path ---
+auto filter_path_exp = JSONPath::create("$.books[?(@.price > 12)].author");
+if (!filter_path_exp) {
+     qWarning() << "Failed to parse filter path:"
+                << utils::std_string_to_qstring(filter_path_exp.error().message);
+     return;
+}
+const JSONPath filter_path = *filter_path_exp; // Alternate access via operator*
 
-| Operation | Processing Time (10,000 iterations) |
-|-----------|-------------------------------------|
-| JSONPointer (with CTRE) | ~XX ms |
-| JSONPath (with CTRE) | ~XX ms |
-| Standard Qt regex (for comparison) | ~XX ms |
+QJsonArray expensive_authors = filter_path.evaluate(doc);
+qDebug() << "Authors of expensive books:" << expensive_authors; // Output: QJsonArray(["Author 2", "Author 1"])
 
-## License
+// --- Example: Invalid Syntax ---
+auto invalid_path_exp = JSONPath::create("$[1:2:0]"); // Invalid step
+if (!invalid_path_exp) {
+    qDebug() << "Path creation failed as expected for invalid syntax. Error:"
+             << utils::std_string_to_qstring(invalid_path_exp.error().message);
+}
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+
+Performance Comparison
+
+This implementation leverages compile-time regular expressions (CTRE) for parsing, which generally offers significantly better performance compared to runtime regex engines like QRegularExpression for the patterns used in path segmentation. Actual performance gains depend on the complexity of the paths and the specific operations. Benchmarking against other libraries or approaches is recommended for specific use cases.

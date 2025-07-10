@@ -1,4 +1,4 @@
-// jsonpointer.h - Updated for CTRE
+// JSONPointer.h - Updated for CTRE
 #ifndef JSONPOINTER_H
 #define JSONPOINTER_H
 
