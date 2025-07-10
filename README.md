@@ -83,7 +83,7 @@ A high-performance, modern C++ implementation of JSONPointer (RFC 6901) and JSON
 
 ```cpp
 #include "JSONPointer.hpp"
-#include "json_query_utils.h" // For conversions if needed elsewhere
+#include "JSONQueryUtils.hpp" // For conversions if needed elsewhere
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QDebug>
@@ -137,7 +137,7 @@ if (!pointer_invalid_exp) {
 JSONPath (C++23 with std::expected for creation)
 
 #include "JSONPath.h"
-#include "json_query_utils.h" // For conversions if needed elsewhere
+#include "JSONQueryUtils.hpp" // For conversions if needed elsewhere
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
