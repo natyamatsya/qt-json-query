@@ -66,21 +66,25 @@ QString JSONPointer::decodeToken(const QString &token)
     std::string result(sv);
 
     // First replace ~1 with / (must be done first to avoid ambiguity)
-    auto slashMatches = ctre::range<escape_slash_pattern>(sv);
-    for (auto it = slashMatches.rbegin(); it != slashMatches.rend(); ++it)
+    std::vector<decltype(*ctre::range<escape_slash_pattern>(sv).begin())> slashMatchesVec;
+    for (auto m : ctre::range<escape_slash_pattern>(sv))
+        slashMatchesVec.push_back(m);
+    for (auto it = slashMatchesVec.rbegin(); it != slashMatchesVec.rend(); ++it)
     {
         auto &match = *it;
-        size_t pos = match.get<0>().begin() - sv.begin();
+        size_t pos = match.template get<0>().begin() - sv.begin();
         result.replace(pos, 2, "/");
     }
 
     // Then replace ~0 with ~
     std::string_view resultSv(result);
-    auto tildeMatches = ctre::range<escape_tilde_pattern>(resultSv);
-    for (auto it = tildeMatches.rbegin(); it != tildeMatches.rend(); ++it)
+    std::vector<decltype(*ctre::range<escape_tilde_pattern>(resultSv).begin())> tildeMatchesVec;
+    for (auto m : ctre::range<escape_tilde_pattern>(resultSv))
+        tildeMatchesVec.push_back(m);
+    for (auto it = tildeMatchesVec.rbegin(); it != tildeMatchesVec.rend(); ++it)
     {
         auto &match = *it;
-        size_t pos = match.get<0>().begin() - resultSv.begin();
+        size_t pos = match.template get<0>().begin() - resultSv.begin();
         result.replace(pos, 2, "~");
     }
 

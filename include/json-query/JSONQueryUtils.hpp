@@ -111,6 +111,24 @@ template <auto &Pattern>
     return res;
 }
 
+template <auto &Pattern>
+[[nodiscard]] inline std::vector<std::pair<size_t,size_t>> find_all_positions(const QString &q)
+{
+    return find_all_positions<Pattern>(to_sv(q));
+}
+
+template <auto &Pattern>
+[[nodiscard]] inline std::optional<std::string> capture(const QString &q)
+{
+    return capture<Pattern>(to_sv(q));
+}
+
+template <auto &Pattern>
+[[nodiscard]] inline std::vector<std::string> captures(const QString &q)
+{
+    return captures<Pattern>(to_sv(q));
+}
+
 } // namespace json_query::utils
 
 // Short alias retained for existing code
