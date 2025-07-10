@@ -6,7 +6,7 @@
 #include <QElapsedTimer>
 
 #include "JSONPath.h"
-#include "JSONPointer.h"
+#include "JSONPointer.hpp"
 
 class BenchmarkTest : public QObject
 {

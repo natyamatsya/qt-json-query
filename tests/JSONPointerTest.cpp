@@ -3,7 +3,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
-#include "json-query/JSONPointer.h"
+#include "json-query/JSONPointer.hpp"
 
 class JSONPointerTest : public QObject
 {

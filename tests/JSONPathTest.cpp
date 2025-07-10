@@ -3,8 +3,8 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
-#include "json-query/JSONPath.h"
-#include "json-query/JSONPointer.h"
+#include "json-query/JSONPath.hpp"
+#include "json-query/JSONPointer.hpp"
 
 class JSONPathTest : public QObject
 {

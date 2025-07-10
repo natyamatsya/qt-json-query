@@ -82,7 +82,7 @@ A high-performance, modern C++ implementation of JSONPointer (RFC 6901) and JSON
 ### JSONPointer (C++23 with `std::expected`)
 
 ```cpp
-#include "JSONPointer.h"
+#include "JSONPointer.hpp"
 #include "json_query_utils.h" // For conversions if needed elsewhere
 #include <QJsonDocument>
 #include <QJsonObject>

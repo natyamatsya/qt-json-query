@@ -3,7 +3,7 @@
 #include <QJsonObject>
 #include <QDebug>
 
-#include "json-query/JSONPointer.h"
+#include "json-query/JSONPointer.hpp"
 
 int main(int argc, char **argv)
 {

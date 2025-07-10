@@ -1,5 +1,5 @@
 // jsonpath.cpp - Using CTRE
-#include "json-query/JSONPath.h"
+#include "json-query/JSONPath.hpp"
 #include <QStack>
 #include "json-query/JSONQueryUtils.hpp"
 
