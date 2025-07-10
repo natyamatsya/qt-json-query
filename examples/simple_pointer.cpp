@@ -13,19 +13,19 @@ int main(int argc, char **argv)
     QJsonObject obj{{"foo", 42}};
     QJsonDocument doc(obj);
 
-    // Create and evaluate JSON Pointer
-    auto pointerExp = JSONPointer::create("/foo");
-    if (!pointerExp) {
-        qWarning() << "Failed to parse JSON Pointer.";
+    // Create JSON Pointer directly
+    JSONPointer pointer("/foo");
+    if (!pointer.isValid()) {
+        qWarning() << "Invalid JSON Pointer.";
         return EXIT_FAILURE;
     }
 
-    auto resultExp = pointerExp->evaluate(doc);
-    if (!resultExp) {
+    QJsonValue result = pointer.evaluate(doc);
+    if (result.isUndefined()) {
         qWarning() << "Failed to evaluate JSON Pointer.";
         return EXIT_FAILURE;
     }
 
-    qInfo() << "Pointer result:" << resultExp.value(); // Should output: 42
+    qInfo() << "Pointer result:" << result; // Should output: 42
     return EXIT_SUCCESS;
 }

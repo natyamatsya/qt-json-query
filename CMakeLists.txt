@@ -21,6 +21,19 @@ find_package(Qt6 REQUIRED COMPONENTS Core)
 # ---------------------------------------------------------------------------
 # Library target
 # ---------------------------------------------------------------------------
+include(FetchContent)
+
+# ---------------------------------------------------------------------------
+# Header-only CTRE (compile-time regular expressions)
+# ---------------------------------------------------------------------------
+FetchContent_Declare(
+    ctre
+    GIT_REPOSITORY https://github.com/hanickadot/compile-time-regular-expressions.git
+    GIT_TAG v3.8.0 # any reasonably recent tag
+    SOURCE_SUBDIR single-header
+)
+FetchContent_MakeAvailable(ctre)
+
 add_library(json_query
     src/JSONPointer.cpp
     src/JSONPath.cpp
@@ -30,12 +43,19 @@ add_library(json_query
 target_include_directories(json_query
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/json-query>
+        $<BUILD_INTERFACE:${ctre_SOURCE_DIR}>
         $<INSTALL_INTERFACE:include>
 )
 
 # Link QtCore (Qt JSON classes live here)
 # If additional Qt modules become necessary, add them here.
 target_link_libraries(json_query PUBLIC Qt6::Core)
+
+# Link CTRE header-only library (interface target defined by FetchContent)
+if(TARGET ctre)
+    target_link_libraries(json_query PUBLIC ctre)
+endif()
 
 # ---------------------------------------------------------------------------
 # Examples and tests

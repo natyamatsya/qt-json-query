@@ -20,13 +20,13 @@ int main(int argc, char **argv)
     QJsonDocument doc(store);
 
     // Query all titles
-    auto pathExp = JSONPath::create("$.books[*].title");
-    if (!pathExp) {
-        qWarning() << "Failed to parse JSONPath.";
+    JSONPath path("$.books[*].title");
+    if (!path.isValid()) {
+        qWarning() << "Invalid JSONPath.";
         return EXIT_FAILURE;
     }
 
-    QJsonArray titles = pathExp->evaluate(doc);
+    QJsonArray titles = path.evaluate(doc);
     qInfo() << "Book titles:" << titles; // Expected: ["Book 1", "Book 2", "Book 3"]
 
     return EXIT_SUCCESS;
