@@ -29,10 +29,16 @@ include(FetchContent)
 FetchContent_Declare(
     ctre
     GIT_REPOSITORY https://github.com/hanickadot/compile-time-regular-expressions.git
-    GIT_TAG v3.8.0 # any reasonably recent tag
+    GIT_TAG main # any reasonably recent tag
     SOURCE_SUBDIR single-header
 )
 FetchContent_MakeAvailable(ctre)
+
+# Create an interface target for the single-header library if none provided
+if(NOT TARGET ctre_interface)
+    add_library(ctre_interface INTERFACE)
+    target_include_directories(ctre_interface INTERFACE ${ctre_SOURCE_DIR})
+endif()
 
 add_library(json_query
     src/JSONPointer.cpp
@@ -53,8 +59,9 @@ target_include_directories(json_query
 target_link_libraries(json_query PUBLIC Qt6::Core)
 
 # Link CTRE header-only library (interface target defined by FetchContent)
-if(TARGET ctre)
-    target_link_libraries(json_query PUBLIC ctre)
+# link interface target
+if(TARGET ctre_interface)
+    target_link_libraries(json_query PRIVATE ctre_interface)
 endif()
 
 # ---------------------------------------------------------------------------

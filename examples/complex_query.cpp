@@ -21,13 +21,13 @@ int main(int argc, char **argv)
     QJsonDocument doc(store);
 
     // Query: authors of books costing more than 20
-    auto pathExp = JSONPath::create("$.books[?(@.price > 20)].author");
-    if (!pathExp) {
-        qWarning() << "Failed to parse JSONPath:";
+    JSONPath path("$.books[?(@.price > 20)].author");
+    if (!path.isValid()) {
+        qWarning() << "Invalid JSONPath.";
         return EXIT_FAILURE;
     }
 
-    QJsonArray result = pathExp->evaluate(doc);
+    QJsonArray result = path.evaluate(doc);
     qInfo() << "Authors of expensive books:" << result; // Expected ["Author 2", "Author 3"]
 
     return EXIT_SUCCESS;

@@ -1,6 +1,6 @@
 // jsonpointer.cpp - Using CTRE
-#include "JSONPointer.h"
-#include "json_query_utils.h"
+#include "json-query/JSONPointer.h"
+#include "json-query/json_query_utils.h"
 
 // ----------------
 // CTRE Patterns
