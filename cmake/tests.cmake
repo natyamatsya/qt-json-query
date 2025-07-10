@@ -1,22 +1,34 @@
 # Enable testing
 enable_testing()
 
-# Tests requiring QtTest
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Test)
+# Tests requiring QtTest (optional)
+find_package(Qt6 COMPONENTS Test QUIET)
+
+# If QtTest is not available, skip adding tests to avoid configure failure
+if (NOT Qt6Test_FOUND)
+    message(STATUS "Qt6::Test not found; skipping unit tests.")
+    return()
+endif()
 
 # Add test executables
 add_executable(jsonpointer_test ${PROJECT_SOURCE_DIR}/tests/JSONPointerTest.cpp)
+# Enable Qt MOC
+set_target_properties(jsonpointer_test PROPERTIES AUTOMOC ON)
+# Include project headers
+target_include_directories(jsonpointer_test PRIVATE ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(jsonpointer_test PRIVATE 
     json_query 
-    Qt${QT_VERSION_MAJOR}::Core 
-    Qt${QT_VERSION_MAJOR}::Test
+    Qt6::Core 
+    Qt6::Test
 )
 
 add_executable(jsonpath_test ${PROJECT_SOURCE_DIR}/tests/JSONPathTest.cpp)
+set_target_properties(jsonpath_test PROPERTIES AUTOMOC ON)
+target_include_directories(jsonpath_test PRIVATE ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(jsonpath_test PRIVATE 
     json_query 
-    Qt${QT_VERSION_MAJOR}::Core 
-    Qt${QT_VERSION_MAJOR}::Test
+    Qt6::Core 
+    Qt6::Test
 )
 
 

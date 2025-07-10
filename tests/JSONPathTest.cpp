@@ -3,8 +3,8 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
-#include "json_query/JSONPath.h"
-#include "json_query/JSONPointer.h"
+#include "json-query/JSONPath.h"
+#include "json-query/JSONPointer.h"
 
 class JSONPathTest : public QObject
 {
@@ -362,5 +362,7 @@ void JSONPathTest::testIntegrationWithJSONPointer()
     QCOMPARE(complexResult[0].toString(), QString("Item 2"));
     QCOMPARE(complexResult[1].toString(), QString("Item 3"));
 }
+
+#include "JSONPathTest.moc"
 
 QTEST_MAIN(JSONPathTest)

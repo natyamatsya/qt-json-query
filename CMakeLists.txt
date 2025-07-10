@@ -3,6 +3,12 @@ cmake_minimum_required(VERSION 3.24)
 project(json_query VERSION 0.1 LANGUAGES CXX)
 
 # ---------------------------------------------------------------------------
+# Testing option (enabled by default) and CTest include
+# ---------------------------------------------------------------------------
+option(BUILD_TESTING "Build and enable tests" ON)
+include(CTest)
+
+# ---------------------------------------------------------------------------
 # Build options
 # ---------------------------------------------------------------------------
 set(CMAKE_CXX_STANDARD 23)

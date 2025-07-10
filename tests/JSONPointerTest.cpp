@@ -3,7 +3,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
-#include "JSONPointer.h"
+#include "json-query/JSONPointer.h"
 
 class JSONPointerTest : public QObject
 {
@@ -141,5 +141,7 @@ void JSONPointerTest::testNonExistentPath()
     QVERIFY(pointerArrayAccess.isValid());
     QVERIFY(pointerArrayAccess.evaluate(doc).isUndefined());
 }
+
+#include "JSONPointerTest.moc"
 
 QTEST_MAIN(JSONPointerTest)
