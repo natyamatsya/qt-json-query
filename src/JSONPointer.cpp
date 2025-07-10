@@ -10,8 +10,9 @@ namespace
 {
     using namespace json_utils;
 
+    // Match each path segment between slashes (at least one non-slash char)
     constexpr auto token_pattern = ctll::fixed_string{
-        "/([^/]*)"};
+        "/([^/]+)"};
 
     constexpr auto escape_tilde_pattern = ctll::fixed_string{
         "~0"};
@@ -42,17 +43,11 @@ void JSONPointer::parsePointer(const QString &pointer)
         return;
     }
 
-    // Find all tokens using CTRE
-    std::string_view sv = to_sv(pointer);
-    auto tokenMatches = ctre::range<token_pattern>(sv);
-
-    for (auto match : tokenMatches)
+    // Split by '/' (RFC 6901), skipping the empty first segment
+    const QStringList parts = pointer.split('/', Qt::SkipEmptyParts);
+    for (const QString &rawToken : parts)
     {
-        if (match.get<1>())
-        {
-            QString token = to_qstr(match.get<1>().to_view());
-            m_tokens.append(decodeToken(token));
-        }
+        m_tokens.append(decodeToken(rawToken));
     }
 }
 
