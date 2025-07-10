@@ -37,7 +37,7 @@ FetchContent_MakeAvailable(ctre)
 # Create an interface target for the single-header library if none provided
 if(NOT TARGET ctre_interface)
     add_library(ctre_interface INTERFACE)
-    target_include_directories(ctre_interface INTERFACE ${ctre_SOURCE_DIR})
+    target_include_directories(ctre_interface INTERFACE ${ctre_SOURCE_DIR}/single-header)
 endif()
 
 add_library(json_query

@@ -68,7 +68,7 @@ namespace json_query::utils
     [[nodiscard]] inline bool matches(const std::string_view sv) noexcept
     { // noexcept if ctre::match is
         // ctre::match checks if the *entire* input matches the pattern.
-        return ctre::match<Pattern>(sv);
+        return ctre::match<Pattern>(sv);}
     }
 
     // Extract the content of the first capture group (index 1) as std::string.
@@ -80,7 +80,7 @@ namespace json_query::utils
         if (const auto m{ctre::match<Pattern>(sv)})
         {
             // Use '.template get<N>()' for dependent template types
-            if (const auto group1{m.template get()})
+            if (const auto group1{m.template get<1>()})
             {   // Check capture group 1 specifically
                 // Create std::string using brace-init from string_view data/length
                 return std::string{group1.data(), group1.length()};
@@ -131,7 +131,7 @@ namespace json_query::utils
         {
             // Get the string_view for the entire match (group 0)
             // Use const auto with brace-initialization
-            const auto full_match_view{match.template get()}; // Group 0 is the full match
+            const auto full_match_view{match.template get<0>()}; // Group 0 is the full match
 
             // Calculate positions relative to the start of the input view 'sv'
             // Use static_cast for pointer difference to size_t conversion.
@@ -146,3 +146,6 @@ namespace json_query::utils
     }
 
 } // namespace json_query::utils
+
+// Convenient alias so existing code can simply use json_utils:: instead of json_query::utils::
+namespace json_utils = json_query::utils;

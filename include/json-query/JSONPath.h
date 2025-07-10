@@ -84,4 +84,4 @@ private:
     QVector<QPair<QString, bool>> splitPathSegments(const QString &path) const;
 };
 
-#endif // JSONPATH_H
+
