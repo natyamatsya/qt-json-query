@@ -50,7 +50,7 @@ target_include_directories(json_query
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/json-query>
-        $<BUILD_INTERFACE:${ctre_SOURCE_DIR}>
+        $<BUILD_INTERFACE:${ctre_SOURCE_DIR}/single-header>
         $<INSTALL_INTERFACE:include>
 )
 

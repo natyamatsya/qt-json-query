@@ -98,8 +98,8 @@ QVector<JSONPath::Segment> JSONPath::parseSegments(const QString &path)
                 recursiveSegment.type = SegmentType::RecursiveDescend;
                 segments.append(recursiveSegment);
             }
-            else if (ctre::match<property_pattern>(to_sv(segment)) &&
-                     to_qstr(ctre::match<property_pattern>(to_sv(segment)).get<1>().to_view()) == "*")
+            else if (auto propertyMatch = ctre::match<property_pattern>(to_sv(segment));
+                     propertyMatch && to_qstr(propertyMatch.template get<1>().to_view()) == "*")
             {
                 // Wildcard property
                 Segment wildcardSegment;
@@ -120,23 +120,23 @@ QVector<JSONPath::Segment> JSONPath::parseSegments(const QString &path)
                 int end = std::numeric_limits<int>::max();
                 int step = 1;
 
-                if (sliceMatch.get<1>())
+                if (sliceMatch.template get<1>())
                 {
-                    start = QString::fromUtf8(sliceMatch.get<1>().data(), sliceMatch.get<1>().size()).toInt();
+                    start = QString::fromUtf8(sliceMatch.template get<1>().data(), sliceMatch.template get<1>().size()).toInt();
                 }
 
-                if (sliceMatch.get<2>())
+                if (sliceMatch.template get<2>())
                 {
-                    auto endStr = QString::fromUtf8(sliceMatch.get<2>().data(), sliceMatch.get<2>().size());
+                    auto endStr = QString::fromUtf8(sliceMatch.template get<2>().data(), sliceMatch.template get<2>().size());
                     if (!endStr.isEmpty())
                     {
                         end = endStr.toInt();
                     }
                 }
 
-                if (sliceMatch.get<3>())
+                if (sliceMatch.template get<3>())
                 {
-                    auto stepStr = QString::fromUtf8(sliceMatch.get<3>().data(), sliceMatch.get<3>().size());
+                    auto stepStr = QString::fromUtf8(sliceMatch.template get<3>().data(), sliceMatch.template get<3>().size());
                     if (!stepStr.isEmpty())
                     {
                         step = stepStr.toInt();
@@ -153,9 +153,9 @@ QVector<JSONPath::Segment> JSONPath::parseSegments(const QString &path)
             else if (auto filterMatch = ctre::match<filter_expr_pattern>(to_sv(segment)))
             {
                 // Filter expression
-                if (filterMatch.get<1>())
+                if (filterMatch.template get<1>())
                 {
-                    QString expr = to_qstr(filterMatch.get<1>().to_view());
+                    QString expr = to_qstr(filterMatch.template get<1>().to_view());
                     auto filterSegment = parseFilterExpression(expr);
                     if (filterSegment.has_value())
                     {
@@ -213,8 +213,8 @@ std::optional<JSONPath::Segment> JSONPath::parseFilterExpression(const QString &
     // Parse a simple equality expression using CTRE
     if (auto eqMatch = ctre::match<eq_expr_pattern>(to_sv(expr)))
     {
-        QString property = to_qstr(eqMatch.get<1>().to_view());
-        QString value = to_qstr(eqMatch.get<2>().to_view());
+        QString property = to_qstr(eqMatch.template get<1>().to_view());
+        QString value = to_qstr(eqMatch.template get<2>().to_view());
 
         segment.data = [property, value](const QJsonValue &json) -> bool
         {
@@ -230,9 +230,9 @@ std::optional<JSONPath::Segment> JSONPath::parseFilterExpression(const QString &
     // Parse a simple numeric comparison using CTRE
     if (auto numMatch = ctre::match<num_comp_expr_pattern>(to_sv(expr)))
     {
-        QString property = to_qstr(numMatch.get<1>().to_view());
-        QString op = to_qstr(numMatch.get<2>().to_view());
-        double compareValue = to_qstr(numMatch.get<3>().to_view()).toDouble();
+        QString property = to_qstr(numMatch.template get<1>().to_view());
+        QString op = to_qstr(numMatch.template get<2>().to_view());
+        double compareValue = to_qstr(numMatch.template get<3>().to_view()).toDouble();
 
         segment.data = [property, op, compareValue](const QJsonValue &json) -> bool
         {
@@ -526,9 +526,9 @@ QString JSONPath::segmentToPointer(const QString &segment) const
     {
         const auto &[start, end] = propMatches[i];
         auto propMatch = ctre::match<property_pattern>(to_sv(result.mid(start, end - start)));
-        if (propMatch.get<1>())
+        if (propMatch.template get<1>())
         {
-            QString propName = to_qstr(propMatch.get<1>().to_view());
+            QString propName = to_qstr(propMatch.template get<1>().to_view());
             result.replace(start, end - start, "/" + propName);
         }
     }
@@ -539,9 +539,9 @@ QString JSONPath::segmentToPointer(const QString &segment) const
     {
         const auto &[start, end] = arrayMatches[i];
         auto arrayMatch = ctre::match<array_index_pattern>(to_sv(result.mid(start, end - start)));
-        if (arrayMatch.get<1>())
+        if (arrayMatch.template get<1>())
         {
-            QString indexStr = to_qstr(arrayMatch.get<1>().to_view());
+            QString indexStr = to_qstr(arrayMatch.template get<1>().to_view());
             result.replace(start, end - start, "/" + indexStr);
         }
     }
@@ -552,9 +552,9 @@ QString JSONPath::segmentToPointer(const QString &segment) const
     {
         const auto &[start, end] = quotedMatches[i];
         auto quotedMatch = ctre::match<quoted_property_pattern>(to_sv(result.mid(start, end - start)));
-        if (quotedMatch.get<1>())
+        if (quotedMatch.template get<1>())
         {
-            QString propName = to_qstr(quotedMatch.get<1>().to_view());
+            QString propName = to_qstr(quotedMatch.template get<1>().to_view());
             result.replace(start, end - start, "/" + propName);
         }
     }
