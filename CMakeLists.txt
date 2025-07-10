@@ -78,8 +78,11 @@ endif()
 # ---------------------------------------------------------------------------
 # Installation (headers and library)
 # ---------------------------------------------------------------------------
+option(JSON_QUERY_ENABLE_INSTALL "Enable installation rules" OFF)
+
+if(JSON_QUERY_ENABLE_INSTALL)
 include(GNUInstallDirs)
-install(TARGETS json_query EXPORT json_queryTargets
+install(TARGETS json_query ctre_interface EXPORT json_queryTargets
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
@@ -91,3 +94,4 @@ install(EXPORT json_queryTargets
         FILE json_queryTargets.cmake
         NAMESPACE json_query::
         DESTINATION ${CMAKE_INSTALL_DATADIR}/json_query/cmake)
+endif()
