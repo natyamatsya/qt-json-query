@@ -61,11 +61,42 @@ QVector<JSONPath::Segment> JSONPath::parseSegments(const QString &path)
     // Split the path into segments using compile-time regex
     auto splitSegments = splitPathSegments(path);
 
-    // First segment must be the root
-    if (splitSegments.isEmpty() || !json_utils::matches<json_utils::root_pattern>(splitSegments.first().first))
+    // Ensure we have at least the root symbol
+    if (splitSegments.isEmpty())
+    {
+        throw std::runtime_error("Invalid JSONPath: Empty path");
+    }
+
+    // Normalise so the root symbol ('$' or '@') is always its own segment
+    QVector<QPair<QString, bool>> normalizedSegments;
+    const QString &firstPart = splitSegments.first().first;
+
+    if (!firstPart.startsWith('$') && !firstPart.startsWith('@'))
     {
         throw std::runtime_error("Invalid JSONPath: Must start with $ or @");
     }
+
+    // Always push the root symbol as a standalone segment
+    normalizedSegments.append({firstPart.left(1), false});
+
+    // If the first part has additional characters beyond the root symbol (e.g. "$.books")
+    if (firstPart.length() > 1)
+    {
+        QString remainder = firstPart.mid(1);
+        if (!remainder.isEmpty())
+        {
+            normalizedSegments.append({remainder, false});
+        }
+    }
+
+    // Append the rest of the original split segments
+    for (int i = 1; i < splitSegments.size(); ++i)
+    {
+        normalizedSegments.append(splitSegments[i]);
+    }
+
+    // Replace with the normalised vector for further processing
+    splitSegments = std::move(normalizedSegments);
 
     // Add the root segment
     Segment rootSegment;
