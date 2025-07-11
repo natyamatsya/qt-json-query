@@ -486,6 +486,81 @@ static inline QJsonValue deepestOrArray(const QList<QString> &paths)
     QJsonArray arr; for(const auto &p:paths) arr.append(p); return QJsonValue(arr);
 }
 
+// -------------------- AsPathList helpers --------------------
+namespace {
+static inline QString escapeSegment(const QString &s)
+{
+    QString r = s; r.replace("~","~0"); r.replace("/","~1"); return r;
+}
+
+template<typename SegT>
+static inline std::vector<PtrFrame> advancePointerSegment(const SegT &seg,
+                                                          const std::vector<PtrFrame> &in)
+{
+    std::vector<PtrFrame> out;
+    out.reserve(in.size());
+
+    QString segStr = std::get<QString>(seg.data);
+    QString keyOrIndex;
+    if (segStr.startsWith('.'))
+        keyOrIndex = segStr.mid(1);
+    else if (segStr.startsWith("['") || segStr.startsWith("[\""))
+        keyOrIndex = segStr.mid(2, segStr.size()-4);
+    else if (segStr.startsWith('['))
+        keyOrIndex = segStr.mid(1, segStr.size()-2);
+
+    for (const auto &frame : in)
+    {
+        // skip root pointer (empty) after the first hop to avoid duplicates
+        if (frame.ptr.isEmpty() && !keyOrIndex.isEmpty() && in.size()!=1)
+            ; // allow first hop
+
+        if (keyOrIndex.isEmpty()) continue;
+        if (frame.val.isObject())
+        {
+            const QJsonObject obj = frame.val.toObject();
+            if (obj.contains(keyOrIndex))
+                out.push_back({obj.value(keyOrIndex), frame.ptr + "/" + escapeSegment(keyOrIndex)});
+        }
+        else if (frame.val.isArray())
+        {
+            bool ok=false; int idx = keyOrIndex.toInt(&ok);
+            if(!ok) continue;
+            QJsonArray arr = frame.val.toArray();
+            if(idx<0) idx = arr.size()+idx;
+            if(idx>=0 && idx<arr.size())
+                out.push_back({arr[idx], frame.ptr + "/" + keyOrIndex});
+        }
+    }
+    return out;
+}
+
+static inline QList<QString> uniqueDeepest(const std::vector<PtrFrame> &frames)
+{
+    QSet<QString> uniq;
+    for (const auto &f : frames)
+        if (!f.ptr.isEmpty()) uniq.insert(f.ptr);
+    if (uniq.isEmpty()) return {};
+
+    QList<QString> paths = uniq.values();
+    // strip parent prefixes
+    QList<QString> keep;
+    for (const auto &p : paths)
+    {
+        bool isPref=false;
+        for (const auto &q : paths)
+        {
+            if (p==q) continue;
+            if (q.startsWith(p) && q.size()>p.size() && q[p.size()]=='/')
+            { isPref=true; break; }
+        }
+        if (!isPref) keep.append(p);
+    }
+    return keep;
+}
+} // anonymous namespace
+
+// -------------------- evalAsPathList --------------------
 QJsonValue JSONPath::evalAsPathList(const JSONPath &self, const QJsonValue &value)
 {
     if (!self.isValid() || self.m_segments.isEmpty())
@@ -543,8 +618,7 @@ QJsonValue JSONPath::evalAsPathList(const JSONPath &self, const QJsonValue &valu
     if (working.empty()) return QJsonValue();
 
     QSet<QString> uniq; for(auto &f:working) if(!f.ptr.isEmpty()) uniq.insert(f.ptr);
-    if(uniq.size()==1)
-        return QJsonValue(*uniq.constBegin());
+    
     QList<QString> paths = uniq.values();
     // remove parent prefixes
     QList<QString> filtered;
