@@ -28,37 +28,48 @@ JSONPointer::JSONPointer(const QString &pointer)
 
 void JSONPointer::parsePointer(const QString &pointer)
 {
-    using namespace json_utils;
+    // Reset state first
+    m_tokens.clear();
+    m_valid = true;
 
-    // Empty pointer is valid and represents the entire document
+    // Empty string – valid pointer to whole document.
     if (pointer.isEmpty())
-    {
         return;
-    }
 
-    // According to RFC 6901, a JSON Pointer must start with '/'
-    if (!pointer.startsWith('/'))
+    // RFC-6901: must begin with '/'.
+    if (pointer.front() != QChar('/'))
     {
         m_valid = false;
         return;
     }
 
-    
-    // Manual single-pass scan to extract tokens without temporary QStringList
+    // Reserve rough space: number of '/' gives upper bound on tokens.
+    const int approxTokens = pointer.count('/') ;
+    m_tokens.reserve(approxTokens);
+
     QStringView view{pointer};
-    qsizetype start = 1; // skip leading '/'
-    const qsizetype n = view.size();
-    while (start <= n)
+    qsizetype begin = 1;            // skip leading '/'
+    const qsizetype len = view.size();
+
+    while (begin < len)
     {
-        qsizetype pos = start;
-        while (pos < n && view.at(pos) != u'/')
-            ++pos;
-        // Extract token substring [start, pos)
-        if (pos > start) // ignore empty segments (consecutive slashes)
+        // find next '/'
+        qsizetype end = begin;
+        while (end < len && view.at(end) != u'/')
+            ++end;
+
+        if (end == begin)
         {
-            m_tokens.append(decodeToken(view.sliced(start, pos - start)));
+            // Empty token ("//") – invalid per RFC.
+            m_valid = false;
+            m_tokens.clear();
+            return;
         }
-        start = pos + 1; // move past '/'
+
+        // Decode and store
+        m_tokens.append(decodeToken(view.sliced(begin, end - begin)));
+
+        begin = end + 1; // step past '/'
     }
 }
 
