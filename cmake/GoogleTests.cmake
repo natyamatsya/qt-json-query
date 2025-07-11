@@ -16,6 +16,7 @@ set(TEST_SOURCES
     ${PROJECT_SOURCE_DIR}/tests/JSONPathConformanceGTest.cpp
     ${PROJECT_SOURCE_DIR}/tests/JSONPointerConformanceGTest.cpp
     ${PROJECT_SOURCE_DIR}/tests/JSONPointerGTest.cpp
+    ${PROJECT_SOURCE_DIR}/tests/JSONPathBaeldungGTest.cpp
 )
 
 # Unified test executable
