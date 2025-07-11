@@ -103,7 +103,7 @@ template <auto &Pattern>
 [[nodiscard]] inline std::vector<std::pair<size_t,size_t>> find_all_positions(std::string_view sv)
 {
     std::vector<std::pair<size_t,size_t>> res;
-    for (const auto match : ctre::range<Pattern>(sv))
+    for (const auto match : ctre::search_all<Pattern>(sv))
     {
         const auto full = match.template get<0>();
         res.emplace_back(static_cast<size_t>(full.begin()-sv.begin()), static_cast<size_t>(full.end()-sv.begin()));

@@ -1,6 +1,6 @@
 // jsonpath.cpp - Using CTRE
 #include "json-query/JSONPath.hpp"
-#include <QStack>
+#include <stack>
 #include "json-query/JSONQueryUtils.hpp"
 
 
@@ -336,6 +336,9 @@ QJsonArray JSONPath::evaluate(const QJsonValue &value) const
     // Evaluate each segment
     for (int i = 1; i < m_segments.size(); ++i)
     {
+        if (result.isEmpty())
+            break; // Early exit if no candidates remain
+
         QJsonArray newResult;
 
         for (int j = 0; j < result.size(); ++j)
@@ -460,52 +463,43 @@ QJsonArray JSONPath::evaluateSegment(const Segment &segment, const QJsonValue &v
     return result;
 }
 
+// Optimized iterative implementation to avoid deep recursion and reduce allocations
 QJsonArray JSONPath::evaluateRecursive(const QJsonValue &value, int /*segmentIndex*/) const
 {
     QJsonArray result;
+    std::stack<QJsonValue> stack;
+    stack.push(value);
 
-    // Only include containers (objects or arrays) to allow further pointer evaluation
-    if (value.isObject() || value.isArray())
+    while (!stack.empty())
     {
-        result.append(value);
-    }
+        QJsonValue current = stack.top();
+        stack.pop();
 
-    if (value.isObject())
-    {
-        QJsonObject obj = value.toObject();
-        for (auto it = obj.begin(); it != obj.end(); ++it)
+        // Store containers so caller can continue evaluation
+        if (current.isObject() || current.isArray())
+            result.append(current);
+
+        if (current.isObject())
         {
-            QJsonArray childMatches = evaluateRecursive(it.value(), 0);
-            for (const QJsonValue &v : childMatches)
-            {
-                result.append(v);
-            }
+            const QJsonObject obj = current.toObject();
+            for (auto it = obj.begin(); it != obj.end(); ++it)
+                stack.push(it.value());
+        }
+        else if (current.isArray())
+        {
+            const QJsonArray arr = current.toArray();
+            for (const QJsonValue &elem : arr)
+                stack.push(elem);
         }
     }
-    else if (value.isArray())
-    {
-        QJsonArray arr = value.toArray();
-        for (const QJsonValue &elem : arr)
-        {
-            QJsonArray childMatches = evaluateRecursive(elem, 0);
-            for (const QJsonValue &v : childMatches)
-            {
-                result.append(v);
-            }
-        }
-    }
-
     return result;
 }
 
 QJsonArray JSONPath::evaluateArraySlice(const QJsonArray &array, int start, int end, int step) const
 {
     QJsonArray result;
-
     if (step <= 0)
-    {
-        return result; // Invalid step
-    }
+        return result;
 
     int size = array.size();
 
