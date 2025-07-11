@@ -3,6 +3,7 @@
 #include <vector>
 #include "json-query/JSONQueryUtils.hpp"
 #include "json-query/ContainerFrame.hpp"
+#include <QRegularExpression>
 using json_query::ContainerFrame;
 
 
@@ -290,6 +291,61 @@ std::optional<JSONPath::Segment> JSONPath::parseFilterExpression(const QString &
     if (exprTrim.startsWith(u'(') && exprTrim.endsWith(u')'))
         exprTrim = exprTrim.mid(1, exprTrim.size() - 2);
 
+
+    // Parse dot-notation predicate like @.id == 2  or @.price > 20.0 via QRegularExpression
+    {
+        static const QRegularExpression dotRe(R"(@\.(\w+)\s*(==|!=|>=|<=|>|<)\s*('([^']*)'|\"([^\"]*)\"|[-+]?\d*\.?\d+))");
+        auto m = dotRe.match(exprTrim);
+        if (m.hasMatch())
+        {
+            const QString property = m.captured(1);
+            const QString op = m.captured(2);
+            const QString rawVal = m.captured(3);
+
+            bool numeric = false;
+            double compareValue = rawVal.toDouble(&numeric);
+            QString compareStr;
+            if (!numeric)
+            {
+                // Strip quotes
+                if (rawVal.size() >= 2 && ((rawVal.startsWith('"') && rawVal.endsWith('"')) || (rawVal.startsWith('\'') && rawVal.endsWith('\''))))
+                    compareStr = rawVal.mid(1, rawVal.size() - 2);
+                else
+                    compareStr = rawVal;
+            }
+
+            segment.data = [property, op, compareValue, numeric, compareStr](const QJsonValue &json) -> bool
+            {
+                if (!json.isObject())
+                    return false;
+                QJsonObject obj = json.toObject();
+                if (!obj.contains(property))
+                    return false;
+
+                if (numeric)
+                {
+                    if (!obj[property].isDouble())
+                        return false;
+                    double value = obj[property].toDouble();
+                    if (op == "==") return value == compareValue;
+                    if (op == "!=") return value != compareValue;
+                    if (op == ">")  return value > compareValue;
+                    if (op == "<")  return value < compareValue;
+                    if (op == ">=") return value >= compareValue;
+                    if (op == "<=") return value <= compareValue;
+                    return false;
+                }
+                else
+                {
+                    QString valStr = obj[property].toString();
+                    if (op == "==") return valStr == compareStr;
+                    if (op == "!=") return valStr != compareStr;
+                    return false; // other ops not meaningful for strings
+                }
+            };
+            return segment;
+        }
+    }
 
     // Parse a simple equality expression using CTRE
     if (auto eqMatch = ctre::match<eq_expr_pattern>(to_sv(exprTrim)))

@@ -84,22 +84,17 @@ TEST(JSONPathBaeldung, PredicatePriceGreaterThan20)
     const QJsonDocument doc = QJsonDocument::fromJson(QByteArray(jsonSrc));
 
     // Inline predicate variant equivalent to article but comparing with constant
-    EXPECT_NO_FATAL_FAILURE({
-        JSONPath expensive("$['book'][?(@['price'] > 20.00)]"); // unsupported; just ensure no crash
-        (void)expensive.evaluateAll(doc);
-        /*
-        // Original assertions preserved for future enablement
-        QJsonArray result = expensive.evaluateAll(doc);
-        QStringList titles;
-        for (const auto &v : result)
-            titles << v.toObject().value("title").toString();
+    JSONPath expensive("$['book'][?(@.price > 20.00)]");
+    ASSERT_TRUE(expensive.isValid());
+    QJsonArray result = expensive.evaluateAll(doc);
+    QStringList titles;
+    for (const auto &v : result)
+        titles << v.toObject().value("title").toString();
 
-        EXPECT_TRUE(titles.contains(u"Beginning JSON"_s));
-        EXPECT_TRUE(titles.contains(u"JSON at Work"_s));
-        EXPECT_FALSE(titles.contains(u"Learn JSON in a DAY"_s));
-        EXPECT_FALSE(titles.contains(u"JSON: Questions and Answers"_s));
-        */
-    }) << "Filter expressions with numeric comparison currently unsupported";
+    EXPECT_TRUE(titles.contains(u"Beginning JSON"_s));
+    EXPECT_TRUE(titles.contains(u"JSON at Work"_s));
+    EXPECT_FALSE(titles.contains(u"Learn JSON in a DAY"_s));
+    EXPECT_FALSE(titles.contains(u"JSON: Questions and Answers"_s));
 }
 
 //---------------------------------------------
@@ -116,20 +111,15 @@ TEST(JSONPathBaeldung, MovieWithId2)
 
     const QJsonDocument doc = QJsonDocument::fromJson(QByteArray(jsonSrc));
 
-    EXPECT_NO_FATAL_FAILURE({
-        JSONPath path("$[?(@.id == 2)]"); // unsupported
-        (void)path.evaluateAll(doc);
-        /*
-        // Original assertions preserved for future enablement
-        QJsonArray resArr = path.evaluateAll(doc);
-        ASSERT_EQ(resArr.size(), 1);
-        const QJsonObject obj = resArr[0].toObject();
+    JSONPath path("$[?(@.id == 2)]");
+    ASSERT_TRUE(path.isValid());
+    QJsonArray resArr = path.evaluateAll(doc);
+    ASSERT_EQ(resArr.size(), 1);
+    const QJsonObject obj = resArr[0].toObject();
 
-        EXPECT_EQ(obj.value("id").toInt(), 2);
-        EXPECT_EQ(obj.value("title").toString(), u"Quantum of Solace"_s);
-        EXPECT_TRUE(obj.value("desc").toString().contains(u"Twenty-second James Bond movie"_s));
-        */
-    }) << "Equality filter currently unsupported";
+    EXPECT_EQ(obj.value("id").toInt(), 2);
+    EXPECT_EQ(obj.value("title").toString(), u"Quantum of Solace"_s);
+    EXPECT_TRUE(obj.value("desc").toString().contains(u"Twenty-second James Bond movie"_s));
 }
 
 //---------------------------------------------
