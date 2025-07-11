@@ -1,6 +1,6 @@
 // jsonpath.cpp - Using CTRE
 #include "json-query/JSONPath.hpp"
-#include <stack>
+#include <vector>
 #include "json-query/JSONQueryUtils.hpp"
 
 
@@ -462,34 +462,85 @@ QJsonArray JSONPath::evaluateSegment(const Segment &segment, const QJsonValue &v
 
     return result;
 }
+// Iterative recursive-descent using lightweight frames to avoid QJsonValue copies.
+struct ContainerFrame
+{
+    QJsonObject object;
+    QJsonArray array;
+    QJsonObject::const_iterator objIt;
+    int arrIndex = -1;
 
-// Optimized iterative implementation to avoid deep recursion and reduce allocations
+    // Constructors for object / array
+    explicit ContainerFrame(const QJsonObject &o) : object(o), objIt(object.begin()) {}
+    explicit ContainerFrame(const QJsonArray  &a) : array(a), arrIndex(0) {}
+
+    bool hasNext() const
+    {
+        return (!object.isEmpty() && objIt != object.end()) ||
+               (!array.isEmpty()  && arrIndex < array.size());
+    }
+
+    QJsonValue next()
+    {
+        if (!object.isEmpty())
+        {
+            QJsonValue ref = objIt.value();
+            ++objIt;
+            return ref;
+        }
+        else
+        {
+            QJsonValue ref = array.at(arrIndex);
+            ++arrIndex;
+            return ref;
+        }
+    }
+};
+
 QJsonArray JSONPath::evaluateRecursive(const QJsonValue &value, int /*segmentIndex*/) const
 {
     QJsonArray result;
-    std::stack<QJsonValue> stack;
-    stack.push(value);
+
+    if (value.isNull() || value.isUndefined())
+        return result;
+
+    if (!value.isObject() && !value.isArray())
+        return result;
+
+    std::vector<ContainerFrame> stack;
+    stack.reserve(32);
+
+    // Push root frame & store root container itself
+    if (value.isObject())
+    {
+        result.append(value);
+        stack.emplace_back(value.toObject());
+    }
+    else // array
+    {
+        result.append(value);
+        stack.emplace_back(value.toArray());
+    }
 
     while (!stack.empty())
     {
-        QJsonValue current = stack.top();
-        stack.pop();
-
-        // Store containers so caller can continue evaluation
-        if (current.isObject() || current.isArray())
-            result.append(current);
-
-        if (current.isObject())
+        ContainerFrame &frame = stack.back();
+        if (!frame.hasNext())
         {
-            const QJsonObject obj = current.toObject();
-            for (auto it = obj.begin(); it != obj.end(); ++it)
-                stack.push(it.value());
+            stack.pop_back();
+            continue;
         }
-        else if (current.isArray())
+
+        QJsonValue child = frame.next();
+        if (child.isObject())
         {
-            const QJsonArray arr = current.toArray();
-            for (const QJsonValue &elem : arr)
-                stack.push(elem);
+            result.append(child);
+            stack.emplace_back(child.toObject());
+        }
+        else if (child.isArray())
+        {
+            result.append(child);
+            stack.emplace_back(child.toArray());
         }
     }
     return result;
