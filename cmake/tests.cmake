@@ -32,23 +32,16 @@ target_link_libraries(jsonpath_test PRIVATE
 )
 
 
-# Benchmark executable (QtTest benchmark harness)
-add_executable(json_benchmark ${PROJECT_SOURCE_DIR}/benchmarks/Benchmark.cpp)
-set_target_properties(json_benchmark PROPERTIES AUTOMOC ON)
-
-target_include_directories(json_benchmark PRIVATE ${PROJECT_SOURCE_DIR}/include)
-
-target_link_libraries(json_benchmark PRIVATE
-    json_query
-    Qt6::Core
-    Qt6::Test
-)
+# ---------------------------------------------------------------------------
+# Google Benchmark integration
+# ---------------------------------------------------------------------------
+include(${PROJECT_SOURCE_DIR}/cmake/Benchmarks.cmake)
 
 # Register tests with CTest
 add_test(NAME JSONPointerTest COMMAND jsonpointer_test)
 add_test(NAME JSONPathTest COMMAND jsonpath_test)
-add_test(NAME JSONBenchmark COMMAND json_benchmark)
+# Benchmark test registration handled in Benchmarks.cmake
+
 # Set test properties
 set_tests_properties(JSONPointerTest PROPERTIES TIMEOUT 60)
 set_tests_properties(JSONPathTest PROPERTIES TIMEOUT 60)
-set_tests_properties(JSONBenchmark PROPERTIES TIMEOUT 120)
