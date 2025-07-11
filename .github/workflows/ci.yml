@@ -1,4 +1,4 @@
-# Continuous Integration for qt-json-query (Qt 6 + GoogleTest)
+# Continuous Integration for qt-json-query (Qt 6 + GoogleTest + Google Benchmark)
 name: ci
 
 on:
@@ -41,13 +41,32 @@ jobs:
           cmake -S . -B build -G Ninja \
                 -DCMAKE_BUILD_TYPE=Release \
                 -DBUILD_TESTING=ON \
-                -DBUILD_BENCHMARKING=OFF
+                -DBUILD_BENCHMARKING=ON
 
       - name: Build
         run: cmake --build build --parallel
 
       - name: Run unit tests
         run: ctest --test-dir build --output-on-failure
+
+      # --- Benchmarks ---
+      - name: Build benchmarks
+        run: cmake --build build --target json_benchmark --parallel
+
+      - name: Run benchmarks (Windows)
+        if: matrix.os == 'windows-latest'
+        run: .\\build\\json_benchmark.exe --benchmark_format=json --benchmark_out=benchmarks-${{ matrix.os }}.json
+
+      - name: Run benchmarks (macOS)
+        if: matrix.os == 'macos-latest'
+        run: ./build/json_benchmark --benchmark_format=json --benchmark_out=benchmarks-${{ matrix.os }}.json
+
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-${{ matrix.os }}
+          path: benchmarks-${{ matrix.os }}.json
 
       - name: Upload test results
         if: always()
