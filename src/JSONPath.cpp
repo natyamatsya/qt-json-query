@@ -59,168 +59,148 @@ void JSONPath::parsePath(const QString &path)
 QVector<JSONPath::Segment> JSONPath::parseSegments(const QString &path)
 {
     QVector<Segment> segments;
+    segments.reserve(path.count('.') + path.count('[') + 4);
 
-    // Split the path into segments using compile-time regex
-    auto splitSegments = splitPathSegments(path);
+    QStringView sv{path};
+    qsizetype pos = 0;
+    const qsizetype n = sv.size();
 
-    // Ensure we have at least the root symbol
-    if (splitSegments.isEmpty())
-    {
-        throw std::runtime_error("Invalid JSONPath: Empty path");
-    }
-
-    // Normalise so the root symbol ('$' or '@') is always its own segment
-    QVector<QPair<QString, bool>> normalizedSegments;
-    const QString &firstPart = splitSegments.first().first;
-
-    if (!firstPart.startsWith('$') && !firstPart.startsWith('@'))
-    {
+    if (n == 0 || (sv.at(0) != u'$' && sv.at(0) != u'@'))
         throw std::runtime_error("Invalid JSONPath: Must start with $ or @");
-    }
 
-    // Always push the root symbol as a standalone segment
-    normalizedSegments.append({firstPart.left(1), false});
+    Segment root;
+    root.type = SegmentType::Pointer;
+    root.data = QString(sv.mid(0,1));
+    segments.append(std::move(root));
+    pos = 1;
 
-    // If the first part has additional characters beyond the root symbol (e.g. "$.books")
-    if (firstPart.length() > 1)
+    auto pushPointer = [&](QStringView segmentView)
     {
-        QString remainder = firstPart.mid(1);
-        if (!remainder.isEmpty())
+        if (segmentView.isEmpty())
+            throw std::runtime_error("Invalid JSONPath: Empty segment");
+        Segment s;
+        s.type = SegmentType::Pointer;
+        s.data = segmentToPointer(QString(segmentView));
+        segments.append(std::move(s));
+    };
+
+    while (pos < n)
+    {
+        const QChar c = sv.at(pos);
+        if (c == u'.')
         {
-            normalizedSegments.append({remainder, false});
-        }
-    }
-
-    // Append the rest of the original split segments
-    for (int i = 1; i < splitSegments.size(); ++i)
-    {
-        normalizedSegments.append(splitSegments[i]);
-    }
-
-    // Replace with the normalised vector for further processing
-    splitSegments = std::move(normalizedSegments);
-
-    // Add the root segment
-    Segment rootSegment;
-    rootSegment.type = SegmentType::Pointer;
-    rootSegment.data = QString("$");
-    segments.append(rootSegment);
-
-    // Process remaining segments
-    for (int i = 1; i < splitSegments.size(); ++i)
-    {
-        const auto &[segment, isSpecial] = splitSegments[i];
-
-        if (!isSpecial)
-        {
-            // Direct path segment validation
-            if (segment.isEmpty() || segment == ".")
+            if (pos + 1 >= n)
+                throw std::runtime_error("Trailing '.' in JSONPath");
+            QChar next = sv.at(pos + 1);
+            if (next == u'.')
             {
-                throw std::runtime_error("Invalid JSONPath: Invalid segment detected");
+                Segment rec{SegmentType::RecursiveDescend, {}};
+                segments.append(std::move(rec));
+                pos += 2;
+                continue;
             }
-            // Convert to JSONPointer format
-            Segment directSegment;
-            directSegment.type = SegmentType::Pointer;
-            directSegment.data = segmentToPointer(segment);
-            segments.append(directSegment);
+            if (next == u'*')
+            {
+                Segment wild{SegmentType::WildProperty, {}};
+                segments.append(std::move(wild));
+                pos += 2;
+                continue;
+            }
+            ++pos;
+            qsizetype start = pos;
+            while (pos < n && sv.at(pos) != u'.' && sv.at(pos) != u'[')
+                ++pos;
+            pushPointer(sv.sliced(start, pos - start));
+            continue;
+        }
+        else if (c == u'[')
+        {
+            ++pos;
+            qsizetype start = pos;
+            int bracketDepth = 1;
+            while (pos < n && bracketDepth > 0)
+            {
+                if (sv.at(pos) == u'[') ++bracketDepth;
+                else if (sv.at(pos) == u']') --bracketDepth;
+                ++pos;
+            }
+            if (bracketDepth != 0)
+                throw std::runtime_error("Unmatched '[' in JSONPath");
+            qsizetype end = pos - 1;
+            QStringView content = sv.sliced(start, end - start);
+
+            if (content == u"*")
+            {
+                Segment aw;
+                aw.type = SegmentType::ArrayWildcard;
+                segments.append(std::move(aw));
+                continue;
+            }
+
+            if (!content.isEmpty() && (content.at(0) == u'?'))
+            {
+                QString expr = QString(content);
+                auto optSeg = parseFilterExpression(expr);
+                if (!optSeg)
+                    throw std::runtime_error("Unsupported filter expression");
+                segments.append(std::move(*optSeg));
+                continue;
+            }
+
+            if (content.indexOf(u':') != -1)
+            {
+                auto takeInt = [](QStringView v, int defaultVal) -> int {
+                    if (v.isEmpty()) return defaultVal;
+                    bool ok = false;
+                    int res = v.toInt(&ok);
+                    return ok ? res : defaultVal;
+                };
+                qsizetype firstColon = content.indexOf(u':');
+                qsizetype secondColon = content.indexOf(u':', firstColon + 1);
+                QStringView startStr = content.sliced(0, firstColon);
+                QStringView endStr;
+                QStringView stepStr;
+                if (secondColon == -1)
+                {
+                    endStr = content.sliced(firstColon + 1);
+                }
+                else
+                {
+                    endStr = content.sliced(firstColon + 1, secondColon - firstColon - 1);
+                    stepStr = content.sliced(secondColon + 1);
+                }
+                int startInt = takeInt(startStr, 0);
+                int endInt = takeInt(endStr, std::numeric_limits<int>::max());
+                int stepInt = takeInt(stepStr, 1);
+                Segment slice;
+                slice.type = SegmentType::ArraySlice;
+                slice.data = std::make_tuple(startInt, endInt, stepInt);
+                segments.append(std::move(slice));
+                continue;
+            }
+
+            if (!content.isEmpty() && (content.at(0) == u'\'' || content.at(0) == u'\"'))
+            {
+                QChar quote = content.at(0);
+                qsizetype qEnd = content.lastIndexOf(quote);
+                if (qEnd <= 0)
+                    throw std::runtime_error("Unmatched quote in bracket property");
+                QStringView prop = content.sliced(1, qEnd - 1);
+                pushPointer(prop);
+                continue;
+            }
+
+            QString bracketSeg = "[" + QString(content) + "]";
+            pushPointer(bracketSeg);
+            continue;
         }
         else
         {
-            // Special operator segment
-            using namespace json_utils;
-
-            if (ctre::match<recursive_descent_pattern>(to_sv(segment)))
-            {
-                // If the segment starts with "..", split it so that the recursive descent is a standalone
-                // segment and the remainder (if any) is processed normally. E.g. "..value" -> ["..", "value"].
-                Segment recursiveSegment;
-                recursiveSegment.type = SegmentType::RecursiveDescend;
-                segments.append(recursiveSegment);
-
-                // Remainder after the leading ".."
-                QString remainder = segment.mid(2);
-                if (remainder.startsWith('.'))
-                {
-                    remainder.remove(0, 1);
-                }
-                if (!remainder.isEmpty())
-                {
-                    Segment directSeg;
-                    directSeg.type = SegmentType::Pointer;
-                    directSeg.data = segmentToPointer(remainder);
-                    segments.append(directSeg);
-                }
-            }
-            else if (auto propertyMatch = ctre::match<property_pattern>(to_sv(segment));
-                     propertyMatch && to_qstr(propertyMatch.template get<1>().to_view()) == "*")
-            {
-                // Wildcard property
-                Segment wildcardSegment;
-                wildcardSegment.type = SegmentType::WildProperty;
-                segments.append(wildcardSegment);
-            }
-            else if (ctre::match<array_wildcard_pattern>(to_sv(segment)))
-            {
-                // Array wildcard
-                Segment wildcardSegment;
-                wildcardSegment.type = SegmentType::ArrayWildcard;
-                segments.append(wildcardSegment);
-            }
-            else if (auto sliceMatch = ctre::match<slice_components_pattern>(to_sv(segment)))
-            {
-                // Array slice
-                int start = 0;
-                int end = std::numeric_limits<int>::max();
-                int step = 1;
-
-                if (sliceMatch.template get<1>())
-                {
-                    start = QString::fromUtf8(sliceMatch.template get<1>().data(), sliceMatch.template get<1>().size()).toInt();
-                }
-
-                if (sliceMatch.template get<2>())
-                {
-                    auto endStr = QString::fromUtf8(sliceMatch.template get<2>().data(), sliceMatch.template get<2>().size());
-                    if (!endStr.isEmpty())
-                    {
-                        end = endStr.toInt();
-                    }
-                }
-
-                if (sliceMatch.template get<3>())
-                {
-                    auto stepStr = QString::fromUtf8(sliceMatch.template get<3>().data(), sliceMatch.template get<3>().size());
-                    if (!stepStr.isEmpty())
-                    {
-                        step = stepStr.toInt();
-                        if (step <= 0)
-                            step = 1; // Ensure positive step
-                    }
-                }
-
-                Segment sliceSegment;
-                sliceSegment.type = SegmentType::ArraySlice;
-                sliceSegment.data = std::make_tuple(start, end, step);
-                segments.append(sliceSegment);
-            }
-            else if (auto filterMatch = ctre::match<filter_expr_pattern>(to_sv(segment)))
-            {
-                // Filter expression
-                if (filterMatch.template get<1>())
-                {
-                    QString expr = to_qstr(filterMatch.template get<1>().to_view());
-                    auto filterSegment = parseFilterExpression(expr);
-                    if (filterSegment.has_value())
-                    {
-                        segments.append(filterSegment.value());
-                    }
-                }
-            }
-            else
-            {
-                // Unsupported or malformed operator
-                throw std::runtime_error("Invalid or unsupported JSONPath operator: " + segment.toStdString());
-            }
+            qsizetype start = pos;
+            while (pos < n && sv.at(pos) != u'.' && sv.at(pos) != u'[')
+                ++pos;
+            pushPointer(sv.sliced(start, pos - start));
+            continue;
         }
     }
 

@@ -24,8 +24,7 @@ public:
 
 private:
     bool m_valid = true;
-    QVector<QStringView> m_tokens;
-    QString m_buffer; // owns decoded token strings
+    QVector<QString> m_tokens;
 
     void parsePointer(const QString &pointer);
     QJsonValue evaluateInternal(const QJsonValue &value, int tokenIndex) const;
