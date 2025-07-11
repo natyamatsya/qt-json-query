@@ -14,7 +14,7 @@ using namespace Qt::StringLiterals;
 //---------------------------------------------
 // 7.1 length() function on array
 //---------------------------------------------
-TEST(JSONPathBaeldungExtra, LengthFunction_ExpectedFailure)
+TEST(JSONPathBaeldungExtra, LengthFunction)
 {
     static const char jsonSrc[] = R"JSON({
         "book": [
@@ -26,21 +26,17 @@ TEST(JSONPathBaeldungExtra, LengthFunction_ExpectedFailure)
 
     const QJsonDocument doc = QJsonDocument::fromJson(QByteArray(jsonSrc));
 
-    EXPECT_NO_FATAL_FAILURE({
-        JSONPath path("$.book.length()"); // unsupported function
-        (void)path.evaluate(doc);
-        /*
-        QJsonValue val = path.evaluate(doc);
-        ASSERT_TRUE(val.isDouble());
-        EXPECT_EQ(val.toInt(), 3);
-        */
-    }) << "length() function not yet implemented but should not crash";
+    JSONPath path("$.book.length()");
+    ASSERT_TRUE(path.isValid());
+    QJsonValue val = path.evaluate(doc);
+    ASSERT_TRUE(val.isDouble());
+    EXPECT_EQ(val.toInt(), 3);
 }
 
 //---------------------------------------------
 // 7.2 min() function on numeric array
 //---------------------------------------------
-TEST(JSONPathBaeldungExtra, MinFunction_ExpectedFailure)
+TEST(JSONPathBaeldungExtra, MinFunction)
 {
     static const char jsonSrc[] = R"JSON([
         {"box office": 594275385},
@@ -51,15 +47,11 @@ TEST(JSONPathBaeldungExtra, MinFunction_ExpectedFailure)
 
     const QJsonDocument doc = QJsonDocument::fromJson(QByteArray(jsonSrc));
 
-    EXPECT_NO_FATAL_FAILURE({
-        JSONPath path("$[*]['box office'].min()"); // unsupported function
-        (void)path.evaluate(doc);
-        /*
-        QJsonValue v = path.evaluate(doc);
-        ASSERT_TRUE(v.isDouble());
-        EXPECT_EQ(v.toVariant().toLongLong(), 591692078LL);
-        */
-    }) << "min() function not yet implemented but should not crash";
+    JSONPath path("$[*]['box office'].min()");
+    ASSERT_TRUE(path.isValid());
+    QJsonValue v = path.evaluate(doc);
+    ASSERT_TRUE(v.isDouble());
+    EXPECT_EQ(v.toVariant().toLongLong(), 591692078LL);
 }
 
 //---------------------------------------------

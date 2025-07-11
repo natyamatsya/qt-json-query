@@ -33,6 +33,8 @@ public:
     bool isValid() const;
     QString toString() const;
 
+public:
+    enum class FunctionType { None, Length, Min, Max };
 private:
     enum class SegmentType
     {
@@ -54,9 +56,11 @@ private:
     };
 
     bool m_valid = true;
+    FunctionType m_func = FunctionType::None;
     QVector<Segment> m_segments;
 
     void parsePath(const QString &path);
+    void detectTrailingFunction(QString &path);
     QVector<Segment> parseSegments(const QString &path);
     std::optional<Segment> parseFilterExpression(const QString &expr);
 

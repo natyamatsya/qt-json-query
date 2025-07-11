@@ -37,14 +37,16 @@ JSONPath::JSONPath(const QString &path)
 
 void JSONPath::parsePath(const QString &path)
 {
-    if (path.isEmpty())
+    QString pathMod = path;
+    detectTrailingFunction(pathMod);
+    if (pathMod.isEmpty())
     {
         m_valid = false;
         return;
     }
 
     // JSONPath must start with $ or @
-    if (!path.startsWith('$') && !path.startsWith('@'))
+    if (!pathMod.startsWith('$') && !pathMod.startsWith('@'))
     {
         m_valid = false;
         return;
@@ -52,13 +54,33 @@ void JSONPath::parsePath(const QString &path)
 
     try
     {
-        m_segments = parseSegments(path);
+        m_segments = parseSegments(pathMod);
     }
     catch (...)
     {
         m_valid = false;
     }
 }
+
+void JSONPath::detectTrailingFunction(QString &path)
+{
+    static const QPair<QString, FunctionType> funcs[] = {
+        {".length()", FunctionType::Length},
+        {".min()", FunctionType::Min},
+        {".max()", FunctionType::Max},
+    };
+    for (const auto &p : funcs)
+    {
+        if (path.endsWith(p.first))
+        {
+            m_func = p.second;
+            path.chop(p.first.size());
+            return;
+        }
+    }
+    m_func = FunctionType::None;
+}
+
 
 QVector<JSONPath::Segment> JSONPath::parseSegments(const QString &path)
 {
@@ -475,9 +497,45 @@ QJsonValue JSONPath::evaluate(const QJsonValue &value) const
 
     if (working.isEmpty())
         return QJsonValue();
-    if (working.size() == 1 && !hadMultiSelect)
+    if (m_func == FunctionType::None && working.size() == 1 && !hadMultiSelect)
         return working.first();
-    return QJsonValue(working);
+    QJsonValue out;
+    if (m_func == FunctionType::None)
+        out = (working.size()==1 && !hadMultiSelect) ? working.first() : QJsonValue(working);
+    else
+        out = QJsonValue(working);
+    // Apply trailing function if any
+    if (m_func != FunctionType::None)
+    {
+        if (m_func == FunctionType::Length)
+        {
+            // If the first (and only) match is itself an array, return its length
+            if (working.size()==1 && working.first().isArray())
+                return QJsonValue(static_cast<double>(working.first().toArray().size()));
+            // Otherwise return the number of matched items
+            return QJsonValue(static_cast<double>(working.size()));
+        }
+        if (m_func == FunctionType::Min || m_func == FunctionType::Max)
+        {
+            if (!out.isArray())
+                return QJsonValue();
+            const QJsonArray arr = out.toArray();
+            if (arr.isEmpty())
+                return QJsonValue();
+            double best = arr.first().toDouble();
+            for (const QJsonValue &v : arr)
+            {
+                if (!v.isDouble()) continue;
+                double d = v.toDouble();
+                if (m_func == FunctionType::Min)
+                    best = std::min(best, d);
+                else
+                    best = std::max(best, d);
+            }
+            return QJsonValue(best);
+        }
+    }
+    return out;
 }
 
 QJsonArray JSONPath::evaluateSegment(const Segment &segment, const QJsonValue &value) const
