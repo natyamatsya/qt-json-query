@@ -53,37 +53,42 @@ void JSONPointer::parsePointer(const QString &pointer)
 
 QString JSONPointer::decodeToken(const QString &token)
 {
-    using namespace json_utils;
+    // Fast single-pass decoder for RFC-6901 escape sequences ("~0" → "~", "~1" → "/").
+    // Avoids conversions to std::string and extra allocations.
 
-    // According to RFC 6901, '~1' is used to represent '/' and '~0' is used to represent '~'
-    // Apply the replacements using CTRE
-    std::string_view sv = to_sv(token);
-    std::string result(sv);
+    if (!token.contains(u'~'))
+        return token; // early exit when no escapes present
 
-    // First replace ~1 with /
-    std::vector<size_t> slashPositions;
-    for (auto m : ctre::range<escape_slash_pattern>(sv))
-    {
-        slashPositions.push_back(static_cast<size_t>(m.template get<0>().begin() - sv.begin()));
-    }
-    for (auto it = slashPositions.rbegin(); it != slashPositions.rend(); ++it)
-    {
-        result.replace(*it, 2, "/");
-    }
+    QString out;
+    out.reserve(token.size()); // worst-case same length
 
-    // Then replace ~0 with ~
-    std::string_view resultSv(result);
-    std::vector<size_t> tildePositions;
-    for (auto m : ctre::range<escape_tilde_pattern>(resultSv))
+    const QStringView view{token};
+    for (qsizetype i = 0; i < view.size(); ++i)
     {
-        tildePositions.push_back(static_cast<size_t>(m.template get<0>().begin() - resultSv.begin()));
-    }
-    for (auto it = tildePositions.rbegin(); it != tildePositions.rend(); ++it)
-    {
-        result.replace(*it, 2, "~");
-    }
+        const QChar ch = view.at(i);
+        if (ch != u'~' || i + 1 >= view.size())
+        {
+            out += ch;
+            continue;
+        }
 
-    return QString::fromStdString(result);
+        const QChar next = view.at(i + 1);
+        if (next == u'1')
+        {
+            out += u'/';
+            ++i; // skip second char
+        }
+        else if (next == u'0')
+        {
+            out += u'~';
+            ++i;
+        }
+        else
+        {
+            out += ch; // unknown escape, keep '~'
+        }
+    }
+    return out;
 }
 
 QJsonValue JSONPointer::evaluate(const QJsonDocument &document) const
