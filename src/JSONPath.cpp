@@ -13,11 +13,11 @@ namespace
 
     // Define all regex patterns at compile-time
     constexpr auto special_operator_pattern = ctll::fixed_string{
-        "(\\.\\.|\\.\\*|\\[\\*\\]|\\[\\d*:\\-?\\d*(?::\\d+)?\\]|\\[\\?\\(.*?\\)\\])"};
+        "(\\.\\.|\\.\\*|\\[\\*\\]|\\[\\-?\\d*:\\-?\\d*(?::\\d+)?\\]|\\[\\?\\(.*?\\)\\])"};
 
     // Extract array slice components
     constexpr auto slice_components_pattern = ctll::fixed_string{
-        "\\[(\\d*):(\\-?\\d*)(?::(\\d+))?\\]"};
+        "\\[(\\-?\\d*):(\\-?\\d*)(?::(\\d+))?\\]"};
 
     // Extract filter expression
     constexpr auto filter_expr_pattern = ctll::fixed_string{
@@ -111,7 +111,12 @@ QVector<JSONPath::Segment> JSONPath::parseSegments(const QString &path)
 
         if (!isSpecial)
         {
-            // Direct path segment - convert to JSONPointer format
+            // Direct path segment validation
+            if (segment.isEmpty() || segment == ".")
+            {
+                throw std::runtime_error("Invalid JSONPath: Invalid segment detected");
+            }
+            // Convert to JSONPointer format
             Segment directSegment;
             directSegment.type = SegmentType::Pointer;
             directSegment.data = segmentToPointer(segment);
@@ -124,10 +129,25 @@ QVector<JSONPath::Segment> JSONPath::parseSegments(const QString &path)
 
             if (ctre::match<recursive_descent_pattern>(to_sv(segment)))
             {
-                // Recursive descent
+                // If the segment starts with "..", split it so that the recursive descent is a standalone
+                // segment and the remainder (if any) is processed normally. E.g. "..value" -> ["..", "value"].
                 Segment recursiveSegment;
                 recursiveSegment.type = SegmentType::RecursiveDescend;
                 segments.append(recursiveSegment);
+
+                // Remainder after the leading ".."
+                QString remainder = segment.mid(2);
+                if (remainder.startsWith('.'))
+                {
+                    remainder.remove(0, 1);
+                }
+                if (!remainder.isEmpty())
+                {
+                    Segment directSeg;
+                    directSeg.type = SegmentType::Pointer;
+                    directSeg.data = segmentToPointer(remainder);
+                    segments.append(directSeg);
+                }
             }
             else if (auto propertyMatch = ctre::match<property_pattern>(to_sv(segment));
                      propertyMatch && to_qstr(propertyMatch.template get<1>().to_view()) == "*")
@@ -193,6 +213,11 @@ QVector<JSONPath::Segment> JSONPath::parseSegments(const QString &path)
                         segments.append(filterSegment.value());
                     }
                 }
+            }
+            else
+            {
+                // Unsupported or malformed operator
+                throw std::runtime_error("Invalid or unsupported JSONPath operator: " + segment.toStdString());
             }
         }
     }
@@ -262,7 +287,7 @@ std::optional<JSONPath::Segment> JSONPath::parseFilterExpression(const QString &
     if (auto numMatch = ctre::match<num_comp_expr_pattern>(to_sv(expr)))
     {
         QString property = to_qstr(numMatch.template get<1>().to_view());
-        QString op = to_qstr(numMatch.template get<2>().to_view());
+        QString op = to_qstr(numMatch.template get<2>().to_view()).trimmed();
         double compareValue = to_qstr(numMatch.template get<3>().to_view()).toDouble();
 
         segment.data = [property, op, compareValue](const QJsonValue &json) -> bool
@@ -338,7 +363,24 @@ QJsonArray JSONPath::evaluateSegment(const Segment &segment, const QJsonValue &v
     {
         QString pointerPath = std::get<QString>(segment.data);
 
-        // Evaluate the pointer
+        // Handle array indices (including negative) directly to support negative indexing
+        if (value.isArray() && pointerPath.startsWith('/'))
+        {
+            bool ok = false;
+            int idx = pointerPath.mid(1).toInt(&ok);
+            if (ok)
+            {
+                QJsonArray arr = value.toArray();
+                int normIdx = normalizeArrayIndex(idx, arr.size());
+                if (normIdx >= 0 && normIdx < arr.size())
+                {
+                    result.append(arr[normIdx]);
+                    break; // Done handling pointer
+                }
+            }
+        }
+
+        // Fallback to JSONPointer evaluation (for object properties and positive indices)
         JSONPointer pointer(pointerPath);
         QJsonValue pointerResult = pointer.evaluate(value);
 
@@ -349,16 +391,7 @@ QJsonArray JSONPath::evaluateSegment(const Segment &segment, const QJsonValue &v
         break;
     }
 
-    case SegmentType::RecursiveDescend:
-    {
-        // Recursive descent requires knowledge of the next segment
-        // In this simplified version, we'll just look for any matching properties recursively
-        if (value.isObject() || value.isArray())
-        {
-            result = evaluateRecursive(value, 0);
-        }
-        break;
-    }
+
 
     case SegmentType::WildProperty:
     {
@@ -388,18 +421,35 @@ QJsonArray JSONPath::evaluateSegment(const Segment &segment, const QJsonValue &v
         break;
     }
 
+    case SegmentType::RecursiveDescend:
+    {
+        // Return all descendant containers (objects/arrays) including current container.
+        // This allows the subsequent segment to evaluate over each descendant.
+        result = evaluateRecursive(value, 0);
+        break;
+    }
+
     case SegmentType::FilterExpression:
     {
-        if (value.isArray())
         {
-            QJsonArray arr = value.toArray();
             auto predicate = std::get<std::function<bool(const QJsonValue &)>>(segment.data);
-
-            for (int i = 0; i < arr.size(); ++i)
+            if (value.isArray())
             {
-                if (predicate(arr[i]))
+                QJsonArray arr = value.toArray();
+                for (const QJsonValue &elem : arr)
                 {
-                    result.append(arr[i]);
+                    if (predicate(elem))
+                    {
+                        result.append(elem);
+                    }
+                }
+            }
+            else
+            {
+                // Value is a single element (object). Apply predicate directly.
+                if (predicate(value))
+                {
+                    result.append(value);
                 }
             }
         }
@@ -410,39 +460,37 @@ QJsonArray JSONPath::evaluateSegment(const Segment &segment, const QJsonValue &v
     return result;
 }
 
-QJsonArray JSONPath::evaluateRecursive(const QJsonValue &value, int segmentIndex) const
+QJsonArray JSONPath::evaluateRecursive(const QJsonValue &value, int /*segmentIndex*/) const
 {
     QJsonArray result;
 
-    // Recursive implementation for the .. operator
+    // Only include containers (objects or arrays) to allow further pointer evaluation
+    if (value.isObject() || value.isArray())
+    {
+        result.append(value);
+    }
+
     if (value.isObject())
     {
         QJsonObject obj = value.toObject();
-
-        // Add all values at this level
-        result = processWildcardProperty(obj);
-
-        // Recursively process all child values
         for (auto it = obj.begin(); it != obj.end(); ++it)
         {
-            QJsonArray childMatches = evaluateRecursive(it.value(), segmentIndex);
-            for (int i = 0; i < childMatches.size(); ++i)
+            QJsonArray childMatches = evaluateRecursive(it.value(), 0);
+            for (const QJsonValue &v : childMatches)
             {
-                result.append(childMatches[i]);
+                result.append(v);
             }
         }
     }
     else if (value.isArray())
     {
         QJsonArray arr = value.toArray();
-
-        // Recursively process all elements
-        for (int i = 0; i < arr.size(); ++i)
+        for (const QJsonValue &elem : arr)
         {
-            QJsonArray childMatches = evaluateRecursive(arr[i], segmentIndex);
-            for (int j = 0; j < childMatches.size(); ++j)
+            QJsonArray childMatches = evaluateRecursive(elem, 0);
+            for (const QJsonValue &v : childMatches)
             {
-                result.append(childMatches[j]);
+                result.append(v);
             }
         }
     }
@@ -564,7 +612,7 @@ QString JSONPath::segmentToPointer(const QString &segment) const
         }
     }
 
-    // Convert array notation using CTRE
+    // Convert positive array notation using CTRE
     auto arrayMatches = find_all_positions<array_index_pattern>(result);
     for (int i = arrayMatches.size() - 1; i >= 0; --i)
     {
@@ -573,6 +621,19 @@ QString JSONPath::segmentToPointer(const QString &segment) const
         if (arrayMatch.template get<1>())
         {
             QString indexStr = to_qstr(arrayMatch.template get<1>().to_view());
+            result.replace(start, end - start, "/" + indexStr);
+        }
+    }
+
+    // Convert negative array indices
+    auto negMatches = find_all_positions<array_neg_index_pattern>(result);
+    for (int i = negMatches.size() - 1; i >= 0; --i)
+    {
+        const auto &[start, end] = negMatches[i];
+        auto negMatch = ctre::match<array_neg_index_pattern>(to_sv(result.mid(start, end - start)));
+        if (negMatch.template get<1>())
+        {
+            QString indexStr = to_qstr(negMatch.template get<1>().to_view());
             result.replace(start, end - start, "/" + indexStr);
         }
     }
@@ -588,6 +649,12 @@ QString JSONPath::segmentToPointer(const QString &segment) const
             QString propName = to_qstr(quotedMatch.template get<1>().to_view());
             result.replace(start, end - start, "/" + propName);
         }
+    }
+
+    // Ensure pointer starts with '/' unless it's empty (root)
+    if (!result.isEmpty() && !result.startsWith('/'))
+    {
+        result.prepend('/');
     }
 
     return result;
