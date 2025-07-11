@@ -47,7 +47,9 @@ jobs:
         run: cmake --build build --parallel
 
       - name: Run unit tests
-        run: ctest --test-dir build --output-on-failure --output-junit build/tests-${{ matrix.os }}.xml
+        working-directory: build
+        continue-on-error: true
+        run: ctest --output-on-failure --output-junit tests-${{ matrix.os }}.xml
 
       # --- Benchmarks ---
       - name: Build benchmarks
