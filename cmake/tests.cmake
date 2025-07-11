@@ -1,23 +1,32 @@
 # Enable testing
 enable_testing()
 
-# Tests requiring QtTest (optional)
-find_package(Qt6 COMPONENTS Test QUIET)
+# Always use GoogleTest for unit tests
+include(FetchContent)
+FetchContent_Declare(
+    googletest
+    URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
+)
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(googletest)
 
-# If QtTest is not available, skip adding tests to avoid configure failure
-# If Qt6::Test is unavailable, fall back to GoogleTest
-if (NOT Qt6Test_FOUND)
-    message(STATUS "Qt6::Test not found; falling back to GoogleTest")
+set(TEST_SOURCES
+    ${PROJECT_SOURCE_DIR}/tests/JSONPathGTest.cpp
+    ${PROJECT_SOURCE_DIR}/tests/JSONPathConformanceGTest.cpp
+    ${PROJECT_SOURCE_DIR}/tests/JSONPointerConformanceGTest.cpp
+    ${PROJECT_SOURCE_DIR}/tests/JSONPointerGTest.cpp
+)
 
-    include(FetchContent)
-    FetchContent_Declare(
-        googletest
-        URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
-    )
-    # Prevent overriding the parent project's compiler/linker settings
-    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-    FetchContent_MakeAvailable(googletest)
-    enable_testing()
+add_executable(json_query_tests ${TEST_SOURCES})
+
+# Project headers
+target_include_directories(json_query_tests PRIVATE ${PROJECT_SOURCE_DIR}/include)
+target_link_libraries(json_query_tests PRIVATE json_query GTest::gtest GTest::gtest_main Qt6::Core)
+
+add_test(NAME JsonQueryTests COMMAND json_query_tests)
+
+# Google Benchmark integration remains
+include(${PROJECT_SOURCE_DIR}/cmake/Benchmarks.cmake)
 
     # GTest-based JSONPath tests
     add_executable(jsonpath_gtest ${PROJECT_SOURCE_DIR}/tests/JSONPathGTest.cpp)

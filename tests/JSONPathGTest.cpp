@@ -1,4 +1,4 @@
-// JSONPathGTest.cpp - GoogleTest-based unit tests replacing QtTest suite
+// JSONPathGTest.cpp - comprehensive GoogleTest suite (formerly JSONPathTestGTest)
 #include <gtest/gtest.h>
 #include <QJsonDocument>
 #include <QJsonObject>
