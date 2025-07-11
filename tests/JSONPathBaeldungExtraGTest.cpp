@@ -65,7 +65,7 @@ TEST(JSONPathBaeldungExtra, MinFunction_ExpectedFailure)
 //---------------------------------------------
 // 7.3 regex filter operator =~
 //---------------------------------------------
-TEST(JSONPathBaeldungExtra, RegexAuthorFilter_ExpectedFailure)
+TEST(JSONPathBaeldungExtra, RegexAuthorFilter)
 {
     static const char jsonSrc[] = R"JSON({
         "book": [
@@ -76,15 +76,11 @@ TEST(JSONPathBaeldungExtra, RegexAuthorFilter_ExpectedFailure)
 
     const QJsonDocument doc = QJsonDocument::fromJson(QByteArray(jsonSrc));
 
-    EXPECT_NO_FATAL_FAILURE({
-        JSONPath path("$['book'][?(@.author =~ /.*Smith/)]"); // unsupported regex filter
-        (void)path.evaluateAll(doc);
-        /*
-        QJsonArray res = path.evaluateAll(doc);
-        ASSERT_EQ(res.size(), 1);
-        EXPECT_EQ(res[0].toObject().value("title").toString(), u"Beginning JSON"_s);
-        */
-    }) << "Regex =~ operator not yet implemented but should not crash";
+    JSONPath path("$['book'][?(@.author =~ /.*Smith/)]");
+    ASSERT_TRUE(path.isValid());
+    QJsonArray res = path.evaluateAll(doc);
+    ASSERT_EQ(res.size(), 1);
+    EXPECT_EQ(res[0].toObject().value("title").toString(), u"Beginning JSON"_s);
 }
 
 //---------------------------------------------

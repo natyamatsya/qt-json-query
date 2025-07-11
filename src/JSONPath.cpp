@@ -1,9 +1,10 @@
 // jsonpath.cpp - Using CTRE
 #include "json-query/JSONPath.hpp"
 #include <vector>
+#include <regex>
 #include "json-query/JSONQueryUtils.hpp"
 #include "json-query/ContainerFrame.hpp"
-#include <QRegularExpression>
+
 using json_query::ContainerFrame;
 
 
@@ -292,29 +293,48 @@ std::optional<JSONPath::Segment> JSONPath::parseFilterExpression(const QString &
         exprTrim = exprTrim.mid(1, exprTrim.size() - 2);
 
 
-    // Parse dot-notation predicate like @.id == 2  or @.price > 20.0 via QRegularExpression
+    // Parse regex predicate @.prop =~ /pattern/
     {
-        static const QRegularExpression dotRe(R"(@\.(\w+)\s*(==|!=|>=|<=|>|<)\s*('([^']*)'|\"([^\"]*)\"|[-+]?\d*\.?\d+))");
-        auto m = dotRe.match(exprTrim);
-        if (m.hasMatch())
+        constexpr auto regex_pred_pattern = ctll::fixed_string{R"(@\.(\w+)\s*=~\s*/([^/]*)/)"};
+        if (auto m = ctre::match<regex_pred_pattern>(to_sv(exprTrim)))
         {
-            const QString property = m.captured(1);
-            const QString op = m.captured(2);
-            const QString rawVal = m.captured(3);
+            QString property = to_qstr(m.template get<1>().to_view());
+            QString pattern  = to_qstr(m.template get<2>().to_view());
+            std::regex re(pattern.toStdString());
+
+            segment.data = [property, re](const QJsonValue &json) -> bool {
+                if (!json.isObject()) return false;
+                QJsonObject obj = json.toObject();
+                if (!obj.contains(property) || !obj[property].isString()) return false;
+                return std::regex_search(obj[property].toString().toStdString(), re);
+            };
+            return segment;
+        }
+    }
+
+    // Parse dot-notation predicate like @.id == 2  or @.price > 20.0 via CTRE
+        {
+        constexpr auto dot_pred_pattern = ctll::fixed_string{R"(@\.(\w+)\s*(==|!=|>=|<=|>|<)\s*(.+))"};
+        if (auto m = ctre::match<dot_pred_pattern>(to_sv(exprTrim)))
+        {
+            QString property = to_qstr(m.template get<1>().to_view());
+            QString op       = to_qstr(m.template get<2>().to_view());
+            QString rawVal   = to_qstr(m.template get<3>().to_view());
+            rawVal = rawVal.trimmed();
 
             bool numeric = false;
             double compareValue = rawVal.toDouble(&numeric);
             QString compareStr;
             if (!numeric)
             {
-                // Strip quotes
+                // Strip surrounding quotes if present
                 if (rawVal.size() >= 2 && ((rawVal.startsWith('"') && rawVal.endsWith('"')) || (rawVal.startsWith('\'') && rawVal.endsWith('\''))))
                     compareStr = rawVal.mid(1, rawVal.size() - 2);
                 else
                     compareStr = rawVal;
             }
 
-            segment.data = [property, op, compareValue, numeric, compareStr](const QJsonValue &json) -> bool
+            segment.data = [property, op, numeric, compareValue, compareStr](const QJsonValue &json) -> bool
             {
                 if (!json.isObject())
                     return false;
@@ -340,7 +360,7 @@ std::optional<JSONPath::Segment> JSONPath::parseFilterExpression(const QString &
                     QString valStr = obj[property].toString();
                     if (op == "==") return valStr == compareStr;
                     if (op == "!=") return valStr != compareStr;
-                    return false; // other ops not meaningful for strings
+                    return false;
                 }
             };
             return segment;
