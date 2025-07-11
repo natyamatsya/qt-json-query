@@ -350,6 +350,22 @@ QJsonValue JSONPath::evaluate(const QJsonDocument &document) const
     return evaluate(root);
 }
 
+QJsonArray JSONPath::evaluateAll(const QJsonDocument &document) const
+{
+    return evaluateAll(document.isArray() ? QJsonValue(document.array())
+                                          : QJsonValue(document.object()));
+}
+
+QJsonArray JSONPath::evaluateAll(const QJsonValue &value) const
+{
+    QJsonValue res = evaluate(value);
+    if (res.isArray())
+        return res.toArray();
+    if (res.isUndefined() || res.isNull())
+        return {};
+    return QJsonArray{res};
+}
+
 QJsonValue JSONPath::evaluate(const QJsonValue &value) const
 {
     if (!isValid() || m_segments.isEmpty())
