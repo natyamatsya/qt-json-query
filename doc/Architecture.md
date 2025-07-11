@@ -52,7 +52,7 @@ struct ContainerFrame
 
 ## 3. Updated Traversal Loop (`evaluateRecursive`)
 
-```
+```cpp
 vector<ContainerFrame> stack;
 stack.emplace_back(rootObjectOrArray);
 

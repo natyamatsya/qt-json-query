@@ -2,6 +2,8 @@
 #include "json-query/JSONPath.hpp"
 #include <vector>
 #include "json-query/JSONQueryUtils.hpp"
+#include "json-query/ContainerFrame.hpp"
+using json_query::ContainerFrame;
 
 
 // ----------------
@@ -462,40 +464,8 @@ QJsonArray JSONPath::evaluateSegment(const Segment &segment, const QJsonValue &v
 
     return result;
 }
-// Iterative recursive-descent using lightweight frames to avoid QJsonValue copies.
-struct ContainerFrame
-{
-    QJsonObject object;
-    QJsonArray array;
-    QJsonObject::const_iterator objIt;
-    int arrIndex = -1;
 
-    // Constructors for object / array
-    explicit ContainerFrame(const QJsonObject &o) : object(o), objIt(object.begin()) {}
-    explicit ContainerFrame(const QJsonArray  &a) : array(a), arrIndex(0) {}
 
-    bool hasNext() const
-    {
-        return (!object.isEmpty() && objIt != object.end()) ||
-               (!array.isEmpty()  && arrIndex < array.size());
-    }
-
-    QJsonValue next()
-    {
-        if (!object.isEmpty())
-        {
-            QJsonValue ref = objIt.value();
-            ++objIt;
-            return ref;
-        }
-        else
-        {
-            QJsonValue ref = array.at(arrIndex);
-            ++arrIndex;
-            return ref;
-        }
-    }
-};
 
 QJsonArray JSONPath::evaluateRecursive(const QJsonValue &value, int /*segmentIndex*/) const
 {
