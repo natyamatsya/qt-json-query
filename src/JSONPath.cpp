@@ -543,6 +543,8 @@ QJsonValue JSONPath::evalAsPathList(const JSONPath &self, const QJsonValue &valu
     if (working.empty()) return QJsonValue();
 
     QSet<QString> uniq; for(auto &f:working) if(!f.ptr.isEmpty()) uniq.insert(f.ptr);
+    if(uniq.size()==1)
+        return QJsonValue(*uniq.constBegin());
     QList<QString> paths = uniq.values();
     // remove parent prefixes
     QList<QString> filtered;
@@ -577,6 +579,9 @@ QJsonValue JSONPath::evalStandard(const JSONPath &self, const QJsonValue &value)
         working = std::move(next);
     }
     if(working.isEmpty()) return QJsonValue();
+    if(self.m_func==JSONPath::FunctionType::Length && working.size()==1 && working.first().isArray())
+        return QJsonValue(static_cast<double>(working.first().toArray().size()));
+
     if(self.m_func==JSONPath::FunctionType::None && working.size()==1 && !hadMulti)
         return working.first();
     QJsonValue out = (self.m_func==JSONPath::FunctionType::None)
