@@ -30,7 +30,8 @@ namespace
 
 }
 
-JSONPath::JSONPath(const QString &path)
+JSONPath::JSONPath(const QString &path, Option opt)
+    : m_option(opt), m_originalPath(path)
 {
     parsePath(path);
 }
@@ -464,8 +465,120 @@ QJsonArray JSONPath::evaluateAll(const QJsonValue &value) const
     return QJsonArray{res};
 }
 
+namespace {
+struct PtrFrame { QJsonValue val; QString ptr; };
+}
+
 QJsonValue JSONPath::evaluate(const QJsonValue &value) const
 {
+    if (m_option == Option::AsPathList)
+    {
+        // Pointer collection mode
+        if (!isValid() || m_segments.isEmpty())
+            return QJsonValue();
+        std::vector<PtrFrame> working; working.reserve(32);
+        working.push_back({value, QString()}); // root pointer ""
+
+        for (int i = 1; i < m_segments.size(); ++i)
+        {
+            const Segment &seg = m_segments[i];
+            std::vector<PtrFrame> next;
+            if (seg.type == SegmentType::Pointer)
+            {
+                QString segStr = std::get<QString>(seg.data);
+                // Obtain plain segment string without leading dot for dot-property
+                QString pointerAdd;
+                QString keyOrIndex;
+                if (segStr.startsWith('.'))
+                    keyOrIndex = segStr.mid(1);
+                else if (segStr.startsWith("['") || segStr.startsWith("[\""))
+                {
+                    // quoted property
+                    keyOrIndex = segStr.mid(2, segStr.size()-4);
+                }
+                else if (segStr.startsWith('['))
+                {
+                    keyOrIndex = segStr.mid(1, segStr.size()-2);
+                }
+                for (const auto &frame : working)
+                {
+                    if (frame.ptr.isEmpty() && i>1) continue; // skip root after first hop
+                    if (keyOrIndex.isEmpty()) continue;
+                    if (frame.val.isObject())
+                    {
+                        QJsonObject obj = frame.val.toObject();
+                        if (obj.contains(keyOrIndex))
+                        {
+                            auto esc=[&](const QString &s){ QString r=s; r.replace("~","~0"); r.replace("/","~1"); return r;};
+                            QString newPtr = frame.ptr + "/" + esc(keyOrIndex);
+                            next.push_back({obj.value(keyOrIndex), newPtr});
+                        }
+                    }
+                    else if (frame.val.isArray())
+                    {
+                        bool ok=false; int idx = keyOrIndex.toInt(&ok);
+                        if (ok)
+                        {
+                            QJsonArray arr = frame.val.toArray();
+                            if (idx<0) idx = arr.size()+idx;
+                            if (idx>=0 && idx<arr.size())
+                            {
+                                QString newPtr = frame.ptr + "/" + keyOrIndex;
+                                next.push_back({arr[idx], newPtr});
+                            }
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // For unsupported segment types, bail early (no matches)
+            }
+            working = std::move(next);
+            if (working.empty()) break;
+        }
+        if (working.empty()) return QJsonValue();
+        {
+            int nonEmptyCount=0; int firstIdx=-1;
+            for(size_t k=0;k<working.size();++k){ if(!working[k].ptr.isEmpty()){ nonEmptyCount++; firstIdx=k;} }
+            if(nonEmptyCount==1)
+            return QJsonValue(working[firstIdx].ptr); }
+        QSet<QString> uniq;
+        for (auto &f: working)
+            if (!f.ptr.isEmpty())
+                uniq.insert(f.ptr);
+        if (uniq.isEmpty())
+            return QJsonValue();
+        if (uniq.size()==1)
+            return QJsonValue(*uniq.constBegin());
+        QJsonArray arr;
+        // Remove parent prefixes: keep only deepest matches
+        QList<QString> paths = uniq.values();
+        // simple O(n^2) filter given small sizes
+        QList<QString> filtered;
+        for (const auto &p : paths)
+        {
+            bool isPrefix=false;
+            for (const auto &q : paths)
+            {
+                if (p==q) continue;
+                if (q.startsWith(p) && q.size()>p.size() && q[p.size()]=='/')
+                { isPrefix=true; break; }
+            }
+            if (!isPrefix) filtered.append(p);
+        }
+        if (filtered.size()==1)
+            return QJsonValue(filtered.first());
+        if (filtered.isEmpty())
+            return QJsonValue();
+        // If there was only one match logically but duplicates collapsed, return string
+        if (filtered.size()==1)
+            return QJsonValue(filtered.first());
+        for (const auto &p : filtered) arr.append(p);
+        return QJsonValue(arr);
+    }
+
+
     if (!isValid() || m_segments.isEmpty())
         return QJsonValue();
 

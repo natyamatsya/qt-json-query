@@ -78,7 +78,7 @@ TEST(JSONPathBaeldungExtra, RegexAuthorFilter)
 //---------------------------------------------
 // 7.4 Option.AS_PATH_LIST behaviour
 //---------------------------------------------
-TEST(JSONPathBaeldungExtra, AsPathListOption_ExpectedFailure)
+TEST(JSONPathBaeldungExtra, AsPathListOption)
 {
     static const char jsonSrc[] = R"JSON({
         "book": [{"title": "Beginning JSON"}]
@@ -86,12 +86,9 @@ TEST(JSONPathBaeldungExtra, AsPathListOption_ExpectedFailure)
 
     const QJsonDocument doc = QJsonDocument::fromJson(QByteArray(jsonSrc));
 
-    EXPECT_NO_FATAL_FAILURE({
-        // C++ port lacks explicit option API. We merely ensure no crash.
-        JSONPath path("$['book'][0]['title']");
-        (void)path.evaluate(doc);
-        /*
-        // With Option.AS_PATH_LIST the expected result would be the path string itself.
-        */
-    }) << "Option.AS_PATH_LIST not yet implemented but should not crash";
+    JSONPath path("$['book'][0]['title']", JSONPath::Option::AsPathList);
+    ASSERT_TRUE(path.isValid());
+    QJsonValue v = path.evaluate(doc);
+    ASSERT_TRUE(v.isString());
+    EXPECT_EQ(v.toString(), "/book/0/title"_L1);
 }

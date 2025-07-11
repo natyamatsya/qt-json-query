@@ -17,7 +17,8 @@
 class JSONPath
 {
 public:
-    explicit JSONPath(const QString &path);
+    enum class Option { None = 0, AsPathList = 1 };
+    explicit JSONPath(const QString &path, Option opt = Option::None);
 
     // Evaluate JSONPath against document or value. Returns:
     //  * Undefined QJsonValue if no match
@@ -57,6 +58,8 @@ private:
 
     bool m_valid = true;
     FunctionType m_func = FunctionType::None;
+    Option m_option = Option::None;
+    QString m_originalPath;
     QVector<Segment> m_segments;
 
     void parsePath(const QString &path);
