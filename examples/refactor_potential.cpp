@@ -1,0 +1,120 @@
+// refactor_potential.cpp – demonstrates how json-query simplifies QJson handling
+// Compares plain Qt JSON APIs with JSONPath-based approach provided by the library.
+// Build target: refactor_potential (added in CMakeLists.txt)
+
+#include <QCoreApplication>
+#include <QDebug>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QString>
+
+#include "json-query/JSONPath.hpp"
+#include "json-query/JSONPointer.hpp"
+
+// -----------------------------------------------------------------------------
+// Sample data – book store with inventory array
+// -----------------------------------------------------------------------------
+static QJsonDocument loadTestDocument()
+{
+    QJsonArray books;
+    for (int i = 0; i < 10; ++i)
+    {
+        QJsonObject author{{"name", QString("Author %1").arg(i)}, {"born", 1950 + i}};
+        QJsonObject edition{{"isbn", QString("978-1-%1").arg(1000 + i)}};
+        QJsonObject details{{"author", author}, {"edition", edition}};
+        books.append(QJsonObject{{"title", QString("Book %1").arg(i)},
+                                 {"price", 10 + i * 5},
+                                 {"details", details}});
+    }
+
+    QJsonObject store{{"inventory", books}};
+    return QJsonDocument(store);
+}
+
+// -----------------------------------------------------------------------------
+// 1) Plain Qt implementation – verbose manual traversal
+// -----------------------------------------------------------------------------
+static QStringList titlesAbovePrice_plain(const QJsonDocument &doc, double threshold)
+{
+    QStringList result;
+
+    const QJsonObject root = doc.object();
+    const QJsonArray inventory = root.value("inventory").toArray();
+
+    for (const QJsonValue &v : inventory)
+    {
+        const QJsonObject obj = v.toObject();
+        const double price = obj.value("price").toDouble();
+        if (price > threshold)
+            result << obj.value("title").toString();
+    }
+    return result;
+}
+
+// -----------------------------------------------------------------------------
+// Deeply nested access example
+// Goal: retrieve the ISBN of book at given index (default 7)
+// -----------------------------------------------------------------------------
+static QString editionIsbn_plain(const QJsonDocument &doc, int index)
+{
+    const QJsonObject root = doc.object();
+    const QJsonArray inventory = root.value("inventory").toArray();
+    if (index < 0 || index >= inventory.size())
+        return {};
+    const QJsonObject book = inventory.at(index).toObject();
+    const QJsonObject details = book.value("details").toObject();
+    const QJsonObject edition = details.value("edition").toObject();
+    return edition.value("isbn").toString();
+}
+
+static QString editionIsbn_pointer(const QJsonDocument &doc, int index)
+{
+    JSONPointer ptr(QString("/inventory/%1/details/edition/isbn").arg(index));
+    return ptr.evaluate(doc).toString();
+}
+
+static QString editionIsbn_path(const QJsonDocument &doc, int index)
+{
+    JSONPath p(QString("$.inventory[%1].details.edition.isbn").arg(index));
+    const QJsonArray res = p.evaluate(doc);
+    return res.isEmpty() ? QString() : res.first().toString();
+}
+
+// -----------------------------------------------------------------------------
+// 2) Library implementation using JSONPath – concise & expressive
+// -----------------------------------------------------------------------------
+static QStringList titlesAbovePrice_jsonquery(const QJsonDocument &doc, double threshold)
+{
+    // Build a JSONPath expression with the price threshold.
+    const QString path = QString("$.inventory[?(@.price > %1)].title").arg(threshold);
+    JSONPath query(path);
+    const QJsonArray matches = query.evaluate(doc);
+
+    QStringList result;
+    for (const QJsonValue &v : matches)
+        result << v.toString();
+    return result;
+}
+
+int main(int argc, char **argv)
+{
+    QCoreApplication app(argc, argv); // Needed for QString conversions on some platforms
+
+    const QJsonDocument doc = loadTestDocument();
+    constexpr double threshold = 25.0;
+
+    const QStringList plain = titlesAbovePrice_plain(doc, threshold);
+    const QStringList viaQuery = titlesAbovePrice_jsonquery(doc, threshold);
+
+    qDebug() << "Plain QtJSON   :" << plain;
+    qDebug() << "json-query path:" << viaQuery;
+
+        // Deep nested ISBN retrieval demo
+    const int bookIndex = 7;
+    qDebug() << "ISBN plain      :" << editionIsbn_plain(doc, bookIndex);
+    qDebug() << "ISBN via pointer:" << editionIsbn_pointer(doc, bookIndex);
+    qDebug() << "ISBN via path   :" << editionIsbn_path(doc, bookIndex);
+
+    return 0;
+}
