@@ -5,7 +5,6 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QString>
-#include <QStringList>
 #include <QVector>
 #include <optional>
 
@@ -25,9 +24,10 @@ public:
 
 private:
     bool m_valid = true;
-    QVector<QString> m_tokens;
+    QVector<QStringView> m_tokens;
+    QString m_buffer; // owns decoded token strings
 
     void parsePointer(const QString &pointer);
     QJsonValue evaluateInternal(const QJsonValue &value, int tokenIndex) const;
-    static QString decodeToken(const QString &token);
+    static QString decodeToken(QStringView token);
 };

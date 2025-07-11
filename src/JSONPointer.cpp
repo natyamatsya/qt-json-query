@@ -43,6 +43,7 @@ void JSONPointer::parsePointer(const QString &pointer)
         return;
     }
 
+    
     // Manual single-pass scan to extract tokens without temporary QStringList
     QStringView view{pointer};
     qsizetype start = 1; // skip leading '/'
@@ -55,35 +56,32 @@ void JSONPointer::parsePointer(const QString &pointer)
         // Extract token substring [start, pos)
         if (pos > start) // ignore empty segments (consecutive slashes)
         {
-            QString token = decodeToken(QString(view.sliced(start, pos - start)));
-            m_tokens.append(std::move(token));
+            m_tokens.append(decodeToken(view.sliced(start, pos - start)));
         }
         start = pos + 1; // move past '/'
     }
 }
 
-QString JSONPointer::decodeToken(const QString &token)
+QString JSONPointer::decodeToken(QStringView token)
 {
     // Fast single-pass decoder for RFC-6901 escape sequences ("~0" → "~", "~1" → "/").
-    // Avoids conversions to std::string and extra allocations.
+    // Avoids extra temporary QStrings.
 
     if (!token.contains(u'~'))
-        return token; // early exit when no escapes present
+        return QString(token); // early exit when no escapes present
 
     QString out;
-    out.reserve(token.size()); // worst-case same length
 
-    const QStringView view{token};
-    for (qsizetype i = 0; i < view.size(); ++i)
+    for (qsizetype i = 0; i < token.size(); ++i)
     {
-        const QChar ch = view.at(i);
-        if (ch != u'~' || i + 1 >= view.size())
+        const QChar ch = token.at(i);
+        if (ch != u'~' || i + 1 >= token.size())
         {
             out += ch;
             continue;
         }
 
-        const QChar next = view.at(i + 1);
+        const QChar next = token.at(i + 1);
         if (next == u'1')
         {
             out += u'/';
