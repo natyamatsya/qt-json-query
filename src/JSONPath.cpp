@@ -604,73 +604,77 @@ QString JSONPath::toString() const
 
 QString JSONPath::segmentToPointer(const QString &segment) const
 {
-    using namespace json_utils;
+    // Fast conversion of a direct JSONPath segment to RFC-6901 JSON Pointer.
+    // Supports dot-notation properties and bracketed array indices/quoted properties.
 
-    QString result = segment;
+    if (segment.isEmpty() || segment == "$")
+        return QString();
 
-    // Remove $ root symbol
-    if (result.startsWith('$'))
+    QStringView sv{segment};
+    qsizetype pos = 0;
+
+    // Skip the root symbol if present.
+    if (sv.at(0) == u'$')
+        ++pos;
+
+    QString out;
+    out.reserve(sv.size()); // worst-case length
+
+    auto flushProperty = [&](qsizetype start, qsizetype end)
     {
-        result.remove(0, 1);
-    }
-
-    // Convert dotted notation to JSONPointer format using CTRE
-    auto propMatches = find_all_positions<property_pattern>(result);
-    for (int i = propMatches.size() - 1; i >= 0; --i)
-    {
-        const auto &[start, end] = propMatches[i];
-        auto propMatch = ctre::match<property_pattern>(to_sv(result.mid(start, end - start)));
-        if (propMatch.template get<1>())
+        if (end > start)
         {
-            QString propName = to_qstr(propMatch.template get<1>().to_view());
-            result.replace(start, end - start, "/" + propName);
+            out += u'/';
+            out += sv.sliced(start, end - start);
         }
-    }
+    };
 
-    // Convert positive array notation using CTRE
-    auto arrayMatches = find_all_positions<array_index_pattern>(result);
-    for (int i = arrayMatches.size() - 1; i >= 0; --i)
+    while (pos < sv.size())
     {
-        const auto &[start, end] = arrayMatches[i];
-        auto arrayMatch = ctre::match<array_index_pattern>(to_sv(result.mid(start, end - start)));
-        if (arrayMatch.template get<1>())
+        const QChar c = sv.at(pos);
+
+        if (c == u'.')
         {
-            QString indexStr = to_qstr(arrayMatch.template get<1>().to_view());
-            result.replace(start, end - start, "/" + indexStr);
+            ++pos; // delimiter between properties
+            continue;
         }
-    }
 
-    // Convert negative array indices
-    auto negMatches = find_all_positions<array_neg_index_pattern>(result);
-    for (int i = negMatches.size() - 1; i >= 0; --i)
-    {
-        const auto &[start, end] = negMatches[i];
-        auto negMatch = ctre::match<array_neg_index_pattern>(to_sv(result.mid(start, end - start)));
-        if (negMatch.template get<1>())
+        if (c == u'[')
         {
-            QString indexStr = to_qstr(negMatch.template get<1>().to_view());
-            result.replace(start, end - start, "/" + indexStr);
+            ++pos; // enter bracket
+            if (pos >= sv.size()) break;
+
+            // Quoted property ['prop'] or ["prop"]
+            if (sv.at(pos) == u'\'' || sv.at(pos) == u'\"')
+            {
+                const QChar quote = sv.at(pos);
+                ++pos;
+                qsizetype start = pos;
+                while (pos < sv.size() && sv.at(pos) != quote)
+                    ++pos;
+                flushProperty(start, pos);
+                // skip closing quote and optional bracket
+                while (pos < sv.size() && sv.at(pos) != u']')
+                    ++pos;
+                ++pos; // skip ']'
+                continue;
+            }
+
+            // Numeric (or negative) array index
+            qsizetype start = pos;
+            while (pos < sv.size() && sv.at(pos) != u']')
+                ++pos;
+            flushProperty(start, pos);
+            ++pos; // skip ']'
+            continue;
         }
+
+        // Plain property until next '.' or '['
+        qsizetype start = pos;
+        while (pos < sv.size() && sv.at(pos) != u'.' && sv.at(pos) != u'[')
+            ++pos;
+        flushProperty(start, pos);
     }
 
-    // Handle quoted property notation using CTRE
-    auto quotedMatches = find_all_positions<quoted_property_pattern>(result);
-    for (int i = quotedMatches.size() - 1; i >= 0; --i)
-    {
-        const auto &[start, end] = quotedMatches[i];
-        auto quotedMatch = ctre::match<quoted_property_pattern>(to_sv(result.mid(start, end - start)));
-        if (quotedMatch.template get<1>())
-        {
-            QString propName = to_qstr(quotedMatch.template get<1>().to_view());
-            result.replace(start, end - start, "/" + propName);
-        }
-    }
-
-    // Ensure pointer starts with '/' unless it's empty (root)
-    if (!result.isEmpty() && !result.startsWith('/'))
-    {
-        result.prepend('/');
-    }
-
-    return result;
+    return out;
 }
