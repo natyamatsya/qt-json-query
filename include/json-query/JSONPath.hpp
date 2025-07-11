@@ -19,8 +19,12 @@ class JSONPath
 public:
     explicit JSONPath(const QString &path);
 
-    QJsonArray evaluate(const QJsonDocument &document) const;
-    QJsonArray evaluate(const QJsonValue &value) const;
+    // Evaluate JSONPath against document or value. Returns:
+    //  * Undefined QJsonValue if no match
+    //  * Single matched scalar/object/array as-is if exactly one match
+    //  * QJsonArray (wrapped into QJsonValue) when multiple matches
+    QJsonValue evaluate(const QJsonDocument &document) const;
+    QJsonValue evaluate(const QJsonValue &value) const;
 
     bool isValid() const;
     QString toString() const;

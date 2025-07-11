@@ -26,7 +26,13 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    QJsonArray titles = path.evaluate(doc);
+    QJsonValue res = path.evaluate(doc);
+    QJsonArray titles;
+    if (res.isArray()) {
+        titles = res.toArray();
+    } else if (!res.isUndefined()) {
+        titles.append(res);
+    }
     qInfo() << "Book titles:" << titles; // Expected: ["Book 1", "Book 2", "Book 3"]
 
     return EXIT_SUCCESS;

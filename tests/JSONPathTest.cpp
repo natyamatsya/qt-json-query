@@ -6,6 +6,13 @@
 #include "json-query/JSONPath.hpp"
 #include "json-query/JSONPointer.hpp"
 
+// Helper to keep legacy array-based assertions with new evaluate API
+static QJsonArray evalArray(const JSONPath &path, const QJsonDocument &doc)
+{
+    QJsonValue v = path.evaluate(doc);
+    return v.isArray() ? v.toArray() : QJsonArray{v};
+}
+
 class JSONPathTest : public QObject
 {
     Q_OBJECT
@@ -32,7 +39,7 @@ void JSONPathTest::testRootAccess()
     JSONPath path("$");
     QVERIFY(path.isValid());
 
-    QJsonArray result = path.evaluate(doc);
+    QJsonArray result = evalArray(path, doc);
     QCOMPARE(result.size(), 1);
     QCOMPARE(result[0].toObject(), obj);
 }
@@ -48,7 +55,7 @@ void JSONPathTest::testSimplePropertyAccess()
     JSONPath path1("$.foo");
     QVERIFY(path1.isValid());
 
-    QJsonArray result1 = path1.evaluate(doc);
+    QJsonArray result1 = evalArray(path1, doc);
     QCOMPARE(result1.size(), 1);
     QCOMPARE(result1[0].toString(), QString("bar"));
 
@@ -56,7 +63,7 @@ void JSONPathTest::testSimplePropertyAccess()
     JSONPath path2("$['baz']");
     QVERIFY(path2.isValid());
 
-    QJsonArray result2 = path2.evaluate(doc);
+    QJsonArray result2 = evalArray(path2, doc);
     QCOMPARE(result2.size(), 1);
     QCOMPARE(result2[0].toInt(), 42);
 }
@@ -73,7 +80,7 @@ void JSONPathTest::testNestedPropertyAccess()
     JSONPath path("$.nested.inner");
     QVERIFY(path.isValid());
 
-    QJsonArray result = path.evaluate(doc);
+    QJsonArray result = evalArray(path, doc);
     QCOMPARE(result.size(), 1);
     QCOMPARE(result[0].toString(), QString("value"));
 }
@@ -87,7 +94,7 @@ void JSONPathTest::testArrayIndexAccess()
     JSONPath path1("$[1]");
     QVERIFY(path1.isValid());
 
-    QJsonArray result1 = path1.evaluate(doc);
+    QJsonArray result1 = evalArray(path1, doc);
     QCOMPARE(result1.size(), 1);
     QCOMPARE(result1[0].toString(), QString("one"));
 
@@ -95,7 +102,7 @@ void JSONPathTest::testArrayIndexAccess()
     JSONPath path2("$[-1]");
     QVERIFY(path2.isValid());
 
-    QJsonArray result2 = path2.evaluate(doc);
+    QJsonArray result2 = evalArray(path2, doc);
     QCOMPARE(result2.size(), 1);
     QCOMPARE(result2[0].toString(), QString("four"));
 
@@ -106,7 +113,7 @@ void JSONPathTest::testArrayIndexAccess()
     JSONPath path3("$.arr[2]");
     QVERIFY(path3.isValid());
 
-    QJsonArray result3 = path3.evaluate(objDoc);
+    QJsonArray result3 = evalArray(path3, objDoc);
     QCOMPARE(result3.size(), 1);
     QCOMPARE(result3[0].toString(), QString("two"));
 }
@@ -120,7 +127,7 @@ void JSONPathTest::testArraySliceAccess()
     JSONPath path1("$[1:3]");
     QVERIFY(path1.isValid());
 
-    QJsonArray result1 = path1.evaluate(doc);
+    QJsonArray result1 = evalArray(path1, doc);
     QCOMPARE(result1.size(), 2);
     QCOMPARE(result1[0].toString(), QString("one"));
     QCOMPARE(result1[1].toString(), QString("two"));
@@ -129,7 +136,7 @@ void JSONPathTest::testArraySliceAccess()
     JSONPath path2("$[0:6:2]");
     QVERIFY(path2.isValid());
 
-    QJsonArray result2 = path2.evaluate(doc);
+    QJsonArray result2 = evalArray(path2, doc);
     QCOMPARE(result2.size(), 3);
     QCOMPARE(result2[0].toString(), QString("zero"));
     QCOMPARE(result2[1].toString(), QString("two"));
@@ -139,7 +146,7 @@ void JSONPathTest::testArraySliceAccess()
     JSONPath path3("$[-3:-1]");
     QVERIFY(path3.isValid());
 
-    QJsonArray result3 = path3.evaluate(doc);
+    QJsonArray result3 = evalArray(path3, doc);
     QCOMPARE(result3.size(), 2);
     QCOMPARE(result3[0].toString(), QString("three"));
     QCOMPARE(result3[1].toString(), QString("four"));
@@ -148,7 +155,7 @@ void JSONPathTest::testArraySliceAccess()
     JSONPath path4("$[2:]");
     QVERIFY(path4.isValid());
 
-    QJsonArray result4 = path4.evaluate(doc);
+    QJsonArray result4 = evalArray(path4, doc);
     QCOMPARE(result4.size(), 4);
     QCOMPARE(result4[0].toString(), QString("two"));
     QCOMPARE(result4[3].toString(), QString("five"));
@@ -166,7 +173,7 @@ void JSONPathTest::testWildcardAccess()
     JSONPath path1("$.*");
     QVERIFY(path1.isValid());
 
-    QJsonArray result1 = path1.evaluate(docObj);
+    QJsonArray result1 = evalArray(path1, docObj);
     QCOMPARE(result1.size(), 3);
 
     // Test array wildcard access
@@ -176,7 +183,7 @@ void JSONPathTest::testWildcardAccess()
     JSONPath path2("$[*]");
     QVERIFY(path2.isValid());
 
-    QJsonArray result2 = path2.evaluate(docArr);
+    QJsonArray result2 = evalArray(path2, docArr);
     QCOMPARE(result2.size(), 3);
     QCOMPARE(result2[0].toString(), QString("zero"));
     QCOMPARE(result2[1].toString(), QString("one"));
@@ -194,7 +201,7 @@ void JSONPathTest::testWildcardAccess()
     JSONPath path3("$.books[*].author");
     QVERIFY(path3.isValid());
 
-    QJsonArray result3 = path3.evaluate(docStore);
+    QJsonArray result3 = evalArray(path3, docStore);
     QCOMPARE(result3.size(), 3);
     QCOMPARE(result3[0].toString(), QString("Author 1"));
     QCOMPARE(result3[1].toString(), QString("Author 2"));
@@ -214,7 +221,7 @@ void JSONPathTest::testRecursiveDescentAccess()
     JSONPath path1("$..value");
     QVERIFY(path1.isValid());
 
-    QJsonArray result1 = path1.evaluate(doc);
+    QJsonArray result1 = evalArray(path1, doc);
     QCOMPARE(result1.size(), 4);
     // Values can be in any order due to recursive search
     QStringList values;
@@ -231,7 +238,7 @@ void JSONPathTest::testRecursiveDescentAccess()
     JSONPath path2("$..id");
     QVERIFY(path2.isValid());
 
-    QJsonArray result2 = path2.evaluate(doc);
+    QJsonArray result2 = evalArray(path2, doc);
     QCOMPARE(result2.size(), 4);
     QStringList ids;
     for (int i = 0; i < result2.size(); ++i)
@@ -267,7 +274,7 @@ void JSONPathTest::testFilterExpression()
     JSONPath path1("$.users[?(@.name == 'Jane')].age");
     QVERIFY(path1.isValid());
 
-    QJsonArray result1 = path1.evaluate(doc);
+    QJsonArray result1 = evalArray(path1, doc);
     QCOMPARE(result1.size(), 1);
     QCOMPARE(result1[0].toInt(), 25);
 
@@ -275,7 +282,7 @@ void JSONPathTest::testFilterExpression()
     JSONPath path2("$.users[?(@.age > 30)].name");
     QVERIFY(path2.isValid());
 
-    QJsonArray result2 = path2.evaluate(doc);
+    QJsonArray result2 = evalArray(path2, doc);
     QCOMPARE(result2.size(), 1);
     QCOMPARE(result2[0].toString(), QString("Bob"));
 }
@@ -328,7 +335,7 @@ void JSONPathTest::testComplexExample()
     JSONPath path("$.inventory[*][?(@.price < 10)].title");
     QVERIFY(path.isValid());
 
-    QJsonArray result = path.evaluate(doc);
+    QJsonArray result = evalArray(path, doc);
     QCOMPARE(result.size(), 1);
     QCOMPARE(result[0].toString(), QString("Pride and Prejudice"));
 }
@@ -349,14 +356,14 @@ void JSONPathTest::testIntegrationWithJSONPointer()
     QJsonValue pointerResult = pointer.evaluate(doc);
 
     JSONPath path("$.items[1].name");
-    QJsonArray pathResult = path.evaluate(doc);
+    QJsonArray pathResult = evalArray(path, doc);
 
     QCOMPARE(pathResult.size(), 1);
     QCOMPARE(pathResult[0], pointerResult);
 
     // Test JSONPath with complex operations
     JSONPath complexPath("$.items[?(@.price > 15)].name");
-    QJsonArray complexResult = complexPath.evaluate(doc);
+    QJsonArray complexResult = evalArray(complexPath, doc);
 
     QCOMPARE(complexResult.size(), 2);
     QCOMPARE(complexResult[0].toString(), QString("Item 2"));

@@ -9,9 +9,13 @@
 // Helper to evaluate a JSONPath on a doc and assert single value equality
 static QJsonValue evalSingle(const JSONPath &path, const QJsonDocument &doc)
 {
-    const auto res = path.evaluate(doc);
-    EXPECT_EQ(res.size(), 1);
-    return res[0];
+    const QJsonValue res = path.evaluate(doc);
+    if (res.isArray()) {
+        const auto arr = res.toArray();
+        EXPECT_EQ(arr.size(), 1);
+        return arr[0];
+    }
+    return res;
 }
 
 TEST(JSONPathBasic, RootAccess)
@@ -20,9 +24,12 @@ TEST(JSONPathBasic, RootAccess)
     QJsonDocument doc(obj);
     JSONPath path("$");
     ASSERT_TRUE(path.isValid());
-    auto res = path.evaluate(doc);
-    ASSERT_EQ(res.size(), 1);
-    EXPECT_EQ(res[0].toObject(), obj);
+    QJsonValue res = path.evaluate(doc);
+    if (res.isArray()) {
+        ASSERT_EQ(res.toArray().size(), 1);
+        res = res.toArray()[0];
+    }
+    EXPECT_EQ(res.toObject(), obj);
 }
 
 TEST(JSONPathBasic, PropertyAccess)

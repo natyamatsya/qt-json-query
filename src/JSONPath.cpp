@@ -24,6 +24,8 @@ namespace
     // Extract filter expression
     constexpr auto filter_expr_pattern = ctll::fixed_string{
         "\\[\\?\\((.+?)\\)\\]"};
+
+
 }
 
 JSONPath::JSONPath(const QString &path)
@@ -280,9 +282,17 @@ std::optional<JSONPath::Segment> JSONPath::parseFilterExpression(const QString &
 
     Segment segment;
     segment.type = SegmentType::FilterExpression;
+    // Normalize expression: remove optional leading '?' and enclosing parentheses
+    QString exprTrim = expr.trimmed();
+    if (exprTrim.startsWith(u'?'))
+        exprTrim.remove(0, 1);
+    // If expression is wrapped in parentheses, strip them
+    if (exprTrim.startsWith(u'(') && exprTrim.endsWith(u')'))
+        exprTrim = exprTrim.mid(1, exprTrim.size() - 2);
+
 
     // Parse a simple equality expression using CTRE
-    if (auto eqMatch = ctre::match<eq_expr_pattern>(to_sv(expr)))
+    if (auto eqMatch = ctre::match<eq_expr_pattern>(to_sv(exprTrim)))
     {
         QString property = to_qstr(eqMatch.template get<1>().to_view());
         QString value = to_qstr(eqMatch.template get<2>().to_view());
@@ -299,7 +309,7 @@ std::optional<JSONPath::Segment> JSONPath::parseFilterExpression(const QString &
     }
 
     // Parse a simple numeric comparison using CTRE
-    if (auto numMatch = ctre::match<num_comp_expr_pattern>(to_sv(expr)))
+    if (auto numMatch = ctre::match<json_utils::num_comp_expr_pattern>(to_sv(exprTrim)))
     {
         QString property = to_qstr(numMatch.template get<1>().to_view());
         QString op = to_qstr(numMatch.template get<2>().to_view()).trimmed();
@@ -333,42 +343,49 @@ std::optional<JSONPath::Segment> JSONPath::parseFilterExpression(const QString &
     return std::nullopt;
 }
 
-QJsonArray JSONPath::evaluate(const QJsonDocument &document) const
+QJsonValue JSONPath::evaluate(const QJsonDocument &document) const
 {
-    return evaluate(document.isObject() ? QJsonValue(document.object()) : QJsonValue(document.array()));
+    const QJsonValue root = document.isArray() ? QJsonValue(document.array())
+                                               : QJsonValue(document.object());
+    return evaluate(root);
 }
 
-QJsonArray JSONPath::evaluate(const QJsonValue &value) const
+QJsonValue JSONPath::evaluate(const QJsonValue &value) const
 {
     if (!isValid() || m_segments.isEmpty())
-    {
-        return QJsonArray();
-    }
+        return QJsonValue();
 
-    QJsonArray result;
-    result.append(value); // Start with the root
+    // Special case: path is just "$"
+    if (m_segments.size() == 1)
+        return value;
 
-    // Evaluate each segment
+    QJsonArray working;
+    working.append(value);
+
+    bool hadMultiSelect = false;
     for (int i = 1; i < m_segments.size(); ++i)
     {
-        if (result.isEmpty())
-            break; // Early exit if no candidates remain
-
-        QJsonArray newResult;
-
-        for (int j = 0; j < result.size(); ++j)
+        const SegmentType t = m_segments[i].type;
+        if (t == SegmentType::FilterExpression || t == SegmentType::ArrayWildcard ||
+            t == SegmentType::WildProperty || t == SegmentType::ArraySlice)
+            hadMultiSelect = true;
+        if (working.isEmpty())
+            break;
+        QJsonArray next;
+        for (const QJsonValue &candidate : working)
         {
-            QJsonArray segmentResult = evaluateSegment(m_segments[i], result[j]);
-            for (const QJsonValue &val : segmentResult)
-            {
-                newResult.append(val);
-            }
+            QJsonArray segVals = evaluateSegment(m_segments[i], candidate);
+            for (const QJsonValue &v : segVals)
+                next.append(v);
         }
-
-        result = newResult;
+        working = std::move(next);
     }
 
-    return result;
+    if (working.isEmpty())
+        return QJsonValue();
+    if (working.size() == 1 && !hadMultiSelect)
+        return working.first();
+    return QJsonValue(working);
 }
 
 QJsonArray JSONPath::evaluateSegment(const Segment &segment, const QJsonValue &value) const

@@ -49,14 +49,22 @@ target_link_libraries(jsonpointer_conformance_test PRIVATE
     Qt6::Core 
     Qt6::Test)
 
+# JSONPath legacy/functional tests
 add_executable(jsonpath_test ${PROJECT_SOURCE_DIR}/tests/JSONPathTest.cpp)
-set_target_properties(jsonpath_test PROPERTIES AUTOMOC ON)
+
+# JSONPath RFC/Draft conformance suite
+add_executable(jsonpath_conformance_test ${PROJECT_SOURCE_DIR}/tests/JSONPathConformanceTest.cpp)
+set_target_properties(jsonpath_test jsonpath_conformance_test PROPERTIES AUTOMOC ON)
 target_include_directories(jsonpath_test PRIVATE ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(jsonpath_test PRIVATE 
     json_query 
     Qt6::Core 
-    Qt6::Test
-)
+    Qt6::Test)
+
+target_link_libraries(jsonpath_conformance_test PRIVATE 
+    json_query 
+    Qt6::Core 
+    Qt6::Test)
 
 
 # ---------------------------------------------------------------------------
@@ -68,9 +76,11 @@ include(${PROJECT_SOURCE_DIR}/cmake/Benchmarks.cmake)
 add_test(NAME JSONPointerTest COMMAND jsonpointer_test)
 add_test(NAME JSONPointerConformanceTest COMMAND jsonpointer_conformance_test)
 add_test(NAME JSONPathTest COMMAND jsonpath_test)
+add_test(NAME JSONPathConformanceTest COMMAND jsonpath_conformance_test)
 # Benchmark test registration handled in Benchmarks.cmake
 
 # Set test properties
 set_tests_properties(JSONPointerTest PROPERTIES TIMEOUT 60)
 set_tests_properties(JSONPointerConformanceTest PROPERTIES TIMEOUT 60)
 set_tests_properties(JSONPathTest PROPERTIES TIMEOUT 60)
+set_tests_properties(JSONPathConformanceTest PROPERTIES TIMEOUT 60)
