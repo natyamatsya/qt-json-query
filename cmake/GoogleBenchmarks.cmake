@@ -1,10 +1,5 @@
 # Benchmarks.cmake - build Google Benchmark-based benchmarks
 
-# Only proceed if BUILD_TESTING is ON (CTest enabled)
-if(NOT BUILD_TESTING)
-    return()
-endif()
-
 include(FetchContent)
 
 # ---------------------------------------------------------------------------

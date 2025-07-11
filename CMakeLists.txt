@@ -78,26 +78,29 @@ add_subdirectory(examples)
 
 # Unit-tests / benchmarks (requires Qt6::Test)
 if (BUILD_TESTING)
-    include(cmake/tests.cmake)
+    include(cmake/GoogleTests.cmake)
+endif()
+
+# Benchmarks
+if (BUILD_BENCHMARKING)
+    include(cmake/GoogleBenchmarks.cmake)
 endif()
 
 # ---------------------------------------------------------------------------
 # Installation (headers and library)
 # ---------------------------------------------------------------------------
-option(JSON_QUERY_ENABLE_INSTALL "Enable installation rules" OFF)
-
 if(JSON_QUERY_ENABLE_INSTALL)
-include(GNUInstallDirs)
-install(TARGETS json_query ctre_interface EXPORT json_queryTargets
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-)
-install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+    include(GNUInstallDirs)
+    install(TARGETS json_query ctre_interface EXPORT json_queryTargets
+            ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    )
+    install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
-# Export for downstream find_package(json_query)
-install(EXPORT json_queryTargets
-        FILE json_queryTargets.cmake
-        NAMESPACE json_query::
-        DESTINATION ${CMAKE_INSTALL_DATADIR}/json_query/cmake)
+    # Export for downstream find_package(json_query)
+    install(EXPORT json_queryTargets
+            FILE json_queryTargets.cmake
+            NAMESPACE json_query::
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/json_query/cmake)
 endif()
