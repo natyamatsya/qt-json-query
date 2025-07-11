@@ -27,12 +27,16 @@ public:
     QJsonValue evaluate(const QJsonDocument &document) const;
     QJsonValue evaluate(const QJsonValue &value) const;
 
-    // Convenience: always returns an array (empty, single wrapped, or multiple)
+// Convenience: always returns an array (empty, single wrapped, or multiple)
     QJsonArray evaluateAll(const QJsonDocument &document) const;
     QJsonArray evaluateAll(const QJsonValue &value) const;
 
-    bool isValid() const;
+bool isValid() const;
     QString toString() const;
+
+private:
+    static QJsonValue evalAsPathList(const JSONPath &self, const QJsonValue &value);
+    static QJsonValue evalStandard(const JSONPath &self, const QJsonValue &value);
 
 public:
     enum class FunctionType { None, Length, Min, Max };
