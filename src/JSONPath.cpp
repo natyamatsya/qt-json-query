@@ -229,34 +229,67 @@ QVector<JSONPath::Segment> JSONPath::parseSegments(const QString &path)
 
 QVector<QPair<QString, bool>> JSONPath::splitPathSegments(const QString &path) const
 {
-    using namespace json_utils;
+    // Manual scan that identifies special JSONPath operators without regex or extra allocations.
+    // A segment is marked `true` (special) if it is one of:
+    //   1. Recursive descent  ".."
+    //   2. Wildcard property ".*"
+    //   3. Any bracket expression  "[ ... ]"  (array index, slice, wildcard, filter, etc.)
 
     QVector<QPair<QString, bool>> segments;
-    std::string_view sv = to_sv(path);
+    const qsizetype len = path.size();
 
-    // Find all special operators
-    auto matches = find_all_positions<special_operator_pattern>(path);
+    qsizetype lastPos = 0;
+    qsizetype pos = 0;
 
-    int lastPos = 0;
-    for (const auto &[start, end] : matches)
+    auto addPlain = [&](qsizetype from, qsizetype to)
     {
-        // Add any direct path segment before the special operator
-        if (start > lastPos)
+        if (to > from)
+            segments.append({path.mid(from, to - from), false});
+    };
+
+    while (pos < len)
+    {
+        const QChar c = path.at(pos);
+
+        if (c == u'.')
         {
-            segments.append({path.mid(lastPos, start - lastPos), false});
+            // Possible special operator: ".." or ".*"
+            if (pos + 1 < len && (path.at(pos + 1) == u'.' || path.at(pos + 1) == u'*'))
+            {
+                addPlain(lastPos, pos);
+                // special operator length 2
+                segments.append({path.mid(pos, 2), true});
+                pos += 2;
+                lastPos = pos;
+                continue;
+            }
+            // Single dot is just a delimiter between plain property names
+            ++pos;
+            continue;
         }
-
-        // Add the special operator
-        segments.append({path.mid(start, end - start), true});
-
-        lastPos = end;
+        else if (c == u'[')
+        {
+            // Bracket expression – treat entire bracketed part as special operator
+            addPlain(lastPos, pos);
+            qsizetype endBracket = path.indexOf(u']', pos + 1);
+            if (endBracket == -1)
+            {
+                // Malformed input: take rest of string as special to avoid endless loop
+                endBracket = len - 1;
+            }
+            segments.append({path.mid(pos, endBracket - pos + 1), true});
+            pos = endBracket + 1;
+            lastPos = pos;
+            continue;
+        }
+        else
+        {
+            ++pos;
+        }
     }
 
-    // Add any remaining direct path segment
-    if (lastPos < path.length())
-    {
-        segments.append({path.mid(lastPos), false});
-    }
+    // trailing plain segment
+    addPlain(lastPos, len);
 
     return segments;
 }
