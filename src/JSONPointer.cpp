@@ -43,8 +43,14 @@ void JSONPointer::parsePointer(const QString &pointer)
         return;
     }
 
+    // Special case: single '/' selects member with empty string key
+    if (pointer.size() == 1) {
+        m_tokens.append(QString());
+        return;
+    }
+
     // Reserve rough space: number of '/' gives upper bound on tokens.
-    const int approxTokens = pointer.count('/') ;
+    const int approxTokens = pointer.count('/');
     m_tokens.reserve(approxTokens);
 
     QStringView view{pointer};
@@ -58,9 +64,10 @@ void JSONPointer::parsePointer(const QString &pointer)
         while (end < len && view.at(end) != u'/')
             ++end;
 
-        if (end == begin)
+        const bool atEnd = (end == len);
+        if (end == begin && !atEnd)
         {
-            // Empty token ("//") – invalid per RFC.
+            // Empty segment in the middle ("//" or "/foo//bar") is invalid.
             m_valid = false;
             m_tokens.clear();
             return;
@@ -113,7 +120,10 @@ QString JSONPointer::decodeToken(QStringView token)
 
 QJsonValue JSONPointer::evaluate(const QJsonDocument &document) const
 {
-    return evaluate(document.isObject() ? QJsonValue(document.object()) : QJsonValue(document.array()));
+    // Prefer array if explicitly an array; otherwise treat as object (default)
+    const QJsonValue root = document.isArray() ? QJsonValue(document.array())
+                                               : QJsonValue(document.object());
+    return evaluate(root);
 }
 
 QJsonValue JSONPointer::evaluate(const QJsonValue &value) const
