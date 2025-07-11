@@ -1,7 +1,6 @@
 // jsonpath.cpp - Using CTRE
 #include "json-query/JSONPath.hpp"
 #include <vector>
-#include <iostream>
 #include <regex>
 #include "json-query/JSONQueryUtils.hpp"
 #include "json-query/ContainerFrame.hpp"
@@ -559,11 +558,6 @@ static inline QList<QString> uniqueDeepest(const std::vector<PtrFrame> &frames)
         }
         if (!isPref) keep.append(p);
     }
-    if(!keep.isEmpty()){
-        std::cerr << "uniqueDeepest returned " << keep.size() << " paths:\n";
-        for(const auto &p: keep) std::cerr << "  " << p.toStdString() << "\n";
-        std::cerr.flush();
-    }
     return keep;
 }
 } // anonymous namespace
@@ -578,12 +572,7 @@ QJsonValue JSONPath::evalAsPathList(const JSONPath &self, const QJsonValue &valu
 
     for (int i = 1; i < self.m_segments.size() && !working.empty(); ++i)
     {
-        const auto &seg = self.m_segments[i];
-        std::cerr << "segment " << i << " type=" << static_cast<int>(seg.type);
-        if(std::holds_alternative<QString>(seg.data)) std::cerr << " data=" << std::get<QString>(seg.data).toStdString();
-        std::cerr << "  frames=" << working.size() << std::endl;
-        working = advancePointerSegment(seg, working);
-        std::cerr << " after frames=" << working.size() << std::endl;
+        working = advancePointerSegment(self.m_segments[i], working);
         if (working.empty()) break;
     }
 
