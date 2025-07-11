@@ -76,6 +76,79 @@ static void BM_JSONPointer_Complex(benchmark::State &state)
 BENCHMARK(BM_JSONPointer_Complex);
 
 // ----------------------------
+// Plain QJson benchmarks (manual traversal)
+// ----------------------------
+static void BM_Plain_Simple(benchmark::State &state)
+{
+    QJsonDocument doc = prepareTestDocument();
+    for (auto _ : state)
+    {
+        const QJsonObject root = doc.object();
+        benchmark::DoNotOptimize(root.value("name").toString());
+    }
+}
+BENCHMARK(BM_Plain_Simple);
+
+static void BM_Plain_Nested(benchmark::State &state)
+{
+    QJsonDocument doc = prepareTestDocument();
+    for (auto _ : state)
+    {
+        const QJsonObject root = doc.object();
+        const QString city = root.value("location").toObject().value("city").toString();
+        benchmark::DoNotOptimize(city);
+    }
+}
+BENCHMARK(BM_Plain_Nested);
+
+static void BM_Plain_Array(benchmark::State &state)
+{
+    QJsonDocument doc = prepareTestDocument();
+    for (auto _ : state)
+    {
+        const QJsonArray inv = doc.object().value("inventory").toArray();
+        const QString title = inv.at(5).toObject().value("title").toString();
+        benchmark::DoNotOptimize(title);
+    }
+}
+BENCHMARK(BM_Plain_Array);
+
+static void BM_Plain_Filter(benchmark::State &state)
+{
+    QJsonDocument doc = prepareTestDocument();
+    for (auto _ : state)
+    {
+        QStringList titles;
+        const QJsonArray inv = doc.object().value("inventory").toArray();
+        for (const QJsonValue &v : inv)
+        {
+            const QJsonObject o = v.toObject();
+            if (o.value("price").toDouble() > 20)
+                titles << o.value("title").toString();
+        }
+        benchmark::DoNotOptimize(titles);
+    }
+}
+BENCHMARK(BM_Plain_Filter);
+
+static void BM_Plain_Recursive(benchmark::State &state)
+{
+    QJsonDocument doc = prepareTestDocument();
+    for (auto _ : state)
+    {
+        QStringList titles;
+        const QJsonArray inv = doc.object().value("inventory").toArray();
+        for (const QJsonValue &v : inv)
+        {
+            const QString t = v.toObject().value("title").toString();
+            titles << t;
+        }
+        benchmark::DoNotOptimize(titles);
+    }
+}
+BENCHMARK(BM_Plain_Recursive);
+
+// ----------------------------
 // JSONPath benchmarks
 // ----------------------------
 static void BM_JSONPath_Simple(benchmark::State &state)
