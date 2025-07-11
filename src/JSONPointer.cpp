@@ -43,11 +43,22 @@ void JSONPointer::parsePointer(const QString &pointer)
         return;
     }
 
-    // Split by '/' (RFC 6901), skipping the empty first segment
-    const QStringList parts = pointer.split('/', Qt::SkipEmptyParts);
-    for (const QString &rawToken : parts)
+    // Manual single-pass scan to extract tokens without temporary QStringList
+    QStringView view{pointer};
+    qsizetype start = 1; // skip leading '/'
+    const qsizetype n = view.size();
+    while (start <= n)
     {
-        m_tokens.append(decodeToken(rawToken));
+        qsizetype pos = start;
+        while (pos < n && view.at(pos) != u'/')
+            ++pos;
+        // Extract token substring [start, pos)
+        if (pos > start) // ignore empty segments (consecutive slashes)
+        {
+            QString token = decodeToken(QString(view.sliced(start, pos - start)));
+            m_tokens.append(std::move(token));
+        }
+        start = pos + 1; // move past '/'
     }
 }
 
