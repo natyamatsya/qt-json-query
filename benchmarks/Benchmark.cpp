@@ -5,8 +5,8 @@
 #include <QJsonArray>
 #include <QElapsedTimer>
 
-#include "JSONPath.h"
-#include "JSONPointer.hpp"
+#include "json-query/JSONPath.hpp"
+#include "json-query/JSONPointer.hpp"
 
 class BenchmarkTest : public QObject
 {
@@ -217,5 +217,7 @@ void BenchmarkTest::benchmarkJsonPathCreation()
         JSONPath path("$.inventory[25].categories[1]");
     }
 }
+
+#include "Benchmark.moc"
 
 QTEST_MAIN(BenchmarkTest)
