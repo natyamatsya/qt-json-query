@@ -49,6 +49,7 @@ endif()
 add_library(json_query
     src/JSONPointer.cpp
     src/json-path/JSONPath.cpp
+    src/json-path/PathParser.cpp
 )
 
 # Public headers
