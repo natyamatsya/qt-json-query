@@ -11,6 +11,7 @@
 #include <optional>
 #include <variant>
 #include <ctre.hpp>
+#include "json-path/PathParser.hpp"
 
 #include "JSONPointer.hpp"
 
@@ -39,26 +40,11 @@ private:
     static QJsonValue evalStandard(const JSONPath &self, const QJsonValue &value);
 
 public:
-    enum class FunctionType { None, Length, Min, Max };
+    // Type aliases imported from json_path:: namespace (see PathParser.hpp)
+    using FunctionType = json_path::FunctionType;
 private:
-    enum class SegmentType
-    {
-        Pointer,
-        RecursiveDescend,
-        WildProperty,
-        ArrayWildcard,
-        ArraySlice,
-        FilterExpression
-    };
-
-    struct Segment
-    {
-        SegmentType type;
-        std::variant<
-            QString,
-            std::tuple<int, int, int>,
-            std::function<bool(const QJsonValue &)>> data;
-    };
+    using SegmentType = json_path::SegmentType;
+    using Segment     = json_path::Segment;
 
     bool m_valid = true;
     FunctionType m_func = FunctionType::None;

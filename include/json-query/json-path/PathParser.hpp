@@ -7,6 +7,10 @@
 
 #include <QVector>
 #include <QString>
+#include <QJsonValue>
+#include <variant>
+#include <tuple>
+#include <functional>
 
 namespace json_path
 {
@@ -15,11 +19,30 @@ namespace json_path
     // the next incremental refactor.
     enum class FunctionType { None, Length, Min, Max };
 
+    enum class SegmentType
+    {
+        Pointer,
+        RecursiveDescend,
+        WildProperty,
+        ArrayWildcard,
+        ArraySlice,
+        FilterExpression
+    };
+
+    struct Segment
+    {
+        SegmentType type;
+        std::variant<
+            QString,
+            std::tuple<int, int, int>,
+            std::function<bool(const QJsonValue &)>> data;
+    };
+
     struct ParseResult
     {
-        // Placeholder members. Real fields will be added when the parser
-        // implementation is migrated.
-        bool valid = true;
+        QVector<Segment> segments;
+        FunctionType     trailingFn = FunctionType::None;
+        bool             valid      = true;
     };
 
     // Entry-point (currently stubbed).
