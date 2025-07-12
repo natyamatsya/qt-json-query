@@ -27,5 +27,9 @@ add_executable(json_query_tests ${TEST_SOURCES})
 target_include_directories(json_query_tests PRIVATE ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(json_query_tests PRIVATE json_query GTest::gtest GTest::gtest_main Qt6::Core)
 
-# Register with CTest
-add_test(NAME JsonQueryTests COMMAND json_query_tests)
+# Register with CTest, discover individual GoogleTest cases
+include(GoogleTest)
+gtest_discover_tests(json_query_tests
+    DISCOVERY_MODE PRE_TEST
+    TEST_PREFIX "JsonQuery/"
+)
