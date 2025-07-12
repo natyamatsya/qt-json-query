@@ -1,32 +1,34 @@
 #pragma once
-
 #include <QJsonValue>
+#include <QVector>
+
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
-#include <QString>
-#include <QVector>
-#include <optional>
-
-// Primary JSONPointer header (preferred .hpp suffix).
-// Implementation remains in src/JSONPointer.cpp.
 
 class JSONPointer
 {
 public:
-    explicit JSONPointer(const QString &pointer);
+    explicit JSONPointer(const QString& pointer);
 
-    QJsonValue evaluate(const QJsonDocument &document) const;
-    QJsonValue evaluate(const QJsonValue &value) const;
+    [[nodiscard]] QJsonValue evaluate(QJsonDocument const&) const;
+    [[nodiscard]] QJsonValue evaluate(QJsonValue   const&) const;
 
-    bool isValid() const;
-    QString toString() const;
+    [[nodiscard]] bool    isValid()  const noexcept { return m_valid; }
+    [[nodiscard]] QString toString() const;
 
 private:
-    bool m_valid = true;
-    QVector<QString> m_tokens;
+    struct Token {
+        enum class Kind : quint8 { Key, Index };
+        Kind       kind;
+        qsizetype  index{};
+        QString    key{};
+    };
 
-    void parsePointer(const QString &pointer);
-    QJsonValue evaluateInternal(const QJsonValue &value, int tokenIndex) const;
-    static QString decodeToken(QStringView token);
+    bool             m_valid {true};
+    QVector<Token>   m_tokens;
+
+    void        parsePointer(QStringView);
+    [[nodiscard]] QJsonValue  evaluateInternal(QJsonValue const&) const;
+    static void decodeAndStore(QStringView raw, QVector<Token>& out);
 };

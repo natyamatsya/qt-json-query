@@ -1,234 +1,289 @@
-// jsonpointer.cpp - Using CTRE
 #include "json-query/JSONPointer.hpp"
 #include "json-query/JSONQueryUtils.hpp"
 
-
-// ----------------
-// CTRE Patterns
-// ----------------
-namespace
-{
-    using namespace json_utils;
-
-    // Match each path segment between slashes (at least one non-slash char)
-    constexpr auto token_pattern = ctll::fixed_string{
-        "/([^/]+)"};
-
-    constexpr auto escape_tilde_pattern = ctll::fixed_string{
-        "~0"};
-
-    constexpr auto escape_slash_pattern = ctll::fixed_string{
-        "~1"};
-}
+#include <charconv>   // std::to_chars
+#include <cmath>      // std::log10 (for capacity guess)
 
 JSONPointer::JSONPointer(const QString &pointer)
 {
     parsePointer(pointer);
 }
 
-void JSONPointer::parsePointer(const QString &pointer)
-{
-    // Reset state first
-    m_tokens.clear();
-    m_valid = true;
-
-    // Empty string – valid pointer to whole document.
-    if (pointer.isEmpty())
-        return;
-
-    // RFC-6901: must begin with '/'.
-    if (pointer.front() != QChar('/'))
-    {
-        m_valid = false;
-        return;
-    }
-
-    // Special case: single '/' selects member with empty string key
-    if (pointer.size() == 1) {
-        m_tokens.append(QString());
-        return;
-    }
-
-    // Reserve rough space: number of '/' gives upper bound on tokens.
-    const int approxTokens = pointer.count('/');
-    m_tokens.reserve(approxTokens);
-
-    QStringView view{pointer};
-    qsizetype begin = 1;            // skip leading '/'
-    const qsizetype len = view.size();
-
-    while (begin < len)
-    {
-        // find next '/'
-        qsizetype end = begin;
-        while (end < len && view.at(end) != u'/')
-            ++end;
-
-        const bool atEnd = (end == len);
-        if (end == begin && !atEnd)
-        {
-            // Empty segment in the middle ("//" or "/foo//bar") is invalid.
-            m_valid = false;
-            m_tokens.clear();
-            return;
-        }
-
-        // Decode and store
-        m_tokens.append(decodeToken(view.sliced(begin, end - begin)));
-
-        begin = end + 1; // step past '/'
-    }
-}
-
-QString JSONPointer::decodeToken(QStringView token)
-{
-    // Fast single-pass decoder for RFC-6901 escape sequences ("~0" → "~", "~1" → "/").
-    // Avoids extra temporary QStrings.
-
-    if (!token.contains(u'~'))
-        return QString(token); // early exit when no escapes present
-
-    QString out;
-
-    for (qsizetype i = 0; i < token.size(); ++i)
-    {
-        const QChar ch = token.at(i);
-        if (ch != u'~' || i + 1 >= token.size())
-        {
-            out += ch;
-            continue;
-        }
-
-        const QChar next = token.at(i + 1);
-        if (next == u'1')
-        {
-            out += u'/';
-            ++i; // skip second char
-        }
-        else if (next == u'0')
-        {
-            out += u'~';
-            ++i;
-        }
-        else
-        {
-            out += ch; // unknown escape, keep '~'
-        }
-    }
-    return out;
-}
-
 QJsonValue JSONPointer::evaluate(const QJsonDocument &document) const
 {
     // Prefer array if explicitly an array; otherwise treat as object (default)
-    const QJsonValue root = document.isArray() ? QJsonValue(document.array())
-                                               : QJsonValue(document.object());
-    return evaluate(root);
+    if (!document.isArray())
+        return evaluate(document.object());
+
+    return evaluate(document.array());
 }
 
 QJsonValue JSONPointer::evaluate(const QJsonValue &value) const
 {
     if (!isValid())
-    {
-        return QJsonValue(QJsonValue::Undefined);
-    }
+        return {QJsonValue::Undefined};
 
     // Empty path returns the value itself
     if (m_tokens.isEmpty())
-    {
         return value;
-    }
 
-    return evaluateInternal(value, 0);
+    return evaluateInternal(value);
 }
 
-QJsonValue JSONPointer::evaluateInternal(const QJsonValue &value, int tokenIndex) const
+namespace
 {
-    if (tokenIndex >= m_tokens.size())
-    {
-        return value;
-    }
+    // anonymous: internal linkage
 
-    const QString &token = m_tokens.at(tokenIndex);
-
-    if (value.isObject())
+    [[nodiscard]] inline QString
+    decodeToken(QStringView const token) noexcept
     {
-        QJsonObject obj = value.toObject();
-        if (!obj.contains(token))
+        // Fast path: nothing to unescape
+        const qsizetype len = token.size();
+        const char16_t* src = token.utf16();
+
+        qsizetype firstTilde = 0;
+        while (firstTilde < len && src[firstTilde] != u'~')
+            ++firstTilde;
+
+        if (firstTilde == len)
+            return token.toString();                // no escapes at all
+
+        // -----------------------------------------------------------------
+        // Allocate *once* with worst-case size, copy the prefix in bulk
+        // -----------------------------------------------------------------
+        QString out(len, Qt::Uninitialized);
+        QChar*  dst = out.data();
+
+        std::memcpy(dst, src, firstTilde * sizeof(char16_t));
+        qsizetype wr = firstTilde;                  // write cursor
+        qsizetype rd = firstTilde;                  // read  cursor
+
+        // -----------------------------------------------------------------
+        // Decode the remainder
+        // -----------------------------------------------------------------
+        while (rd < len)
         {
-            return QJsonValue(QJsonValue::Undefined);
+            const char16_t ch = src[rd++];
+
+            if (ch == u'~' && rd < len) [[likely]]
+            {
+                switch (src[rd])
+                {
+                case u'0':  dst[wr++] = u'~'; ++rd; continue;
+                case u'1':  dst[wr++] = u'/'; ++rd; continue;
+                default:    break;              // fall through → copy '~'
+                }
+            }
+            dst[wr++] = ch;                         // literal copy
         }
-        return evaluateInternal(obj.value(token), tokenIndex + 1);
+
+        out.truncate(wr);                           // shrink to real size
+        return out;
     }
-    else if (value.isArray())
+
+    // ─────────────────────────────────────────────────────────────────────
+    //  Locale-free, overflow-safe decimal parser           (unchanged)
+    // ─────────────────────────────────────────────────────────────────────
+    [[nodiscard]] inline bool parseArrayIndex(QString const& s, qsizetype& out) noexcept
     {
-        QJsonArray array = value.toArray();
-        bool ok = false;
-        int index = token.toInt(&ok);
+        if (s.isEmpty()) return false;
 
-        // Check if the token is a valid array index
-        if (!ok || index < 0 || index >= array.size())
+        qsizetype value{0};
+        for (const QChar ch : s)
         {
-            return QJsonValue(QJsonValue::Undefined);
+            if (ch < u'0' || ch > u'9')
+                return false;
+
+            const qsizetype digit = ch.unicode() - u'0';
+            if (value > (std::numeric_limits<qsizetype>::max() - digit) / 10)
+                return false;                    // overflow
+            value = value * 10 + digit;
         }
-
-        return evaluateInternal(array.at(index), tokenIndex + 1);
+        out = value;
+        return true;
     }
-
-    // If we're trying to navigate further but current value is not an object or array
-    return QJsonValue(QJsonValue::Undefined);
 }
 
-bool JSONPointer::isValid() const
+void JSONPointer::parsePointer(QStringView const ptr)
 {
-    return m_valid;
+    m_tokens.clear();
+    m_valid = true;
+
+    [[maybe_unused]] constexpr char16_t Slash{ u'/' };
+
+    // Empty string  →  whole document
+    if (ptr.isEmpty()) [[unlikely]]
+        return;
+
+    // Must begin with '/'
+    if (ptr.front() != Slash) [[unlikely]] {
+        m_valid = false;
+        return;
+    }
+
+    // Single '/' → token is empty string
+    if (ptr.size() == 1) {
+        m_tokens.append(Token{ Token::Kind::Key, 0, QString{} });
+        return;
+    }
+
+    // Upper bound: every '/' may introduce a token
+    const qsizetype approxTokens{ ptr.count(Slash) };
+    m_tokens.reserve(approxTokens);
+
+    for (qsizetype begin{ 1 }; /*loop*/; )
+    {
+        const qsizetype end   { ptr.indexOf(Slash, begin) };
+        const bool      atEnd { end == -1 };
+
+        const QStringView rawSeg = atEnd
+                                 ? ptr.sliced(begin)
+                                 : ptr.sliced(begin, end - begin);
+
+        // Empty segment *inside* the pointer is invalid (“//”)
+        if (rawSeg.isEmpty() && !atEnd) [[unlikely]] {
+            m_valid = false;
+            m_tokens.clear();
+            return;
+        }
+
+        // RFC-6901 unescaping
+        const QString decoded = decodeToken(rawSeg);
+
+        // Decide Key vs Index once, store appropriately
+        qsizetype idxVal{};
+        if (parseArrayIndex(decoded, idxVal)) {
+            m_tokens.append(Token{ Token::Kind::Index, idxVal, {} });
+        } else {
+            m_tokens.append(Token{ Token::Kind::Key,   0,     decoded });
+        }
+
+        if (atEnd)
+            break;                  // finished last segment
+
+        begin = end + 1;            // jump past the slash
+    }
+}
+
+namespace
+{
+    // ────────────────────────────────────────────────────────────────────
+    //  Inline helpers
+    // ────────────────────────────────────────────────────────────────────
+    [[nodiscard]] inline bool stepObject(QJsonValue& current, QString const& key) noexcept
+    {
+        const QJsonObject obj{ current.toObject() };
+        const auto        it { obj.constFind(key) };
+        if (it == obj.constEnd())  return false;
+
+        current = *it;
+        return true;
+    }
+
+    [[nodiscard]] inline bool stepArray(QJsonValue& current, qsizetype index) noexcept
+    {
+        const QJsonArray arr{ current.toArray() };
+        if (index < 0 || index >= arr.size())  return false;
+
+        current = arr.at(index);
+        return true;
+    }
+} // anonymous namespace
+
+// ────────────────────────────────────────────────────────────────────
+//  JSONPointer::evaluateInternal()
+//  Iterative, no conversions, branch-light
+// ────────────────────────────────────────────────────────────────────
+QJsonValue JSONPointer::evaluateInternal(QJsonValue const& root) const
+{
+    QJsonValue current{ root };
+
+    for (Token const& tk : m_tokens) // cache-friendly AoS loop
+    {
+        switch (current.type())
+        {
+            // ─────────── Objects ───────────
+            case QJsonValue::Object:
+                if (tk.kind != Token::Kind::Key) [[unlikely]]
+                    return QJsonValue{ QJsonValue::Undefined };
+
+                if (!stepObject(current, tk.key)) [[unlikely]]
+                    return QJsonValue{ QJsonValue::Undefined };
+                break;
+
+            // ─────────── Arrays ────────────
+            case QJsonValue::Array:
+                if (tk.kind != Token::Kind::Index) [[unlikely]]
+                    return QJsonValue{ QJsonValue::Undefined };
+
+                if (!stepArray(current, tk.index)) [[unlikely]]
+                    return QJsonValue{ QJsonValue::Undefined };
+                break;
+
+            // ─────────── Scalars / Null ────
+        default:
+            return QJsonValue{ QJsonValue::Undefined };
+        }
+    }
+    return current;                            // all tokens consumed
 }
 
 QString JSONPointer::toString() const
 {
-    using namespace json_utils;
+    if (!m_valid || m_tokens.isEmpty())
+        return {};
 
-    if (!isValid())
-    {
-        return QString();
+    // ───────────────────────────────── capacity ─────────────────────────────────
+    qsizetype cap = 0;
+    for (const Token& tk : m_tokens) {
+        cap += 1;                         // the leading '/'
+        if (tk.kind == Token::Kind::Key)
+            cap += tk.key.size() * 2;     // worst-case expansion
+        else {                            // digits in index
+            cap += (tk.index == 0) ? 1
+                                   : static_cast<qsizetype>(
+                                         std::floor(std::log10(
+                                             static_cast<double>(tk.index))) + 1);
+        }
     }
 
-    // Special case for an empty path
-    if (m_tokens.isEmpty())
-    {
-        return QString();
-    }
+    // ─────────────────────────────── single allocation ──────────────────────────
+    QString out(cap, Qt::Uninitialized);
+    QChar*  dst = out.data();
+    qsizetype wr = 0;
 
-    // Build the string representation
-    QString result;
-    for (const QString &token : m_tokens)
-    {
-        // Encode special characters using CTRE
-        std::string_view sv = to_sv(token);
-        std::string encodedToken(sv);
+    auto writeIndex = [&](qsizetype value) {
+        char buf[24];
+        auto [ptr, ec] = std::to_chars(std::begin(buf), std::end(buf), value);
+        const qsizetype len = ptr - buf;
+        for (qsizetype i = 0; i < len; ++i)
+            dst[wr++] = QLatin1Char(buf[i]);
+    };
 
-        // First replace ~ with ~0
-        for (size_t pos = 0; pos < encodedToken.size(); ++pos)
+    // ─────────────────────────────── encode segments ────────────────────────────
+    for (const Token& tk : m_tokens)
+    {
+        dst[wr++] = u'/';
+
+        if (tk.kind == Token::Kind::Key)
         {
-            if (encodedToken[pos] == '~')
-            {
-                encodedToken.replace(pos, 1, "~0");
-                pos += 1; // Skip the replacement
+            const QChar* src = tk.key.constData();
+            const qsizetype n = tk.key.size();
+
+            for (qsizetype i = 0; i < n; ++i) {
+                switch (src[i].unicode()) {
+                case u'~': dst[wr++] = u'~'; dst[wr++] = u'0'; break;
+                case u'/': dst[wr++] = u'~'; dst[wr++] = u'1'; break;
+                default  : dst[wr++] = src[i];                 break;
+                }
             }
         }
-
-        // Then replace / with ~1
-        for (size_t pos = 0; pos < encodedToken.size(); ++pos)
+        else
         {
-            if (encodedToken[pos] == '/')
-            {
-                encodedToken.replace(pos, 1, "~1");
-                pos += 1; // Skip the replacement
-            }
+            writeIndex(tk.index);
         }
-
-        result += "/" + QString::fromStdString(encodedToken);
     }
 
-    return result;
+    out.truncate(wr);
+    return out;
 }
