@@ -13,12 +13,16 @@ permissions:
 
 jobs:
   report:
-    name: Publish test report
+    name: Publish test reports
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+
     steps:
       - uses: dorny/test-reporter@v2
         with:
-          artifact: test-*     # uploaded by CI workflow
-          name: GoogleTest Suite       # name of the check run
-          path: "*.xml"                # look for any .xml (JUnit) inside the artifact
-          reporter: java-junit         # parse JUnit XML format
+          artifact: test-results-${{ matrix.os }}
+          name: Test Report (${{ matrix.os }})
+          path: "*.xml"
+          reporter: java-junit
