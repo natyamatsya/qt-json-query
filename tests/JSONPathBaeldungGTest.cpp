@@ -123,9 +123,9 @@ TEST(JSONPathBaeldung, MovieWithId2)
 }
 
 //---------------------------------------------
-// 6.2  Movie Title Given Starring – unsupported 'in' operator
+// 6.2  Movie Title Given Starring – 'in' operator
 //---------------------------------------------
-TEST(JSONPathBaeldung, TitleByStarringEvaGreen_ExpectedFailure)
+TEST(JSONPathBaeldung, TitleByStarringEvaGreen)
 {
     static const char jsonSrc[] = R"JSON([
         {"id": 1, "title": "Casino Royale", "director": "Martin Campbell", "starring": ["Daniel Craig", "Eva Green"], "desc": "Twenty-first James Bond movie", "release date": 1163466000000, "box office": 594275385},
@@ -136,11 +136,12 @@ TEST(JSONPathBaeldung, TitleByStarringEvaGreen_ExpectedFailure)
 
     const QJsonDocument doc = QJsonDocument::fromJson(QByteArray(jsonSrc));
 
-    EXPECT_NO_FATAL_FAILURE({
-        JSONPath path("$[?('Eva Green' in @['starring'])]");
-        /* ASSERT_TRUE(path.isValid()); */
-        (void)path.evaluateAll(doc);
-    }) << "'in' operator not yet implemented but should not crash";
+    JSONPath path("$[?('Eva Green' in @['starring'])]");
+    ASSERT_TRUE(path.isValid());
+    QJsonArray res = path.evaluateAll(doc);
+    ASSERT_EQ(res.size(), 1);
+    QJsonObject obj = res[0].toObject();
+    EXPECT_EQ(obj.value("title").toString(), u"Casino Royale"_s);
 }
 
 //---------------------------------------------
@@ -196,9 +197,9 @@ TEST(JSONPathBaeldung, HighestRevenueMovie)
 }
 
 //---------------------------------------------
-// 6.5  Latest Movie of Director – logical && operator unsupported
+// 6.5  Latest Movie of Director – logical && operator
 //---------------------------------------------
-TEST(JSONPathBaeldung, LatestMovieOfSamMendes_ExpectedFailure)
+TEST(JSONPathBaeldung, LatestMovieOfSamMendes)
 {
     static const char jsonSrc[] = R"JSON([
         {"id": 1, "title": "Casino Royale", "director": "Martin Campbell", "starring": ["Daniel Craig", "Eva Green"], "desc": "Twenty-first James Bond movie", "release date": 1163466000000, "box office": 594275385},
@@ -209,9 +210,10 @@ TEST(JSONPathBaeldung, LatestMovieOfSamMendes_ExpectedFailure)
 
     const QJsonDocument doc = QJsonDocument::fromJson(QByteArray(jsonSrc));
 
-    EXPECT_NO_FATAL_FAILURE({
-        JSONPath path("$[?(@['director'] == 'Sam Mendes' && @['release date'] == 1445821200000)]"); // unsupported
-        /* ASSERT_TRUE(path.isValid()); */
-        (void)path.evaluateAll(doc);
-    }) << "Logical '&&' not yet implemented but should not crash";
+    JSONPath path("$[?(@['director'] == 'Sam Mendes' && @['release date'] == 1445821200000)]");
+    ASSERT_TRUE(path.isValid());
+    QJsonArray res = path.evaluateAll(doc);
+    ASSERT_EQ(res.size(), 1);
+    QJsonObject obj = res[0].toObject();
+    EXPECT_EQ(obj.value("title").toString(), u"Spectre"_s);
 }

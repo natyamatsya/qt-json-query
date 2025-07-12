@@ -335,6 +335,112 @@ std::optional<JSONPath::Segment> JSONPath::parseFilterExpression(const QString &
         }
     }
 
+    // Handle logical AND (&&) by recursively evaluating sub-expressions
+    {
+        int andPos = exprTrim.indexOf("&&");
+        if (andPos != -1)
+        {
+            QString leftExpr  = exprTrim.left(andPos).trimmed();
+            QString rightExpr = exprTrim.mid(andPos + 2).trimmed();
+
+            auto leftSegOpt  = parseFilterExpression(leftExpr);
+            auto rightSegOpt = parseFilterExpression(rightExpr);
+            if (leftSegOpt && rightSegOpt)
+            {
+                auto leftPred  = std::get<std::function<bool(const QJsonValue &)>>((*leftSegOpt).data);
+                auto rightPred = std::get<std::function<bool(const QJsonValue &)>>((*rightSegOpt).data);
+
+                segment.data = [leftPred, rightPred](const QJsonValue &json) -> bool
+                {
+                    return leftPred(json) && rightPred(json);
+                };
+                return segment;
+            }
+        }
+    }
+
+    // Support the 'in' operator  e.g.  'Eva Green' in @['starring']
+    {
+        constexpr auto in_op_pattern = ctll::fixed_string{R"('\s*([^']+?)\s*'\s+in\s+@\[['\"]([^'\"]+)['\"]\])"};
+        if (auto m = ctre::match<in_op_pattern>(to_sv(exprTrim)))
+        {
+            QString searchVal = to_qstr(m.template get<1>().to_view());
+            QString arrayProp = to_qstr(m.template get<2>().to_view());
+
+            segment.data = [searchVal, arrayProp](const QJsonValue &json) -> bool
+            {
+                if (!json.isObject())
+                    return false;
+                QJsonObject obj = json.toObject();
+                if (!obj.contains(arrayProp) || !obj[arrayProp].isArray())
+                    return false;
+                QJsonArray arr = obj[arrayProp].toArray();
+                for (const auto &v : arr)
+                {
+                    if (v.isString() && v.toString() == searchVal)
+                        return true;
+                }
+                return false;
+            };
+            return segment;
+        }
+    }
+
+    // Parse bracket-notation predicate like @['prop'] == value or @['prop'] > 5
+    {
+        constexpr auto bracket_pred_pattern = ctll::fixed_string{R"(@\[['\"]([^'\"]+)['\"]\]\s*(==|!=|>=|<=|>|<)\s*(.+))"};
+        if (auto m = ctre::match<bracket_pred_pattern>(to_sv(exprTrim)))
+        {
+            QString property = to_qstr(m.template get<1>().to_view());
+            QString op       = to_qstr(m.template get<2>().to_view());
+            QString rawVal   = to_qstr(m.template get<3>().to_view());
+            rawVal = rawVal.trimmed();
+
+            bool numeric = false;
+            double compareValue = rawVal.toDouble(&numeric);
+            QString compareStr;
+            if (!numeric)
+            {
+                // Strip surrounding quotes if present
+                if (rawVal.size() >= 2 && ((rawVal.startsWith('"') && rawVal.endsWith('"')) || (rawVal.startsWith('\'') && rawVal.endsWith('\''))))
+                    compareStr = rawVal.mid(1, rawVal.size() - 2);
+                else
+                    compareStr = rawVal;
+            }
+
+            segment.data = [property, op, numeric, compareValue, compareStr](const QJsonValue &json) -> bool
+            {
+                if (!json.isObject())
+                    return false;
+                QJsonObject obj = json.toObject();
+                if (!obj.contains(property))
+                    return false;
+
+                if (numeric)
+                {
+                    if (!obj[property].isDouble())
+                        return false;
+                    double value = obj[property].toDouble();
+                    if (op == "==") return value == compareValue;
+                    if (op == "!=") return value != compareValue;
+                    if (op == ">")  return value > compareValue;
+                    if (op == "<")  return value < compareValue;
+                    if (op == ">=") return value >= compareValue;
+                    if (op == "<=") return value <= compareValue;
+                    return false;
+                }
+                else
+                {
+                    QString valStr = obj[property].toString();
+                    if (op == "==") return valStr == compareStr;
+                    if (op == "!=") return valStr != compareStr;
+                    return false;
+                }
+            };
+            return segment;
+        }
+    }
+
     // Parse dot-notation predicate like @.id == 2  or @.price > 20.0 via CTRE
         {
         constexpr auto dot_pred_pattern = ctll::fixed_string{R"(@\.(\w+)\s*(==|!=|>=|<=|>|<)\s*(.+))"};
