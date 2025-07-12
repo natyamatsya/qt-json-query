@@ -190,10 +190,11 @@ TEST(JSONPathBaeldung, HighestRevenueMovie)
         highest = std::max(highest, v.toVariant().toLongLong());
 
     // 2. Find movie with that revenue
-    EXPECT_NO_FATAL_FAILURE({
-        JSONPath moviePath(QString("$[?(@['box office'] == %1)]").arg(highest));
-        (void)moviePath.evaluateAll(doc);
-    }) << "Equality filter currently unsupported";
+    JSONPath moviePath(QString("$[?(@['box office'] == %1)]").arg(highest));
+    ASSERT_TRUE(moviePath.isValid());
+    QJsonArray res = moviePath.evaluateAll(doc);
+    ASSERT_EQ(res.size(), 1);
+    EXPECT_EQ(res[0].toObject().value("title").toString(), u"Skyfall"_s);
 }
 
 //---------------------------------------------
