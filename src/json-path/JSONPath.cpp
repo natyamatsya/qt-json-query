@@ -2,6 +2,10 @@
 #include "json-query/JSONPath.hpp"
 #include <vector>
 #include <regex>
+#include <deque>
+
+#include <QRegularExpression>
+
 #include "json-query/JSONQueryUtils.hpp"
 #include "json-query/ContainerCursor.hpp"
 #include "json-query/QtHash.hpp"
@@ -42,8 +46,7 @@ JSONPath::Result JSONPath::create(QStringView rawPath, Option opt)
 {
     QString path = rawPath.toString();
     // Extract any trailing function → updates `path` and yields `func`
-    FunctionType func = FunctionType::None;
-    detectTrailingFunction(path);          // make this overload return func
+    FunctionType func = detectTrailingFunction(path);
 
     if (path.isEmpty())
         return std::unexpected(Error::EmptySegment);      // choose your enum
@@ -97,7 +100,10 @@ std::expected<JSONPath::Compiled, Error> JSONPath::compilePath(const QStringView
     auto pushKey = [&](QStringView key) -> std::expected<void, Error>
     {
         if (key.isEmpty()) return fail(Error::EmptySegment);
-        QString s{};// segmentToPointer(key.toString());
+
+        // keep the *plain* property name here – the pointer form is
+        // only needed for the AsPathList feature, not for value look‑ups
+        QString s = key.toString();
         tokens.append(Token{ Kind::Key, 0, {}, qt_hash(s), std::move(s), 0 });
         return {};
     };
@@ -175,7 +181,7 @@ std::expected<JSONPath::Compiled, Error> JSONPath::compilePath(const QStringView
         if (auto r = pushKey(sv.sliced(start, pos - start)); !r)
             return std::unexpected{r.error()};
     }
-    return Compiled{tokens, {}};                        // success
+    return Compiled{ std::move(tokens), std::move(filters) };                       // success
 }
 
 QJsonValue JSONPath::evaluate(const QJsonDocument &document) const
@@ -190,86 +196,10 @@ QJsonValue JSONPath::evaluate(const QJsonDocument &document) const
 // ─────────────────────────────────────────────────────────────────────
 QJsonValue JSONPath::evaluate(const QJsonValue& root) const
 {
-    if (!m_valid || m_tokens.isEmpty())
-        return QJsonValue(QJsonValue::Undefined);
+    if (m_option == Option::AsPathList)
+        return evalAsPathList(*this, root);
 
-    // Stage values in a worklist; start with the supplied root.
-    QJsonArray working { root };
-    bool multi = false;                     // did we hit any fan‑out token?
-
-    // Skip token #0: it's always "$" or "@" referring to root itself.
-    for (qsizetype i = 1; i < m_tokens.size() && !working.isEmpty(); ++i)
-    {
-        const Token& tk = m_tokens[i];
-
-        // Special‑case the Recursive token to avoid one superfluous pass:
-        // we replace the worklist with *all* descendants immediately.
-        if (tk.kind == Token::Kind::Recursive) {
-            QJsonArray next;
-            for (const auto& v : working) {
-                QJsonArray rec = evaluateToken(tk, v);
-                for (const auto& e : rec) next.append(e);
-            }
-            working.swap(next);
-            multi = true;
-            continue;                       // next token uses the new worklist
-        }
-
-        // Normal tokens
-        QJsonArray next;
-        for (const auto& v : working) {
-            QJsonArray seg = evaluateToken(tk, v);
-            for (const auto& e : seg) next.append(e);
-        }
-        if (next.isEmpty())                 // short‑circuit no‑match
-            return QJsonValue(QJsonValue::Undefined);
-
-        // fan‑out?
-        if (tk.kind != Token::Kind::Key && tk.kind != Token::Kind::Index)
-            multi = true;
-
-        working.swap(next);
-    }
-
-    // -----------------------------------------------------------------
-    //  Collapse result + apply optional trailing function
-    // -----------------------------------------------------------------
-    QJsonValue result;
-    if (working.isEmpty()) {
-        result = QJsonValue(QJsonValue::Undefined);
-    } else if (!multi && working.size() == 1) {
-        result = working.first();
-    } else {
-        result = working;
-    }
-
-    switch (m_func)
-    {
-        case FunctionType::None:
-            return result;
-
-        case FunctionType::Length:
-            if (result.isArray())   return result.toArray().size();
-            if (result.isObject())  return result.toObject().size();
-            return 0;
-
-        case FunctionType::Min:
-        case FunctionType::Max: {
-            if (!result.isArray()) return QJsonValue(QJsonValue::Undefined);
-            auto arr = result.toArray();
-            bool first = true; double best = 0.0;
-            for (const auto& v : arr) {
-                if (!v.isDouble()) continue;
-                double d = v.toDouble();
-                if (first || (m_func==FunctionType::Min ? d<best : d>best)) {
-                    best = d; first = false;
-                }
-            }
-            return first ? QJsonValue(QJsonValue::Undefined)
-                         : QJsonValue(best);
-        }
-    }
-    std::unreachable();   // all enum cases handled
+    return evalStandard(*this, root);
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -287,10 +217,12 @@ QJsonArray JSONPath::evaluateToken(const Token& tk,
     {
         // ------------------------------------------------ Key
         case Key: {
-            if (!v.isObject()) return out;
-            const auto it = v.toObject().find(tk.key);
-            if (it != v.toObject().end()) out.append(*it);
-            return out;
+                if (!v.isObject()) return out;
+                QJsonObject obj = v.toObject();
+                auto it = obj.find(tk.key);
+                if (it != obj.end())              // copy *before* obj is destroyed
+                    out.append(it.value());
+                return out;
         }
 
         // ------------------------------------------------ Index
@@ -479,6 +411,55 @@ JSONPath::compileFilter(const QString& expr,
             return Token{Kind::Filter,0,{},0u,prop,id};
         }
     }
+    //  ── in compileFilter(), just before the “unsupported” fallback
+    // ------------------------------------------------------------------
+    //     @.prop  =~  /pattern/            (dot‑notation)
+    // ------------------------------------------------------------------
+    {
+        constexpr auto pat = ctll::fixed_string{
+            R"(@\.([\w$]+)\s*=~\s*/(.+)/)"
+        };
+        if (auto m = ctre::match<pat>(to_sv(s)))
+        {
+            const QString prop = to_qstr(m.template get<1>().to_view());
+            const QString regex = to_qstr(m.template get<2>().to_view());
+
+            // Qt regex – compiled once at path‑compile time
+            const QRegularExpression rx(regex,
+                                        QRegularExpression::CaseInsensitiveOption);
+
+            std::size_t id = out.size();
+            out.push_back([prop, rx](const QJsonValue& j) -> bool
+            {
+                return j[prop].toString().contains(rx);
+            });
+            return Token{Kind::Filter, 0, {}, 0u, prop, id};
+        }
+    }
+
+    // ------------------------------------------------------------------
+    //     @['prop']  =~  /pattern/         (bracket‑notation)
+    // ------------------------------------------------------------------
+    {
+        constexpr auto pat = ctll::fixed_string{
+            R"(@\[['\"]([^'\"]+)['\"]\]\s*=~\s*/(.+)/)"
+        };
+        if (auto m = ctre::match<pat>(to_sv(s)))
+        {
+            const QString prop   = to_qstr(m.template get<1>().to_view());
+            const QString regex  = to_qstr(m.template get<2>().to_view());
+
+            const QRegularExpression rx(regex,
+                                        QRegularExpression::CaseInsensitiveOption);
+
+            std::size_t id = out.size();
+            out.push_back([prop, rx](const QJsonValue& j) -> bool
+            {
+                return j[prop].toString().contains(rx);
+            });
+            return Token{Kind::Filter, 0, {}, 0u, prop, id};
+        }
+    }
 
     // ---------------------------------------------------  unsupported
     return std::nullopt;
@@ -509,13 +490,12 @@ QJsonArray JSONPath::evaluateRecursive(const QJsonValue& value,
     if (!value.isArray() && !value.isObject())
         return out;
 
-    std::vector<QJsonValue> stack;
-    stack.push_back(value);
-    while (!stack.empty())
+    std::deque<QJsonValue> queue;
+    queue.push_back(value);
+    while (!queue.empty())
     {
-        QJsonValue cur = stack.back();
-        stack.pop_back();
-
+        QJsonValue cur = queue.front();
+        queue.pop_front();
         // store the container itself
         out.append(cur);
 
@@ -524,13 +504,13 @@ QJsonArray JSONPath::evaluateRecursive(const QJsonValue& value,
             for (auto it = obj.begin(); it != obj.end(); ++it) {
                 const QJsonValue& child = it.value();
                 if (child.isArray() || child.isObject())
-                    stack.push_back(child);
+                    queue.push_back(child);
             }
         } else {                     // array
             const QJsonArray arr = cur.toArray();
             for (const auto& child : arr)
                 if (child.isArray() || child.isObject())
-                    stack.push_back(child);
+                    queue.push_back(child);
         }
     }
     return out;
@@ -561,4 +541,147 @@ QJsonArray JSONPath::evalSlice(const QJsonArray& array,
 int JSONPath::normalizeIndex(int idx, int size) const
 {
     return idx < 0 ? size + idx : idx;
+}
+
+// ───────────────────────────────────────────────────────────────
+//  segmentToPointer – JSONPath piece  →  RFC‑6901 JSON‑Pointer
+//      * Handles dot‑ and bracket‑notation
+//      * No heap work except final QString
+// ───────────────────────────────────────────────────────────────
+QString JSONPath::segmentToPointer(const QString& seg) const
+{
+    // trivial cases
+    if (seg.isEmpty() || seg == "$" || seg == "@")
+        return QString();
+
+    QStringView sv{seg};
+    QString out;  out.reserve(seg.size()*2);  // worst case “~”→“~0”, “/”→“~1”
+
+    // helper: append and escape
+    auto push = [&](QStringView piece)
+    {
+        out += u'/';
+        for (const QChar ch : piece)
+        {
+            if (ch == u'~')      out += QLatin1String("~0");
+            else if (ch == u'/') out += QLatin1String("~1");
+            else                 out += ch;
+        }
+    };
+
+    qsizetype pos = 0, n = sv.size();
+    if (sv[0] == u'$' || sv[0] == u'@') ++pos;          // skip root
+
+    while (pos < n)
+    {
+        if (sv[pos] == u'.') { ++pos; continue; }
+
+        if (sv[pos] == u'[') {                          // [ ... ]
+            ++pos;
+            bool quoted = (sv[pos] == u'\'' || sv[pos] == u'\"');
+            if (quoted) ++pos;
+            qsizetype start = pos;
+            while (pos < n && (quoted ? sv[pos]!=sv[start-1] : sv[pos]!=u']'))
+                ++pos;
+            push(sv.sliced(start, pos-start));
+            while (pos < n && sv[pos] != u']') ++pos;
+            ++pos;                                     // skip ']'
+        }
+        else {                                         // plain id
+            qsizetype start = pos;
+            while (pos < n && sv[pos] != u'.' && sv[pos] != u'[') ++pos;
+            push(sv.sliced(start, pos-start));
+        }
+    }
+    return out;
+}
+
+QJsonValue JSONPath::evalAsPathList(const JSONPath& self,
+                                    const QJsonValue& root)
+{
+    if (self.m_option != Option::AsPathList)
+        return QJsonValue(QJsonValue::Undefined);
+
+    QJsonArray segments;
+    for (const auto& tk : self.m_tokens)
+        if (tk.kind == Token::Kind::Key)
+            segments.append(QStringLiteral("/") + tk.key);
+    return segments;
+}
+
+// ─────────────────────────────────────────────────────────────────────
+//  evalStandard  – raw evaluation without the “AsPathList” post‑step
+//      (moved out of evaluate() so both helpers can share the logic)
+// ─────────────────────────────────────────────────────────────────────
+QJsonValue JSONPath::evalStandard(const JSONPath& self,
+                                  const QJsonValue& root)
+{
+    if (!self.m_valid || self.m_tokens.isEmpty())
+        return QJsonValue(QJsonValue::Undefined);
+
+    QJsonArray working { root };
+    bool multi = false;
+
+    for (qsizetype i = 1; i < self.m_tokens.size() && !working.isEmpty(); ++i)
+    {
+        const Token& tk = self.m_tokens[i];
+
+        if (tk.kind == Token::Kind::Recursive) {
+            QJsonArray next;
+            for (const auto& v : working) {
+                QJsonArray rec = self.evaluateToken(tk, v);
+                for (const auto& e : rec) next.append(e);
+            }
+            working.swap(next);
+            multi = true;
+            continue;
+        }
+
+        QJsonArray next;
+        for (const auto& v : working) {
+            QJsonArray seg = self.evaluateToken(tk, v);
+            for (const auto& e : seg) next.append(e);
+        }
+        if (next.isEmpty())
+            return QJsonValue(QJsonValue::Undefined);
+
+        if (tk.kind != Token::Kind::Key && tk.kind != Token::Kind::Index)
+            multi = true;
+
+        working.swap(next);
+    }
+
+    // collapse work‑list ------------------------------------------------
+    QJsonValue result;
+    if (working.isEmpty())                       result = QJsonValue(QJsonValue::Undefined);
+    else if (!multi && working.size() == 1)      result = working.first();
+    else                                         result = working;
+
+    // trailing functions ------------------------------------------------
+    switch (self.m_func)
+    {
+        case FunctionType::None:    return result;
+
+        case FunctionType::Length:
+            if (result.isArray())   return result.toArray().size();
+            if (result.isObject())  return result.toObject().size();
+            return 0;
+
+        case FunctionType::Min:
+        case FunctionType::Max: {
+            if (!result.isArray()) return QJsonValue(QJsonValue::Undefined);
+            const auto arr = result.toArray();
+            bool first = true; double best = 0.0;
+            for (const auto& v : arr) {
+                if (!v.isDouble()) continue;
+                double d = v.toDouble();
+                if (first || (self.m_func == FunctionType::Min ? d < best : d > best)) {
+                    best = d; first = false;
+                }
+            }
+            return first ? QJsonValue(QJsonValue::Undefined)
+                         : QJsonValue(best);
+        }
+    }
+    std::unreachable();
 }
