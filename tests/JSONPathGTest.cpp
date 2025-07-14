@@ -22,9 +22,9 @@ TEST(JSONPathBasic, RootAccess)
 {
     QJsonObject obj{{"foo", "bar"}};
     QJsonDocument doc(obj);
-    JSONPath path("$");
-    ASSERT_TRUE(path.isValid());
-    QJsonValue res = path.evaluate(doc);
+    auto path{ JSONPath::create(u"$") };
+    ASSERT_TRUE(path);
+    QJsonValue res = path->evaluate(doc);
     if (res.isArray()) {
         ASSERT_EQ(res.toArray().size(), 1);
         res = res.toArray()[0];
@@ -36,20 +36,20 @@ TEST(JSONPathBasic, PropertyAccess)
 {
     QJsonObject obj{{"foo", "bar"}, {"baz", 42}};
     QJsonDocument doc(obj);
-    JSONPath path("$.foo");
-    EXPECT_EQ(evalSingle(path, doc).toString(), QStringLiteral("bar"));
-    JSONPath path2("$['baz']");
-    EXPECT_EQ(evalSingle(path2, doc).toInt(), 42);
+    auto path{ JSONPath::create(u"$.foo") };
+    EXPECT_EQ(evalSingle(*path, doc).toString(), QStringLiteral("bar"));
+    auto path2{ JSONPath::create(u"$['baz']") };
+    EXPECT_EQ(evalSingle(*path2, doc).toInt(), 42);
 }
 
 TEST(JSONPathBasic, ArrayIndex)
 {
     QJsonArray arr = QJsonArray::fromVariantList({"zero", "one", "two"});
     QJsonDocument doc(arr);
-    JSONPath idx("$[1]");
-    EXPECT_EQ(evalSingle(idx, doc).toString(), QStringLiteral("one"));
-    JSONPath neg("$[-1]");
-    EXPECT_EQ(evalSingle(neg, doc).toString(), QStringLiteral("two"));
+    auto idx{ JSONPath::create(u"$[1]") };
+    EXPECT_EQ(evalSingle(*idx, doc).toString(), QStringLiteral("one"));
+    auto neg{ JSONPath::create(u"$[-1]") };
+    EXPECT_EQ(evalSingle(*neg, doc).toString(), QStringLiteral("two"));
 }
 
 TEST(JSONPathPointerInterop, CompareWithJSONPointer)
@@ -57,6 +57,6 @@ TEST(JSONPathPointerInterop, CompareWithJSONPointer)
     QJsonObject obj{{"items", QJsonArray{ QJsonObject{{"id", 1}, {"name", "Item1"}} }}};
     QJsonDocument doc(obj);
     JSONPointer ptr("/items/0/name");
-    JSONPath path("$.items[0].name");
-    EXPECT_EQ(evalSingle(path, doc), ptr.evaluate(doc));
+    auto path{ JSONPath::create(u"$.items[0].name") };
+    EXPECT_EQ(evalSingle(*path, doc), ptr.evaluate(doc));
 }

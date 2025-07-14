@@ -20,20 +20,29 @@ int main(int argc, char **argv)
     QJsonObject store{{"books", books}};
     QJsonDocument doc(store);
 
-    // Query: authors of books costing more than 20
-    JSONPath path("$.books[?(@.price > 20)].author");
-    if (!path.isValid()) {
-        qWarning() << "Invalid JSONPath.";
-        return EXIT_FAILURE;
-    }
+    // ─── helper: always give me an array ───────────────────────────────────────
+    auto toArray = [](QJsonValue v) -> QJsonArray {
+        if (v.isArray())            return v.toArray();
+        if (!v.isUndefined())       return QJsonArray{ v };
+        return {};
+    };
 
-    QJsonValue res = path.evaluate(doc);
-    QJsonArray result;
-    if (res.isArray())
-        result = res.toArray();
-    else if (!res.isUndefined())
-        result.append(res);
-    qInfo() << "Authors of expensive books:" << result; // Expected ["Author 2", "Author 3"]
+    // ─── one monadic pipeline ─────────────────────────────────────────────────
+    JSONPath::create(u"$.books[?(@.price > 20)].author")          // Result<JSONPath>
+        .transform([&](const JSONPath& jp) {                      // -> QJsonValue
+            return jp.evaluate(doc);
+        })
+        .transform(toArray)                                       // -> QJsonArray
+        .and_then([](const QJsonArray& authors) {                 // happy path
+            qInfo() << "Authors of expensive books:" << authors;
+            return std::expected<void, json_query::Error>{};      // propagate Ok
+        })
+        .or_else([](json_query::Error e) -> std::expected<void,json_query::Error>
+        {
+            // error path
+            qWarning() << "Invalid JSONPath:" << json_query::toString(e).data();
+            return {};
+        });
 
     return EXIT_SUCCESS;
 }

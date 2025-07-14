@@ -19,21 +19,25 @@ int main(int argc, char **argv)
     QJsonObject store{{"books", books}};
     QJsonDocument doc(store);
 
-    // Query all titles
-    JSONPath path("$.books[*].title");
-    if (!path.isValid()) {
-        qWarning() << "Invalid JSONPath.";
-        return EXIT_FAILURE;
-    }
+    // Small utility: whatever comes back, give me a QJsonArray
+    const auto toArray = [](QJsonValue v) -> QJsonArray {
+        if (v.isArray())            return v.toArray();
+        if (!v.isUndefined())       return QJsonArray{ v };
+        return {};
+    };
 
-    QJsonValue res = path.evaluate(doc);
-    QJsonArray titles;
-    if (res.isArray()) {
-        titles = res.toArray();
-    } else if (!res.isUndefined()) {
-        titles.append(res);
-    }
-    qInfo() << "Book titles:" << titles; // Expected: ["Book 1", "Book 2", "Book 3"]
+    JSONPath::create(u"$.books[*].title")                 // expected<JSONPath,Error>
+        .transform([&](const JSONPath& jp) {              // → QJsonValue
+            return jp.evaluate(doc);
+        })
+        .transform(toArray)                               // → QJsonArray
+        .and_then([](const QJsonArray& titles) {          // success branch
+            qInfo() << "Book titles:" << titles;          // ["Book 1", "Book 2", "Book 3"]
+            return std::expected<void, json_query::Error>{};
+        })
+        .or_else([](json_query::Error e) -> std::expected<void,json_query::Error> {                // error branch
+            qWarning() << "Invalid JSONPath:" << json_query::toString(e).data();
+        });
 
     return EXIT_SUCCESS;
 }

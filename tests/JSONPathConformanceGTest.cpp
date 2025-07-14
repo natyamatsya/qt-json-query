@@ -55,9 +55,9 @@ TEST(JSONPathConformance, ValidPaths)
     };
 
     for (const auto &c : cases) {
-        JSONPath jp(c.path);
-        ASSERT_TRUE(jp.isValid()) << qPrintable(QStringLiteral("Invalid path: %1").arg(c.path));
-        compareJson(jp.evaluate(sampleDoc()), c.expected);
+        auto jp { JSONPath::create(c.path) };
+        ASSERT_TRUE(jp) << qPrintable(QStringLiteral("Invalid path: %1").arg(c.path));
+        compareJson(jp->evaluate(sampleDoc()), c.expected);
     }
 }
 

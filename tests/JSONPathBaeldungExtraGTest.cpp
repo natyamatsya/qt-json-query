@@ -26,9 +26,9 @@ TEST(JSONPathBaeldungExtra, LengthFunction)
 
     const QJsonDocument doc = QJsonDocument::fromJson(QByteArray(jsonSrc));
 
-    JSONPath path("$.book.length()");
-    ASSERT_TRUE(path.isValid());
-    QJsonValue val = path.evaluate(doc);
+    auto path{ JSONPath::create(u"$.book.length()") };
+    ASSERT_TRUE(path);
+    QJsonValue val = path->evaluate(doc);
     ASSERT_TRUE(val.isDouble());
     EXPECT_EQ(val.toInt(), 3);
 }
@@ -47,9 +47,9 @@ TEST(JSONPathBaeldungExtra, MinFunction)
 
     const QJsonDocument doc = QJsonDocument::fromJson(QByteArray(jsonSrc));
 
-    JSONPath path("$[*]['box office'].min()");
-    ASSERT_TRUE(path.isValid());
-    QJsonValue v = path.evaluate(doc);
+    auto path{ JSONPath::create(u"$[*]['box office'].min()") };
+    ASSERT_TRUE(path);
+    QJsonValue v = path->evaluate(doc);
     ASSERT_TRUE(v.isDouble());
     EXPECT_EQ(v.toVariant().toLongLong(), 591692078LL);
 }
@@ -68,9 +68,9 @@ TEST(JSONPathBaeldungExtra, RegexAuthorFilter)
 
     const QJsonDocument doc = QJsonDocument::fromJson(QByteArray(jsonSrc));
 
-    JSONPath path("$['book'][?(@.author =~ /.*Smith/)]");
-    ASSERT_TRUE(path.isValid());
-    QJsonArray res = path.evaluateAll(doc);
+    auto path{ JSONPath::create(u"$['book'][?(@.author =~ /.*Smith/)]") };
+    ASSERT_TRUE(path);
+    QJsonArray res = path->evaluateAll(doc);
     ASSERT_EQ(res.size(), 1);
     EXPECT_EQ(res[0].toObject().value("title").toString(), u"Beginning JSON"_s);
 }
@@ -86,9 +86,9 @@ TEST(JSONPathBaeldungExtra, AsPathListOption)
 
     const QJsonDocument doc = QJsonDocument::fromJson(QByteArray(jsonSrc));
 
-    JSONPath path("$['book'][0]['title']", JSONPath::Option::AsPathList);
-    ASSERT_TRUE(path.isValid());
-    QJsonValue v = path.evaluate(doc);
+    auto path{ JSONPath::create(u"$['book'][0]['title']", JSONPath::Option::AsPathList) };
+    ASSERT_TRUE(path);
+    QJsonValue v = path->evaluate(doc);
     ASSERT_TRUE(v.isString());
     EXPECT_EQ(v.toString(), "/book/0/title"_L1);
 }

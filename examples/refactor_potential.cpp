@@ -76,8 +76,8 @@ static QString editionIsbn_pointer(const QJsonDocument &doc, int index)
 
 static QString editionIsbn_path(const QJsonDocument &doc, int index)
 {
-    JSONPath p(QString("$.inventory[%1].details.edition.isbn").arg(index));
-    QJsonValue r = p.evaluate(doc);
+    auto pathResult{JSONPath::create(QString(u"$.inventory[%1].details.edition.isbn").arg(index))};
+    QJsonValue r{ pathResult->evaluate(doc) };
     if (r.isArray()) {
         const auto arr = r.toArray();
         return arr.isEmpty() ? QString() : arr.first().toString();
@@ -91,9 +91,9 @@ static QString editionIsbn_path(const QJsonDocument &doc, int index)
 static QStringList titlesAbovePrice_jsonquery(const QJsonDocument &doc, double threshold)
 {
     // Build a JSONPath expression with the price threshold.
-    const QString path = QString("$.inventory[?(@.price > %1)].title").arg(threshold);
-    JSONPath query(path);
-    QJsonValue r = query.evaluate(doc);
+    QStringView pathView = QString("$.inventory[?(@.price > %1)].title").arg(threshold);
+    auto query{ JSONPath::create(pathView) };
+    QJsonValue r = query->evaluate(doc);
     QStringList result;
     if (r.isArray()) {
         for (const QJsonValue &v : r.toArray())
