@@ -18,8 +18,8 @@ using json_query::Error;
 // ──────────────────────────────────────────────────────────────────────
 //  Helpers local to this TU
 // ──────────────────────────────────────────────────────────────────────
-namespace {
-
+namespace
+{
     // Parse [start:end:step]   (empty parts get defaults)
     [[nodiscard]] static inline Slice makeSlice(QStringView v)
     {
