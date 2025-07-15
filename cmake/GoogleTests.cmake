@@ -18,6 +18,7 @@ set(TEST_SOURCES
     ${PROJECT_SOURCE_DIR}/tests/JSONPointerGTest.cpp
     ${PROJECT_SOURCE_DIR}/tests/JSONPathBaeldungGTest.cpp
     ${PROJECT_SOURCE_DIR}/tests/JSONPathBaeldungExtraGTest.cpp
+    ${PROJECT_SOURCE_DIR}/tests/JSONPathLogicalOrPredicateGTest.cpp
 )
 
 # Unified test executable

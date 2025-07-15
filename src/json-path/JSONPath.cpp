@@ -40,6 +40,40 @@ namespace {
                                    : readInt(v.sliced(c2 + 1, v.size()-c2-2), 1);
         return { start, end, step };
     }
+
+    //  src/json-path/JSONPath.cpp
+    static inline QString stripOuterParens(QStringView sv)
+    {
+        // remove exactly one balanced pair if present
+        if (sv.size() >= 2 && sv.front() == u'(' && sv.back() == u')')
+            sv = sv.mid(1, sv.size() - 2);
+
+        return QString(sv).trimmed();   // QString ctor understands QStringView
+    }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+// Helper: split at the first occurrence of delim that is **not** in parentheses
+// Returns { left , right }  if found,  otherwise std::nullopt
+// ─────────────────────────────────────────────────────────────────────────────
+auto splitTopLevel = [](QStringView sv, QLatin1StringView delim)
+        -> std::optional<std::pair<QString,QString>>
+{
+    const qsizetype nDelim = delim.size();
+    int parenDepth = 0;
+
+    for (qsizetype i = 0, N = sv.size() - nDelim + 1; i < N; ++i) {
+        const QChar c = sv[i];
+        if (c == u'(')         ++parenDepth;
+        else if (c == u')')    --parenDepth;
+        else if (parenDepth == 0 && sv.mid(i, nDelim) == delim) {
+            return std::pair<QString,QString>{
+                QString(sv.left(i)),
+                QString(sv.mid(i + nDelim)) };
+        }
+    }
+    return std::nullopt;
+};
+
 } // namespace
 
 JSONPath::Result JSONPath::create(QStringView rawPath, Option opt)
@@ -66,14 +100,22 @@ JSONPath::Result JSONPath::create(QStringView rawPath, Option opt)
 
 JSONPath::FunctionType JSONPath::detectTrailingFunction(QString& path)
 {
+    using enum FunctionType;
+
     static const QPair<QString, FunctionType> table[] = {
-        {".length()", FunctionType::Length},
-        {".min()",    FunctionType::Min   },
-        {".max()",    FunctionType::Max   },
+        {".length()", Length},
+        {".min()",    Min   },
+        {".max()",    Max   },
     };
+
     for (auto& p : table)
-        if (path.endsWith(p.first)) { path.chop(p.first.size()); return p.second; }
-    return FunctionType::None;
+        if (path.endsWith(p.first))
+        {
+            path.chop(p.first.size());
+            return p.second;
+        }
+
+    return None;
 }
 
 std::expected<JSONPath::Compiled, Error> JSONPath::compilePath(const QStringView sv)
@@ -293,47 +335,59 @@ QJsonArray JSONPath::evaluateAll(const QJsonValue &value) const
 //        3.  'foo' in @['arrayProp']
 //      Extend with more patterns as needed.
 // ───────────────────────────────────────────────────────────────
+// === replace the very top of JSONPath::compileFilter =========================
 std::optional<Token>
-JSONPath::compileFilter(const QString& expr,
-                        QVector<json_query::FilterFn>& out)
+JSONPath::compileFilter(const QString &expr, QVector<json_query::FilterFn> &out)
 {
     using Kind = Token::Kind;
     using json_query::utils::to_sv;
     using json_query::utils::to_qstr;
 
-    QString s = expr.trimmed();
-    if (s.startsWith(u'?'))  s.remove(0,1);
-    if (s.startsWith(u'(') && s.endsWith(u')'))
-        s = s.mid(1, s.size()-2).trimmed();
+    // remove one pair of outer parentheses so we can look for top‑level operators
+    QString s = stripOuterParens(expr);
 
-    // ── handle logical AND between two simple predicates ───────────────
-    if (s.contains("&&"_L1))        // ① plain 8‑bit literal → _L1 is fine
-    {
-        const auto parts = s.split("&&"_L1);
-        if (parts.size() == 2)
-        {
-            // small lambda that re‑invokes compileFilter *recursively*
-            auto parseSingle = [&](const QString& sub)
-                               -> std::optional<FilterFn>
-            {
-                QVector<FilterFn> tmp;
-                if (auto t = compileFilter(sub.trimmed(), tmp); t && !tmp.isEmpty())
-                    return tmp.back();          // produced predicate
-                return std::nullopt;
-            };
+    // ── logical OR  (lowest precedence) ──────────────────────────────────────────
+    if (auto split = splitTopLevel(s, "||"_L1); split) {
+        const auto &[lhsStr, rhsStr] = *split;
 
-            auto left  = parseSingle(parts[0]);
-            auto right = parseSingle(parts[1]);
-            if (left && right)
-            {
-                std::size_t id = out.size();
-                out.push_back( FilterFn{ [l = *left, r = *right](const QJsonValue& j)
-                                          { return l(j) && r(j); }} );  // ② std::function
+        auto parseSingle = [&](const QString &sub) -> std::optional<FilterFn> {
+            QVector<FilterFn> tmp;
+            if (auto t = compileFilter(sub.trimmed(), tmp); t && !tmp.isEmpty())
+                return tmp.back();
+            return std::nullopt;
+        };
 
-                return Token{Kind::Filter, 0, {}, 0u, {}, id};
-            }
+        auto lhs = parseSingle(lhsStr);
+        auto rhs = parseSingle(rhsStr);
+        if (lhs && rhs) {
+            const std::size_t id = out.size();
+            out.push_back(FilterFn{ [l = *lhs, r = *rhs](const QJsonValue &j) {
+                                        return l(j) || r(j); } });
+            return Token{Kind::Filter, 0, {}, 0u, {}, id};
         }
-        return std::nullopt;                     // malformed “&&”
+        return std::nullopt;                       // malformed “||”
+    }
+
+    // ── logical AND  (higher precedence than OR) ────────────────────────────────
+    if (auto split = splitTopLevel(s, "&&"_L1); split) {
+        const auto &[lhsStr, rhsStr] = *split;
+
+        auto parseSingle = [&](const QString &sub) -> std::optional<FilterFn> {
+            QVector<FilterFn> tmp;
+            if (auto t = compileFilter(sub.trimmed(), tmp); t && !tmp.isEmpty())
+                return tmp.back();
+            return std::nullopt;
+        };
+
+        auto lhs = parseSingle(lhsStr);
+        auto rhs = parseSingle(rhsStr);
+        if (lhs && rhs) {
+            const std::size_t id = out.size();
+            out.push_back(FilterFn{ [l = *lhs, r = *rhs](const QJsonValue &j) {
+                                        return l(j) && r(j); } });
+            return Token{Kind::Filter, 0, {}, 0u, {}, id};
+        }
+        return std::nullopt;                       // malformed “&&”
     }
 
     // ---------------------------------------------------  'foo' in @['tags']
