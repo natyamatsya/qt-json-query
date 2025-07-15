@@ -118,112 +118,151 @@ JSONPath::FunctionType JSONPath::detectTrailingFunction(QString& path)
     return None;
 }
 
-std::expected<JSONPath::Compiled, Error> JSONPath::compilePath(const QStringView sv)
-{
-    using Kind = Token::Kind;
+namespace detail {
 
+// ────────────────────────────────────────────────────────────────
+// 1. pushKey helper (renamed)
+// ────────────────────────────────────────────────────────────────
+struct KeyBuilder {
+    QVector<Token>& tgt;
+
+    std::expected<void,Error> push(QStringView key)
+    {
+        if (key.isEmpty()) return std::unexpected(Error::EmptySegment);
+        QString s = key.toString();
+        tgt.append(Token{ Token::Kind::Key, 0, {}, qt_hash(s), std::move(s), 0 });
+        return {};
+    }
+};
+
+// ────────────────────────────────────────────────────────────────
+// 2. dot‑segment parser (no switch on QChar)
+// ────────────────────────────────────────────────────────────────
+[[nodiscard]] std::expected<qsizetype,Error>
+parseDot(qsizetype pos, QStringView sv,
+         KeyBuilder& kb, QVector<Token>& tokens)
+{
+    const qsizetype n = sv.size();
+    if (++pos >= n) return std::unexpected(Error::TrailingDot);
+
+    QChar nxt = sv[pos];
+    if (nxt == u'.') { tokens.append(Token{Token::Kind::Recursive}); ++pos; return pos; }
+    if (nxt == u'*') { tokens.append(Token{Token::Kind::Wildcard }); ++pos; return pos; }
+
+    qsizetype start = pos;
+    while (pos < n && sv[pos] != u'.' && sv[pos] != u'[') ++pos;
+    if (auto r = kb.push(sv.sliced(start, pos - start)); !r)
+        return std::unexpected(r.error());
+    return pos;
+}
+
+// ── detail::parseBracket  (replace the whole previous body) ──────────────────
+[[nodiscard]] std::expected<qsizetype,Error>
+parseBracket(qsizetype pos, QStringView sv,
+             KeyBuilder& kb, QVector<Token>& tokens, QVector<JSONPath::FilterFn>& filters)
+{
+    using K = Token::Kind;
+
+    const qsizetype n      = sv.size();
+    const qsizetype startB = ++pos;          // skip '['
+
+    int depth = 1;
+    while (pos < n && depth) {               // find matching ']'
+        if      (sv[pos] == u'[') ++depth;
+        else if (sv[pos] == u']') --depth;
+        ++pos;
+    }
+    if (depth) return std::unexpected(Error::UnmatchedBracket);
+
+    const QStringView content = sv.sliced(startB, pos - startB - 1);
+
+    // *   ---------------------------------------------------------------------
+    if (content == u"*") {
+        tokens.append(Token{K::Wildcard});
+        return pos;
+    }
+
+    // ?(filter) ----------------------------------------------------------------
+    if (!content.isEmpty() && content.front() == u'?') {
+        auto tk = JSONPath::compileFilter(content.mid(1).toString(), filters);
+        if (!tk) return std::unexpected(Error::UnsupportedFilter);
+        tokens.append(*tk);
+        return pos;
+    }
+
+    // slice  -------------------------------------------------------------------
+    if (content.contains(u':')) {
+        tokens.append(Token{K::Slice, 0, makeSlice(content), 0u});
+        return pos;
+    }
+
+    // quoted key ---------------------------------------------------------------
+    if (!content.isEmpty() &&
+        (content.front() == u'\'' || content.front() == u'\"'))
+    {
+        const qsizetype qEnd = content.lastIndexOf(content.front());
+        if (qEnd <= 0) return std::unexpected(Error::UnmatchedQuote);
+
+        if (auto r = kb.push(content.sliced(1, qEnd - 1)); !r)
+            return std::unexpected(r.error());
+        return pos;
+    }
+
+    // numeric index ------------------------------------------------------------
+    bool ok = false;
+    const int idx = QString(content).toInt(&ok);
+    if (ok) {
+        tokens.append(Token{K::Index, idx});
+        return pos;
+    }
+
+    // fallback: treat raw content as key ---------------------------------------
+    const QString bracketSeg = "[" + QString(content) + "]";
+    if (auto r = kb.push(bracketSeg); !r)
+        return std::unexpected(r.error());
+    return pos;
+}
+
+// bare‑name parser: replace kb.pushKey → kb.push
+[[nodiscard]] std::expected<qsizetype,Error>
+parseBare(qsizetype pos, QStringView sv, KeyBuilder& kb)
+{
+    qsizetype n = sv.size(), start = pos;
+    while (pos < n && sv[pos] != u'.' && sv[pos] != u'[') ++pos;
+    if (auto r = kb.push(sv.sliced(start, pos - start)); !r)
+        return std::unexpected(r.error());
+    return pos;
+}
+} // namespace detail
+
+std::expected<JSONPath::Compiled, Error>
+JSONPath::compilePath(QStringView sv)
+{
+    using K = Token::Kind;
     QVector<Token> tokens;
     QVector<FilterFn> filters;
     tokens.reserve(sv.count('.') + sv.count('[') + 4);
 
-    // ── root ────────────────────────────────────────────────────────
+    // root
     if (sv.empty() || (sv[0] != u'$' && sv[0] != u'@'))
         return std::unexpected(Error::MissingRoot);
-
-    tokens.append(Token{ Kind::Key, 0, {},
-                         qt_hash(sv.first(1)),
+    tokens.append(Token{ K::Key, 0, {}, qt_hash(sv.first(1)),
                          sv.first(1).toString(), 0 });
 
-    qsizetype pos = 1, n = sv.size();
+    detail::KeyBuilder kb{tokens};
 
-    auto fail = [](Error e)
-        { return std::unexpected(e); };
-
-    auto pushKey = [&](QStringView key) -> std::expected<void, Error>
+    // scan
+    for (qsizetype pos = 1, n = sv.size(); pos < n; )
     {
-        if (key.isEmpty()) return fail(Error::EmptySegment);
+        std::expected<qsizetype,Error> next =
+            (sv[pos] == u'.') ? detail::parseDot    (pos, sv, kb, tokens)
+          : (sv[pos] == u'[') ? detail::parseBracket(pos, sv, kb, tokens, filters)
+          :                    detail::parseBare   (pos, sv, kb);
 
-        // keep the *plain* property name here – the pointer form is
-        // only needed for the AsPathList feature, not for value look‑ups
-        QString s = key.toString();
-        tokens.append(Token{ Kind::Key, 0, {}, qt_hash(s), std::move(s), 0 });
-        return {};
-    };
-
-    // ── main loop ───────────────────────────────────────────────────
-    while (pos < n)
-    {
-        const QChar c = sv[pos];
-
-        // dot-notation ------------------------------------------------
-        if (c == u'.') {
-            if (++pos >= n) return fail(Error::TrailingDot);
-            const QChar next = sv[pos];
-
-            if (next == u'.') { tokens.append(Token{Kind::Recursive}); ++pos; continue; }
-            if (next == u'*') { tokens.append(Token{Kind::Wildcard});  ++pos; continue; }
-
-            qsizetype start = pos;
-            while (pos < n && sv[pos] != u'.' && sv[pos] != u'[') ++pos;
-            if (auto r = pushKey(sv.sliced(start, pos - start)); !r)
-                return std::unexpected{r.error()};
-            continue;
-        }
-
-        // bracket-notation -------------------------------------------
-        if (c == u'[') {
-            const qsizetype startB = ++pos;
-            int depth = 1;
-            while (pos < n && depth) {
-                if   (sv[pos] == u'[') ++depth;
-                else if (sv[pos] == u']') --depth;
-                ++pos;
-            }
-            if (depth) return fail(Error::UnmatchedBracket);
-
-            const QStringView content = sv.sliced(startB, pos - startB - 1);
-
-            if (content == u"*") { tokens.append(Token{Kind::Wildcard}); continue; }
-
-            if (!content.isEmpty() && content.front() == u'?') {
-                auto tk = compileFilter(content.mid(1).toString(), filters);
-
-                if (!tk) return fail(Error::UnsupportedFilter);
-                tokens.append(*tk); continue;
-            }
-
-            if (content.contains(u':')) {
-                tokens.append(Token{Kind::Slice,0,makeSlice(content),0u});
-                continue;
-            }
-
-            if (!content.isEmpty() &&
-                (content.front()==u'\''||content.front()==u'\"'))
-            {
-                auto qEnd = content.lastIndexOf(content.front());
-                if (qEnd <= 0) return fail(Error::UnmatchedQuote);
-                if (auto r = pushKey(content.sliced(1, qEnd-1)); !r)
-                    return std::unexpected{r.error()};
-                continue;
-            }
-
-            bool ok=false; int idx = QString{content}.toInt(&ok);
-            if (ok) { tokens.append(Token{Kind::Index, idx}); continue; }
-
-            // fallback: treat as raw key
-            QString bracketSeg = "[" + QString(content) + "]";
-            if (auto r = pushKey(bracketSeg); !r)
-                return std::unexpected{r.error()};;
-            continue;
-        }
-
-        // bare property name -----------------------------------------
-        qsizetype start = pos;
-        while (pos < n && sv[pos] != u'.' && sv[pos] != u'[') ++pos;
-        if (auto r = pushKey(sv.sliced(start, pos - start)); !r)
-            return std::unexpected{r.error()};
+        if (!next) return std::unexpected(next.error());
+        pos = *next;
     }
-    return Compiled{ std::move(tokens), std::move(filters) };                       // success
+    return Compiled{ std::move(tokens), std::move(filters) };
 }
 
 QJsonValue JSONPath::evaluate(const QJsonDocument &document) const

@@ -103,6 +103,15 @@ namespace detail {
                       const QJsonArray&);
 }
 
+namespace detail {
+    struct KeyBuilder;   // new
+
+    std::expected<qsizetype, json_query::Error>
+    parseBracket(qsizetype, QStringView,
+                 KeyBuilder&, QVector<json_query::Token>&,
+                 QVector<json_query::FilterFn>&);
+}
+
 // ======================================================================
 //  JSONPath  – public façade; now created through a factory
 // ======================================================================
@@ -210,4 +219,10 @@ private:
     friend QJsonArray detail::fanOut(const JSONPath&,
                                  const Token&,
                                  const QJsonArray&);
+
+    /* existing friends … */
+    friend std::expected<qsizetype, json_query::Error>
+           detail::parseBracket(qsizetype, QStringView,
+                                detail::KeyBuilder&, QVector<json_query::Token>&,
+                                QVector<json_query::FilterFn>&);
 };
