@@ -306,6 +306,36 @@ JSONPath::compileFilter(const QString& expr,
     if (s.startsWith(u'(') && s.endsWith(u')'))
         s = s.mid(1, s.size()-2).trimmed();
 
+    // ── handle logical AND between two simple predicates ───────────────
+    if (s.contains("&&"_L1))        // ① plain 8‑bit literal → _L1 is fine
+    {
+        const auto parts = s.split("&&"_L1);
+        if (parts.size() == 2)
+        {
+            // small lambda that re‑invokes compileFilter *recursively*
+            auto parseSingle = [&](const QString& sub)
+                               -> std::optional<FilterFn>
+            {
+                QVector<FilterFn> tmp;
+                if (auto t = compileFilter(sub.trimmed(), tmp); t && !tmp.isEmpty())
+                    return tmp.back();          // produced predicate
+                return std::nullopt;
+            };
+
+            auto left  = parseSingle(parts[0]);
+            auto right = parseSingle(parts[1]);
+            if (left && right)
+            {
+                std::size_t id = out.size();
+                out.push_back( FilterFn{ [l = *left, r = *right](const QJsonValue& j)
+                                          { return l(j) && r(j); }} );  // ② std::function
+
+                return Token{Kind::Filter, 0, {}, 0u, {}, id};
+            }
+        }
+        return std::nullopt;                     // malformed “&&”
+    }
+
     // ---------------------------------------------------  'foo' in @['tags']
     {
         constexpr auto pat = ctll::fixed_string{
@@ -599,15 +629,27 @@ QString JSONPath::segmentToPointer(const QString& seg) const
 QJsonValue JSONPath::evalAsPathList(const JSONPath& self,
                                     const QJsonValue& root)
 {
+    Q_UNUSED(root)
     if (self.m_option != Option::AsPathList)
         return QJsonValue(QJsonValue::Undefined);
 
-    QJsonArray segments;
-    for (const auto& tk : self.m_tokens)
-        if (tk.kind == Token::Kind::Key)
-            segments.append(QStringLiteral("/") + tk.key);
-    return segments;
+    QStringList segments;
+    for (qsizetype i = 1; i < self.m_tokens.size(); ++i) {
+        const Token& tk = self.m_tokens[i];
+        switch (tk.kind) {
+        case Token::Kind::Key:
+            segments.append(escapePointerSegment(tk.key));
+            break;
+        case Token::Kind::Index:
+            segments.append(QString::number(tk.index));
+            break;
+        default:                    // unsupported for AsPathList
+            return QJsonValue(QJsonValue::Undefined);
+        }
+    }
+    return "/"_L1 + segments.join(u'/' );     // single pointer string
 }
+
 
 // ─────────────────────────────────────────────────────────────────────
 //  evalStandard  – raw evaluation without the “AsPathList” post‑step
@@ -684,4 +726,16 @@ QJsonValue JSONPath::evalStandard(const JSONPath& self,
         }
     }
     std::unreachable();
+}
+
+QString JSONPath::escapePointerSegment(const QString& seg)
+{
+    QString out;
+    out.reserve(seg.size());
+    for (const QChar c : seg) {
+        if (c == u'~') out += "~0"_L1;
+        else if (c == u'/') out += "~1"_L1;
+        else out += c;
+    }
+    return out;
 }

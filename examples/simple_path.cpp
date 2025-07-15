@@ -37,6 +37,7 @@ int main(int argc, char **argv)
         })
         .or_else([](json_query::Error e) -> std::expected<void,json_query::Error> {                // error branch
             qWarning() << "Invalid JSONPath:" << json_query::toString(e).data();
+            return {};
         });
 
     return EXIT_SUCCESS;

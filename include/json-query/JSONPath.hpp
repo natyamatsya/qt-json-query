@@ -22,6 +22,8 @@
 
 #include <ctre.hpp>
 
+using namespace Qt::StringLiterals;
+
 namespace json_query
 {
 // ======================================================================
@@ -157,6 +159,7 @@ private:
     [[nodiscard]] QJsonArray recursiveDescend  (const QJsonValue& v,
                                   const QString& prop) const;
     [[nodiscard]] QString     segmentToPointer (const QString& seg) const;
+    [[nodiscard]] static QString escapePointerSegment(const QString&);
 
     // -----------------------------------------------------------------
     //  Data members
