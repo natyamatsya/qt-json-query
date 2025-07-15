@@ -97,6 +97,12 @@ namespace detail {
     std::optional<json_query::Token> parseRegex   (QString, QVector<json_query::FilterFn>&);
 }
 
+namespace detail {
+    QJsonArray fanOut(const JSONPath&,
+                      const json_query::Token&,
+                      const QJsonArray&);
+}
+
 // ======================================================================
 //  JSONPath  – public façade; now created through a factory
 // ======================================================================
@@ -200,4 +206,8 @@ private:
     friend std::optional<Token> detail::parseIn     (QString, QVector<FilterFn>&);
     friend std::optional<Token> detail::parseCompare(QString, QVector<FilterFn>&);
     friend std::optional<Token> detail::parseRegex  (QString, QVector<FilterFn>&);
+
+    friend QJsonArray detail::fanOut(const JSONPath&,
+                                 const Token&,
+                                 const QJsonArray&);
 };
