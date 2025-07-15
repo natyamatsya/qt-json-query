@@ -249,67 +249,119 @@ QJsonValue JSONPath::evaluate(const QJsonValue& root) const
 //      * Returns an array with all matches (empty ⇒ no match).
 //      * Fast‑path exits keep nesting shallow.
 // ─────────────────────────────────────────────────────────────────────
-QJsonArray JSONPath::evaluateToken(const Token& tk,
-                                   const QJsonValue& v) const
+// -----------------------------------------------------------------------------
+// Inline evaluators — one per token kind
+// -----------------------------------------------------------------------------
+namespace detail {
+
+template<JSONPath::Token::Kind K>
+inline QJsonArray eval(const JSONPath& jp,
+                       const JSONPath::Token& tk,
+                       const QJsonValue& v);
+
+// --- Key -------------------------------------------------------------------
+template<>
+inline QJsonArray eval<JSONPath::Token::Kind::Key>(const JSONPath&,
+                                                   const JSONPath::Token& tk,
+                                                   const QJsonValue& v)
 {
-    using enum Token::Kind;
     QJsonArray out;
+    if (!v.isObject()) return out;
 
-    switch (tk.kind)
-    {
-        // ------------------------------------------------ Key
-        case Key: {
-                if (!v.isObject()) return out;
-                QJsonObject obj = v.toObject();
-                auto it = obj.find(tk.key);
-                if (it != obj.end())              // copy *before* obj is destroyed
-                    out.append(it.value());
-                return out;
-        }
-
-        // ------------------------------------------------ Index
-        case Index: {
-            if (!v.isArray()) return out;
-            const auto& arr = v.toArray();
-            int idx = normalizeIndex(static_cast<int>(tk.index), arr.size());
-            if (idx >= 0 && idx < arr.size()) out.append(arr[idx]);
-            return out;
-        }
-
-        // ------------------------------------------------ Slice
-        case Slice:
-            if (v.isArray())
-                return evalSlice(v.toArray(), tk.slice);
-            return out;
-
-        // ------------------------------------------------ Wildcard
-        case Wildcard:
-            if (v.isObject()) return wildcardObject(v.toObject());
-            if (v.isArray())  return wildcardArray (v.toArray());
-            return out;
-
-        // ------------------------------------------------ Recursive
-        case Recursive:
-            return evaluateRecursive(v, /*unused*/0);
-
-        // ------------------------------------------------ Filter
-        case Filter: {
-            if (tk.filterId >= static_cast<std::size_t>(m_filters.size()))
-                return out;
-            const auto& pred = m_filters[tk.filterId];
-
-            if (v.isArray()) {
-                for (const auto& e : v.toArray())
-                    if (pred(e)) out.append(e);
-                return out;
-            }
-            if (pred(v)) out.append(v);
-            return out;
-        }
-    }
-
-    std::unreachable();
+    const auto obj = v.toObject();
+    if (auto it = obj.find(tk.key); it != obj.end())
+        out.append(it.value());
+    return out;
 }
+
+// --- Index -----------------------------------------------------------------
+template<>
+inline QJsonArray eval<JSONPath::Token::Kind::Index>(const JSONPath& jp,
+                                                     const JSONPath::Token& tk,
+                                                     const QJsonValue& v)
+{
+    QJsonArray out;
+    if (!v.isArray()) return out;
+
+    const auto& arr = v.toArray();
+    const int idx   = jp.normalizeIndex(static_cast<int>(tk.index), arr.size());
+    if (idx >= 0 && idx < arr.size()) out.append(arr[idx]);
+    return out;
+}
+
+// --- Slice -----------------------------------------------------------------
+template<>
+inline QJsonArray eval<JSONPath::Token::Kind::Slice>(const JSONPath& jp,
+                                                     const JSONPath::Token& tk,
+                                                     const QJsonValue& v)
+{
+    if (v.isArray())
+        return jp.evalSlice(v.toArray(), tk.slice);
+    return {};
+}
+
+// --- Wildcard --------------------------------------------------------------
+template<>
+inline QJsonArray eval<JSONPath::Token::Kind::Wildcard>(const JSONPath& jp,
+                                                        const JSONPath::Token&,
+                                                        const QJsonValue& v)
+{
+    if (v.isObject()) return jp.wildcardObject(v.toObject());
+    if (v.isArray())  return jp.wildcardArray (v.toArray());
+    return {};
+}
+
+// --- Recursive -------------------------------------------------------------
+template<>
+inline QJsonArray eval<JSONPath::Token::Kind::Recursive>(const JSONPath& jp,
+                                                         const JSONPath::Token&,
+                                                         const QJsonValue& v)
+{
+    return jp.evaluateRecursive(v, 0);
+}
+
+// --- Filter ----------------------------------------------------------------
+template<>
+inline QJsonArray eval<JSONPath::Token::Kind::Filter>(const JSONPath& jp,
+                                                      const JSONPath::Token& tk,
+                                                      const QJsonValue& v)
+{
+    QJsonArray out;
+    if (tk.filterId >= jp.m_filters.size()) return out;
+
+    const auto& pred = jp.m_filters[tk.filterId];
+    if (v.isArray()) {
+        for (const auto& e : v.toArray())
+            if (pred(e)) out.append(e);
+        return out;
+    }
+    if (pred(v)) out.append(v);
+    return out;
+}
+
+} // namespace detail
+
+// -----------------------------------------------------------------------------
+// Fast dispatch table: Kind → evaluator
+// -----------------------------------------------------------------------------
+inline QJsonArray JSONPath::evaluateToken(const Token& tk,
+                                          const QJsonValue& v) const
+{
+    using K = Token::Kind;
+    // NB: keep the order in sync with the enum!
+    constexpr std::array<
+        QJsonArray (*)(const JSONPath&, const Token&, const QJsonValue&), 6> lut = {
+        detail::eval<K::Key>,
+        detail::eval<K::Index>,
+        detail::eval<K::Slice>,
+        detail::eval<K::Wildcard>,
+        detail::eval<K::Recursive>,
+        detail::eval<K::Filter>
+    };
+
+    return lut[static_cast<std::size_t>(tk.kind)](*this, tk, v);
+}
+
 
 QJsonArray JSONPath::evaluateAll(const QJsonDocument &document) const
 {
@@ -328,7 +380,7 @@ QJsonArray JSONPath::evaluateAll(const QJsonValue &value) const
 }
 
 // ───────────────────────────────────────────────────────────────
-//  compileFilter  — turns [? …] into Token{Filter,…} + lambda
+//  compileFilter  — turns [? …] into Token{Filter,…} + lambda
 //      Supports three forms:
 //        1.  @.prop  <op>  value          (numeric or string, == != > < >= <=)
 //        2.  @['prop'] <op> value         (same operators)

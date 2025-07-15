@@ -71,13 +71,23 @@ toString(Error e) noexcept
         case UnsupportedFilter: return "unsupported filter expression";
         case InvalidSlice     : return "bad array slice";
         case InvalidIndex     : return "bad numeric index";
-        default                  : return "unknown error";
+        default               : return "unknown error";
     }
 }
 
 using FilterFn = std::function<bool (const QJsonValue&)>;
 
 } // namespace json_query
+
+class JSONPath;
+
+namespace detail
+{
+    template<json_query::Token::Kind K>
+    QJsonArray eval(const JSONPath&,
+                    const json_query::Token&,
+                    const QJsonValue&);
+}
 
 // ======================================================================
 //  JSONPath  – public façade; now created through a factory
@@ -170,4 +180,9 @@ private:
     QString                    m_originalPath;
     QVector<Token>             m_tokens;
     QVector<json_query::FilterFn> m_filters;
+
+    template<Token::Kind K>
+    friend QJsonArray detail::eval(const JSONPath&,
+                const Token&,
+                const QJsonValue&);
 };
