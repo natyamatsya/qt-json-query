@@ -106,6 +106,8 @@ namespace detail {
 namespace detail {
     struct KeyBuilder;   // new
 
+    std::optional<json_query::Token> callCompileFilter(const QString&, QVector<json_query::FilterFn>&);
+
     std::expected<qsizetype, json_query::Error>
     parseBracket(qsizetype, QStringView,
                  KeyBuilder&, QVector<json_query::Token>&,
@@ -225,4 +227,6 @@ private:
            detail::parseBracket(qsizetype, QStringView,
                                 detail::KeyBuilder&, QVector<json_query::Token>&,
                                 QVector<json_query::FilterFn>&);
+
+    friend std::optional<Token> detail::callCompileFilter(const QString&, QVector<FilterFn>&);
 };

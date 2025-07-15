@@ -156,72 +156,134 @@ parseDot(qsizetype pos, QStringView sv,
     return pos;
 }
 
-// ── detail::parseBracket  (replace the whole previous body) ──────────────────
-[[nodiscard]] std::expected<qsizetype,Error>
-parseBracket(qsizetype pos, QStringView sv,
-             KeyBuilder& kb, QVector<Token>& tokens, QVector<JSONPath::FilterFn>& filters)
+// Friend‑level wrapper so rule lambdas can call compileFilter  ----------------
+inline std::optional<Token>
+callCompileFilter(const QString& expr, QVector<JSONPath::FilterFn>& f)
 {
-    using K = Token::Kind;
-
-    const qsizetype n      = sv.size();
-    const qsizetype startB = ++pos;          // skip '['
-
-    int depth = 1;
-    while (pos < n && depth) {               // find matching ']'
-        if      (sv[pos] == u'[') ++depth;
-        else if (sv[pos] == u']') --depth;
-        ++pos;
-    }
-    if (depth) return std::unexpected(Error::UnmatchedBracket);
-
-    const QStringView content = sv.sliced(startB, pos - startB - 1);
-
-    // *   ---------------------------------------------------------------------
-    if (content == u"*") {
-        tokens.append(Token{K::Wildcard});
-        return pos;
-    }
-
-    // ?(filter) ----------------------------------------------------------------
-    if (!content.isEmpty() && content.front() == u'?') {
-        auto tk = JSONPath::compileFilter(content.mid(1).toString(), filters);
-        if (!tk) return std::unexpected(Error::UnsupportedFilter);
-        tokens.append(*tk);
-        return pos;
-    }
-
-    // slice  -------------------------------------------------------------------
-    if (content.contains(u':')) {
-        tokens.append(Token{K::Slice, 0, makeSlice(content), 0u});
-        return pos;
-    }
-
-    // quoted key ---------------------------------------------------------------
-    if (!content.isEmpty() &&
-        (content.front() == u'\'' || content.front() == u'\"'))
-    {
-        const qsizetype qEnd = content.lastIndexOf(content.front());
-        if (qEnd <= 0) return std::unexpected(Error::UnmatchedQuote);
-
-        if (auto r = kb.push(content.sliced(1, qEnd - 1)); !r)
-            return std::unexpected(r.error());
-        return pos;
-    }
-
-    // numeric index ------------------------------------------------------------
-    bool ok = false;
-    const int idx = QString(content).toInt(&ok);
-    if (ok) {
-        tokens.append(Token{K::Index, idx});
-        return pos;
-    }
-
-    // fallback: treat raw content as key ---------------------------------------
-    const QString bracketSeg = "[" + QString(content) + "]";
-    if (auto r = kb.push(bracketSeg); !r)
-        return std::unexpected(r.error());
-    return pos;
+    return JSONPath::compileFilter(expr, f);        // still private
 }
+
+// A small façade so every rule can emit tokens consistently
+    // BracketSink now carries *filters* as well
+    struct BracketSink {
+    QVector<Token>&   tk;
+    KeyBuilder&       kb;
+    QVector<JSONPath::FilterFn>& filters;
+
+    std::expected<void,Error> key(QStringView k) { return kb.push(k); }
+    void wild()                 { tk.append(Token{Token::Kind::Wildcard}); }
+    void slice(const Slice& s)   { tk.append(Token{Token::Kind::Slice,0,s,0u}); }
+    void index(int i)            { tk.append(Token{Token::Kind::Index,i}); }
+    void pushFilter(const Token& t){ tk.append(t); }
+};
+
+
+// A helper to iterate over the content and run rules.
+using BrRule = std::function<std::optional<Error>(QStringView, BracketSink&)>;
+
+static const std::array<BrRule,6> BR_RULES = {{
+
+    // 1.  *      ----------------------------------------------------
+    [](QStringView content, BracketSink& out)->std::optional<Error> {
+        if (content == u"*") { out.wild(); return {}; }
+        return std::nullopt;
+    },
+
+    // 2.  ?(filter)  -----------------------------------------------
+    [](QStringView content, BracketSink& out)->std::optional<Error> {
+        if (!content.isEmpty() && content.front()==u'?') {
+            auto tk = callCompileFilter(content.mid(1).toString(), out.filters);
+            if (!tk) return Error::UnsupportedFilter;
+            out.pushFilter(*tk);
+            return {};
+        }
+        return std::nullopt;
+    },
+
+    // 3.  slice      -----------------------------------------------
+    [](QStringView content, BracketSink& out)->std::optional<Error> {
+        if (content.contains(u':')) {
+            out.slice(makeSlice(content));
+            return {};
+        }
+        return std::nullopt;
+    },
+
+    // 4.  quoted key -----------------------------------------------
+    [](QStringView content, BracketSink& out)->std::optional<Error> {
+        if (!content.isEmpty() &&
+           (content.front()==u'\'' || content.front()==u'\"'))
+        {
+            const qsizetype qEnd = content.lastIndexOf(content.front());
+            if (qEnd <= 0) return Error::UnmatchedQuote;
+            if (auto r = out.key(content.sliced(1,qEnd-1)); !r)
+                return r.error();
+            return {};
+        }
+        return std::nullopt;
+    },
+
+    // 5.  numeric index --------------------------------------------
+    [](QStringView content, BracketSink& out)->std::optional<Error> {
+        bool ok=false; int idx = QString(content).toInt(&ok);
+        if (ok) { out.index(idx); return {}; }
+        return std::nullopt;
+    },
+
+    // 6.  fallback raw key -----------------------------------------
+    [](QStringView content, BracketSink& out)->std::optional<Error> {
+        const QString wrapped = "[" + QString(content) + "]";
+        if (auto r = out.key(wrapped); !r) return r.error();
+        return {};
+    }
+}};
+
+// ------------------------------------------------------------------
+// parseBracket dispatcher
+// ------------------------------------------------------------------
+[[nodiscard]] std::expected<qsizetype, Error>
+parseBracket(qsizetype pos,
+             QStringView          sv,
+             KeyBuilder&          kb,
+             QVector<Token>&      tokens,
+             QVector<JSONPath::FilterFn>&   filters)
+    {
+        using K = Token::Kind;
+
+        // 1. find the matching ’]’ -------------------------------------------------
+        const qsizetype n      = sv.size();
+        const qsizetype startB = ++pos;                 // skip initial '['
+
+        int depth = 1;
+        while (pos < n && depth) {
+            if      (sv[pos] == u'[') ++depth;
+            else if (sv[pos] == u']') --depth;
+            ++pos;
+        }
+        if (depth) return std::unexpected(Error::UnmatchedBracket);
+
+        const QStringView content = sv.sliced(startB, pos - startB - 1);
+
+        // 2. run rule table until one rule adds something --------------------------
+        BracketSink sink{tokens, kb, filters};
+
+        for (auto&& rule : BR_RULES)
+        {
+            const std::size_t tokBefore   = tokens .size();
+            const std::size_t filtBefore  = filters.size();
+
+            if (auto err = rule(content, sink))               // matched but errored
+                return std::unexpected(*err);
+
+            // did this rule append at least one token or filter?
+            if (tokens.size() != tokBefore || filters.size() != filtBefore)
+                return pos;                                   // handled → stop
+        }
+
+        // Fallback rule in BR_RULES always handles the segment, so we should never
+        // reach this line. If we do, return a generic syntax error.
+        return std::unexpected(Error::InvalidIndex);
+    }
 
 // bare‑name parser: replace kb.pushKey → kb.push
 [[nodiscard]] std::expected<qsizetype,Error>
@@ -795,21 +857,16 @@ namespace detail {
 // 1.  Fan-out: apply one token to every value in 'src'
 //     – handles the Recursive fast-path internally
 // ------------------------------------------------------------------
+// completely replaces the previous implementation
 [[nodiscard]] inline QJsonArray fanOut(const JSONPath& self,
                                        const JSONPath::Token& tk,
                                        const QJsonArray& src)
 {
     QJsonArray dst;
-    if (tk.kind == JSONPath::Token::Kind::Recursive) {
-        for (const auto& v : src) {
-            for (const auto& e : self.evaluateToken(tk, v))
-                dst.append(e);
-        }
-    } else {
-        for (const auto& v : src) {
-            for (const auto& e : self.evaluateToken(tk, v))
-                dst.append(e);
-        }
+    for (const auto& v : src) {
+        const QJsonArray seg = self.evaluateToken(tk, v);   // keep it alive
+        for (const auto& e : seg)
+            dst.append(e);
     }
     return dst;
 }
