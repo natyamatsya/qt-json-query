@@ -89,6 +89,14 @@ namespace detail
                     const QJsonValue&);
 }
 
+namespace detail {
+    std::optional<json_query::Token> parseOr      (QString, QVector<json_query::FilterFn>&);
+    std::optional<json_query::Token> parseAnd     (QString, QVector<json_query::FilterFn>&);
+    std::optional<json_query::Token> parseIn      (QString, QVector<json_query::FilterFn>&);
+    std::optional<json_query::Token> parseCompare (QString, QVector<json_query::FilterFn>&);
+    std::optional<json_query::Token> parseRegex   (QString, QVector<json_query::FilterFn>&);
+}
+
 // ======================================================================
 //  JSONPath  – public façade; now created through a factory
 // ======================================================================
@@ -185,4 +193,11 @@ private:
     friend QJsonArray detail::eval(const JSONPath&,
                 const Token&,
                 const QJsonValue&);
+
+    // Give the rule parsers access to the private static compileFilter()
+    friend std::optional<Token> detail::parseOr     (QString, QVector<FilterFn>&);
+    friend std::optional<Token> detail::parseAnd    (QString, QVector<FilterFn>&);
+    friend std::optional<Token> detail::parseIn     (QString, QVector<FilterFn>&);
+    friend std::optional<Token> detail::parseCompare(QString, QVector<FilterFn>&);
+    friend std::optional<Token> detail::parseRegex  (QString, QVector<FilterFn>&);
 };
