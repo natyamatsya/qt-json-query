@@ -14,8 +14,22 @@ using namespace jp;
     TEST(JaywayPathCompilerParity, DISABLED_##name) { GTEST_SKIP() << reason; }
 
 // -----------------------------------------------------------------------------
-// Root path test placeholder (disabled until compile API exposed)
-PATHCOMPILER_STUB(RootPathCanBeCompiled, "compile() API not publicly available yet");
+// Root path can be compiled ---------------------------------------------------
+TEST(JaywayPathCompilerParity, RootPathCanBeCompiled)
+{
+    using json_query::Error;
+    // "$" root
+    auto resDollar = json_query::compile(u"$");
+    ASSERT_TRUE(resDollar.has_value()) << "Compilation of '$' failed";
+    EXPECT_EQ(resDollar->tokens.size(), 1);
+    EXPECT_EQ(resDollar->tokens.front().key, "$");
+
+    // "@" root (current node)
+    auto resAt = json_query::compile(u"@");
+    ASSERT_TRUE(resAt.has_value()) << "Compilation of '@' failed";
+    EXPECT_EQ(resAt->tokens.size(), 1);
+    EXPECT_EQ(resAt->tokens.front().key, "@");
+}
 
 // -----------------------------------------------------------------------------
 // Parity stubs (remaining ~30 Java tests) --------------------------------------

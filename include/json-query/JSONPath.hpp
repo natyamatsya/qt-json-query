@@ -217,6 +217,8 @@ private:
     friend std::optional<Token> detail::parseIn     (QString, QVector<FilterFn>&);
     friend std::optional<Token> detail::parseCompare(QString, QVector<FilterFn>&);
     friend std::optional<Token> detail::parseRegex  (QString, QVector<FilterFn>&);
+    // Grant access to free compile() wrapper
+    friend std::expected<JSONPath::Compiled, json_query::Error> compile(QStringView);
 
     friend QJsonArray detail::fanOut(const JSONPath&,
                                  const Token&,
@@ -230,3 +232,19 @@ private:
 
     friend std::optional<Token> detail::callCompileFilter(const QString&, QVector<FilterFn>&);
 };
+
+// ---------------------------------------------------------------------------
+//  Free wrapper: json_query::compile(path)
+//  Provides Jayway-style compile API returning token+filter structure.
+// ---------------------------------------------------------------------------
+[[nodiscard]] inline std::expected<JSONPath::Compiled, json_query::Error>
+compile(QStringView path)
+{
+    return JSONPath::compilePath(path);
+}
+
+namespace json_query {
+    using ::compile;
+}
+
+
