@@ -1,0 +1,8 @@
+{
+  "version": 6,
+  "include": [
+
+    "cmake/presets/Debug.json",
+    "cmake/presets/Release.json"
+  ]
+}

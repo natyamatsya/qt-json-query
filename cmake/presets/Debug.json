@@ -1,0 +1,26 @@
+{
+  "version": 6,
+  "include": [
+    "Common.json"
+  ],
+  "configurePresets": [
+    {
+      "name": "debug",
+      "inherits": "common",
+      "displayName": "Debug",
+      "description": "Debug build with debug info and assertions",
+      "binaryDir": "${sourceDir}/build-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "debug",
+      "configurePreset": "debug",
+      "description": "Build debug configuration",
+      "jobs": 8
+    }
+  ]
+}

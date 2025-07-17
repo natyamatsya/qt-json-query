@@ -1,0 +1,26 @@
+{
+  "version": 6,
+  "include": [
+    "Common.json"
+  ],
+  "configurePresets": [
+    {
+      "name": "release",
+      "inherits": "common",
+      "displayName": "Release",
+      "description": "Release build with optimizations",
+      "binaryDir": "${sourceDir}/build-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "release",
+      "configurePreset": "release",
+      "description": "Build release configuration",
+      "jobs": 8
+    }
+  ]
+}

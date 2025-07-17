@@ -1,0 +1,12 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "common",
+      "displayName": "Common",
+      "description": "Shared settings for all builds",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build-${presetName}"
+    }
+  ]
+}
