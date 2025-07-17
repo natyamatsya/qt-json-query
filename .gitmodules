@@ -1,0 +1,3 @@
+[submodule "tests/references/JsonPath"]
+	path = tests/references/jayway-json-path
+	url = https://github.com/json-path/JsonPath.git
