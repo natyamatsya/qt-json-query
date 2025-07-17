@@ -1,8 +1,9 @@
 {
-  "version": 6,
+  "version": 9,
   "configurePresets": [
     {
       "name": "common",
+      "hidden": true,
       "displayName": "Common",
       "description": "Shared settings for all builds",
       "generator": "Ninja",
