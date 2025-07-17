@@ -5,26 +5,12 @@
 // added incrementally.
 
 #include <gtest/gtest.h>
+#include <gmock/gmock.h>
 #include <QJsonDocument>
-#include <QJsonArray>
 #include "json-query/JSONPath.hpp"
+#include "JaywayParityGTestHelpers.hpp"
 #include <QJsonValue>
 
-// Helper: parse JSON text into a QJsonDocument
-static QJsonDocument parseJson(const char* src)
-{
-    return QJsonDocument::fromJson(QByteArray(src));
-}
-
-// Helper: evaluate a path and return the resulting QJsonArray (flattening if the
-// implementation returns a single value)
-static QJsonArray evalArray(const JSONPath& path, const QJsonDocument& doc)
-{
-    const QJsonValue v = path.evaluate(doc);
-    if (v.isArray())
-        return v.toArray();
-    return QJsonArray{v};
-}
 
 TEST(JaywayDeepScanParity, NonArraySubscriptionIgnored)
 {
@@ -32,18 +18,18 @@ TEST(JaywayDeepScanParity, NonArraySubscriptionIgnored)
     ASSERT_TRUE(path);
 
     {
-        QJsonArray result = evalArray(*path, parseJson(R"({"x": [0,1,[0,1,2,3,null],null]})"));
+        QJsonArray result = jp::evalArray(*path, jp::parseJson(R"({"x": [0,1,[0,1,2,3,null],null]})"));
         ASSERT_EQ(result.size(), 1);
         EXPECT_EQ(result[0].toInt(), 3);
     }
     {
-        QJsonArray result = evalArray(*path, parseJson(R"({"x": [0,1,[0,1,2,3,null],null], "y": [0,1,2]})"));
+        QJsonArray result = jp::evalArray(*path, jp::parseJson(R"({"x": [0,1,[0,1,2,3,null],null], "y": [0,1,2]})"));
         ASSERT_EQ(result.size(), 1);
         EXPECT_EQ(result[0].toInt(), 3);
     }
     {
-        QJsonArray result = evalArray(*path, parseJson(R"({"x": [0,1,[0,1,2],null], "y": [0,1,2]})"));
-        EXPECT_TRUE(result.isEmpty());
+        QJsonArray result = jp::evalArray(*path, jp::parseJson(R"({"x": [0,1,[0,1,2],null], "y": [0,1,2]})"));
+        EXPECT_THAT(result, ::testing::IsEmpty());
     }
 }
 
@@ -53,12 +39,12 @@ TEST(JaywayDeepScanParity, NullSubscriptionIgnored)
     ASSERT_TRUE(path);
 
     {
-        QJsonArray result = evalArray(*path, parseJson(R"({"x": [null,null,[0,1,2,3,null],null]})"));
+        QJsonArray result = jp::evalArray(*path, jp::parseJson(R"({"x": [null,null,[0,1,2,3,null],null]})"));
         ASSERT_EQ(result.size(), 1);
         EXPECT_EQ(result[0].toInt(), 3);
     }
     {
-        QJsonArray result = evalArray(*path, parseJson(R"({"x": [null,null,[0,1,2,3,null],null], "y": [0,1,null]})"));
+        QJsonArray result = jp::evalArray(*path, jp::parseJson(R"({"x": [null,null,[0,1,2,3,null],null], "y": [0,1,null]})"));
         ASSERT_EQ(result.size(), 1);
         EXPECT_EQ(result[0].toInt(), 3);
     }
@@ -76,48 +62,47 @@ TEST(JaywayDeepScanParity, ArrayIndexOobIgnored)
 {
     auto path1 = JSONPath::create(u"$..[4]");
     ASSERT_TRUE(path1);
-    QJsonArray r1 = evalArray(*path1, parseJson(R"({"x": [0,1,[0,1,2,3,10],null]})"));
+    QJsonArray r1 = jp::evalArray(*path1, jp::parseJson(R"({"x": [0,1,[0,1,2,3,10],null]})"));
     ASSERT_EQ(r1.size(), 1);
-    EXPECT_EQ(r1[0].toInt(), 10);
+    EXPECT_THAT(r1, ::testing::ElementsAre(QJsonValue(10)));
 
     auto path2 = JSONPath::create(u"$..[2][3]");
     ASSERT_TRUE(path2);
-    QJsonArray r2 = evalArray(*path2, parseJson(R"({"x": [null,null,[0,1,2,3]], "y": [null,null,[0,1]]})"));
-    ASSERT_EQ(r2.size(), 1);
-    EXPECT_EQ(r2[0].toInt(), 3);
+    QJsonArray r2 = jp::evalArray(*path2, jp::parseJson(R"({"x": [null,null,[0,1,2,3]], "y": [null,null,[0,1]]})"));
+    EXPECT_THAT(r2, ::testing::ElementsAre(QJsonValue(3)));
 }
 
 PARITY_TEST(DefiniteUpstreamIllegalArrayAccessThrows, "Awaiting PathNotFoundException support.");
 TEST(JaywayDeepScanParity, DISABLED_IllegalPropertyAccessIgnored)
 {
     // $..foo should collect both objects and scalars
-    QJsonArray r1 = evalArray(*JSONPath::create(u"$..foo"),
-        parseJson(R"({"x": {"foo": {"bar": 4}}, "y": {"foo": 1}})"));
+    QJsonArray r1 = jp::evalArray(*JSONPath::create(u"$..foo"),
+        jp::parseJson(R"({"x": {"foo": {"bar": 4}}, "y": {"foo": 1}})"));
     ASSERT_EQ(r1.size(), 2);
 
     // $..foo.bar should only return the nested bar property
-    QJsonArray r2 = evalArray(*JSONPath::create(u"$..foo.bar"),
-        parseJson(R"({"x": {"foo": {"bar": 4}}, "y": {"foo": 1}})"));
+    QJsonArray r2 = jp::evalArray(*JSONPath::create(u"$..foo.bar"),
+        jp::parseJson(R"({"x": {"foo": {"bar": 4}}, "y": {"foo": 1}})"));
     ASSERT_EQ(r2.size(), 1);
     EXPECT_EQ(r2[0].toInt(), 4);
 
-    QJsonArray r3 = evalArray(*JSONPath::create(u"$..[*].foo.bar"),
-        parseJson(R"({"x": {"foo": {"bar": 4}}, "y": {"foo": 1}})"));
+    QJsonArray r3 = jp::evalArray(*JSONPath::create(u"$..[*].foo.bar"),
+        jp::parseJson(R"({"x": {"foo": {"bar": 4}}, "y": {"foo": 1}})"));
     ASSERT_EQ(r3.size(), 1);
     EXPECT_EQ(r3[0].toInt(), 4);
 
-    QJsonArray r4 = evalArray(*JSONPath::create(u"$..[*].foo.bar"),
-        parseJson(R"({"x": {"foo": {"baz": 4}}, "y": {"foo": 1}})"));
+    QJsonArray r4 = jp::evalArray(*JSONPath::create(u"$..[*].foo.bar"),
+        jp::parseJson(R"({"x": {"foo": {"baz": 4}}, "y": {"foo": 1}})"));
     EXPECT_TRUE(r4.isEmpty());
 }
+
 TEST(JaywayDeepScanParity, IllegalPredicateIgnored)
 {
     // Predicate selects objects having a bar property, then extracts bar
     auto path = JSONPath::create(u"$..foo[?(@.bar)].bar");
     ASSERT_TRUE(path);
-    QJsonArray result = evalArray(*path, parseJson(R"({"x": {"foo": {"bar": 4}}, "y": {"foo": 1}})"));
-    ASSERT_EQ(result.size(), 1);
-    EXPECT_EQ(result[0].toInt(), 4);
+    QJsonArray result = jp::evalArray(*path, jp::parseJson(R"({"x": {"foo": {"bar": 4}}, "y": {"foo": 1}})"));
+    EXPECT_THAT(result, ::testing::ElementsAre(QJsonValue(4)));
 }
 
 PARITY_TEST(RequirePropertiesIgnoredOnScanTarget, "Requires Option::REQUIRE_PROPERTIES flag handling.");
@@ -132,7 +117,7 @@ TEST(JaywayDeepScanParity, LeafMultiPropsWork)
 
     auto path = JSONPath::create(u"$..['a','c']");
     ASSERT_TRUE(path);
-    QJsonArray result = evalArray(*path, parseJson(jsonSrc));
+    QJsonArray result = jp::evalArray(*path, jp::parseJson(jsonSrc));
     // Expected behaviour: only objects containing *all* requested properties
     ASSERT_EQ(result.size(), 1);
     QJsonValue obj = result[0];
@@ -157,9 +142,9 @@ TEST(JaywayDeepScanParity, ScanForSingleProperty)
     ])";
     auto path = JSONPath::create(u"$..['a']");
     ASSERT_TRUE(path);
-    QJsonArray result = evalArray(*path, parseJson(jsonSrc));
+    QJsonArray result = jp::evalArray(*path, jp::parseJson(jsonSrc));
     // Expect: "aa", {"a":"aa"}, "aa"
-    ASSERT_EQ(result.size(), 3);
+    EXPECT_THAT(result, ::testing::SizeIs(3));
     EXPECT_TRUE(result[0].isString());
     EXPECT_EQ(result[0].toString(), u"aa");
     EXPECT_TRUE(result[1].isObject());
@@ -177,7 +162,7 @@ TEST(JaywayDeepScanParity, ScanForPropertyPath)
     ])";
     auto path = JSONPath::create(u"$..['a'].x");
     ASSERT_TRUE(path);
-    QJsonArray result = evalArray(*path, parseJson(jsonSrc));
+    QJsonArray result = jp::evalArray(*path, jp::parseJson(jsonSrc));
     ASSERT_EQ(result.size(), 2);
     EXPECT_EQ(result[0].toString(), u"xx");
     EXPECT_EQ(result[1].toString(), u"xx");
@@ -192,7 +177,7 @@ TEST(JaywayDeepScanParity, ScansCanBeFiltered)
     ])";
     auto path = JSONPath::create(u"$..[?(@.mammal == true)].color");
     ASSERT_TRUE(path);
-    QJsonArray result = evalArray(*path, parseJson(jsonSrc));
+    QJsonArray result = jp::evalArray(*path, jp::parseJson(jsonSrc));
     ASSERT_EQ(result.size(), 2);
     EXPECT_TRUE(result[0].isObject());
     EXPECT_TRUE(result[1].isObject());

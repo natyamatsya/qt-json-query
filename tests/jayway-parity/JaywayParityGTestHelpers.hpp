@@ -19,6 +19,9 @@
 #define JAYWAY_PARITY_GTEST_HELPERS_HPP
 
 #include <gtest/gtest.h>
+#include <gmock/gmock.h>
+#include <utility>
+#include <initializer_list>
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QJsonObject>
@@ -92,8 +95,36 @@ inline EvalResult evalExp(QStringView path,
         EXPECT_EQ(_res.error(), (errEnum));                    \
     } while (false)
 
+} // namespace jp
+
 // ---------------------------------------------------------------------------
-// Custom GoogleTest matchers --------------------------------------------------
+// Custom GoogleTest matchers ------------------------------------------------
+
+// Matcher for JSON string equality
+MATCHER_P(IsJsonString, expected, "JSON string equals")
+{
+    return arg.isString() && arg.toString() == expected;
+}
+
+MATCHER_P(IsJsonInt, expected, "JSON int equals")
+{
+    return arg.isDouble() && arg.toInt() == expected;
+}
+
+MATCHER_P(JsonObjContains, kvPairs, "object contains key/value pairs")
+{
+    if (!arg.isObject()) return false;
+    const auto obj = arg.toObject();
+    for (const auto &pair : kvPairs)
+    {
+        const QString &key = pair.first;
+        const QJsonValue &val = pair.second;
+        if (!obj.contains(key) || obj.value(key) != val)
+            return false;
+    }
+    return true;
+}
+
 // ---------------------------------------------------------------------------
 
 // Verify QJsonValue is string and equals expected.
@@ -128,7 +159,5 @@ template <typename... T>
     return ::testing::AssertionSuccess();
 }
 
-
-} // namespace jp
 
 #endif // JAYWAY_PARITY_GTEST_HELPERS_HPP

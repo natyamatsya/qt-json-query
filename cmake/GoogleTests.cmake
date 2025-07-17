@@ -38,7 +38,7 @@ set(JAYWAY_PARITY_SOURCES
 )
 add_executable(jayway_parity_tests ${JAYWAY_PARITY_SOURCES})
 target_include_directories(jayway_parity_tests PRIVATE ${PROJECT_SOURCE_DIR}/include)
-target_link_libraries(jayway_parity_tests PRIVATE json_query GTest::gtest GTest::gtest_main Qt6::Core)
+target_link_libraries(jayway_parity_tests PRIVATE json_query GTest::gtest GTest::gmock GTest::gtest_main Qt6::Core)
 
 # Register with CTest, discover individual GoogleTest cases for both suites
 include(GoogleTest)
