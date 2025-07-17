@@ -6,17 +6,14 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include "json-query/JSONPath.hpp"
+#include "JaywayParityGTestHelpers.hpp"
+#include <gmock/gmock.h>
 
-static QJsonDocument parse(const char* src)
+namespace jayway_parity
 {
-    return QJsonDocument::fromJson(QByteArray(src));
-}
 
-static QJsonObject evalObject(const JSONPath& path, const QJsonDocument& doc)
-{
-    QJsonValue v = path.evaluate(doc);
-    return v.toObject();
-}
+using namespace ::testing;
+using namespace jp;
 
 // -----------------------------------------------------------------------------
 // Implemented test – expected to pass with current library --------------------
@@ -28,20 +25,12 @@ TEST(JaywayMultiPropParity, MultiPropCanBeReadFromRoot)
         "b": "b-val",
         "c": "c-val"
     })";
-    auto doc = parse(json);
-    auto path = JSONPath::create(u"$['a','b']");
-    ASSERT_TRUE(path);
-    QJsonObject obj = evalObject(*path, doc);
-    ASSERT_EQ(obj.size(), 2);
-    EXPECT_EQ(obj["a"].toString(), u"a-val");
-    EXPECT_EQ(obj["b"].toString(), u"b-val");
+    QJsonValue v = eval(u"$['a','b']", parseJson(json));
+    EXPECT_THAT(v, JsonObjContains(kvlist(kv("a", "a-val"), kv("b", "b-val"))));
 
     // Absent props skipped by default
-    path = JSONPath::create(u"$['a','d']");
-    ASSERT_TRUE(path);
-    obj = evalObject(*path, doc);
-    ASSERT_EQ(obj.size(), 1);
-    EXPECT_TRUE(obj.contains("a"));
+    v = eval(u"$['a','d']", parseJson(json));
+    EXPECT_THAT(v, JsonObjContains(kvlist(kv("a", "a-val"))));
 }
 
 // -----------------------------------------------------------------------------
@@ -59,5 +48,7 @@ MP_PARITY_STUB(MultiPropsWithPostFilter, "Requires predicate filter support with
 MP_PARITY_STUB(DeepScanDoesNotAffectNonLeafMultiProps, "Combination of deep scan and multiprops.");
 MP_PARITY_STUB(MultiPropsCanBeInTheMiddle, "Multiprop in middle of path segments.");
 MP_PARITY_STUB(NonLeafMultiPropsCanBeRequired, "Option::REQUIRE_PROPERTIES with non-leaf multiprops.");
+
+} // namespace jayway_parity
 
 #undef MP_PARITY_STUB
