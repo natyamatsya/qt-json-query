@@ -111,7 +111,7 @@ TEST(JaywayDeepScanParity, LeafMultiPropsWork)
     auto path = JSONPath::create(u"$..['a','c']");
     ASSERT_TRUE(path);
     QJsonArray result = jp::evalArray(*path, jp::parseJson(jsonSrc));
-    EXPECT_THAT(result, ::testing::ElementsAre(JsonObjContains(std::initializer_list<std::pair<QString, QJsonValue>>{{QStringLiteral("a"), QJsonValue("a-val")}, {QStringLiteral("b"), QJsonValue("b-val")}, {QStringLiteral("c"), QJsonValue("c-val")}})));
+    EXPECT_THAT(result, ::testing::ElementsAre(JsonObjContains(kvlist(kv("a","a-val"), kv("b","b-val"), kv("c","c-val")))));
 }
 
 PARITY_TEST(RequireSinglePropertyOk, "Requires property requirement enforcement.");
@@ -129,12 +129,10 @@ TEST(JaywayDeepScanParity, ScanForSingleProperty)
     ASSERT_TRUE(path);
     QJsonArray result = jp::evalArray(*path, jp::parseJson(jsonSrc));
     // Expect: "aa", {"a":"aa"}, "aa"
-    EXPECT_THAT(result, ::testing::SizeIs(3));
-    EXPECT_TRUE(result[0].isString());
-    EXPECT_EQ(result[0].toString(), u"aa");
-    EXPECT_TRUE(result[1].isObject());
-    EXPECT_TRUE(result[2].isString());
-    EXPECT_EQ(result[2].toString(), u"aa");
+    EXPECT_THAT(result, ::testing::ElementsAre(
+        IsJsonString("aa"),
+        JsonObjContains(kvlist(kv("a","aa"))),
+        IsJsonString("aa")));
 }
 
 TEST(JaywayDeepScanParity, ScanForPropertyPath)
@@ -148,7 +146,7 @@ TEST(JaywayDeepScanParity, ScanForPropertyPath)
     auto path = JSONPath::create(u"$..['a'].x");
     ASSERT_TRUE(path);
     QJsonArray result = jp::evalArray(*path, jp::parseJson(jsonSrc));
-    EXPECT_THAT(result, ::testing::ElementsAre(IsJsonString(QStringLiteral("xx")), IsJsonString(QStringLiteral("xx"))));
+    EXPECT_THAT(result, ::testing::ElementsAre(IsJsonString("xx"), IsJsonString("xx")));
 }
 
 TEST(JaywayDeepScanParity, ScansCanBeFiltered)

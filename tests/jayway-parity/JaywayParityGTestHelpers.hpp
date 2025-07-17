@@ -20,6 +20,7 @@
 
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
+#include <type_traits>
 #include <utility>
 #include <initializer_list>
 #include <QJsonDocument>
@@ -101,9 +102,34 @@ inline EvalResult evalExp(QStringView path,
 // Custom GoogleTest matchers ------------------------------------------------
 
 // Matcher for JSON string equality
+// Overload-friendly JSON string matcher: accepts QString, QStringView, or UTF-8 string literal
 MATCHER_P(IsJsonString, expected, "JSON string equals")
 {
-    return arg.isString() && arg.toString() == expected;
+    QString expectedStr;
+    if constexpr (std::is_same_v<std::decay_t<decltype(expected)>, const char*>) {
+        expectedStr = QString::fromUtf8(expected);
+    } else {
+        expectedStr = QString(expected);
+    }
+    return arg.isString() && arg.toString() == expectedStr;
+}
+
+// Convenience helper to build key/value pairs for JsonObjContains without std::initializer_list verbosity.
+inline std::pair<QString, QJsonValue> kv(const char* key, const char* val)
+{
+    return { QString::fromUtf8(key), QJsonValue(QString::fromUtf8(val)) };
+}
+
+inline std::pair<QString, QJsonValue> kv(QStringView key, QStringView val)
+{
+    return { QString(key), QJsonValue(QString(val)) };
+}
+
+// Helper to assemble initializer_list without explicit type
+template<typename... Pairs>
+inline std::initializer_list<std::pair<QString, QJsonValue>> kvlist(Pairs&&... pairs)
+{
+    return { std::forward<Pairs>(pairs)... };
 }
 
 MATCHER_P(IsJsonInt, expected, "JSON int equals")
