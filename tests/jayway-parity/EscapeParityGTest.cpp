@@ -5,6 +5,7 @@
 #include <QJsonDocument>
 #include <QJsonArray>
 #include "json-query/JSONPath.hpp"
+#include "JaywayParityGTestHelpers.hpp"
 
 // The Java EscapeTest ensures that JSON provider does not escape forward slashes
 // when serialising. Qt's QJsonDocument always escapes only control chars so
@@ -21,7 +22,7 @@ TEST(JaywayEscapeParity, UrlsAreNotEscaped)
     ])";
 
     // Evaluate path "$" (identity) which should return whole array
-    auto doc = QJsonDocument::fromJson(QByteArray(json));
+    auto doc = jp::parseJson(json);
     ASSERT_TRUE(!doc.isNull());
 
     auto path = JSONPath::create(u"$");

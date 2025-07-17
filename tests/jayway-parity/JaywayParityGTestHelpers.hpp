@@ -102,7 +102,7 @@ inline ::testing::AssertionResult IsString(const QJsonValue& v, QStringView expe
     if (!v.isString())
         return ::testing::AssertionFailure() << "value is not a JSON string";
     if (v.toString() != expected)
-        return ::testing::AssertionFailure() << "expected '" << expected.toStdString()
+        return ::testing::AssertionFailure() << "expected '" << expected.toString().toStdString()
                                             << "' but got '" << v.toString().toStdString() << "'";
     return ::testing::AssertionSuccess();
 }
