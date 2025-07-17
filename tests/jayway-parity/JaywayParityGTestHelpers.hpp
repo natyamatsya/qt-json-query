@@ -125,6 +125,16 @@ inline std::pair<QString, QJsonValue> kv(QStringView key, QStringView val)
     return { QString(key), QJsonValue(QString(val)) };
 }
 
+inline std::pair<QString, QJsonValue> kv(const char* key, int val)
+{
+    return { QString::fromUtf8(key), QJsonValue(val) };
+}
+
+inline std::pair<QString, QJsonValue> kv(QStringView key, int val)
+{
+    return { QString(key), QJsonValue(val) };
+}
+
 // Helper to assemble initializer_list without explicit type
 template<typename... Pairs>
 inline std::initializer_list<std::pair<QString, QJsonValue>> kvlist(Pairs&&... pairs)

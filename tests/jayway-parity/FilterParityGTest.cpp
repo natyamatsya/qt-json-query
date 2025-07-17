@@ -6,20 +6,19 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include "json-query/JSONPath.hpp"
+#include "JaywayParityGTestHelpers.hpp"
+#include <gmock/gmock.h>
 
-static QJsonDocument parse(const char* src)
-{
-    return QJsonDocument::fromJson(QByteArray(src));
-}
-
-static QJsonArray evalArray(const JSONPath& p, const QJsonDocument& doc)
-{
-    QJsonValue v = p.evaluate(doc);
-    return v.isArray() ? v.toArray() : QJsonArray{v};
-}
 
 // -----------------------------------------------------------------------------
 // Implemented simple filter parity test ---------------------------------------
+
+namespace jayway_parity
+{
+
+using namespace ::testing;
+using namespace jp;
+
 // Mirror of int_eq_evals: select root objects where int-key == 1
 
 TEST(JaywayFilterParity, IntEqFilterEvaluates)
@@ -31,10 +30,8 @@ TEST(JaywayFilterParity, IntEqFilterEvaluates)
 
     auto path = JSONPath::create(u"$[?(@['int-key']==1)]");
     ASSERT_TRUE(path);
-    QJsonArray result = evalArray(*path, parse(json));
-    ASSERT_EQ(result.size(), 1);
-    ASSERT_TRUE(result[0].isObject());
-    EXPECT_EQ(result[0].toObject()["int-key"].toInt(), 1);
+    QJsonArray result = evalArray(*path, parseJson(json));
+    EXPECT_THAT(result, ElementsAre(JsonObjContains(kvlist(kv("int-key", 1)))));
 }
 
 // -----------------------------------------------------------------------------
@@ -96,5 +93,7 @@ FILTER_PARITY_STUB(TestFilterWithOrShortCircuit1, "OR short circuit test1.");
 FILTER_PARITY_STUB(TestFilterWithOrShortCircuit2, "OR short circuit test2.");
 FILTER_PARITY_STUB(CriteriaCanBeParsed, "Criteria parse.");
 FILTER_PARITY_STUB(InlineInCriteriaEvaluates, "Inline IN criteria.");
+
+} // namespace jayway_parity
 
 #undef FILTER_PARITY_STUB
