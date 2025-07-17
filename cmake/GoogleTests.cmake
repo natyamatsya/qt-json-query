@@ -34,6 +34,7 @@ set(JAYWAY_PARITY_SOURCES
     ${PROJECT_SOURCE_DIR}/tests/jayway-parity/DeepScanParityGTest.cpp
     ${PROJECT_SOURCE_DIR}/tests/jayway-parity/MultiPropParityGTest.cpp
     ${PROJECT_SOURCE_DIR}/tests/jayway-parity/FilterParityGTest.cpp
+    ${PROJECT_SOURCE_DIR}/tests/jayway-parity/EscapeParityGTest.cpp
 )
 add_executable(jayway_parity_tests ${JAYWAY_PARITY_SOURCES})
 target_include_directories(jayway_parity_tests PRIVATE ${PROJECT_SOURCE_DIR}/include)
