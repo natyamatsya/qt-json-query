@@ -4,33 +4,36 @@
 #include <gtest/gtest.h>
 #include <QJsonDocument>
 #include <QJsonArray>
+#include <gmock/gmock.h>
 #include "json-query/JSONPath.hpp"
 #include "JaywayParityGTestHelpers.hpp"
 
 // The Java EscapeTest ensures that JSON provider does not escape forward slashes
-// when serialising. Qt's QJsonDocument always escapes only control chars so
-// behaviour already matches. Implement a quick check, but mark disabled until
-// we formalise serialisation helper.
+// when serialising. Qt's QJsonDocument already leaves them untouched, so the
+// semantics align.  This parity test verifies both the evaluated result and
+// the round-trip serialisation using our matcher helpers.
+
+namespace jayway_parity {
+using namespace ::testing;
+using namespace jp;
 
 TEST(JaywayEscapeParity, UrlsAreNotEscaped)
 {
-    // JSON array of URLs as in Java EscapeTest
-    const char* json = R"([
+    constexpr const char* json = R"([
         "https://a/b/1",
         "https://a/b/2",
         "https://a/b/3"
     ])";
 
-    // Evaluate path "$" (identity) which should return whole array
-    auto doc = jp::parseJson(json);
-    ASSERT_TRUE(!doc.isNull());
+    // Identity path should yield the full array
+    QJsonArray arr = evalArray(*JSONPath::create(u"$"), parseJson(json));
+    EXPECT_THAT(arr, ElementsAre(IsJsonString("https://a/b/1"),
+                                 IsJsonString("https://a/b/2"),
+                                 IsJsonString("https://a/b/3")));
 
-    auto path = JSONPath::create(u"$");
-    ASSERT_TRUE(path);
-    QJsonValue result = path->evaluate(doc);
-    ASSERT_TRUE(result.isArray());
-
-    // Serialise back to JSON and verify slashes remain unescaped
-    QByteArray serialised = QJsonDocument(result.toArray()).toJson(QJsonDocument::Compact);
+    // Serialise array and confirm slashes stay unescaped
+    QByteArray serialised = QJsonDocument(arr).toJson(QJsonDocument::Compact);
     EXPECT_TRUE(serialised.contains("https://a/b/1"));
 }
+
+} // namespace jayway_parity
