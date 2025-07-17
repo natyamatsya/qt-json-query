@@ -132,6 +132,11 @@ inline std::initializer_list<std::pair<QString, QJsonValue>> kvlist(Pairs&&... p
     return { std::forward<Pairs>(pairs)... };
 }
 
+MATCHER(IsJsonObject, "JSON object")
+{
+    return arg.isObject();
+}
+
 MATCHER_P(IsJsonInt, expected, "JSON int equals")
 {
     return arg.isDouble() && arg.toInt() == expected;

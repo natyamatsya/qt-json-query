@@ -163,9 +163,7 @@ TEST(JaywayDeepScanParity, ScansCanBeFiltered)
     auto path = JSONPath::create(u"$..[?(@.mammal == true)].color");
     ASSERT_TRUE(path);
     QJsonArray result = evalArray(*path, parseJson(jsonSrc));
-    ASSERT_EQ(result.size(), 2);
-    EXPECT_TRUE(result[0].isObject());
-    EXPECT_TRUE(result[1].isObject());
+    EXPECT_THAT(result, ElementsAre(IsJsonObject(), IsJsonObject()));
 }
 
 PARITY_TEST(ScanWithFunctionFilter, "Requires function filter implementation.");
