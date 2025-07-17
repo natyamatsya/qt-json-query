@@ -5,8 +5,14 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include "json-query/JSONPath.hpp"
+#include "JaywayParityGTestHelpers.hpp"
+#include <gmock/gmock.h>
 
-static QJsonDocument parse(const char* src) { return QJsonDocument::fromJson(QByteArray(src)); }
+namespace jayway_parity {
+
+using namespace ::testing;
+using namespace jp;
+
 
 // -----------------------------------------------------------------------------
 // Implemented simple parity test: default VALUE evaluation
@@ -16,12 +22,8 @@ static QJsonDocument parse(const char* src) { return QJsonDocument::fromJson(QBy
 TEST(JaywayOptionsParity, PathEvaluationReturnedAsValueByDefault)
 {
     const char* json = R"({"foo" : "bar"})";
-    auto doc = parse(json);
-    auto path = JSONPath::create(u"$.foo");
-    ASSERT_TRUE(path);
-    QJsonValue res = path->evaluate(doc);
-    ASSERT_TRUE(res.isString());
-    EXPECT_EQ(res.toString(), u"bar");
+    QJsonValue res = jp::eval(u"$.foo", parseJson(json));
+    EXPECT_THAT(res, IsJsonString("bar"));
 }
 
 // -----------------------------------------------------------------------------
@@ -41,5 +43,7 @@ OPTIONS_PARITY_STUB(WhenPropertyIsRequiredExceptionIsThrown, "REQUIRE_PROPERTIES
 OPTIONS_PARITY_STUB(WhenPropertyIsRequiredExceptionIsThrown2, "REQUIRE_PROPERTIES enforcement.");
 OPTIONS_PARITY_STUB(IssueSuppressExceptionsDoesNotBreakIndefiniteEvaluation, "SUPPRESS_EXCEPTIONS option.");
 OPTIONS_PARITY_STUB(IsbnIsDefaultedWhenOptionIsProvided, "DEFAULT_PATH_LEAF_TO_NULL with wildcard.");
+
+} // namespace jayway_parity
 
 #undef OPTIONS_PARITY_STUB

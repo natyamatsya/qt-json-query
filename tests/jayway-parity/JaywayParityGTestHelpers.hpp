@@ -137,7 +137,7 @@ inline std::pair<QString, QJsonValue> kv(QStringView key, int val)
 
 // Helper to assemble initializer_list without explicit type
 template<typename... Pairs>
-inline std::initializer_list<std::pair<QString, QJsonValue>> kvlist(Pairs&&... pairs)
+inline std::vector<std::pair<QString, QJsonValue>> kvlist(Pairs&&... pairs)
 {
     return { std::forward<Pairs>(pairs)... };
 }
