@@ -31,6 +31,7 @@ target_link_libraries(json_query_tests PRIVATE json_query GTest::gtest GTest::gt
 # Jayway parity tests ---------------------------------------------------------
 set(JAYWAY_PARITY_SOURCES
     ${PROJECT_SOURCE_DIR}/tests/jayway-parity/JaywayParityGTest.cpp
+    ${PROJECT_SOURCE_DIR}/tests/jayway-parity/DeepScanParityGTest.cpp
 )
 add_executable(jayway_parity_tests ${JAYWAY_PARITY_SOURCES})
 target_include_directories(jayway_parity_tests PRIVATE ${PROJECT_SOURCE_DIR}/include)
