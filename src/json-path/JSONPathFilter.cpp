@@ -1,4 +1,5 @@
 #include "JSONPath.hpp"
+#include "JSONPathHelpers.hpp"
 
 namespace detail {
 
@@ -7,6 +8,8 @@ namespace detail {
     using Kind  = Token::Kind;
     using json_query::utils::to_sv;
     using json_query::utils::to_qstr;
+    using json_query::detail::splitTopLevel;
+    using json_query::detail::stripOuterParens;
 
 // ───────────────────────────────────────────────────────────────
 //  compileFilter  — turns [? …] into Token{Filter,…} + lambda
@@ -202,7 +205,7 @@ std::optional<Token> parseRegex(QString s, QVector<FilterFn>& out)
 std::optional<JSONPath::Token>
 JSONPath::compileFilter(const QString& expr, QVector<FilterFn>& out)
 {
-    QString s = stripOuterParens(expr);
+    QString s = json_query::detail::stripOuterParens(expr);
     for (detail::RuleFn fn : detail::rules)
         if (auto t = fn(s, out))  return t;
     return std::nullopt;          // unsupported

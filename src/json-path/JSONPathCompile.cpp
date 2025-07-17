@@ -29,40 +29,6 @@ namespace
                                    : readInt(v.sliced(c2 + 1, v.size()-c2-2), 1);
         return { start, end, step };
     }
-
-    //  src/json-path/JSONPath.cpp
-    static inline QString stripOuterParens(QStringView sv)
-    {
-        // remove exactly one balanced pair if present
-        if (sv.size() >= 2 && sv.front() == u'(' && sv.back() == u')')
-            sv = sv.mid(1, sv.size() - 2);
-
-        return QString(sv).trimmed();   // QString ctor understands QStringView
-    }
-
-  // ─────────────────────────────────────────────────────────────────────────────
-// Helper: split at the first occurrence of delim that is **not** in parentheses
-// Returns { left , right }  if found,  otherwise std::nullopt
-// ─────────────────────────────────────────────────────────────────────────────
-auto splitTopLevel = [](QStringView sv, QLatin1StringView delim)
-        -> std::optional<std::pair<QString,QString>>
-{
-    const qsizetype nDelim = delim.size();
-    int parenDepth = 0;
-
-    for (qsizetype i = 0, N = sv.size() - nDelim + 1; i < N; ++i) {
-        const QChar c = sv[i];
-        if (c == u'(')         ++parenDepth;
-        else if (c == u')')    --parenDepth;
-        else if (parenDepth == 0 && sv.mid(i, nDelim) == delim) {
-            return std::pair<QString,QString>{
-                QString(sv.left(i)),
-                QString(sv.mid(i + nDelim)) };
-        }
-    }
-    return std::nullopt;
-};
-
 } // namespace
 
 namespace detail {
