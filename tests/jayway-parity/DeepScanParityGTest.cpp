@@ -122,7 +122,28 @@ TEST(JaywayDeepScanParity, IllegalPredicateIgnored)
 
 PARITY_TEST(RequirePropertiesIgnoredOnScanTarget, "Requires Option::REQUIRE_PROPERTIES flag handling.");
 PARITY_TEST(RequirePropertiesIgnoredOnScanTargetButNotChildren, "Requires Option::REQUIRE_PROPERTIES nested handling.");
-PARITY_TEST(LeafMultiPropsWork, "Requires multi-property deep scan support.");
+TEST(JaywayDeepScanParity, LeafMultiPropsWork)
+{
+    const char* jsonSrc = R"([
+        {"a": "a-val", "b": "b-val", "c": "c-val"},
+        [1,5],
+        {"a": "a-val"}
+    ])";
+
+    auto path = JSONPath::create(u"$..['a','c']");
+    ASSERT_TRUE(path);
+    QJsonArray result = evalArray(*path, parseJson(jsonSrc));
+    // Expected behaviour: only objects containing *all* requested properties
+    ASSERT_EQ(result.size(), 1);
+    QJsonValue obj = result[0];
+    ASSERT_TRUE(obj.isObject());
+    auto o = obj.toObject();
+    EXPECT_EQ(o.size(), 3);
+    EXPECT_EQ(o["a"].toString(), u"a-val");
+    EXPECT_EQ(o["b"].toString(), u"b-val");
+    EXPECT_EQ(o["c"].toString(), u"c-val");
+}
+
 PARITY_TEST(RequireSinglePropertyOk, "Requires property requirement enforcement.");
 PARITY_TEST(RequireSingleProperty, "Requires property requirement enforcement.");
 PARITY_TEST(RequireMultiPropertyAllMatch, "Requires multi-property all-match enforcement.");
@@ -146,9 +167,37 @@ TEST(JaywayDeepScanParity, ScanForSingleProperty)
     EXPECT_EQ(result[2].toString(), u"aa");
 }
 
-PARITY_TEST(ScanForPropertyPath, "Pending property path deep scan.");
-PARITY_TEST(ScanForPropertyPathMissingRequiredProperty, "Pending REQUIRE_PROPERTIES handling for missing property.");
-PARITY_TEST(ScansCanBeFiltered, "Pending predicate filter support.");
+TEST(JaywayDeepScanParity, ScanForPropertyPath)
+{
+    const char* jsonSrc = R"([
+        {"a": "aa"},
+        {"x": "xx"},
+        {"a": {"x": "xx"}},
+        {"z": {"a": {"x": "xx"}}}
+    ])";
+    auto path = JSONPath::create(u"$..['a'].x");
+    ASSERT_TRUE(path);
+    QJsonArray result = evalArray(*path, parseJson(jsonSrc));
+    ASSERT_EQ(result.size(), 2);
+    EXPECT_EQ(result[0].toString(), u"xx");
+    EXPECT_EQ(result[1].toString(), u"xx");
+}
+
+TEST(JaywayDeepScanParity, ScansCanBeFiltered)
+{
+    const char* jsonSrc = R"([
+        {"mammal": true,  "color": {"val": "brown"}},
+        {"mammal": true,  "color": {"val": "white"}},
+        {"mammal": false}
+    ])";
+    auto path = JSONPath::create(u"$..[?(@.mammal == true)].color");
+    ASSERT_TRUE(path);
+    QJsonArray result = evalArray(*path, parseJson(jsonSrc));
+    ASSERT_EQ(result.size(), 2);
+    EXPECT_TRUE(result[0].isObject());
+    EXPECT_TRUE(result[1].isObject());
+}
+
 PARITY_TEST(ScanWithFunctionFilter, "Requires function filter implementation.");
 PARITY_TEST(DeepScanPathDefault, "Pending executeScanPath default implementation.");
 PARITY_TEST(DeepScanPathRequireProperties, "Pending executeScanPath with REQUIRE_PROPERTIES option.");
