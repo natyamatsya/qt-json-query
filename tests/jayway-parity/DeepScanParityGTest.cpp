@@ -19,13 +19,11 @@ TEST(JaywayDeepScanParity, NonArraySubscriptionIgnored)
 
     {
         QJsonArray result = jp::evalArray(*path, jp::parseJson(R"({"x": [0,1,[0,1,2,3,null],null]})"));
-        ASSERT_EQ(result.size(), 1);
-        EXPECT_EQ(result[0].toInt(), 3);
+        EXPECT_THAT(result, ::testing::ElementsAre(IsJsonInt(3)));
     }
     {
         QJsonArray result = jp::evalArray(*path, jp::parseJson(R"({"x": [0,1,[0,1,2,3,null],null], "y": [0,1,2]})"));
-        ASSERT_EQ(result.size(), 1);
-        EXPECT_EQ(result[0].toInt(), 3);
+        EXPECT_THAT(result, ::testing::ElementsAre(IsJsonInt(3)));
     }
     {
         QJsonArray result = jp::evalArray(*path, jp::parseJson(R"({"x": [0,1,[0,1,2],null], "y": [0,1,2]})"));
@@ -40,13 +38,11 @@ TEST(JaywayDeepScanParity, NullSubscriptionIgnored)
 
     {
         QJsonArray result = jp::evalArray(*path, jp::parseJson(R"({"x": [null,null,[0,1,2,3,null],null]})"));
-        ASSERT_EQ(result.size(), 1);
-        EXPECT_EQ(result[0].toInt(), 3);
+        EXPECT_THAT(result, ::testing::ElementsAre(IsJsonInt(3)));
     }
     {
         QJsonArray result = jp::evalArray(*path, jp::parseJson(R"({"x": [null,null,[0,1,2,3,null],null], "y": [0,1,null]})"));
-        ASSERT_EQ(result.size(), 1);
-        EXPECT_EQ(result[0].toInt(), 3);
+        EXPECT_THAT(result, ::testing::ElementsAre(IsJsonInt(3)));
     }
 }
 
@@ -63,13 +59,12 @@ TEST(JaywayDeepScanParity, ArrayIndexOobIgnored)
     auto path1 = JSONPath::create(u"$..[4]");
     ASSERT_TRUE(path1);
     QJsonArray r1 = jp::evalArray(*path1, jp::parseJson(R"({"x": [0,1,[0,1,2,3,10],null]})"));
-    ASSERT_EQ(r1.size(), 1);
-    EXPECT_THAT(r1, ::testing::ElementsAre(QJsonValue(10)));
+    EXPECT_THAT(r1, ::testing::ElementsAre(IsJsonInt(10)));
 
     auto path2 = JSONPath::create(u"$..[2][3]");
     ASSERT_TRUE(path2);
     QJsonArray r2 = jp::evalArray(*path2, jp::parseJson(R"({"x": [null,null,[0,1,2,3]], "y": [null,null,[0,1]]})"));
-    EXPECT_THAT(r2, ::testing::ElementsAre(QJsonValue(3)));
+    EXPECT_THAT(r2, ::testing::ElementsAre(IsJsonInt(3)));
 }
 
 PARITY_TEST(DefiniteUpstreamIllegalArrayAccessThrows, "Awaiting PathNotFoundException support.");
@@ -83,13 +78,11 @@ TEST(JaywayDeepScanParity, DISABLED_IllegalPropertyAccessIgnored)
     // $..foo.bar should only return the nested bar property
     QJsonArray r2 = jp::evalArray(*JSONPath::create(u"$..foo.bar"),
         jp::parseJson(R"({"x": {"foo": {"bar": 4}}, "y": {"foo": 1}})"));
-    ASSERT_EQ(r2.size(), 1);
-    EXPECT_EQ(r2[0].toInt(), 4);
+    EXPECT_THAT(r2, ::testing::ElementsAre(IsJsonInt(4)));
 
     QJsonArray r3 = jp::evalArray(*JSONPath::create(u"$..[*].foo.bar"),
         jp::parseJson(R"({"x": {"foo": {"bar": 4}}, "y": {"foo": 1}})"));
-    ASSERT_EQ(r3.size(), 1);
-    EXPECT_EQ(r3[0].toInt(), 4);
+    EXPECT_THAT(r3, ::testing::ElementsAre(IsJsonInt(4)));
 
     QJsonArray r4 = jp::evalArray(*JSONPath::create(u"$..[*].foo.bar"),
         jp::parseJson(R"({"x": {"foo": {"baz": 4}}, "y": {"foo": 1}})"));
@@ -102,7 +95,7 @@ TEST(JaywayDeepScanParity, IllegalPredicateIgnored)
     auto path = JSONPath::create(u"$..foo[?(@.bar)].bar");
     ASSERT_TRUE(path);
     QJsonArray result = jp::evalArray(*path, jp::parseJson(R"({"x": {"foo": {"bar": 4}}, "y": {"foo": 1}})"));
-    EXPECT_THAT(result, ::testing::ElementsAre(QJsonValue(4)));
+    EXPECT_THAT(result, ::testing::ElementsAre(IsJsonInt(4)));
 }
 
 PARITY_TEST(RequirePropertiesIgnoredOnScanTarget, "Requires Option::REQUIRE_PROPERTIES flag handling.");
@@ -118,15 +111,7 @@ TEST(JaywayDeepScanParity, LeafMultiPropsWork)
     auto path = JSONPath::create(u"$..['a','c']");
     ASSERT_TRUE(path);
     QJsonArray result = jp::evalArray(*path, jp::parseJson(jsonSrc));
-    // Expected behaviour: only objects containing *all* requested properties
-    ASSERT_EQ(result.size(), 1);
-    QJsonValue obj = result[0];
-    ASSERT_TRUE(obj.isObject());
-    auto o = obj.toObject();
-    EXPECT_EQ(o.size(), 3);
-    EXPECT_EQ(o["a"].toString(), u"a-val");
-    EXPECT_EQ(o["b"].toString(), u"b-val");
-    EXPECT_EQ(o["c"].toString(), u"c-val");
+    EXPECT_THAT(result, ::testing::ElementsAre(JsonObjContains(std::initializer_list<std::pair<QString, QJsonValue>>{{QStringLiteral("a"), QJsonValue("a-val")}, {QStringLiteral("b"), QJsonValue("b-val")}, {QStringLiteral("c"), QJsonValue("c-val")}})));
 }
 
 PARITY_TEST(RequireSinglePropertyOk, "Requires property requirement enforcement.");
@@ -163,9 +148,7 @@ TEST(JaywayDeepScanParity, ScanForPropertyPath)
     auto path = JSONPath::create(u"$..['a'].x");
     ASSERT_TRUE(path);
     QJsonArray result = jp::evalArray(*path, jp::parseJson(jsonSrc));
-    ASSERT_EQ(result.size(), 2);
-    EXPECT_EQ(result[0].toString(), u"xx");
-    EXPECT_EQ(result[1].toString(), u"xx");
+    EXPECT_THAT(result, ::testing::ElementsAre(IsJsonString(QStringLiteral("xx")), IsJsonString(QStringLiteral("xx"))));
 }
 
 TEST(JaywayDeepScanParity, ScansCanBeFiltered)
