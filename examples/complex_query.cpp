@@ -8,6 +8,9 @@
 
 int main(int argc, char **argv)
 {
+    using namespace json_query;
+    using namespace json_query::json_path;
+
     QCoreApplication app(argc, argv);
 
     // Simulate a store with books and authors
@@ -35,12 +38,12 @@ int main(int argc, char **argv)
         .transform(toArray)                                       // -> QJsonArray
         .and_then([](const QJsonArray& authors) {                 // happy path
             qInfo() << "Authors of expensive books:" << authors;
-            return std::expected<void, json_query::Error>{};      // propagate Ok
+            return std::expected<void, Error>{};      // propagate Ok
         })
-        .or_else([](json_query::Error e) -> std::expected<void,json_query::Error>
+        .or_else([](Error e) -> std::expected<void, Error>
         {
             // error path
-            qWarning() << "Invalid JSONPath:" << json_query::toString(e).data();
+            qWarning() << "Invalid JSONPath:" << toString(e).data();
             return {};
         });
 

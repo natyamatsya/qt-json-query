@@ -11,9 +11,9 @@
 #include "json-query/QtHash.hpp"
 
 using json_query::ContainerCursor;
-using json_query::Slice;
-using json_query::Token;
-using json_query::Error;
+using json_query::json_path::Slice;
+using json_query::json_path::Token;
+using json_query::json_path::Error;
 
 QJsonValue JSONPath::evaluate(const QJsonDocument &document) const
 {

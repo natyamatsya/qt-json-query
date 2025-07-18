@@ -5,7 +5,10 @@
 #include "JaywayParityGTestHelpers.hpp"
 #include <gmock/gmock.h>
 
-namespace jayway_parity {
+namespace jayway_parity 
+{
+    using namespace json_query;
+    using namespace json_query::json_path;
 using namespace ::testing;
 using namespace jp;
 
@@ -17,7 +20,6 @@ using namespace jp;
 // Root path can be compiled ---------------------------------------------------
 TEST(JaywayPathCompilerParity, RootPathCanBeCompiled)
 {
-    using json_query::Error;
     // "$" root
     auto resDollar = json_query::compile(u"$");
     ASSERT_TRUE(resDollar.has_value()) << "Compilation of '$' failed";
@@ -32,7 +34,7 @@ TEST(JaywayPathCompilerParity, RootPathCanBeCompiled)
 }
 
 // -----------------------------------------------------------------------------
-// Parity stubs (remaining ~30 Java tests) --------------------------------------
+// Parity stubs (remaining ~30 Java tests) -------------------------------------
 // The reasons reference unimplemented validation logic in the C++ compiler.
 // -----------------------------------------------------------------------------
 PATHCOMPILER_STUB(PathMustStartWithDollarOrAt, "$ or @ requirement not yet validated");

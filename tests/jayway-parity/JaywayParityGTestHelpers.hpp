@@ -31,6 +31,9 @@
 #include <expected>
 #include "json-query/JSONPath.hpp"
 
+using namespace json_query;
+using namespace json_query::json_path;
+
 namespace jp {
 // Parse raw JSON C-string into a QJsonDocument.
 inline QJsonDocument parseJson(const char* src)
@@ -70,7 +73,7 @@ inline QJsonArray evalArray(const JSONPath& path, const QJsonDocument& doc)
 // Transition from throw-based to std::expected tests.  Provide helpers that
 // check for specific json_query::Error codes instead of exceptions.
 
-using EvalResult = std::expected<QJsonValue, json_query::Error>;
+using EvalResult = std::expected<QJsonValue, Error>;
 
 // Evaluate path and propagate compile-time errors via std::expected.  Runtime
 // evaluation currently cannot fail (always returns a value), so we wrap it in

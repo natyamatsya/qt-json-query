@@ -4,7 +4,6 @@
 namespace detail {
 
     using ::json_query::FilterFn;
-    using Token = json_query::Token;
     using Kind  = Token::Kind;
     using json_query::utils::to_sv;
     using json_query::utils::to_qstr;
