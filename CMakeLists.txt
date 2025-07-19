@@ -52,6 +52,7 @@ add_library(json_query
         src/json-query/json-path/JSONPathCreate.cpp
         src/json-query/json-path/JSONPathCompile.cpp
         src/json-query/json-path/JSONPathFilter.cpp
+        src/json-query/json-path/JSONPathTokenEvaluators.cpp
 )
 
 # Public headers

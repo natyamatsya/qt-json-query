@@ -1,14 +1,10 @@
-// jsonpath.cpp - Using CTRE
-#include "../../../include/json-query/json-path/JSONPath.hpp"
+#include "json-query/json-path/JSONPath.hpp"
+#include "json-query/json-path/JSONPathTokenEvaluators.hpp"
+#include "json-query/json-path/internal/ContainerCursor.hpp"
+
 #include <vector>
-#include <regex>
 #include <deque>
 
-#include <QRegularExpression>
-
-#include "json-query/JSONQueryUtils.hpp"
-#include "../../../include/json-query/json-path/internal/ContainerCursor.hpp"
-#include "../../../include/json-query/json-path/internal/QtHash.hpp"
 
 namespace json_query {
 
@@ -41,100 +37,6 @@ QJsonValue JSONPath::evaluate(const QJsonValue& root) const
 //      * Returns an array with all matches (empty ⇒ no match).
 //      * Fast‑path exits keep nesting shallow.
 // ─────────────────────────────────────────────────────────────────────
-// -----------------------------------------------------------------------------
-// Inline evaluators — one per token kind
-// -----------------------------------------------------------------------------
-namespace json_path::detail {
-
-template<Token::Kind K>
-inline QJsonArray eval(const json_query::JSONPath& jp,
-                       const Token& tk,
-                       const QJsonValue& v);
-
-// --- Key -------------------------------------------------------------------
-template<>
-inline QJsonArray eval<Token::Kind::Key>(const json_query::JSONPath&,
-                                         const Token& tk,
-                                         const QJsonValue& v)
-{
-    QJsonArray out;
-    if (!v.isObject()) return out;
-    const auto obj = v.toObject();
-    if (obj.contains(tk.key))
-        out.append(obj[tk.key]);
-    return out;
-}
-
-// --- Index -----------------------------------------------------------------
-template<>
-inline QJsonArray eval<Token::Kind::Index>(const json_query::JSONPath& jp,
-                                           const Token& tk,
-                                           const QJsonValue& v)
-{
-    QJsonArray out;
-    if (!v.isArray()) return out;
-    const auto arr = v.toArray();
-    const int idx = jp.normalizeIndex(tk.index, arr.size());
-    if (idx >= 0 && idx < arr.size())
-        out.append(arr[idx]);
-    return out;
-}
-
-// --- Slice -----------------------------------------------------------------
-template<>
-inline QJsonArray eval<Token::Kind::Slice>(const json_query::JSONPath& jp,
-                                           const Token& tk,
-                                           const QJsonValue& v)
-{
-    if (v.isArray())
-        return jp.evalSlice(v.toArray(), tk.slice);
-    return {};
-}
-
-// --- Wildcard --------------------------------------------------------------
-template<>
-inline QJsonArray eval<Token::Kind::Wildcard>(const json_query::JSONPath& jp,
-                                              const Token&,
-                                              const QJsonValue& v)
-{
-    if (v.isObject()) return jp.wildcardObject(v.toObject());
-    if (v.isArray())  return jp.wildcardArray (v.toArray());
-    return {};
-}
-
-// --- Recursive -------------------------------------------------------------
-template<>
-inline QJsonArray eval<Token::Kind::Recursive>(const json_query::JSONPath& jp,
-                                               const Token&,
-                                               const QJsonValue& v)
-{
-    return jp.evaluateRecursive(v, 0);
-}
-
-// --- Filter ----------------------------------------------------------------
-template<>
-inline QJsonArray eval<Token::Kind::Filter>(const json_query::JSONPath& jp,
-                                            const Token& tk,
-                                            const QJsonValue& v)
-{
-    QJsonArray out;
-    if (tk.filterId >= jp.m_filters.size()) return out;
-
-    const auto& filterFn = jp.m_filters[tk.filterId];
-    if (v.isArray()) {
-        for (const auto& item : v.toArray()) {
-            if (filterFn(item))
-                out.append(item);
-        }
-    } else if (v.isObject()) {
-        if (filterFn(v))
-            out.append(v);
-    }
-    return out;
-}
-
-} // namespace json_path::detail
-
 // -----------------------------------------------------------------------------
 // Fast dispatch table: Kind → evaluator
 // -----------------------------------------------------------------------------
