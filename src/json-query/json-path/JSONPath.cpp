@@ -1,10 +1,10 @@
 #include "json-query/json-path/JSONPath.hpp"
 #include "json-query/json-path/JSONPathTokenEvaluators.hpp"
+#include "json-query/json-path/JSONPathEvaluate.hpp"
 #include "json-query/json-path/internal/ContainerCursor.hpp"
 
 #include <vector>
 #include <deque>
-
 
 namespace json_query {
 
@@ -64,18 +64,12 @@ inline QJsonArray JSONPath::evaluateToken(const Token& tk,
 
 QJsonArray JSONPath::evaluateAll(const QJsonDocument &document) const
 {
-    return evaluateAll(document.isArray() ? QJsonValue(document.array())
-                                          : QJsonValue(document.object()));
+    return json_path::detail::evaluateAll(*this, document);
 }
 
 QJsonArray JSONPath::evaluateAll(const QJsonValue &value) const
 {
-    QJsonValue res = evaluate(value);
-    if (res.isArray())
-        return res.toArray();
-    if (res.isUndefined() || res.isNull())
-        return {};
-    return QJsonArray{res};
+    return json_path::detail::evaluateAll(*this, value);
 }
 
 // ===================================================================
@@ -83,51 +77,21 @@ QJsonArray JSONPath::evaluateAll(const QJsonValue &value) const
 // ===================================================================
 QJsonArray JSONPath::wildcardObject(const QJsonObject& obj) const
 {
-    QJsonArray out;
-    for (auto it = obj.begin(); it != obj.end(); ++it)
-        out.append(it.value());
-    return out;
+    return json_path::detail::wildcardObject(*this, obj);
 }
 
 QJsonArray JSONPath::wildcardArray(const QJsonArray& arr) const
 {
-    return arr;                      // shallow copy; Qt is implicit‑shared
+    return json_path::detail::wildcardArray(*this, arr);
 }
 
 // ===================================================================
 //  Recursive‑descent – collect *all* descendant containers
 // ===================================================================
 QJsonArray JSONPath::evaluateRecursive(const QJsonValue& value,
-                                       int /*unused*/) const
+                                       int unused) const
 {
-    QJsonArray out;
-    if (!value.isArray() && !value.isObject())
-        return out;
-
-    std::deque<QJsonValue> queue;
-    queue.push_back(value);
-    while (!queue.empty())
-    {
-        QJsonValue cur = queue.front();
-        queue.pop_front();
-        // store the container itself
-        out.append(cur);
-
-        if (cur.isObject()) {
-            const QJsonObject obj = cur.toObject();
-            for (auto it = obj.begin(); it != obj.end(); ++it) {
-                const QJsonValue& child = it.value();
-                if (child.isArray() || child.isObject())
-                    queue.push_back(child);
-            }
-        } else {                     // array
-            const QJsonArray arr = cur.toArray();
-            for (const auto& child : arr)
-                if (child.isArray() || child.isObject())
-                    queue.push_back(child);
-        }
-    }
-    return out;
+    return json_path::detail::evaluateRecursive(*this, value, unused);
 }
 
 // ===================================================================
@@ -234,12 +198,24 @@ QJsonValue JSONPath::evalAsPathList(const json_query::JSONPath& self,
     return "/"_L1 + segments.join(u'/' );     // single pointer string
 }
 
+QString JSONPath::escapePointerSegment(const QString& seg)
+{
+    QString out;
+    out.reserve(seg.size());
+    for (const QChar c : seg) {
+        if (c == u'~') out += "~0"_L1;
+        else if (c == u'/') out += "~1"_L1;
+        else out += c;
+    }
+    return out;
+}
+
+} // namespace json_query
+
 // ─────────────────────────────────────────────────────────────────────
 //  evalStandard  – raw evaluation without the "AsPathList" post‑step
 //      (moved out of evaluate() so both helpers can share the logic)
 // ─────────────────────────────────────────────────────────────────────
-} // namespace json_query
-
 namespace json_query::json_path::detail {
 
 // ------------------------------------------------------------------
@@ -247,9 +223,9 @@ namespace json_query::json_path::detail {
 //     – handles the Recursive fast-path internally
 // ------------------------------------------------------------------
 // completely replaces the previous implementation
-[[nodiscard]] inline QJsonArray fanOut(const json_query::JSONPath& self,
-                                       const Token& tk,
-                                       const QJsonArray& src)
+QJsonArray fanOut(const json_query::JSONPath& self,
+                  const Token& tk,
+                  const QJsonArray& src)
 {
     QJsonArray dst;
     for (const auto& v : src) {
@@ -263,7 +239,7 @@ namespace json_query::json_path::detail {
 // ------------------------------------------------------------------
 // 2.  Did this token multiply the result set?
 // ------------------------------------------------------------------
-[[nodiscard]] constexpr bool addsMultiplicity(const Token& tk) noexcept
+bool addsMultiplicity(const Token& tk)
 {
     using enum Token::Kind;
     return tk.kind != Key && tk.kind != Index;
@@ -272,7 +248,7 @@ namespace json_query::json_path::detail {
 // ------------------------------------------------------------------
 // 3.  Collapse the working set into a single QJsonValue
 // ------------------------------------------------------------------
-[[nodiscard]] inline QJsonValue squash(QJsonArray arr, bool multi)
+QJsonValue squash(QJsonArray arr, bool multi)
 {
     if (arr.isEmpty())          return QJsonValue(QJsonValue::Undefined);
     if (!multi && arr.size()==1) return arr.first();
@@ -282,8 +258,8 @@ namespace json_query::json_path::detail {
 // ------------------------------------------------------------------
 // 4.  Apply the trailing function (.length(), .min(), .max())
 // ------------------------------------------------------------------
-[[nodiscard]] QJsonValue applyTrailing(json_path::FunctionType fn,
-                                       const QJsonValue& v)
+QJsonValue applyTrailing(json_path::FunctionType fn,
+                        const QJsonValue& v)
 {
     using enum json_path::FunctionType;
 
@@ -342,18 +318,6 @@ QJsonValue JSONPath::evalStandard(const json_query::JSONPath& self,
 
     QJsonValue collapsed = json_path::detail::squash(std::move(working), multi);
     return json_path::detail::applyTrailing(self.m_func, collapsed);
-}
-
-QString JSONPath::escapePointerSegment(const QString& seg)
-{
-    QString out;
-    out.reserve(seg.size());
-    for (const QChar c : seg) {
-        if (c == u'~') out += "~0"_L1;
-        else if (c == u'/') out += "~1"_L1;
-        else out += c;
-    }
-    return out;
 }
 
 } // namespace json_query
