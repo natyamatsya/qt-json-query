@@ -2,6 +2,7 @@
 
 #include <QJsonValue>
 #include <QJsonArray>
+#include <QJsonObject>
 
 #include "json-query/json-path/PathEvalCtx.hpp"
 #include "json-query/json-path/JSONPathCompile.hpp"
@@ -28,5 +29,10 @@ QJsonValue evalAsPathList (const PathEvalCtx& ctx, const QJsonValue& root);
 QJsonValue evaluate       (const PathEvalCtx& ctx, const QJsonValue& root);
 
 QJsonArray evaluateAll    (const PathEvalCtx& ctx, const QJsonValue& root);
+
+// Wildcard and recursive helpers
+QJsonArray wildcardObject(const QJsonObject& obj);
+QJsonArray wildcardArray (const QJsonArray& arr);
+QJsonArray evaluateRecursive(const QJsonValue& value, int unused = 0);
 
 } // namespace json_query::json_path::detail

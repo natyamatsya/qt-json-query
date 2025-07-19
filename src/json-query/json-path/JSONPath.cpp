@@ -1,6 +1,5 @@
 #include "json-query/json-path/JSONPath.hpp"
 #include "json-query/json-path/JSONPathTokenEvaluators.hpp"
-#include "json-query/json-path/JSONPathEvaluate.hpp"
 #include "json-query/json-path/PathEvaluator.hpp"
 #include "json-query/json-path/internal/ContainerCursor.hpp"
 
@@ -82,12 +81,12 @@ QJsonArray JSONPath::evaluateAll(const QJsonValue &value) const
 // ===================================================================
 QJsonArray JSONPath::wildcardObject(const QJsonObject& obj) const
 {
-    return json_path::detail::wildcardObject(*this, obj);
+    return json_path::detail::wildcardObject(obj);
 }
 
 QJsonArray JSONPath::wildcardArray(const QJsonArray& arr) const
 {
-    return json_path::detail::wildcardArray(*this, arr);
+    return json_path::detail::wildcardArray(arr);
 }
 
 // ===================================================================
@@ -96,7 +95,7 @@ QJsonArray JSONPath::wildcardArray(const QJsonArray& arr) const
 QJsonArray JSONPath::evaluateRecursive(const QJsonValue& value,
                                        int unused) const
 {
-    return json_path::detail::evaluateRecursive(*this, value, unused);
+    return json_path::detail::evaluateRecursive(value, unused);
 }
 
 // ===================================================================

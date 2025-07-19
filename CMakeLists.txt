@@ -53,7 +53,6 @@ add_library(json_query
         src/json-query/json-path/JSONPathCompile.cpp
         src/json-query/json-path/JSONPathFilter.cpp
         src/json-query/json-path/JSONPathTokenEvaluators.cpp
-        src/json-query/json-path/JSONPathEvaluate.cpp
         src/json-query/json-path/PathEvaluator.cpp
         src/json-query/json-path/JSONPathPointerConversion.cpp
 )

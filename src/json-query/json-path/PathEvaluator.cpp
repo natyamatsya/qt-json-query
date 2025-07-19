@@ -1,5 +1,4 @@
 #include "json-query/json-path/PathEvaluator.hpp"
-#include "json-query/json-path/JSONPathEvaluate.hpp" // for pure helpers
 #include "json-query/json-path/JSONPathTokenEvaluators.hpp"
 #include "json-query/json-path/JSONPathPointerConversion.hpp"
 
@@ -37,14 +36,66 @@ QJsonArray evalSlice(const QJsonArray& array, const Slice& s)
     return out;
 }
 
-} // namespace json_query::json_path::detail
+// ---------------------------------------------------------------------------
+//  Wildcard and recursive helpers (moved from JSONPathEvaluate.cpp)
+// ---------------------------------------------------------------------------
+namespace {
+QJsonArray __wildcardObjectImpl(const QJsonObject& obj)
+{
+    QJsonArray out;
+    for (auto it = obj.begin(); it != obj.end(); ++it)
+        out.append(it.value());
+    return out;
+}
 
-// ===========================================================================
-// Phase-C pure evaluation implementation (no JSONPath dependency)
-// ===========================================================================
-//
-// We reopen the namespace to append the new helpers while keeping the legacy
-// bridge above alive until call-sites are migrated.
+QJsonArray __evaluateRecursiveImpl(const QJsonValue& value)
+{
+    QJsonArray out;
+    if (!value.isArray() && !value.isObject())
+        return out;
+
+    std::deque<QJsonValue> queue;
+    queue.push_back(value);
+    while (!queue.empty())
+    {
+        QJsonValue cur = queue.front();
+        queue.pop_front();
+        out.append(cur);
+
+        if (cur.isObject()) {
+            const QJsonObject obj = cur.toObject();
+            for (auto it = obj.begin(); it != obj.end(); ++it) {
+                const QJsonValue& child = it.value();
+                if (child.isArray() || child.isObject())
+                    queue.push_back(child);
+            }
+        } else {
+            const QJsonArray arr = cur.toArray();
+            for (const auto& child : arr)
+                if (child.isArray() || child.isObject())
+                    queue.push_back(child);
+        }
+    }
+    return out;
+}
+} // anonymous
+
+QJsonArray wildcardObject(const QJsonObject& obj)
+{
+    return __wildcardObjectImpl(obj);
+}
+
+QJsonArray wildcardArray(const QJsonArray& arr)
+{
+    return arr; // shallow copy
+}
+
+QJsonArray evaluateRecursive(const QJsonValue& value, int /*unused*/)
+{
+    return __evaluateRecursiveImpl(value);
+}
+
+} // namespace json_query::json_path::detail
 
 namespace json_query::json_path::detail {
 
