@@ -5,8 +5,10 @@
 #include <QJsonArray>
 #include <QJsonValue>
 #include "json-query/JSONPointer.hpp"
+#include "framework/JSONMatchersGTest.hpp"
 
 using json_query::JSONPointer;
+using namespace ::testing;
 
 namespace {
 
@@ -75,7 +77,7 @@ TEST(JSONPointerConformance, InvalidPointers)
     for (const QString &ptr : invalidPtrs) {
         JSONPointer jp(ptr);
         ASSERT_FALSE(jp.isValid()) << qPrintable(QStringLiteral("Pointer unexpectedly valid: %1").arg(ptr));
-        EXPECT_TRUE(jp.evaluate(testDoc()).isUndefined());
+        EXPECT_THAT(jp.evaluate(testDoc()), IsJsonUndefined());
     }
 }
 

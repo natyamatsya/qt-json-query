@@ -165,6 +165,12 @@ MATCHER_P(JsonObjContains, kvPairs, "object contains key/value pairs")
     return true;
 }
 
+// Matcher for undefined JSON value (Qt's isUndefined)
+MATCHER(IsJsonUndefined, "JSON value is undefined")
+{
+    return arg.isUndefined();
+}
+
 // ---------------------------------------------------------------------------
 
 // Verify QJsonValue is string and equals expected.

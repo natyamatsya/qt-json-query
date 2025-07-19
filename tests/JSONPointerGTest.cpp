@@ -5,8 +5,10 @@
 #include <QJsonArray>
 #include <QJsonValue>
 #include "json-query/JSONPointer.hpp"
+#include "framework/JSONMatchersGTest.hpp"
 
 using json_query::JSONPointer;
+using namespace ::testing;
 
 static QJsonValue evalPtr(const QString &ptr, const QJsonDocument &doc)
 {
@@ -20,44 +22,44 @@ TEST(JSONPointerBasic, EmptyPointer)
     QJsonDocument doc(QJsonObject{{"foo","bar"}});
     JSONPointer p("");
     ASSERT_TRUE(p.isValid());
-    EXPECT_EQ(p.evaluate(doc).toObject(), doc.object());
+    EXPECT_THAT(p.evaluate(doc), JsonObjContains(kvlist(kv("foo","bar"))));
 }
 
 TEST(JSONPointerBasic, ObjectAccess)
 {
     QJsonObject obj{{"foo","bar"},{"baz",42}};
     QJsonDocument doc(obj);
-    EXPECT_EQ(evalPtr("/foo", doc).toString(), "bar");
-    EXPECT_EQ(evalPtr("/baz", doc).toInt(), 42);
+    EXPECT_THAT(evalPtr("/foo", doc), IsJsonString("bar"));
+    EXPECT_THAT(evalPtr("/baz", doc), IsJsonInt(42));
 }
 
 TEST(JSONPointerBasic, NestedObject)
 {
     QJsonObject obj{{"nested", QJsonObject{{"inner","value"}}}};
     QJsonDocument doc(obj);
-    EXPECT_EQ(evalPtr("/nested/inner", doc).toString(), "value");
+    EXPECT_THAT(evalPtr("/nested/inner", doc), IsJsonString("value"));
 }
 
 TEST(JSONPointerArray, Index)
 {
     QJsonArray arr = QJsonArray::fromStringList({"zero","one","two"});
     QJsonDocument doc(arr);
-    EXPECT_EQ(evalPtr("/0", doc).toString(), "zero");
-    EXPECT_EQ(evalPtr("/2", doc).toString(), "two");
+    EXPECT_THAT(evalPtr("/0", doc), IsJsonString("zero"));
+    EXPECT_THAT(evalPtr("/2", doc), IsJsonString("two"));
 }
 
 TEST(JSONPointerArray, Mixed)
 {
     QJsonDocument doc(QJsonObject{{"array", QJsonArray::fromStringList({"a","b","c"})}});
-    EXPECT_EQ(evalPtr("/array/1", doc).toString(), "b");
+    EXPECT_THAT(evalPtr("/array/1", doc), IsJsonString("b"));
 }
 
 TEST(JSONPointerEscaping, SlashTilde)
 {
     QJsonObject obj{{"foo/bar","v1"},{"foo~bar","v2"}};
     QJsonDocument doc(obj);
-    EXPECT_EQ(evalPtr("/foo~1bar", doc).toString(), "v1");
-    EXPECT_EQ(evalPtr("/foo~0bar", doc).toString(), "v2");
+    EXPECT_THAT(evalPtr("/foo~1bar", doc), IsJsonString("v1"));
+    EXPECT_THAT(evalPtr("/foo~0bar", doc), IsJsonString("v2"));
 }
 
 TEST(JSONPointerError, InvalidPointer)
