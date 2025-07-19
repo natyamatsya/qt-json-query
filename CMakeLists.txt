@@ -90,7 +90,8 @@ endif()
 
 # Benchmarks
 if (BUILD_BENCHMARKING)
-    include(cmake/GoogleBenchmarks.cmake)
+    include(cmake/GoogleBenchmarkSetup.cmake)
+    add_subdirectory(benchmarks)
 endif()
 
 # ---------------------------------------------------------------------------
