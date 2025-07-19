@@ -4,7 +4,7 @@
 #include <QJsonArray>
 #include <QDebug>
 
-#include "json-query/JSONPath.hpp"
+#include "../include/json-query/json-path/JSONPath.hpp"
 
 int main(int argc, char **argv)
 {

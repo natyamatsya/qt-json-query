@@ -4,7 +4,7 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QJsonValue>
-#include "json-query/JSONPath.hpp"
+#include "../include/json-query/json-path/JSONPath.hpp"
 
 namespace {
 

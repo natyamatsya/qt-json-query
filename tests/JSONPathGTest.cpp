@@ -3,7 +3,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
-#include "json-query/JSONPath.hpp"
+#include "../include/json-query/json-path/JSONPath.hpp"
 #include "json-query/JSONPointer.hpp"
 
 // Helper to evaluate a JSONPath on a doc and assert single value equality

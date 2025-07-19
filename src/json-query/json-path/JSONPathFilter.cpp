@@ -1,5 +1,6 @@
-#include "JSONPath.hpp"
-#include "JSONPathHelpers.hpp"
+#include "json-query/json-path/JSONPathFilter.hpp"
+#include "json-query/json-path/JSONPath.hpp"
+#include "json-query/json-path/JSONPathHelpers.hpp"
 
 namespace detail {
 
@@ -71,8 +72,8 @@ std::optional<Token> parseOr(QString s, QVector<FilterFn>& out)
         const auto& [lhsS, rhsS] = *split;
 
         QVector<FilterFn> tmp;
-        auto lhsT = JSONPath::compileFilter(lhsS.trimmed(), tmp);
-        auto rhsT = JSONPath::compileFilter(rhsS.trimmed(), tmp);
+        auto lhsT = json_query::json_path::compileFilter(lhsS.trimmed(), tmp);
+        auto rhsT = json_query::json_path::compileFilter(rhsS.trimmed(), tmp);
         if (!lhsT || !rhsT || tmp.isEmpty()) return std::nullopt;
 
         Builder b{out};
@@ -90,8 +91,8 @@ std::optional<Token> parseAnd(QString s, QVector<FilterFn>& out)
         const auto& [lhsS, rhsS] = *split;
 
         QVector<FilterFn> tmp;
-        auto lhsT = JSONPath::compileFilter(lhsS.trimmed(), tmp);
-        auto rhsT = JSONPath::compileFilter(rhsS.trimmed(), tmp);
+        auto lhsT = json_query::json_path::compileFilter(lhsS.trimmed(), tmp);
+        auto rhsT = json_query::json_path::compileFilter(rhsS.trimmed(), tmp);
         if (!lhsT || !rhsT || tmp.isEmpty()) return std::nullopt;
 
         Builder b{out};
@@ -202,10 +203,10 @@ std::optional<Token> parseRegex(QString s, QVector<FilterFn>& out)
 
 // Public dispatcher -----------------------------------------------------------
 std::optional<JSONPath::Token>
-JSONPath::compileFilter(const QString& expr, QVector<FilterFn>& out)
+json_query::json_path::compileFilter(const QString& expr, QVector<FilterFn>& out)
 {
     QString s = json_query::detail::stripOuterParens(expr);
-    for (detail::RuleFn fn : detail::rules)
+    for (auto fn : ::detail::rules)
         if (auto t = fn(s, out))  return t;
     return std::nullopt;          // unsupported
 }

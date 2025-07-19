@@ -47,11 +47,11 @@ if(NOT TARGET ctre_interface)
 endif()
 
 add_library(json_query
-    src/JSONPointer.cpp
-    src/json-path/JSONPath.cpp
-    src/json-path/JSONPathCreate.cpp
-    src/json-path/JSONPathCompile.cpp
-    src/json-path/JSONPathFilter.cpp
+        src/json-query/JSONPointer.cpp
+        src/json-query/json-path/JSONPath.cpp
+        src/json-query/json-path/JSONPathCreate.cpp
+        src/json-query/json-path/JSONPathCompile.cpp
+        src/json-query/json-path/JSONPathFilter.cpp
 )
 
 # Public headers

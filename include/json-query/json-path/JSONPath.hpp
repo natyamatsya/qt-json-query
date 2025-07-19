@@ -16,9 +16,9 @@
 #include <cstdint>
 
 // ────────────────────────────── Project
-#include "json-path/JSONPathCompiler.hpp"
-#include "JSONQueryUtils.hpp"
-#include "JSONPointer.hpp"
+#include "JSONPathCompile.hpp"
+#include "../JSONQueryUtils.hpp"
+#include "../JSONPointer.hpp"
 
 #include <ctre.hpp>
 
@@ -68,7 +68,7 @@ namespace detail {
 }
 
 // ======================================================================
-//  JSONPath  – public façade; now created through a factory
+//  JSONPath  – public façade; now uses JSONPathCompiler internally
 // ======================================================================
 class JSONPath
 {
@@ -108,7 +108,7 @@ public:
 
 private:
     // -----------------------------------------------------------------
-    //  Private “data” ctor – used only by factory                     ★
+    //  Private "data" ctor – used only by factory                     ★
     // -----------------------------------------------------------------
     JSONPath( Option                      opt,
               FunctionType                func,
@@ -128,14 +128,6 @@ private:
     // -----------------------------------------------------------------
     static QJsonValue evalAsPathList(const JSONPath&, const QJsonValue&);
     static QJsonValue evalStandard  (const JSONPath&, const QJsonValue&);
-
-    // -----------------------------------------------------------------
-    //  Parsing helpers (exception-free, use std::expected)         ★
-    // -----------------------------------------------------------------
-    struct Compiled { QVector<Token> tokens; QVector<json_query::FilterFn> filters; };  // ★
-    static std::expected<Compiled, Error> compilePath(QStringView sv);                  // ★
-    static FunctionType detectTrailingFunction(QString&);                               // ★
-    static std::optional<Token> compileFilter(const QString& expr, QVector<json_query::FilterFn>& out);
 
     [[nodiscard]] QJsonArray evaluateToken     (const Token& tk, const QJsonValue& v) const;
     [[nodiscard]] QJsonArray evaluateRecursive (const QJsonValue& value, int)  const;
@@ -170,8 +162,6 @@ private:
     friend std::optional<Token> detail::parseIn     (QString, QVector<FilterFn>&);
     friend std::optional<Token> detail::parseCompare(QString, QVector<FilterFn>&);
     friend std::optional<Token> detail::parseRegex  (QString, QVector<FilterFn>&);
-    // Grant access to free compile() wrapper
-    friend std::expected<JSONPath::Compiled, Error> compile(QStringView);
 
     friend QJsonArray detail::fanOut(const JSONPath&,
                                  const Token&,
@@ -185,19 +175,3 @@ private:
 
     friend std::optional<Token> detail::callCompileFilter(const QString&, QVector<FilterFn>&);
 };
-
-// ---------------------------------------------------------------------------
-//  Free wrapper: json_query::compile(path)
-//  Provides Jayway-style compile API returning token+filter structure.
-// ---------------------------------------------------------------------------
-[[nodiscard]] inline std::expected<JSONPath::Compiled, json_query::json_path::Error>
-compile(QStringView path)
-{
-    return JSONPath::compilePath(path);
-}
-
-namespace json_query {
-    using ::compile;
-}
-
-

@@ -10,7 +10,7 @@
 #include <QJsonArray>
 #include <gtest/gtest-spi.h>
 #include <algorithm>
-#include "json-query/JSONPath.hpp"
+#include "../include/json-query/json-path/JSONPath.hpp"
 
 using namespace Qt::StringLiterals;
 

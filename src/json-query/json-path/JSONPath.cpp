@@ -1,5 +1,5 @@
 // jsonpath.cpp - Using CTRE
-#include "json-query/JSONPath.hpp"
+#include "../../../include/json-query/json-path/JSONPath.hpp"
 #include <vector>
 #include <regex>
 #include <deque>
@@ -7,8 +7,8 @@
 #include <QRegularExpression>
 
 #include "json-query/JSONQueryUtils.hpp"
-#include "json-query/ContainerCursor.hpp"
-#include "json-query/QtHash.hpp"
+#include "../../../include/json-query/json-path/internal/ContainerCursor.hpp"
+#include "../../../include/json-query/json-path/internal/QtHash.hpp"
 
 using json_query::ContainerCursor;
 using json_query::json_path::Slice;
