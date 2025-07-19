@@ -37,24 +37,6 @@ QJsonArray evalSlice(const QJsonArray& array, const Slice& s)
     return out;
 }
 
-// --------------------------------------------------------------
-// Core evaluation entry points (bridge implementation)
-// --------------------------------------------------------------
-QJsonValue evaluate(const PathEvalCtx& ctx,
-                    const json_query::JSONPath& /*self*/,
-                    const QJsonValue& root)
-{
-    // Transition bridge: now forward to pure evaluator
-    return json_query::json_path::detail::evaluate(ctx, root);
-}
-
-QJsonArray evaluateAll(const PathEvalCtx& ctx,
-                       const json_query::JSONPath& /*self*/,
-                       const QJsonValue& root)
-{
-    return json_query::json_path::detail::evaluateAll(ctx, root);
-}
-
 } // namespace json_query::json_path::detail
 
 // ===========================================================================

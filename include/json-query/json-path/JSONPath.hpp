@@ -38,21 +38,8 @@ namespace json_query::json_path::detail {
     QJsonValue evaluate(const PathEvalCtx&, const json_query::JSONPath&, const QJsonValue&);
     QJsonArray evaluateAll(const PathEvalCtx&, const json_query::JSONPath&, const QJsonValue&);
 
-    using Token = json_path::Token;
-    using FilterFn = json_path::FilterFn;
-    using Error = json_path::Error;
-
-    std::optional<Token> parseOr      (QString, QVector<FilterFn>&);
-    std::optional<Token> parseAnd     (QString, QVector<FilterFn>&);
-    std::optional<Token> parseIn      (QString, QVector<FilterFn>&);
-    std::optional<Token> parseCompare (QString, QVector<FilterFn>&);
-    std::optional<Token> parseRegex   (QString, QVector<FilterFn>&);
-
-    struct KeyBuilder;   // new
-
-    std::expected<qsizetype, Error> parseBracket(qsizetype, QStringView,
-                 KeyBuilder&, QVector<Token>&,
-                 QVector<FilterFn>&);
+    // (internal filter-parsing helpers moved to JSONPathFilter.cpp – no longer
+    //  forward-declared here)
 
 } // namespace json_query::json_path::detail
 
@@ -95,8 +82,9 @@ public:
     using FunctionType = json_path::FunctionType;
     using Slice        = json_path::Slice;
     using Token        = json_path::Token;
-    using Error        = json_path::Error;
     using FilterFn     = json_path::FilterFn;
+
+    // (no friend declarations needed for pure evaluators)
 
 private:
     // -----------------------------------------------------------------
@@ -141,17 +129,6 @@ private:
     QString                    m_originalPath;
     QVector<Token>             m_tokens;
     QVector<FilterFn> m_filters;
-
-    // Previous friendship for eval<> and fanOut no longer required after
-    // functional refactor; removed.
-
-    // fanOut friend no longer required after Phase C extraction.
-
-    // friend declarations for new functional evaluator (phase B)
-    friend QJsonValue json_query::json_path::detail::evaluate(
-        const json_query::json_path::detail::PathEvalCtx&, const json_query::JSONPath&, const QJsonValue&);
-    friend QJsonArray json_query::json_path::detail::evaluateAll(
-        const json_query::json_path::detail::PathEvalCtx&, const json_query::JSONPath&, const QJsonValue&);
 
 }; // end class JSONPath
 
