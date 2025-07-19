@@ -2,9 +2,10 @@
 #include "json-query/JSONQueryUtils.hpp"
 #include "json-query/json-pointer/JSONPointerParsing.hpp"
 #include "json-query/json-pointer/JSONPointerEvaluation.hpp"
-
+#include "json-query/json-pointer/JSONPointerEvaluation.hpp"
 #include <charconv>   // std::to_chars
 #include <cmath>      // std::log10 (for capacity guess)
+#include <expected>
 
 namespace json_query {
 
@@ -37,13 +38,34 @@ QJsonValue JSONPointer::evaluate(const QJsonDocument &document) const
 
 QJsonValue JSONPointer::evaluate(const QJsonValue &value) const
 {
-    return json_pointer::detail::evaluatePointer(m_tokens, value);
+    auto res = json_pointer::detail::evaluatePointer(m_tokens, value);
+    return res ? res.value() : QJsonValue{QJsonValue::Undefined};
 }
 
 // evaluateInternal no longer needed; but keep thin wrapper for legacy internal call
 QJsonValue JSONPointer::evaluateInternal(QJsonValue const& root) const
 {
-    return json_pointer::detail::evaluatePointer(m_tokens, root);
+    auto res = json_pointer::detail::evaluatePointer(m_tokens, root);
+    return res ? res.value() : QJsonValue{QJsonValue::Undefined};
+}
+
+// ────────────────────────────────────────────────────────────
+//  Public evaluation with detailed error
+// ────────────────────────────────────────────────────────────
+
+std::expected<QJsonValue, JSONPointer::EvalError>
+JSONPointer::evaluateEx(QJsonDocument const& doc) const
+{
+    return evaluateEx(doc.isNull() ? QJsonValue{} : QJsonValue{ doc.object() });
+}
+
+std::expected<QJsonValue, JSONPointer::EvalError>
+JSONPointer::evaluateEx(QJsonValue const& value) const
+{
+    auto res = json_pointer::detail::evaluatePointer(m_tokens, value);
+    if (res)
+        return res.value();
+    return std::unexpected(mapEvalError(res.error()));
 }
 
 QString JSONPointer::toString() const
@@ -104,6 +126,19 @@ QString JSONPointer::toString() const
 
     out.truncate(wr);
     return out;
+}
+
+// Mapping evaluation error
+JSONPointer::EvalError JSONPointer::mapEvalError(json_pointer::detail::EvalError ee)
+{
+    using DE = json_pointer::detail::EvalError;
+    switch (ee) {
+    case DE::TypeMismatchObject: return EvalError::TypeMismatchObject;
+    case DE::TypeMismatchArray:  return EvalError::TypeMismatchArray;
+    case DE::KeyNotFound:        return EvalError::KeyNotFound;
+    case DE::IndexOutOfRange:    return EvalError::IndexOutOfRange;
+    default:                     return EvalError::TypeMismatchObject;
+    }
 }
 
 JSONPointer::Error JSONPointer::mapError(json_pointer::detail::ParseError pe)

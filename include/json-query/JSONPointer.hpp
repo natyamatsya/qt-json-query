@@ -23,11 +23,23 @@ public:
         ArrayIndexOverflow
     };
 
+    // Evaluation-time errors
+    enum class EvalError : std::uint8_t {
+        TypeMismatchObject,
+        TypeMismatchArray,
+        KeyNotFound,
+        IndexOutOfRange
+    };
+
     // Factory function mirroring JSONPath
     static std::expected<JSONPointer, Error> create(QStringView pointer);
 
     [[nodiscard]] QJsonValue evaluate(QJsonDocument const&) const;
     [[nodiscard]] QJsonValue evaluate(QJsonValue   const&) const;
+
+    // Detailed-error variants
+    [[nodiscard]] std::expected<QJsonValue, EvalError> evaluateEx(QJsonDocument const&) const;
+    [[nodiscard]] std::expected<QJsonValue, EvalError> evaluateEx(QJsonValue   const&) const;
 
     [[nodiscard]] QString toString() const;
 
@@ -39,6 +51,7 @@ private:
 
     [[nodiscard]] std::expected<void, Error> parsePointer(QStringView);
     static Error              mapError(json_pointer::detail::ParseError);
+    static EvalError          mapEvalError(json_pointer::detail::EvalError);
     [[nodiscard]] QJsonValue  evaluateInternal(QJsonValue const&) const;
     static void decodeAndStore(QStringView raw, QVector<Token>& out);
 };
