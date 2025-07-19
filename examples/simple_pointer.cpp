@@ -16,14 +16,14 @@ int main(int argc, char **argv)
     QJsonObject obj{{"foo", 42}};
     QJsonDocument doc(obj);
 
-    // Create JSON Pointer directly
-    JSONPointer pointer("/foo");
-    if (!pointer.isValid()) {
+    // Create JSON Pointer via factory
+    auto pointer = JSONPointer::create(QStringLiteral("/foo"));
+    if (!pointer) {
         qWarning() << "Invalid JSON Pointer.";
         return EXIT_FAILURE;
     }
 
-    QJsonValue result = pointer.evaluate(doc);
+    QJsonValue result = pointer->evaluate(doc);
     if (result.isUndefined()) {
         qWarning() << "Failed to evaluate JSON Pointer.";
         return EXIT_FAILURE;

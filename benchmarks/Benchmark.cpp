@@ -43,8 +43,9 @@ static void BM_JSONPointer_Simple(benchmark::State &state)
     QJsonDocument doc = prepareTestDocument();
     for (auto _ : state)
     {
-        JSONPointer ptr("/name");
-        benchmark::DoNotOptimize(ptr.evaluate(doc));
+        auto ptr = JSONPointer::create(QStringLiteral("/name"));
+        benchmark::DoNotOptimize(ptr);
+        benchmark::DoNotOptimize(ptr->evaluate(doc));
     }
 }
 BENCHMARK(BM_JSONPointer_Simple);
@@ -54,8 +55,9 @@ static void BM_JSONPointer_Nested(benchmark::State &state)
     QJsonDocument doc = prepareTestDocument();
     for (auto _ : state)
     {
-        JSONPointer ptr("/location/city");
-        benchmark::DoNotOptimize(ptr.evaluate(doc));
+        auto ptr = JSONPointer::create(QStringLiteral("/location/city"));
+        benchmark::DoNotOptimize(ptr);
+        benchmark::DoNotOptimize(ptr->evaluate(doc));
     }
 }
 BENCHMARK(BM_JSONPointer_Nested);
@@ -65,8 +67,9 @@ static void BM_JSONPointer_Array(benchmark::State &state)
     QJsonDocument doc = prepareTestDocument();
     for (auto _ : state)
     {
-        JSONPointer ptr("/inventory/5/title");
-        benchmark::DoNotOptimize(ptr.evaluate(doc));
+        auto ptr = JSONPointer::create(QStringLiteral("/inventory/5/title"));
+        benchmark::DoNotOptimize(ptr);
+        benchmark::DoNotOptimize(ptr->evaluate(doc));
     }
 }
 BENCHMARK(BM_JSONPointer_Array);
@@ -76,8 +79,9 @@ static void BM_JSONPointer_Complex(benchmark::State &state)
     QJsonDocument doc = prepareTestDocument();
     for (auto _ : state)
     {
-        JSONPointer ptr("/inventory/15/author/name");
-        benchmark::DoNotOptimize(ptr.evaluate(doc));
+        auto ptr = JSONPointer::create(QStringLiteral("/inventory/15/author/name"));
+        benchmark::DoNotOptimize(ptr);
+        benchmark::DoNotOptimize(ptr->evaluate(doc));
     }
 }
 BENCHMARK(BM_JSONPointer_Complex);
@@ -224,7 +228,7 @@ static void BM_JSONPointer_Creation(benchmark::State &state)
 {
     for (auto _ : state)
     {
-        JSONPointer ptr("/inventory/25/categories/1");
+        auto ptr = JSONPointer::create(QStringLiteral("/inventory/25/categories/1"));
         benchmark::DoNotOptimize(ptr);
     }
 }

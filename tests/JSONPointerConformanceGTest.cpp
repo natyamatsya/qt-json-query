@@ -65,9 +65,9 @@ TEST(JSONPointerConformance, ValidPointers)
     };
 
     for (const auto &c : cases) {
-        JSONPointer jp(c.ptr);
-        ASSERT_TRUE(jp.isValid()) << qPrintable(QStringLiteral("Invalid pointer: %1").arg(c.ptr));
-        compareJson(jp.evaluate(testDoc()), c.expected);
+        auto jp = JSONPointer::create(c.ptr);
+        ASSERT_TRUE(jp) << qPrintable(QStringLiteral("Invalid pointer: %1").arg(c.ptr));
+        compareJson(jp->evaluate(testDoc()), c.expected);
     }
 }
 
@@ -75,9 +75,9 @@ TEST(JSONPointerConformance, InvalidPointers)
 {
     const QStringList invalidPtrs{"foo/bar", "//", "/foo//bar"};
     for (const QString &ptr : invalidPtrs) {
-        JSONPointer jp(ptr);
-        ASSERT_FALSE(jp.isValid()) << qPrintable(QStringLiteral("Pointer unexpectedly valid: %1").arg(ptr));
-        EXPECT_THAT(jp.evaluate(testDoc()), IsJsonUndefined());
+        auto jp = JSONPointer::create(ptr);
+        ASSERT_FALSE(jp) << qPrintable(QStringLiteral("Pointer unexpectedly valid: %1").arg(ptr));
+        // jp is error, nothing to evaluate
     }
 }
 

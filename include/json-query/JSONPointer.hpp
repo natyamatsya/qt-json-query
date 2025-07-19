@@ -1,6 +1,8 @@
 #pragma once
 #include <QJsonValue>
 #include <QVector>
+#include <optional>
+#include <expected>
 
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -12,15 +14,26 @@ namespace json_query
 class JSONPointer
 {
 public:
-    explicit JSONPointer(const QString& pointer);
+    enum class Error {
+        InvalidSyntax
+    };
+
+    // Factory function mirroring JSONPath
+    static std::expected<JSONPointer, Error> create(QStringView pointer);
+
+#ifdef JSONQUERY_ENABLE_LEGACY_CONSTRUCTORS
+    [[deprecated("Use JSONPointer::create instead")]]
+    explicit JSONPointer(const QString& pointer) { parsePointer(pointer); }
+#endif
 
     [[nodiscard]] QJsonValue evaluate(QJsonDocument const&) const;
     [[nodiscard]] QJsonValue evaluate(QJsonValue   const&) const;
 
-    [[nodiscard]] bool    isValid()  const noexcept { return m_valid; }
     [[nodiscard]] QString toString() const;
 
 private:
+    JSONPointer() = default;  // internal default ctor for factory
+
     struct Token {
         enum class Kind : quint8 { Key, Index };
         Kind       kind;
@@ -28,10 +41,9 @@ private:
         QString    key{};
     };
 
-    bool             m_valid {true};
     QVector<Token>   m_tokens;
 
-    void        parsePointer(QStringView);
+    [[nodiscard]] bool        parsePointer(QStringView);
     [[nodiscard]] QJsonValue  evaluateInternal(QJsonValue const&) const;
     static void decodeAndStore(QStringView raw, QVector<Token>& out);
 };

@@ -6,9 +6,79 @@
 
 namespace json_query {
 
-JSONPointer::JSONPointer(const QString &pointer)
+// ────────────────────────────────────────────────────────────────────
+//  Factory
+// ────────────────────────────────────────────────────────────────────
+std::expected<JSONPointer, JSONPointer::Error> JSONPointer::create(QStringView pointer)
 {
-    parsePointer(pointer);
+    JSONPointer jp;
+    if (!jp.parsePointer(pointer))
+        return std::unexpected(Error::InvalidSyntax);
+    return jp;
+}
+
+namespace {
+    [[nodiscard]] QString decodeToken(QStringView token) noexcept;
+    [[nodiscard]] bool    parseArrayIndex(QString const& s, qsizetype& out) noexcept;
+}
+
+bool JSONPointer::parsePointer(QStringView const ptr)
+{
+    m_tokens.clear();
+
+    [[maybe_unused]] constexpr char16_t Slash{ u'/' };
+
+    // Empty string  →  whole document
+    if (ptr.isEmpty()) [[unlikely]]
+        return true;
+
+    // Must begin with '/'
+    if (ptr.front() != Slash) [[unlikely]] {
+        return false;
+    }
+
+    // Single '/' → token is empty string
+    if (ptr.size() == 1) {
+        m_tokens.append(Token{ Token::Kind::Key, 0, QString{} });
+        return true;
+    }
+
+    // Upper bound: every '/' may introduce a token
+    const qsizetype approxTokens{ ptr.count(Slash) };
+    m_tokens.reserve(approxTokens);
+
+    for (qsizetype begin{ 1 }; /*loop*/; )
+    {
+        const qsizetype end   { ptr.indexOf(Slash, begin) };
+        const bool      atEnd { end == -1 };
+
+        const QStringView rawSeg = atEnd
+                                 ? ptr.sliced(begin)
+                                 : ptr.sliced(begin, end - begin);
+
+        // Empty segment *inside* the pointer is invalid (“//”)
+        if (rawSeg.isEmpty() && !atEnd) [[unlikely]] {
+            m_tokens.clear();
+            return false;
+        }
+
+        // RFC-6901 unescaping
+        const QString decoded = decodeToken(rawSeg);
+
+        // Decide Key vs Index once, store appropriately
+        qsizetype idxVal{};
+        if (parseArrayIndex(decoded, idxVal)) {
+            m_tokens.append(Token{ Token::Kind::Index, idxVal, {} });
+        } else {
+            m_tokens.append(Token{ Token::Kind::Key,   0,     decoded });
+        }
+
+        if (atEnd)
+            break;                  // finished last segment
+
+        begin = end + 1;            // jump past the slash
+    }
+    return true;
 }
 
 QJsonValue JSONPointer::evaluate(const QJsonDocument &document) const
@@ -22,9 +92,6 @@ QJsonValue JSONPointer::evaluate(const QJsonDocument &document) const
 
 QJsonValue JSONPointer::evaluate(const QJsonValue &value) const
 {
-    if (!isValid())
-        return {QJsonValue::Undefined};
-
     // Empty path returns the value itself
     if (m_tokens.isEmpty())
         return value;
@@ -106,67 +173,6 @@ namespace
     }
 }
 
-void JSONPointer::parsePointer(QStringView const ptr)
-{
-    m_tokens.clear();
-    m_valid = true;
-
-    [[maybe_unused]] constexpr char16_t Slash{ u'/' };
-
-    // Empty string  →  whole document
-    if (ptr.isEmpty()) [[unlikely]]
-        return;
-
-    // Must begin with '/'
-    if (ptr.front() != Slash) [[unlikely]] {
-        m_valid = false;
-        return;
-    }
-
-    // Single '/' → token is empty string
-    if (ptr.size() == 1) {
-        m_tokens.append(Token{ Token::Kind::Key, 0, QString{} });
-        return;
-    }
-
-    // Upper bound: every '/' may introduce a token
-    const qsizetype approxTokens{ ptr.count(Slash) };
-    m_tokens.reserve(approxTokens);
-
-    for (qsizetype begin{ 1 }; /*loop*/; )
-    {
-        const qsizetype end   { ptr.indexOf(Slash, begin) };
-        const bool      atEnd { end == -1 };
-
-        const QStringView rawSeg = atEnd
-                                 ? ptr.sliced(begin)
-                                 : ptr.sliced(begin, end - begin);
-
-        // Empty segment *inside* the pointer is invalid (“//”)
-        if (rawSeg.isEmpty() && !atEnd) [[unlikely]] {
-            m_valid = false;
-            m_tokens.clear();
-            return;
-        }
-
-        // RFC-6901 unescaping
-        const QString decoded = decodeToken(rawSeg);
-
-        // Decide Key vs Index once, store appropriately
-        qsizetype idxVal{};
-        if (parseArrayIndex(decoded, idxVal)) {
-            m_tokens.append(Token{ Token::Kind::Index, idxVal, {} });
-        } else {
-            m_tokens.append(Token{ Token::Kind::Key,   0,     decoded });
-        }
-
-        if (atEnd)
-            break;                  // finished last segment
-
-        begin = end + 1;            // jump past the slash
-    }
-}
-
 namespace
 {
     // ────────────────────────────────────────────────────────────────────
@@ -232,7 +238,7 @@ QJsonValue JSONPointer::evaluateInternal(QJsonValue const& root) const
 
 QString JSONPointer::toString() const
 {
-    if (!m_valid || m_tokens.isEmpty())
+    if (m_tokens.isEmpty())
         return {};
 
     // ───────────────────────────────── capacity ─────────────────────────────────
