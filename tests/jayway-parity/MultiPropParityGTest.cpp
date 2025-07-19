@@ -3,17 +3,20 @@
 // Source repository: tests/references/jayway-json-path/json-path/src/test/java/com/jayway/jsonpath/MultiPropTest.java
 
 #include <gtest/gtest.h>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include "json-query/JSONPath.hpp"
-#include "JaywayParityGTestHelpers.hpp"
 #include <gmock/gmock.h>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QJsonValue>
+#include "json-query/json-path/JSONPath.hpp"
+#include "JaywayParityGTestHelpers.hpp"
 
-namespace jayway_parity
-{
+using json_query::JSONPath;
 
 using namespace ::testing;
 using namespace jp;
+
+namespace jayway_parity {
 
 // -----------------------------------------------------------------------------
 // Implemented test – expected to pass with current library --------------------

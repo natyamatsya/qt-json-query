@@ -29,19 +29,19 @@ target_include_directories(json_query_tests PRIVATE ${PROJECT_SOURCE_DIR}/includ
 target_link_libraries(json_query_tests PRIVATE json_query GTest::gtest GTest::gtest_main Qt6::Core)
 
 # Jayway parity tests ---------------------------------------------------------
-# DISABLED: Jayway parity tests temporarily disabled for refactoring
-# set(JAYWAY_PARITY_SOURCES
-#     ${PROJECT_SOURCE_DIR}/tests/jayway-parity/DeepScanParityGTest.cpp
-#     ${PROJECT_SOURCE_DIR}/tests/jayway-parity/MultiPropParityGTest.cpp
-#     ${PROJECT_SOURCE_DIR}/tests/jayway-parity/FilterParityGTest.cpp
-#     ${PROJECT_SOURCE_DIR}/tests/jayway-parity/EscapeParityGTest.cpp
-#     ${PROJECT_SOURCE_DIR}/tests/jayway-parity/OptionsParityGTest.cpp
-#     ${PROJECT_SOURCE_DIR}/tests/jayway-parity/MapperParityGTest.cpp
-#     ${PROJECT_SOURCE_DIR}/tests/jayway-parity/PathCompilerParityGTest.cpp
-# )
-# add_executable(jayway_parity_tests ${JAYWAY_PARITY_SOURCES})
-# target_include_directories(jayway_parity_tests PRIVATE ${PROJECT_SOURCE_DIR}/include)
-# target_link_libraries(jayway_parity_tests PRIVATE json_query GTest::gtest GTest::gmock GTest::gtest_main Qt6::Core)
+# Jayway parity tests for comprehensive compatibility testing
+set(JAYWAY_PARITY_SOURCES
+    ${PROJECT_SOURCE_DIR}/tests/jayway-parity/DeepScanParityGTest.cpp
+    ${PROJECT_SOURCE_DIR}/tests/jayway-parity/MultiPropParityGTest.cpp
+    ${PROJECT_SOURCE_DIR}/tests/jayway-parity/FilterParityGTest.cpp
+    ${PROJECT_SOURCE_DIR}/tests/jayway-parity/EscapeParityGTest.cpp
+    ${PROJECT_SOURCE_DIR}/tests/jayway-parity/OptionsParityGTest.cpp
+    ${PROJECT_SOURCE_DIR}/tests/jayway-parity/MapperParityGTest.cpp
+    ${PROJECT_SOURCE_DIR}/tests/jayway-parity/PathCompilerParityGTest.cpp
+)
+add_executable(jayway_parity_tests ${JAYWAY_PARITY_SOURCES})
+target_include_directories(jayway_parity_tests PRIVATE ${PROJECT_SOURCE_DIR}/include)
+target_link_libraries(jayway_parity_tests PRIVATE json_query GTest::gtest GTest::gmock GTest::gtest_main Qt6::Core)
 
 # Register with CTest, discover individual GoogleTest cases for both suites
 include(GoogleTest)
@@ -50,8 +50,8 @@ gtest_discover_tests(json_query_tests
     TEST_PREFIX "JsonQuery/"
 )
 
-# DISABLED: Jayway parity test discovery temporarily disabled
-# gtest_discover_tests(jayway_parity_tests
-#     DISCOVERY_MODE PRE_TEST
-#     TEST_PREFIX "jayway-parity/"
-# )
+# Jayway parity test discovery
+gtest_discover_tests(jayway_parity_tests
+    DISCOVERY_MODE PRE_TEST
+    TEST_PREFIX "jayway-parity/"
+)

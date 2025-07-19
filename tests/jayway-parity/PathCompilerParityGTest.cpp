@@ -1,16 +1,20 @@
 // PathCompilerParityGTest.cpp
 // Parity scaffolding for Jayway PathCompilerTest.java
 #include <gtest/gtest.h>
-#include "json-query/JSONPath.hpp"
-#include "JaywayParityGTestHelpers.hpp"
 #include <gmock/gmock.h>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QJsonValue>
+#include "json-query/json-path/JSONPath.hpp"
+#include "JaywayParityGTestHelpers.hpp"
 
 namespace jayway_parity 
 {
-    using namespace json_query;
     using namespace json_query::json_path;
-using namespace ::testing;
-using namespace jp;
+    using json_query::JSONPath;
+    using namespace ::testing;
+    using namespace jp;
 
 // Helper macro to create disabled parity stubs quickly
 #define PATHCOMPILER_STUB(name, reason) \
@@ -21,16 +25,27 @@ using namespace jp;
 TEST(JaywayPathCompilerParity, RootPathCanBeCompiled)
 {
     // "$" root
-    auto resDollar = json_query::compile(u"$");
+    auto resDollar = compile(u"$");
     ASSERT_TRUE(resDollar.has_value()) << "Compilation of '$' failed";
-    EXPECT_EQ(resDollar->tokens.size(), 1);
-    EXPECT_EQ(resDollar->tokens.front().key, "$");
+    EXPECT_EQ(resDollar->compiled.tokens.size(), 1);
+    EXPECT_EQ(resDollar->compiled.tokens.front().key, "$");
 
     // "@" root (current node)
-    auto resAt = json_query::compile(u"@");
+    auto resAt = compile(u"@");
     ASSERT_TRUE(resAt.has_value()) << "Compilation of '@' failed";
-    EXPECT_EQ(resAt->tokens.size(), 1);
-    EXPECT_EQ(resAt->tokens.front().key, "@");
+    EXPECT_EQ(resAt->compiled.tokens.size(), 1);
+    EXPECT_EQ(resAt->compiled.tokens.front().key, "@");
+}
+
+// -----------------------------------------------------------------------------
+// Implemented basic compilation parity test -----------------------------------
+
+TEST(JaywayPathCompilerParity, CompileAtSymbol)
+{
+    auto resAt = compile(u"@");
+    ASSERT_TRUE(resAt.has_value()) << "Compilation of '@' failed";
+    EXPECT_EQ(resAt->compiled.tokens.size(), 1);
+    EXPECT_EQ(resAt->compiled.tokens.front().key, "@");
 }
 
 // -----------------------------------------------------------------------------

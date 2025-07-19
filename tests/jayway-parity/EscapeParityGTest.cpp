@@ -2,11 +2,15 @@
 // Parity representation for Jayway EscapeTest.java
 
 #include <gtest/gtest.h>
+#include <gmock/gmock.h>
 #include <QJsonDocument>
 #include <QJsonArray>
-#include <gmock/gmock.h>
-#include "json-query/JSONPath.hpp"
+#include <QJsonObject>
+#include <QJsonValue>
+#include "json-query/json-path/JSONPath.hpp"
 #include "JaywayParityGTestHelpers.hpp"
+
+using json_query::JSONPath;
 
 // The Java EscapeTest ensures that JSON provider does not escape forward slashes
 // when serialising. Qt's QJsonDocument already leaves them untouched, so the

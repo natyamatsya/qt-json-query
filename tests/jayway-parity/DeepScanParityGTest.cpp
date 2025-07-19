@@ -7,9 +7,11 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 #include <QJsonDocument>
-#include "json-query/JSONPath.hpp"
+#include "json-query/json-path/JSONPath.hpp"
 #include "JaywayParityGTestHelpers.hpp"
 #include <QJsonValue>
+
+using json_query::JSONPath;
 
 namespace jayway_parity
 {

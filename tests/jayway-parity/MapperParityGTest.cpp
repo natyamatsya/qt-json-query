@@ -2,13 +2,18 @@
 // Parity representation for Jayway MapperTest.java
 
 #include <gtest/gtest.h>
-#include "json-query/JSONPath.hpp"
-#include "JaywayParityGTestHelpers.hpp"
 #include <gmock/gmock.h>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QJsonValue>
+#include "json-query/json-path/JSONPath.hpp"
+#include "JaywayParityGTestHelpers.hpp"
 
 namespace jayway_parity {
 using namespace ::testing;
 using namespace jp;
+using json_query::JSONPath;
 
 // -----------------------------------------------------------------------------
 // Implemented basic numeric conversion cases that already work in Qt JSON stack

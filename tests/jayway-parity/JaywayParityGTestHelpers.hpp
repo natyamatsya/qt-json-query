@@ -29,10 +29,10 @@
 #include <QString>
 #include <vector>
 #include <expected>
-#include "json-query/JSONPath.hpp"
+#include "json-query/json-path/JSONPath.hpp"
 
-using namespace json_query;
-using namespace json_query::json_path;
+using json_query::JSONPath;
+using json_query::json_path::Error;
 
 namespace jp {
 // Parse raw JSON C-string into a QJsonDocument.
