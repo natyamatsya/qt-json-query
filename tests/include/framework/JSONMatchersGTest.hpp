@@ -1,11 +1,13 @@
 #pragma once
-// Common helper utilities and lightweight matchers shared by the C++ Jayway
-// parity test suite.  The goal is to mimic the convenience found in the
-// original Java tests (BaseTest, TestUtils, AssertJ chainable assertions) while
-// staying minimal and dependency-free beyond GoogleTest & Qt.
+// JSONMatchersGTest.hpp
+// ---------------------------------------------------------------------------
+// Centralised helper utilities and lightweight GoogleTest/GMock matchers used
+// across all test suites (conformance, Baeldung, Jayway parity, etc.).  The
+// goal is to keep test code concise and dependency-free beyond GoogleTest, Qt
+// Core and the standard library.
 //
-// Usage:
-//   #include "JaywayParityGTestHelpers.hpp"
+// Usage example:
+//   #include "framework/JSONMatchersGTest.hpp"
 //   auto doc  = jp::parseJson(R"({"foo": "bar"})");
 //   auto path = *JSONPath::create(u"$.foo");
 //   QJsonValue v = jp::eval(path, doc);

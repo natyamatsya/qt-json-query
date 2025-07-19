@@ -82,9 +82,10 @@ endif()
 # Build example executables (simple_pointer, simple_path, ...)
 add_subdirectory(examples)
 
-# Unit-tests / benchmarks (requires Qt6::Test)
+# Unit tests (GoogleTest)
 if (BUILD_TESTING)
-    include(cmake/GoogleTests.cmake)
+    include(cmake/GoogleTestSetup.cmake)
+    add_subdirectory(tests)
 endif()
 
 # Benchmarks
