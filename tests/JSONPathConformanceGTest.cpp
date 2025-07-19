@@ -3,7 +3,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
-#include "../include/json-query/json-path/JSONPath.hpp"
+#include "framework/JSONMatchersGTest.hpp"
 
 // Using declarations for convenience
 using json_query::JSONPath;
@@ -59,7 +59,7 @@ TEST(JSONPathConformance, ValidPaths)
     for (const auto &c : cases) {
         auto jp { JSONPath::create(c.path) };
         ASSERT_TRUE(jp) << qPrintable(QStringLiteral("Invalid path: %1").arg(c.path));
-        compareJson(jp->evaluate(sampleDoc()), c.expected);
+        compareJson(eval(*jp, sampleDoc()), c.expected);
     }
 }
 

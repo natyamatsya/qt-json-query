@@ -10,25 +10,14 @@
 #include <QJsonArray>
 #include <gtest/gtest-spi.h>
 #include <algorithm>
-#include "../include/json-query/json-path/JSONPath.hpp"
+#include "framework/JSONMatchersGTest.hpp"
+#include "json-query/json-path/JSONPath.hpp"
 
 using namespace Qt::StringLiterals;
+using namespace ::testing;
 
 // Using declarations for convenience
 using json_query::JSONPath;
-
-// Helper to evaluate JSONPath and unwrap a single element when needed
-static QJsonValue evalSingle(const JSONPath &path, const QJsonDocument &doc)
-{
-    QJsonValue res = path.evaluate(doc);
-    if (res.isArray())
-    {
-        const auto arr = res.toArray();
-        EXPECT_EQ(arr.size(), 1);
-        return arr[0];
-    }
-    return res;
-}
 
 //---------------------------------------------
 // 4.1  Access to Documents
@@ -58,15 +47,12 @@ TEST(JSONPathBaeldung, CreatorNameAndLocation)
     ASSERT_TRUE(namePath);
     ASSERT_TRUE(locationPath);
 
-    EXPECT_EQ(evalSingle(*namePath, doc).toString(), u"Jayway Inc."_s);
+    EXPECT_THAT( eval(*namePath, doc), IsJsonString(u"Jayway Inc.") );
 
-    QJsonArray locArr = locationPath->evaluateAll(doc);
-    QStringList locStrings;
-    for (const auto &v : locArr)
-        locStrings << v.toString();
-    EXPECT_TRUE(locStrings.contains(u"Malmo"_s));
-    EXPECT_TRUE(locStrings.contains(u"San Francisco"_s));
-    EXPECT_TRUE(locStrings.contains(u"Helsingborg"_s));
+    EXPECT_THAT( locationPath->evaluateAll(doc),
+                 ElementsAre(IsJsonString(u"Malmo"),
+                             IsJsonString(u"San Francisco"),
+                             IsJsonString(u"Helsingborg")) );
 }
 
 //---------------------------------------------
