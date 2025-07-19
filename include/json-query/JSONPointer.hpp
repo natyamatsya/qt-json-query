@@ -16,8 +16,11 @@ namespace json_query
 class JSONPointer
 {
 public:
-    enum class Error {
-        InvalidSyntax
+    enum class Error : std::uint8_t {
+        MissingLeadingSlash,
+        EmptyNonTerminalToken,
+        InvalidEscapeSequence,
+        ArrayIndexOverflow
     };
 
     // Factory function mirroring JSONPath
@@ -34,7 +37,8 @@ private:
     using Token = json_query::json_pointer::detail::Token;
     QVector<Token>   m_tokens;
 
-    [[nodiscard]] bool        parsePointer(QStringView);
+    [[nodiscard]] std::expected<void, Error> parsePointer(QStringView);
+    static Error              mapError(json_pointer::detail::ParseError);
     [[nodiscard]] QJsonValue  evaluateInternal(QJsonValue const&) const;
     static void decodeAndStore(QStringView raw, QVector<Token>& out);
 };

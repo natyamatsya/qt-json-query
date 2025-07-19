@@ -14,15 +14,18 @@ namespace json_query {
 std::expected<JSONPointer, JSONPointer::Error> JSONPointer::create(QStringView pointer)
 {
     JSONPointer jp;
-    if (!jp.parsePointer(pointer))
-        return std::unexpected(Error::InvalidSyntax);
+    auto res = jp.parsePointer(pointer);
+    if (!res)
+        return std::unexpected(res.error());
     return jp;
 }
 
-bool JSONPointer::parsePointer(QStringView ptr)
+std::expected<void, JSONPointer::Error> JSONPointer::parsePointer(QStringView ptr)
 {
-    m_tokens.clear();
-    return json_pointer::detail::parsePointer(ptr, m_tokens);
+    auto res = json_pointer::detail::parsePointer(ptr, m_tokens);
+    if (!res)
+        return std::unexpected(mapError(res.error()));
+    return {};
 }
 
 QJsonValue JSONPointer::evaluate(const QJsonDocument &document) const
@@ -101,6 +104,18 @@ QString JSONPointer::toString() const
 
     out.truncate(wr);
     return out;
+}
+
+JSONPointer::Error JSONPointer::mapError(json_pointer::detail::ParseError pe)
+{
+    using PE = json_pointer::detail::ParseError;
+    switch (pe) {
+    case PE::MissingLeadingSlash:    return Error::MissingLeadingSlash;
+    case PE::EmptyNonTerminalToken:  return Error::EmptyNonTerminalToken;
+    case PE::InvalidEscapeSequence:  return Error::InvalidEscapeSequence;
+    case PE::ArrayIndexOverflow:     return Error::ArrayIndexOverflow;
+    default:                         return Error::InvalidEscapeSequence; // fallback
+    }
 }
 
 } // namespace json_query
