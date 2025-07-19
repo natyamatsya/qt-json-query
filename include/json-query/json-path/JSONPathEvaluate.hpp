@@ -59,4 +59,9 @@ QJsonArray wildcardArray(const json_query::JSONPath& jp, const QJsonArray& arr);
  */
 QJsonArray evaluateRecursive(const json_query::JSONPath& jp, const QJsonValue& value, int unused = 0);
 
+// New pure overloads (phase A) – no JSONPath dependency
+QJsonArray wildcardObject(const QJsonObject& obj);
+QJsonArray wildcardArray(const QJsonArray& arr);
+QJsonArray evaluateRecursive(const QJsonValue& value, int unused = 0);
+
 } // namespace json_query::json_path::detail

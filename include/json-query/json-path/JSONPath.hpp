@@ -31,6 +31,12 @@ namespace json_query {
 
 namespace json_query::json_path::detail {
 
+    class PathEvalCtx; // forward declaration for friend
+
+    // forward declarations of new evaluator free-functions
+    QJsonValue evaluate(const PathEvalCtx&, const json_query::JSONPath&, const QJsonValue&);
+    QJsonArray evaluateAll(const PathEvalCtx&, const json_query::JSONPath&, const QJsonValue&);
+
     template<json_path::Token::Kind K>
     QJsonArray eval(const json_query::JSONPath&,
                     const json_path::Token&,
@@ -151,19 +157,16 @@ private:
                     const QJsonValue&);
 
     // Give the rule parsers access to the private static compileFilter()
-    friend std::optional<Token> json_query::json_path::detail::parseOr     (QString, QVector<FilterFn>&);
-    friend std::optional<Token> json_query::json_path::detail::parseAnd    (QString, QVector<FilterFn>&);
-    friend std::optional<Token> json_query::json_path::detail::parseIn     (QString, QVector<FilterFn>&);
-    friend std::optional<Token> json_query::json_path::detail::parseCompare(QString, QVector<FilterFn>&);
-    friend std::optional<Token> json_query::json_path::detail::parseRegex  (QString, QVector<FilterFn>&);
     friend QJsonArray json_query::json_path::detail::fanOut(const JSONPath&,
                                      const Token&,
                                      const QJsonArray&);
-    /* existing friends … */
-    friend std::expected<qsizetype, Error>
-               json_query::json_path::detail::parseBracket(qsizetype, QStringView,
-                                    json_query::json_path::detail::KeyBuilder&, QVector<Token>&,
-                                    QVector<FilterFn>&);
-};
+
+    // friend declarations for new functional evaluator (phase B)
+    friend QJsonValue json_query::json_path::detail::evaluate(
+        const json_query::json_path::detail::PathEvalCtx&, const JSONPath&, const QJsonValue&);
+    friend QJsonArray json_query::json_path::detail::evaluateAll(
+        const json_query::json_path::detail::PathEvalCtx&, const JSONPath&, const QJsonValue&);
+
+}; // end class JSONPath
 
 } // namespace json_query

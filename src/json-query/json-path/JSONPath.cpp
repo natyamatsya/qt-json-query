@@ -1,6 +1,7 @@
 #include "json-query/json-path/JSONPath.hpp"
 #include "json-query/json-path/JSONPathTokenEvaluators.hpp"
 #include "json-query/json-path/JSONPathEvaluate.hpp"
+#include "json-query/json-path/PathEvaluator.hpp"
 #include "json-query/json-path/internal/ContainerCursor.hpp"
 
 #include <vector>
@@ -26,10 +27,8 @@ QJsonValue JSONPath::evaluate(const QJsonDocument &document) const
 // ─────────────────────────────────────────────────────────────────────
 QJsonValue JSONPath::evaluate(const QJsonValue& root) const
 {
-    if (m_option == Option::AsPathList)
-        return evalAsPathList(*this, root);
-
-    return evalStandard(*this, root);
+    json_path::detail::PathEvalCtx ctx{m_tokens, m_filters, m_option, m_func};
+    return json_path::detail::evaluate(ctx, *this, root);
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -64,12 +63,16 @@ inline QJsonArray JSONPath::evaluateToken(const Token& tk,
 
 QJsonArray JSONPath::evaluateAll(const QJsonDocument &document) const
 {
-    return json_path::detail::evaluateAll(*this, document);
+    const QJsonValue root = document.isArray() ? QJsonValue(document.array())
+                                               : QJsonValue(document.object());
+    json_path::detail::PathEvalCtx ctx{m_tokens, m_filters, m_option, m_func};
+    return json_path::detail::evaluateAll(ctx, *this, root);
 }
 
 QJsonArray JSONPath::evaluateAll(const QJsonValue &value) const
 {
-    return json_path::detail::evaluateAll(*this, value);
+    json_path::detail::PathEvalCtx ctx{m_tokens, m_filters, m_option, m_func};
+    return json_path::detail::evaluateAll(ctx, *this, value);
 }
 
 // ===================================================================
