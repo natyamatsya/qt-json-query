@@ -7,6 +7,8 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include "json-query/json-pointer/JSONPointerParsing.hpp"
+#include "json-query/json-pointer/JSONPointerEvaluation.hpp"
 
 namespace json_query
 {
@@ -21,11 +23,6 @@ public:
     // Factory function mirroring JSONPath
     static std::expected<JSONPointer, Error> create(QStringView pointer);
 
-#ifdef JSONQUERY_ENABLE_LEGACY_CONSTRUCTORS
-    [[deprecated("Use JSONPointer::create instead")]]
-    explicit JSONPointer(const QString& pointer) { parsePointer(pointer); }
-#endif
-
     [[nodiscard]] QJsonValue evaluate(QJsonDocument const&) const;
     [[nodiscard]] QJsonValue evaluate(QJsonValue   const&) const;
 
@@ -34,13 +31,7 @@ public:
 private:
     JSONPointer() = default;  // internal default ctor for factory
 
-    struct Token {
-        enum class Kind : quint8 { Key, Index };
-        Kind       kind;
-        qsizetype  index{};
-        QString    key{};
-    };
-
+    using Token = json_query::json_pointer::detail::Token;
     QVector<Token>   m_tokens;
 
     [[nodiscard]] bool        parsePointer(QStringView);

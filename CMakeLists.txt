@@ -46,35 +46,7 @@ if(NOT TARGET ctre_interface)
     target_include_directories(ctre_interface INTERFACE ${ctre_SOURCE_DIR}/single-header)
 endif()
 
-add_library(json_query
-        src/json-query/JSONPointer.cpp
-        src/json-query/json-path/JSONPath.cpp
-        src/json-query/json-path/JSONPathCreate.cpp
-        src/json-query/json-path/JSONPathCompile.cpp
-        src/json-query/json-path/JSONPathFilter.cpp
-        src/json-query/json-path/JSONPathTokenEvaluators.cpp
-        src/json-query/json-path/JSONPathEvaluate.cpp
-        src/json-query/json-path/JSONPathPointerConversion.cpp
-)
-
-# Public headers
-target_include_directories(json_query
-    PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/json-query>
-        $<BUILD_INTERFACE:${ctre_SOURCE_DIR}/single-header>
-        $<INSTALL_INTERFACE:include>
-)
-
-# Link QtCore (Qt JSON classes live here)
-# If additional Qt modules become necessary, add them here.
-target_link_libraries(json_query PUBLIC Qt6::Core)
-
-# Link CTRE header-only library (interface target defined by FetchContent)
-# link interface target
-if(TARGET ctre_interface)
-    target_link_libraries(json_query PRIVATE ctre_interface)
-endif()
+add_subdirectory(src/json-query)
 
 # ---------------------------------------------------------------------------
 # Examples and tests
