@@ -81,9 +81,9 @@ static QString editionIsbn_plain(const QJsonDocument &doc, int index)
 static QString editionIsbn_pointer(const QJsonDocument &doc, int index)
 {
     auto ptr = JSONPointer::create(QString("/inventory/%1/details/edition/isbn").arg(index));
-    if (!ptr)
-        return {};
-    return ptr->evaluate(doc).toString();
+    if (!ptr) return {};
+    auto res = ptr->evaluate(doc);
+    return res ? res->toString() : QString{};
 }
 
 static QString editionIsbn_path(const QJsonDocument &doc, int index)

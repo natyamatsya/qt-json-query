@@ -20,15 +20,10 @@ int main(int argc, char **argv)
     auto pointer = JSONPointer::create(QStringLiteral("/foo"));
     if (!pointer) {
         qWarning() << "Invalid JSON Pointer.";
-        return EXIT_FAILURE;
+        return -1;
     }
 
-    QJsonValue result = pointer->evaluate(doc);
-    if (result.isUndefined()) {
-        qWarning() << "Failed to evaluate JSON Pointer.";
-        return EXIT_FAILURE;
-    }
-
-    qInfo() << "Pointer result:" << result; // Should output: 42
+    auto res = pointer->evaluate(doc);
+    qDebug() << (res ? res->toString() : QString("<err>"));
     return EXIT_SUCCESS;
 }

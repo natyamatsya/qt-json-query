@@ -67,7 +67,9 @@ TEST(JSONPointerConformance, ValidPointers)
     for (const auto &c : cases) {
         auto jp = JSONPointer::create(c.ptr);
         ASSERT_TRUE(jp) << qPrintable(QStringLiteral("Invalid pointer: %1").arg(c.ptr));
-        compareJson(jp->evaluate(testDoc()), c.expected);
+        auto res = jp->evaluate(testDoc());
+        ASSERT_TRUE(res);
+        compareJson(res.value(), c.expected);
     }
 }
 

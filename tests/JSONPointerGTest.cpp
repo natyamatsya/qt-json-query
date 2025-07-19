@@ -14,7 +14,8 @@ static QJsonValue evalPtr(QStringView ptr, const QJsonDocument &doc)
 {
     auto jp = JSONPointer::create(ptr);
     EXPECT_TRUE(jp) << qPrintable(QStringLiteral("Pointer invalid: %1").arg(QString(ptr)));
-    return jp->evaluate(doc);
+    auto res = jp->evaluate(doc);
+    return res ? res.value() : QJsonValue{QJsonValue::Undefined};
 }
 
 TEST(JSONPointerBasic, EmptyPointer)
@@ -22,7 +23,9 @@ TEST(JSONPointerBasic, EmptyPointer)
     QJsonDocument doc(QJsonObject{{"foo","bar"}});
     auto p = JSONPointer::create(QStringLiteral(""));
     ASSERT_TRUE(p);
-    EXPECT_THAT(p->evaluate(doc), JsonObjContains(kvlist(kv("foo","bar"))));
+    auto valRes = p->evaluate(doc);
+    EXPECT_TRUE(valRes);
+    EXPECT_THAT(valRes.value(), JsonObjContains(kvlist(kv("foo","bar"))));
 }
 
 TEST(JSONPointerBasic, ObjectAccess)

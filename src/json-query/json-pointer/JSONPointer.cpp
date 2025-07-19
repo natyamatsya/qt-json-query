@@ -2,7 +2,6 @@
 #include "json-query/JSONQueryUtils.hpp"
 #include "json-query/json-pointer/JSONPointerParsing.hpp"
 #include "json-query/json-pointer/JSONPointerEvaluation.hpp"
-#include "json-query/json-pointer/JSONPointerEvaluation.hpp"
 #include <charconv>   // std::to_chars
 #include <cmath>      // std::log10 (for capacity guess)
 #include <expected>
@@ -12,7 +11,7 @@ namespace json_query {
 // ────────────────────────────────────────────────────────────────────
 //  Factory
 // ────────────────────────────────────────────────────────────────────
-std::expected<JSONPointer, JSONPointer::Error> JSONPointer::create(QStringView pointer)
+JSONPointer::Result JSONPointer::create(QStringView pointer)
 {
     JSONPointer jp;
     auto res = jp.parsePointer(pointer);
@@ -29,38 +28,23 @@ std::expected<void, JSONPointer::Error> JSONPointer::parsePointer(QStringView pt
     return {};
 }
 
-QJsonValue JSONPointer::evaluate(const QJsonDocument &document) const
-{
-    return document.isArray()
-             ? evaluate(document.array())
-             : evaluate(document.object());
-}
-
-QJsonValue JSONPointer::evaluate(const QJsonValue &value) const
-{
-    auto res = json_pointer::detail::evaluatePointer(m_tokens, value);
-    return res ? res.value() : QJsonValue{QJsonValue::Undefined};
-}
-
-// evaluateInternal no longer needed; but keep thin wrapper for legacy internal call
-QJsonValue JSONPointer::evaluateInternal(QJsonValue const& root) const
-{
-    auto res = json_pointer::detail::evaluatePointer(m_tokens, root);
-    return res ? res.value() : QJsonValue{QJsonValue::Undefined};
-}
-
 // ────────────────────────────────────────────────────────────
 //  Public evaluation with detailed error
 // ────────────────────────────────────────────────────────────
 
-std::expected<QJsonValue, JSONPointer::EvalError>
-JSONPointer::evaluateEx(QJsonDocument const& doc) const
+JSONPointer::EvalResult JSONPointer::evaluate(QJsonDocument const& doc) const
 {
-    return evaluateEx(doc.isNull() ? QJsonValue{} : QJsonValue{ doc.object() });
+    if (doc.isNull())
+        return evaluate(QJsonValue{});
+    if (doc.isObject())
+        return evaluate(QJsonValue{ doc.object() });
+    if (doc.isArray())
+        return evaluate(QJsonValue{ doc.array() });
+    // otherwise, treat as undefined
+    return evaluate(QJsonValue{});
 }
 
-std::expected<QJsonValue, JSONPointer::EvalError>
-JSONPointer::evaluateEx(QJsonValue const& value) const
+JSONPointer::EvalResult JSONPointer::evaluate(QJsonValue const& value) const
 {
     auto res = json_pointer::detail::evaluatePointer(m_tokens, value);
     if (res)

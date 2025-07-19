@@ -32,14 +32,15 @@ public:
     };
 
     // Factory function mirroring JSONPath
-    static std::expected<JSONPointer, Error> create(QStringView pointer);
+    using Result = std::expected<JSONPointer, Error>;
+    static Result create(QStringView pointer);
 
-    [[nodiscard]] QJsonValue evaluate(QJsonDocument const&) const;
-    [[nodiscard]] QJsonValue evaluate(QJsonValue   const&) const;
+    // Alias for evaluation result with error
+    using EvalResult = std::expected<QJsonValue, EvalError>;
 
     // Detailed-error variants
-    [[nodiscard]] std::expected<QJsonValue, EvalError> evaluateEx(QJsonDocument const&) const;
-    [[nodiscard]] std::expected<QJsonValue, EvalError> evaluateEx(QJsonValue   const&) const;
+    [[nodiscard]] EvalResult evaluate(QJsonDocument const&) const;
+    [[nodiscard]] EvalResult evaluate(QJsonValue   const&) const;
 
     [[nodiscard]] QString toString() const;
 
@@ -50,9 +51,8 @@ private:
     QVector<Token>   m_tokens;
 
     [[nodiscard]] std::expected<void, Error> parsePointer(QStringView);
-    static Error              mapError(json_pointer::detail::ParseError);
     static EvalError          mapEvalError(json_pointer::detail::EvalError);
-    [[nodiscard]] QJsonValue  evaluateInternal(QJsonValue const&) const;
+    static Error              mapError(json_pointer::detail::ParseError);
     static void decodeAndStore(QStringView raw, QVector<Token>& out);
 };
 

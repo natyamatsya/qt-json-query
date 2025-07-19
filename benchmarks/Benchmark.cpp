@@ -44,8 +44,8 @@ static void BM_JSONPointer_Simple(benchmark::State &state)
     for (auto _ : state)
     {
         auto ptr = JSONPointer::create(QStringLiteral("/name"));
-        benchmark::DoNotOptimize(ptr);
-        benchmark::DoNotOptimize(ptr->evaluate(doc));
+        auto res = ptr->evaluate(doc);
+        benchmark::DoNotOptimize(res);
     }
 }
 BENCHMARK(BM_JSONPointer_Simple);
@@ -56,7 +56,6 @@ static void BM_JSONPointer_Nested(benchmark::State &state)
     for (auto _ : state)
     {
         auto ptr = JSONPointer::create(QStringLiteral("/location/city"));
-        benchmark::DoNotOptimize(ptr);
         benchmark::DoNotOptimize(ptr->evaluate(doc));
     }
 }
@@ -68,7 +67,6 @@ static void BM_JSONPointer_Array(benchmark::State &state)
     for (auto _ : state)
     {
         auto ptr = JSONPointer::create(QStringLiteral("/inventory/5/title"));
-        benchmark::DoNotOptimize(ptr);
         benchmark::DoNotOptimize(ptr->evaluate(doc));
     }
 }
@@ -80,7 +78,6 @@ static void BM_JSONPointer_Complex(benchmark::State &state)
     for (auto _ : state)
     {
         auto ptr = JSONPointer::create(QStringLiteral("/inventory/15/author/name"));
-        benchmark::DoNotOptimize(ptr);
         benchmark::DoNotOptimize(ptr->evaluate(doc));
     }
 }
@@ -275,7 +272,8 @@ BENCHMARK_MAIN();
     
     {
         JSONPointer pointer("/name");
-        QJsonValue result = pointer.evaluate(doc);
+        auto res = pointer.evaluate(doc);
+        benchmark::DoNotOptimize(res);
     }
 }
 
@@ -286,7 +284,7 @@ benchmarkJsonPointerNestedPath()
     
     {
         JSONPointer pointer("/location/city");
-        QJsonValue result = pointer.evaluate(doc);
+        benchmark::DoNotOptimize(pointer.evaluate(doc));
     }
 }
 
@@ -297,7 +295,7 @@ benchmarkJsonPointerArrayPath()
     
     {
         JSONPointer pointer("/inventory/5/title");
-        QJsonValue result = pointer.evaluate(doc);
+        benchmark::DoNotOptimize(pointer.evaluate(doc));
     }
 }
 
@@ -308,7 +306,7 @@ benchmarkJsonPointerComplexPath()
     
     {
         JSONPointer pointer("/inventory/15/author/name");
-        QJsonValue result = pointer.evaluate(doc);
+        benchmark::DoNotOptimize(pointer.evaluate(doc));
     }
 }
 
