@@ -1,7 +1,7 @@
 #include "json-query/json-path/PathEvaluator.hpp"
-#include "json-query/json-path/JSONPath.hpp"
 #include "json-query/json-path/JSONPathEvaluate.hpp" // for pure helpers
 #include "json-query/json-path/JSONPathTokenEvaluators.hpp"
+#include "json-query/json-path/JSONPathPointerConversion.hpp"
 
 #include <array>
 #include <deque>
@@ -174,35 +174,14 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
 QJsonValue evalAsPathList(const PathEvalCtx& ctx, const QJsonValue& root)
 {
     Q_UNUSED(root)
-    using Option = json_query::JSONPath::Option;
-    if (ctx.option != Option::AsPathList)
+    if (ctx.option != PathEvalCtx::Option::AsPathList)
         return QJsonValue(QJsonValue::Undefined);
 
-    auto escapeSeg = [](const QString& seg){
-        QString out; out.reserve(seg.size());
-        for (QChar c : seg) {
-            if (c == u'~') out += "~0"_L1;
-            else if (c == u'/') out += "~1"_L1;
-            else out += c;
-        }
-        return out;
-    };
-
-    QStringList segments;
-    for (qsizetype i = 1; i < ctx.tokens.size(); ++i) {
-        const Token& tk = ctx.tokens[i];
-        switch (tk.kind) {
-        case Token::Kind::Key:
-            segments.append(escapeSeg(tk.key));
-            break;
-        case Token::Kind::Index:
-            segments.append(QString::number(tk.index));
-            break;
-        default:
-            return QJsonValue(QJsonValue::Undefined);
-        }
-    }
-    return "/"_L1 + segments.join(u'/');
+    QStringList segs;
+    const QString ptr = tokensToPointer(segs, ctx.tokens);
+    if (ptr.isEmpty())
+        return QJsonValue(QJsonValue::Undefined);
+    return ptr;
 }
 
 // ---------------------------------------------------------------------------
@@ -210,7 +189,7 @@ QJsonValue evalAsPathList(const PathEvalCtx& ctx, const QJsonValue& root)
 // ---------------------------------------------------------------------------
 QJsonValue evaluate(const PathEvalCtx& ctx, const QJsonValue& root)
 {
-    if (ctx.option == json_query::JSONPath::Option::AsPathList)
+    if (ctx.option == PathEvalCtx::Option::AsPathList)
         return evalAsPathList(ctx, root);
     return evalStandard(ctx, root);
 }
