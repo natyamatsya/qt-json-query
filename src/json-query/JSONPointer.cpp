@@ -4,6 +4,8 @@
 #include <charconv>   // std::to_chars
 #include <cmath>      // std::log10 (for capacity guess)
 
+namespace json_query {
+
 JSONPointer::JSONPointer(const QString &pointer)
 {
     parsePointer(pointer);
@@ -287,3 +289,5 @@ QString JSONPointer::toString() const
     out.truncate(wr);
     return out;
 }
+
+} // namespace json_query

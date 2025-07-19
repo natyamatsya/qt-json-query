@@ -6,6 +6,8 @@
 #include <QJsonValue>
 #include "json-query/JSONPointer.hpp"
 
+using json_query::JSONPointer;
+
 namespace {
 
 static const QJsonDocument &testDoc()

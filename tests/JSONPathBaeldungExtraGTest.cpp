@@ -4,12 +4,13 @@
 // intended assertions (commented for future enablement).
 
 #include <gtest/gtest.h>
-#include <gtest/gtest-spi.h>
 #include <QJsonDocument>
+#include <QJsonObject>
 #include <QJsonArray>
 #include "../include/json-query/json-path/JSONPath.hpp"
 
 using namespace Qt::StringLiterals;
+using json_query::JSONPath;
 
 //---------------------------------------------
 // 7.1 length() function on array

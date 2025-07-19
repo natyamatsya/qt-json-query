@@ -10,10 +10,13 @@
 #include "../../../include/json-query/json-path/internal/ContainerCursor.hpp"
 #include "../../../include/json-query/json-path/internal/QtHash.hpp"
 
-using json_query::ContainerCursor;
-using json_query::json_path::Slice;
-using json_query::json_path::Token;
-using json_query::json_path::Error;
+namespace json_query {
+
+using json_path::internal::ContainerCursor;
+using json_path::Slice;
+using json_path::Token;
+using json_path::Error;
+using json_path::FilterFn;
 
 QJsonValue JSONPath::evaluate(const QJsonDocument &document) const
 {
@@ -41,48 +44,47 @@ QJsonValue JSONPath::evaluate(const QJsonValue& root) const
 // -----------------------------------------------------------------------------
 // Inline evaluators — one per token kind
 // -----------------------------------------------------------------------------
-namespace detail {
+namespace json_path::detail {
 
-template<JSONPath::Token::Kind K>
-inline QJsonArray eval(const JSONPath& jp,
-                       const JSONPath::Token& tk,
+template<Token::Kind K>
+inline QJsonArray eval(const json_query::JSONPath& jp,
+                       const Token& tk,
                        const QJsonValue& v);
 
 // --- Key -------------------------------------------------------------------
 template<>
-inline QJsonArray eval<JSONPath::Token::Kind::Key>(const JSONPath&,
-                                                   const JSONPath::Token& tk,
-                                                   const QJsonValue& v)
+inline QJsonArray eval<Token::Kind::Key>(const json_query::JSONPath&,
+                                         const Token& tk,
+                                         const QJsonValue& v)
 {
     QJsonArray out;
     if (!v.isObject()) return out;
-
     const auto obj = v.toObject();
-    if (auto it = obj.find(tk.key); it != obj.end())
-        out.append(it.value());
+    if (obj.contains(tk.key))
+        out.append(obj[tk.key]);
     return out;
 }
 
 // --- Index -----------------------------------------------------------------
 template<>
-inline QJsonArray eval<JSONPath::Token::Kind::Index>(const JSONPath& jp,
-                                                     const JSONPath::Token& tk,
-                                                     const QJsonValue& v)
+inline QJsonArray eval<Token::Kind::Index>(const json_query::JSONPath& jp,
+                                           const Token& tk,
+                                           const QJsonValue& v)
 {
     QJsonArray out;
     if (!v.isArray()) return out;
-
-    const auto& arr = v.toArray();
-    const int idx   = jp.normalizeIndex(static_cast<int>(tk.index), arr.size());
-    if (idx >= 0 && idx < arr.size()) out.append(arr[idx]);
+    const auto arr = v.toArray();
+    const int idx = jp.normalizeIndex(tk.index, arr.size());
+    if (idx >= 0 && idx < arr.size())
+        out.append(arr[idx]);
     return out;
 }
 
 // --- Slice -----------------------------------------------------------------
 template<>
-inline QJsonArray eval<JSONPath::Token::Kind::Slice>(const JSONPath& jp,
-                                                     const JSONPath::Token& tk,
-                                                     const QJsonValue& v)
+inline QJsonArray eval<Token::Kind::Slice>(const json_query::JSONPath& jp,
+                                           const Token& tk,
+                                           const QJsonValue& v)
 {
     if (v.isArray())
         return jp.evalSlice(v.toArray(), tk.slice);
@@ -91,9 +93,9 @@ inline QJsonArray eval<JSONPath::Token::Kind::Slice>(const JSONPath& jp,
 
 // --- Wildcard --------------------------------------------------------------
 template<>
-inline QJsonArray eval<JSONPath::Token::Kind::Wildcard>(const JSONPath& jp,
-                                                        const JSONPath::Token&,
-                                                        const QJsonValue& v)
+inline QJsonArray eval<Token::Kind::Wildcard>(const json_query::JSONPath& jp,
+                                              const Token&,
+                                              const QJsonValue& v)
 {
     if (v.isObject()) return jp.wildcardObject(v.toObject());
     if (v.isArray())  return jp.wildcardArray (v.toArray());
@@ -102,33 +104,36 @@ inline QJsonArray eval<JSONPath::Token::Kind::Wildcard>(const JSONPath& jp,
 
 // --- Recursive -------------------------------------------------------------
 template<>
-inline QJsonArray eval<JSONPath::Token::Kind::Recursive>(const JSONPath& jp,
-                                                         const JSONPath::Token&,
-                                                         const QJsonValue& v)
+inline QJsonArray eval<Token::Kind::Recursive>(const json_query::JSONPath& jp,
+                                               const Token&,
+                                               const QJsonValue& v)
 {
     return jp.evaluateRecursive(v, 0);
 }
 
 // --- Filter ----------------------------------------------------------------
 template<>
-inline QJsonArray eval<JSONPath::Token::Kind::Filter>(const JSONPath& jp,
-                                                      const JSONPath::Token& tk,
-                                                      const QJsonValue& v)
+inline QJsonArray eval<Token::Kind::Filter>(const json_query::JSONPath& jp,
+                                            const Token& tk,
+                                            const QJsonValue& v)
 {
     QJsonArray out;
     if (tk.filterId >= jp.m_filters.size()) return out;
 
-    const auto& pred = jp.m_filters[tk.filterId];
+    const auto& filterFn = jp.m_filters[tk.filterId];
     if (v.isArray()) {
-        for (const auto& e : v.toArray())
-            if (pred(e)) out.append(e);
-        return out;
+        for (const auto& item : v.toArray()) {
+            if (filterFn(item))
+                out.append(item);
+        }
+    } else if (v.isObject()) {
+        if (filterFn(v))
+            out.append(v);
     }
-    if (pred(v)) out.append(v);
     return out;
 }
 
-} // namespace detail
+} // namespace json_path::detail
 
 // -----------------------------------------------------------------------------
 // Fast dispatch table: Kind → evaluator
@@ -136,22 +141,24 @@ inline QJsonArray eval<JSONPath::Token::Kind::Filter>(const JSONPath& jp,
 inline QJsonArray JSONPath::evaluateToken(const Token& tk,
                                           const QJsonValue& v) const
 {
-    using namespace detail;
     using enum Token::Kind;
     // NB: keep the order in sync with the enum!
     constexpr std::array<
-        QJsonArray (*)(const JSONPath&, const Token&, const QJsonValue&), 6> lut = {
-        eval<Key>,
-        eval<Index>,
-        eval<Slice>,
-        eval<Wildcard>,
-        eval<Recursive>,
-        eval<Filter>
+        QJsonArray (*)(const json_query::JSONPath&, const Token&, const QJsonValue&), 6> lut = {
+        json_path::detail::eval<Key>,
+        json_path::detail::eval<Index>,
+        json_path::detail::eval<Slice>,
+        json_path::detail::eval<Wildcard>,
+        json_path::detail::eval<Recursive>,
+        json_path::detail::eval<Filter>
     };
+
+    static_assert(lut.size() == 6, "Update the LUT when adding token kinds");
+    if (static_cast<std::size_t>(tk.kind) >= lut.size())
+        return {};
 
     return lut[static_cast<std::size_t>(tk.kind)](*this, tk, v);
 }
-
 
 QJsonArray JSONPath::evaluateAll(const QJsonDocument &document) const
 {
@@ -225,7 +232,7 @@ QJsonArray JSONPath::evaluateRecursive(const QJsonValue& value,
 //  Slice helper + negative‑index helper  (already declared in header)
 // ===================================================================
 QJsonArray JSONPath::evalSlice(const QJsonArray& array,
-                               const Slice& s) const
+                               const json_path::Slice& s) const
 {
     QJsonArray out;
     if (s.step <= 0) return out;
@@ -260,7 +267,7 @@ QString JSONPath::segmentToPointer(const QString& seg) const
         return QString();
 
     QStringView sv{seg};
-    QString out;  out.reserve(seg.size()*2);  // worst case “~”→“~0”, “/”→“~1”
+    QString out;  out.reserve(seg.size()*2);  // worst case "~"→"~0", "/"→"~1"
 
     // helper: append and escape
     auto push = [&](QStringView piece)
@@ -301,7 +308,7 @@ QString JSONPath::segmentToPointer(const QString& seg) const
     return out;
 }
 
-QJsonValue JSONPath::evalAsPathList(const JSONPath& self,
+QJsonValue JSONPath::evalAsPathList(const json_query::JSONPath& self,
                                     const QJsonValue& root)
 {
     Q_UNUSED(root)
@@ -325,20 +332,21 @@ QJsonValue JSONPath::evalAsPathList(const JSONPath& self,
     return "/"_L1 + segments.join(u'/' );     // single pointer string
 }
 
-
 // ─────────────────────────────────────────────────────────────────────
-//  evalStandard  – raw evaluation without the “AsPathList” post‑step
+//  evalStandard  – raw evaluation without the "AsPathList" post‑step
 //      (moved out of evaluate() so both helpers can share the logic)
 // ─────────────────────────────────────────────────────────────────────
-namespace detail {
+} // namespace json_query
+
+namespace json_query::json_path::detail {
 
 // ------------------------------------------------------------------
 // 1.  Fan-out: apply one token to every value in 'src'
 //     – handles the Recursive fast-path internally
 // ------------------------------------------------------------------
 // completely replaces the previous implementation
-[[nodiscard]] inline QJsonArray fanOut(const JSONPath& self,
-                                       const JSONPath::Token& tk,
+[[nodiscard]] inline QJsonArray fanOut(const json_query::JSONPath& self,
+                                       const Token& tk,
                                        const QJsonArray& src)
 {
     QJsonArray dst;
@@ -353,9 +361,9 @@ namespace detail {
 // ------------------------------------------------------------------
 // 2.  Did this token multiply the result set?
 // ------------------------------------------------------------------
-[[nodiscard]] constexpr bool addsMultiplicity(const JSONPath::Token& tk) noexcept
+[[nodiscard]] constexpr bool addsMultiplicity(const Token& tk) noexcept
 {
-    using enum JSONPath::Token::Kind;
+    using enum Token::Kind;
     return tk.kind != Key && tk.kind != Index;
 }
 
@@ -372,10 +380,10 @@ namespace detail {
 // ------------------------------------------------------------------
 // 4.  Apply the trailing function (.length(), .min(), .max())
 // ------------------------------------------------------------------
-[[nodiscard]] QJsonValue applyTrailing(JSONPath::FunctionType fn,
+[[nodiscard]] QJsonValue applyTrailing(json_path::FunctionType fn,
                                        const QJsonValue& v)
 {
-    using enum JSONPath::FunctionType;
+    using enum json_path::FunctionType;
 
     switch (fn) {
     case None:   return v;
@@ -404,14 +412,14 @@ namespace detail {
     std::unreachable();
 }
 
-} // namespace detail
-// ──────────────────────────────────────────────────────────────────────────────
+} // namespace json_query::json_path::detail
 
+namespace json_query {
 
 // ─────────────────────────────────────────────────────────────────────
 //  refactored evalStandard
 // ─────────────────────────────────────────────────────────────────────
-QJsonValue JSONPath::evalStandard(const JSONPath& self,
+QJsonValue JSONPath::evalStandard(const json_query::JSONPath& self,
                                   const QJsonValue& root)
 {
     if (!self.m_valid || self.m_tokens.isEmpty())
@@ -422,16 +430,16 @@ QJsonValue JSONPath::evalStandard(const JSONPath& self,
 
     for (qsizetype i = 1; i < self.m_tokens.size() && !working.isEmpty(); ++i)
     {
-        const Token& tk = self.m_tokens[i];
-        working = detail::fanOut(self, tk, working);
+        const json_path::Token& tk = self.m_tokens[i];
+        working = json_path::detail::fanOut(self, tk, working);
         if (working.isEmpty())
             return QJsonValue(QJsonValue::Undefined);
 
-        multi |= detail::addsMultiplicity(tk);
+        multi |= json_path::detail::addsMultiplicity(tk);
     }
 
-    QJsonValue collapsed = detail::squash(std::move(working), multi);
-    return detail::applyTrailing(self.m_func, collapsed);
+    QJsonValue collapsed = json_path::detail::squash(std::move(working), multi);
+    return json_path::detail::applyTrailing(self.m_func, collapsed);
 }
 
 QString JSONPath::escapePointerSegment(const QString& seg)
@@ -445,3 +453,5 @@ QString JSONPath::escapePointerSegment(const QString& seg)
     }
     return out;
 }
+
+} // namespace json_query

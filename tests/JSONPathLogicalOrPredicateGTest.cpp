@@ -6,7 +6,9 @@
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <ranges>                        // C++20 helpers
-#include "../include/json-query/json-path/JSONPath.hpp"
+#include <json-query/json-path/JSONPath.hpp>
+
+using json_query::JSONPath;
 
 using namespace Qt::StringLiterals;
 

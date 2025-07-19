@@ -24,28 +24,21 @@
 
 using namespace Qt::StringLiterals;
 
-namespace json_query
-{
-
-using FilterFn = std::function<bool (const QJsonValue&)>;
-
-} // namespace json_query
-
-class JSONPath;
-
-namespace detail
-{
-    template<json_query::json_path::Token::Kind K>
-    QJsonArray eval(const JSONPath&,
-                    const json_query::json_path::Token&,
-                    const QJsonValue&);
+// Forward declaration for the detail namespace
+namespace json_query {
+    class JSONPath;
 }
 
-namespace detail {
+namespace json_query::json_path::detail {
 
-    using json_query::json_path::Token;
-    using json_query::FilterFn;
-    using json_query::json_path::Error;
+    template<json_path::Token::Kind K>
+    QJsonArray eval(const json_query::JSONPath&,
+                    const json_path::Token&,
+                    const QJsonValue&);
+
+    using Token = json_path::Token;
+    using FilterFn = json_path::FilterFn;
+    using Error = json_path::Error;
 
     std::optional<Token> parseOr      (QString, QVector<FilterFn>&);
     std::optional<Token> parseAnd     (QString, QVector<FilterFn>&);
@@ -53,21 +46,23 @@ namespace detail {
     std::optional<Token> parseCompare (QString, QVector<FilterFn>&);
     std::optional<Token> parseRegex   (QString, QVector<FilterFn>&);
 
-    QJsonArray fanOut(const JSONPath&,
+    QJsonArray fanOut(const json_query::JSONPath&,
                       const Token&,
                       const QJsonArray&);
 
     struct KeyBuilder;   // new
 
-    std::expected<qsizetype, Error>
-    parseBracket(qsizetype, QStringView,
+    std::expected<qsizetype, Error> parseBracket(qsizetype, QStringView,
                  KeyBuilder&, QVector<Token>&,
                  QVector<FilterFn>&);
-}
+
+} // namespace json_query::json_path::detail
 
 // ======================================================================
 //  JSONPath  – public façade; now uses JSONPathCompiler internally
 // ======================================================================
+namespace json_query {
+
 class JSONPath
 {
 public:
@@ -76,10 +71,11 @@ public:
     // -----------------------------------------------------------------
     //  Factory (replaces throwing constructor)                    ★
     // -----------------------------------------------------------------
-    using Result = std::expected<JSONPath, json_query::json_path::Error>;   // ★
+    using Result = std::expected<JSONPath, json_path::Error>;
+    // ★
     static Result create(QStringView path,                       // ★
-                         Option opt = Option::None);             // ★
-
+                             Option opt = Option::None);
+    // ★
     // -----------------------------------------------------------------
     //  Evaluation API (unchanged)
     // -----------------------------------------------------------------
@@ -98,28 +94,28 @@ public:
     JSONPath& operator=(const JSONPath&)     = default;
 
     //  Aliases exported for callers
-    using FunctionType = json_query::json_path::FunctionType;
-    using Slice        = json_query::json_path::Slice;
-    using Token        = json_query::json_path::Token;
-    using Error        = json_query::json_path::Error;
-    using FilterFn     = json_query::FilterFn;
+    using FunctionType = json_path::FunctionType;
+    using Slice        = json_path::Slice;
+    using Token        = json_path::Token;
+    using Error        = json_path::Error;
+    using FilterFn     = json_path::FilterFn;
 
 private:
     // -----------------------------------------------------------------
     //  Private "data" ctor – used only by factory                     ★
     // -----------------------------------------------------------------
     JSONPath( Option                      opt,
-              FunctionType                func,
-              QString                     original,
-              QVector<Token>              tokens,
-              QVector<json_query::FilterFn> filters ) noexcept
-        : m_valid(true)
-        , m_func(func)
-        , m_option(opt)
-        , m_originalPath(std::move(original))
-        , m_tokens(std::move(tokens))
-        , m_filters(std::move(filters))
-    {}
+                  FunctionType                func,
+                  QString                     original,
+                  QVector<Token>              tokens,
+                  QVector<FilterFn> filters ) noexcept
+            : m_valid(true)
+            , m_func(func)
+            , m_option(opt)
+            , m_originalPath(std::move(original))
+            , m_tokens(std::move(tokens))
+            , m_filters(std::move(filters))
+        {}
 
     // -----------------------------------------------------------------
     //  Internal helpers
@@ -130,12 +126,12 @@ private:
     [[nodiscard]] QJsonArray evaluateToken     (const Token& tk, const QJsonValue& v) const;
     [[nodiscard]] QJsonArray evaluateRecursive (const QJsonValue& value, int)  const;
     [[nodiscard]] QJsonArray evalSlice         (const QJsonArray& arr,
-                                  const Slice& s) const;
+                                      const Slice& s) const;
     [[nodiscard]] int        normalizeIndex    (int idx, int size) const;
     [[nodiscard]] QJsonArray wildcardObject    (const QJsonObject& obj) const;
     [[nodiscard]] QJsonArray wildcardArray     (const QJsonArray&  arr) const;
     [[nodiscard]] QJsonArray recursiveDescend  (const QJsonValue& v,
-                                  const QString& prop) const;
+                                      const QString& prop) const;
     [[nodiscard]] QString     segmentToPointer (const QString& seg) const;
     [[nodiscard]] static QString escapePointerSegment(const QString&);
 
@@ -150,24 +146,24 @@ private:
     QVector<FilterFn> m_filters;
 
     template<Token::Kind K>
-    friend QJsonArray detail::eval(const JSONPath&,
-                const Token&,
-                const QJsonValue&);
+        friend QJsonArray json_query::json_path::detail::eval(const JSONPath&,
+                    const Token&,
+                    const QJsonValue&);
 
     // Give the rule parsers access to the private static compileFilter()
-    friend std::optional<Token> detail::parseOr     (QString, QVector<FilterFn>&);
-    friend std::optional<Token> detail::parseAnd    (QString, QVector<FilterFn>&);
-    friend std::optional<Token> detail::parseIn     (QString, QVector<FilterFn>&);
-    friend std::optional<Token> detail::parseCompare(QString, QVector<FilterFn>&);
-    friend std::optional<Token> detail::parseRegex  (QString, QVector<FilterFn>&);
-
-    friend QJsonArray detail::fanOut(const JSONPath&,
-                                 const Token&,
-                                 const QJsonArray&);
-
+    friend std::optional<Token> json_query::json_path::detail::parseOr     (QString, QVector<FilterFn>&);
+    friend std::optional<Token> json_query::json_path::detail::parseAnd    (QString, QVector<FilterFn>&);
+    friend std::optional<Token> json_query::json_path::detail::parseIn     (QString, QVector<FilterFn>&);
+    friend std::optional<Token> json_query::json_path::detail::parseCompare(QString, QVector<FilterFn>&);
+    friend std::optional<Token> json_query::json_path::detail::parseRegex  (QString, QVector<FilterFn>&);
+    friend QJsonArray json_query::json_path::detail::fanOut(const JSONPath&,
+                                     const Token&,
+                                     const QJsonArray&);
     /* existing friends … */
     friend std::expected<qsizetype, Error>
-           detail::parseBracket(qsizetype, QStringView,
-                                detail::KeyBuilder&, QVector<Token>&,
-                                QVector<FilterFn>&);
+               json_query::json_path::detail::parseBracket(qsizetype, QStringView,
+                                    json_query::json_path::detail::KeyBuilder&, QVector<Token>&,
+                                    QVector<FilterFn>&);
 };
+
+} // namespace json_query

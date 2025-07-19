@@ -48,9 +48,10 @@ struct KeyBuilder {
 
     std::expected<void,Error> push(QStringView key)
     {
-        if (key.isEmpty()) return std::unexpected(Error::EmptySegment);
-        QString s = key.toString();
-        tgt.append(Token{ Token::Kind::Key, 0, {}, qt_hash(s), std::move(s), 0 });
+        if (key.isEmpty())
+            return std::unexpected(Error::EmptySegment);
+
+        tgt.append(Token{Token::Kind::Key, 0, {}, qt_hash(key), key.toString()});
         return {};
     }
 };
@@ -81,7 +82,7 @@ parseDot(qsizetype pos, QStringView sv,
 struct BracketSink {
     QVector<Token>&   tk;
     KeyBuilder&       kb;
-    QVector<json_query::FilterFn>& filters;
+    QVector<FilterFn>& filters;
 
     std::expected<void,Error> key(QStringView k) { return kb.push(k); }
     void wild()                 { tk.append(Token{Token::Kind::Wildcard}); }
@@ -158,7 +159,7 @@ std::expected<qsizetype, Error> parseBracket(qsizetype pos,
          QStringView          sv,
          KeyBuilder&          kb,
          QVector<Token>&      tokens,
-         QVector<json_query::FilterFn>&   filters)
+         QVector<FilterFn>&   filters)
 {
     const qsizetype n = sv.size();
     if (++pos >= n) return std::unexpected(Error::UnmatchedBracket);
@@ -235,7 +236,7 @@ std::expected<Compiled, Error> compilePath(QStringView sv)
 {
     using K = Token::Kind;
     QVector<Token> tokens;
-    QVector<json_query::FilterFn> filters;
+    QVector<FilterFn> filters;
     tokens.reserve(sv.count('.') + sv.count('[') + 4);
 
     // root

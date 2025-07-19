@@ -14,13 +14,11 @@
 #include <expected>
 #include <optional>
 
-namespace json_query
-{
-    using FilterFn = std::function<bool (const QJsonValue&)>;
-}
-
 namespace json_query::json_path
 {
+    // Filter function type - moved here for better organization
+    using FilterFn = std::function<bool (const QJsonValue&)>;
+
     enum class FunctionType { None, Length, Min, Max };
 
     // ======================================================================
@@ -80,7 +78,7 @@ toString(Error e) noexcept
 // Compiled result structure containing tokens and filters
 struct Compiled { 
     QVector<Token> tokens; 
-    QVector<json_query::FilterFn> filters; 
+    QVector<FilterFn> filters; 
 };
 
 // ──────────────────────────────────────────────────────────────────────
@@ -104,7 +102,7 @@ detectTrailingFunction(QString& path);
 /// @param filters Output vector to store the compiled filter function
 /// @return Token representing the filter, or nullopt if compilation failed
 [[nodiscard]] std::optional<Token> 
-compileFilter(const QString& expr, QVector<json_query::FilterFn>& filters);
+compileFilter(const QString& expr, QVector<FilterFn>& filters);
 
 // ──────────────────────────────────────────────────────────────────────
 //  Convenience API

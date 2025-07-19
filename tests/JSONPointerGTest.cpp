@@ -3,9 +3,10 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QJsonValue>
 #include "json-query/JSONPointer.hpp"
 
-using namespace ::testing;
+using json_query::JSONPointer;
 
 static QJsonValue evalPtr(const QString &ptr, const QJsonDocument &doc)
 {

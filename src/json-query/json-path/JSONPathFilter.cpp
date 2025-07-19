@@ -2,14 +2,14 @@
 #include "json-query/json-path/JSONPath.hpp"
 #include "json-query/json-path/JSONPathHelpers.hpp"
 
-namespace detail {
+namespace json_query::json_path::detail {
 
-    using ::json_query::FilterFn;
+    using FilterFn = json_path::FilterFn;
     using Kind  = Token::Kind;
     using json_query::utils::to_sv;
     using json_query::utils::to_qstr;
-    using json_query::detail::splitTopLevel;
-    using json_query::detail::stripOuterParens;
+    using json_query::json_path::detail::splitTopLevel;
+    using json_query::json_path::detail::stripOuterParens;
 
 // ───────────────────────────────────────────────────────────────
 //  compileFilter  — turns [? …] into Token{Filter,…} + lambda
@@ -64,7 +64,7 @@ constexpr std::array rules = {
     &parseRegex
 };
 
-// ────────────────────────── parser implementations ───────────────────────────
+// ────────────────── parser implementations ───────────────────────────
 std::optional<Token> parseOr(QString s, QVector<FilterFn>& out)
 {
     if (auto split = splitTopLevel(s, "||"_L1); split)
@@ -198,15 +198,21 @@ std::optional<Token> parseRegex(QString s, QVector<FilterFn>& out)
     return        parseRegex1<brkPat>(s, out);
 }
 
-} // unnamed namespace
+} // namespace json_query::json_path::detail
+
 // ──────────────────────────────────────────────────────────────────────────────
 
+namespace json_query::json_path {
+
 // Public dispatcher -----------------------------------------------------------
-std::optional<JSONPath::Token>
-json_query::json_path::compileFilter(const QString& expr, QVector<FilterFn>& out)
+std::optional<Token> compileFilter(const QString& expr, QVector<FilterFn>& out)
 {
-    QString s = json_query::detail::stripOuterParens(expr);
-    for (auto fn : ::detail::rules)
-        if (auto t = fn(s, out))  return t;
-    return std::nullopt;          // unsupported
+    QString s = json_query::json_path::detail::stripOuterParens(expr);
+    for (const auto rule : detail::rules) {
+        if (auto result = rule(s, out))
+            return result;
+    }
+    return std::nullopt;
 }
+
+} // namespace json_query::json_path

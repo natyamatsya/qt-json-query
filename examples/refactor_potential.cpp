@@ -3,14 +3,24 @@
 // Build target: refactor_potential (added in CMakeLists.txt)
 
 #include <QCoreApplication>
-#include <QDebug>
-#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QString>
+#include <QJsonArray>
+#include <QJsonValue>
+#include <QDebug>
+#include <QFile>
+#include <QTextStream>
+#include <QStringView>
+#include <QElapsedTimer>
+#include <QRandomGenerator>
 
+#include "../include/json-query/JSONPointer.hpp"
 #include "../include/json-query/json-path/JSONPath.hpp"
-#include "json-query/JSONPointer.hpp"
+
+using json_query::JSONPointer;
+using json_query::JSONPath;
+
+using namespace Qt::StringLiterals;
 
 // -----------------------------------------------------------------------------
 // Sample data – book store with inventory array

@@ -3,8 +3,10 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
-#include <QJsonValue>
 #include "../include/json-query/json-path/JSONPath.hpp"
+
+// Using declarations for convenience
+using json_query::JSONPath;
 
 namespace {
 

@@ -1,9 +1,12 @@
 #include <QCoreApplication>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonValue>
 #include <QDebug>
 
 #include "json-query/JSONPointer.hpp"
+
+using json_query::JSONPointer;
 
 int main(int argc, char **argv)
 {

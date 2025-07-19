@@ -11,6 +11,8 @@
 #include <type_traits>
 #include <concepts>
 
+namespace json_query::json_path::internal {
+
 namespace detail {
 
     //  Detect whether qHash(T, uint) exists  (newer overloads)
@@ -36,3 +38,5 @@ template<typename T>
 
     return static_cast<quint32>(static_cast<std::uint64_t>(raw) & 0xFFFF'FFFFu);
 }
+
+} // namespace json_query::json_path::internal

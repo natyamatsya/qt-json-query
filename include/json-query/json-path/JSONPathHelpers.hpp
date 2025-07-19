@@ -11,7 +11,7 @@
 #include <optional>
 #include <utility>
 
-namespace json_query::detail {
+namespace json_query::json_path::detail {
 
 // Remove exactly one balanced pair of outer parentheses, then trim.
 inline QString stripOuterParens(QStringView sv)
@@ -43,4 +43,4 @@ splitTopLevel(QStringView sv, QLatin1StringView delim)
     return std::nullopt;
 }
 
-} // namespace json_query::detail
+} // namespace json_query::json_path::detail

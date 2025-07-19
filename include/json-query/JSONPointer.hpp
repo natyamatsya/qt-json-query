@@ -6,6 +6,9 @@
 #include <QJsonObject>
 #include <QJsonArray>
 
+namespace json_query
+{
+
 class JSONPointer
 {
 public:
@@ -32,3 +35,5 @@ private:
     [[nodiscard]] QJsonValue  evaluateInternal(QJsonValue const&) const;
     static void decodeAndStore(QStringView raw, QVector<Token>& out);
 };
+
+} // namespace json_query

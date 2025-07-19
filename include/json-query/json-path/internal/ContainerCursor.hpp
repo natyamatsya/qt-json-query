@@ -7,10 +7,10 @@
 #include <cstdint>
 #include <cstddef>
 
-namespace json_query
-{
+namespace json_query::json_path::internal {
+
     /**
-     * @brief  Lightweight cursor used by JSONPath’s depth-first traversal.
+     * @brief  Lightweight cursor used by JSONPath's depth-first traversal.
      *
      * Holds a non-owning pointer to either a QJsonObject or QJsonArray plus a
      * simple index that advances with each call to next().  Because no container
@@ -84,4 +84,4 @@ namespace json_query
 
     static_assert(alignof(QJsonObject) % 2 == 0, "Pointer LSB is available");
     static_assert(alignof(QJsonArray ) % 2 == 0, "Pointer LSB is available");
-} // namespace json_query
+} // namespace json_query::json_path::internal

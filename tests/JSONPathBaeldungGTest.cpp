@@ -14,6 +14,9 @@
 
 using namespace Qt::StringLiterals;
 
+// Using declarations for convenience
+using json_query::JSONPath;
+
 // Helper to evaluate JSONPath and unwrap a single element when needed
 static QJsonValue evalSingle(const JSONPath &path, const QJsonDocument &doc)
 {

@@ -6,6 +6,10 @@
 #include "../include/json-query/json-path/JSONPath.hpp"
 #include "json-query/JSONPointer.hpp"
 
+// Using declarations for convenience
+using json_query::JSONPath;
+using json_query::JSONPointer;
+
 // Helper to evaluate a JSONPath on a doc and assert single value equality
 static QJsonValue evalSingle(const JSONPath &path, const QJsonDocument &doc)
 {

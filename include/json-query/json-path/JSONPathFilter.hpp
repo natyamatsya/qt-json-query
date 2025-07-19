@@ -19,20 +19,14 @@
 // ────────────────────────────── Project
 #include "json-query/json-path/JSONPathCompile.hpp"  // For json_query::json_path::Token / Error
 
-namespace json_query
-{
-    // Alias kept in a central place so we don’t need to duplicate it.
-    using FilterFn = std::function<bool (const QJsonValue&)>;
-}
+namespace json_query::json_path::detail {
 
-namespace detail
-{
-    using json_query::json_path::Token;
-    using json_query::FilterFn;
+    using Token = json_path::Token;
+    using FilterFn = json_path::FilterFn;
 
     // Same error enum as the main compiler – handy if users need to signal
     // syntax errors.
-    using json_query::json_path::Error;
+    using Error = json_path::Error;
 
     // ---------------------------------------------------------------------
     //  Individual rule parsers
@@ -43,4 +37,4 @@ namespace detail
     [[nodiscard]] std::optional<Token> parseCompare (QString expr, QVector<FilterFn>& out);
     [[nodiscard]] std::optional<Token> parseRegex   (QString expr, QVector<FilterFn>& out);
 
-} // namespace detail
+} // namespace json_query::json_path::detail
