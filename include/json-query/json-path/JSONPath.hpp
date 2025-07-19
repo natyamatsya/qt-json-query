@@ -37,11 +37,6 @@ namespace json_query::json_path::detail {
     QJsonValue evaluate(const PathEvalCtx&, const json_query::JSONPath&, const QJsonValue&);
     QJsonArray evaluateAll(const PathEvalCtx&, const json_query::JSONPath&, const QJsonValue&);
 
-    template<json_path::Token::Kind K>
-    QJsonArray eval(const json_query::JSONPath&,
-                    const json_path::Token&,
-                    const QJsonValue&);
-
     using Token = json_path::Token;
     using FilterFn = json_path::FilterFn;
     using Error = json_path::Error;
@@ -51,10 +46,6 @@ namespace json_query::json_path::detail {
     std::optional<Token> parseIn      (QString, QVector<FilterFn>&);
     std::optional<Token> parseCompare (QString, QVector<FilterFn>&);
     std::optional<Token> parseRegex   (QString, QVector<FilterFn>&);
-
-    QJsonArray fanOut(const json_query::JSONPath&,
-                      const Token&,
-                      const QJsonArray&);
 
     struct KeyBuilder;   // new
 
@@ -126,8 +117,7 @@ private:
     // -----------------------------------------------------------------
     //  Internal helpers
     // -----------------------------------------------------------------
-    static QJsonValue evalAsPathList(const JSONPath&, const QJsonValue&);
-    static QJsonValue evalStandard  (const JSONPath&, const QJsonValue&);
+    // Top-level evaluation helpers have been migrated to PathEvaluator.cpp.
 
     [[nodiscard]] QJsonArray evaluateToken     (const Token& tk, const QJsonValue& v) const;
     [[nodiscard]] QJsonArray evaluateRecursive (const QJsonValue& value, int)  const;
@@ -154,16 +144,13 @@ private:
     // Previous friendship for eval<> and fanOut no longer required after
     // functional refactor; removed.
 
+    // fanOut friend no longer required after Phase C extraction.
+
     // friend declarations for new functional evaluator (phase B)
     friend QJsonValue json_query::json_path::detail::evaluate(
         const json_query::json_path::detail::PathEvalCtx&, const json_query::JSONPath&, const QJsonValue&);
     friend QJsonArray json_query::json_path::detail::evaluateAll(
         const json_query::json_path::detail::PathEvalCtx&, const json_query::JSONPath&, const QJsonValue&);
-
-    // fanOut still needs access to private evaluateToken
-    friend QJsonArray json_query::json_path::detail::fanOut(const JSONPath&,
-                                     const Token&,
-                                     const QJsonArray&);
 
 }; // end class JSONPath
 

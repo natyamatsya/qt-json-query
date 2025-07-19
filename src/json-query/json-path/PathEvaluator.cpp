@@ -1,6 +1,13 @@
 #include "json-query/json-path/PathEvaluator.hpp"
 #include "json-query/json-path/JSONPath.hpp"
 #include "json-query/json-path/JSONPathEvaluate.hpp" // for pure helpers
+#include "json-query/json-path/JSONPathTokenEvaluators.hpp"
+
+#include <array>
+#include <deque>
+
+#include <QStringList>
+#include <QString>
 
 namespace json_query::json_path::detail {
 
@@ -34,21 +41,186 @@ QJsonArray evalSlice(const QJsonArray& array, const Slice& s)
 // Core evaluation entry points (bridge implementation)
 // --------------------------------------------------------------
 QJsonValue evaluate(const PathEvalCtx& ctx,
-                    const json_query::JSONPath& self,
+                    const json_query::JSONPath& /*self*/,
                     const QJsonValue& root)
 {
-    // Bridge: still delegate to legacy implementations using JSONPath.
-    if (ctx.option == json_query::JSONPath::Option::AsPathList)
-        return self.evalAsPathList(self, root);      // friend method
-    return self.evalStandard(self, root);
+    // Transition bridge: now forward to pure evaluator
+    return json_query::json_path::detail::evaluate(ctx, root);
 }
 
 QJsonArray evaluateAll(const PathEvalCtx& ctx,
-                       const json_query::JSONPath& self,
+                       const json_query::JSONPath& /*self*/,
                        const QJsonValue& root)
 {
-    // Re-use existing helper which already returns flattened array
-    return json_path::detail::evaluateAll(self, root);
+    return json_query::json_path::detail::evaluateAll(ctx, root);
+}
+
+} // namespace json_query::json_path::detail
+
+// ===========================================================================
+// Phase-C pure evaluation implementation (no JSONPath dependency)
+// ===========================================================================
+//
+// We reopen the namespace to append the new helpers while keeping the legacy
+// bridge above alive until call-sites are migrated.
+
+namespace json_query::json_path::detail {
+
+// ---------------------------------------------------------------------------
+//  Token dispatcher (ex-JSONPath::evaluateToken)
+// ---------------------------------------------------------------------------
+QJsonArray evaluateToken(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
+{
+    using enum Token::Kind;
+    constexpr std::array<QJsonArray (*)(const PathEvalCtx&, const Token&, const QJsonValue&), 6> lut = {
+        eval<Key>, eval<Index>, eval<Slice>, eval<Wildcard>, eval<Recursive>, eval<Filter>
+    };
+
+    if (static_cast<size_t>(tk.kind) >= lut.size())
+        return {};
+
+    return lut[static_cast<size_t>(tk.kind)](ctx, tk, v);
+}
+
+// ---------------------------------------------------------------------------
+//  Fan-out helper (adapted from legacy implementation)
+// ---------------------------------------------------------------------------
+QJsonArray fanOut(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src)
+{
+    QJsonArray dst;
+    for (const auto& v : src) {
+        const QJsonArray seg = evaluateToken(ctx, tk, v);
+        for (const auto& e : seg)
+            dst.append(e);
+    }
+    return dst;
+}
+
+// ---------------------------------------------------------------------------
+//  Utility helpers reused by evalStandard
+// ---------------------------------------------------------------------------
+static bool addsMultiplicity(const Token& tk)
+{
+    using enum Token::Kind;
+    return tk.kind != Key && tk.kind != Index;
+}
+
+static QJsonValue squash(QJsonArray arr, bool multi)
+{
+    if (arr.isEmpty())           return QJsonValue(QJsonValue::Undefined);
+    if (!multi && arr.size()==1) return arr.first();
+    return arr;
+}
+
+static QJsonValue applyTrailing(json_path::FunctionType fn, const QJsonValue& v)
+{
+    using enum json_path::FunctionType;
+
+    switch (fn) {
+    case None:   return v;
+
+    case Length:
+        if (v.isArray())  return v.toArray().size();
+        if (v.isObject()) return v.toObject().size();
+        return 0;
+
+    case Min:
+    case Max:
+        if (!v.isArray()) return QJsonValue(QJsonValue::Undefined);
+        {
+            const auto arr = v.toArray();
+            bool first=true; double best=0.0;
+            for (const auto& e : arr) {
+                if (!e.isDouble()) continue;
+                const double d = e.toDouble();
+                if (first || (fn==Min ? d<best : d>best))
+                    best = d, first = false;
+            }
+            return first ? QJsonValue(QJsonValue::Undefined)
+                         : QJsonValue(best);
+        }
+    }
+    std::unreachable();
+}
+
+// ---------------------------------------------------------------------------
+//  evalStandard – pure variant
+// ---------------------------------------------------------------------------
+QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
+{
+    if (ctx.tokens.isEmpty())
+        return QJsonValue(QJsonValue::Undefined);
+
+    QJsonArray working{root};
+    bool multi = false;
+
+    for (qsizetype i = 1; i < ctx.tokens.size() && !working.isEmpty(); ++i)
+    {
+        const Token& tk = ctx.tokens[i];
+        working = fanOut(ctx, tk, working);
+        if (working.isEmpty())
+            return QJsonValue(QJsonValue::Undefined);
+
+        multi |= addsMultiplicity(tk);
+    }
+
+    QJsonValue collapsed = squash(std::move(working), multi);
+    return applyTrailing(ctx.trailingFn, collapsed);
+}
+
+// ---------------------------------------------------------------------------
+//  evalAsPathList – pure variant
+// ---------------------------------------------------------------------------
+QJsonValue evalAsPathList(const PathEvalCtx& ctx, const QJsonValue& root)
+{
+    Q_UNUSED(root)
+    using Option = json_query::JSONPath::Option;
+    if (ctx.option != Option::AsPathList)
+        return QJsonValue(QJsonValue::Undefined);
+
+    auto escapeSeg = [](const QString& seg){
+        QString out; out.reserve(seg.size());
+        for (QChar c : seg) {
+            if (c == u'~') out += "~0"_L1;
+            else if (c == u'/') out += "~1"_L1;
+            else out += c;
+        }
+        return out;
+    };
+
+    QStringList segments;
+    for (qsizetype i = 1; i < ctx.tokens.size(); ++i) {
+        const Token& tk = ctx.tokens[i];
+        switch (tk.kind) {
+        case Token::Kind::Key:
+            segments.append(escapeSeg(tk.key));
+            break;
+        case Token::Kind::Index:
+            segments.append(QString::number(tk.index));
+            break;
+        default:
+            return QJsonValue(QJsonValue::Undefined);
+        }
+    }
+    return "/"_L1 + segments.join(u'/');
+}
+
+// ---------------------------------------------------------------------------
+//  Convenience entry points (pure)
+// ---------------------------------------------------------------------------
+QJsonValue evaluate(const PathEvalCtx& ctx, const QJsonValue& root)
+{
+    if (ctx.option == json_query::JSONPath::Option::AsPathList)
+        return evalAsPathList(ctx, root);
+    return evalStandard(ctx, root);
+}
+
+QJsonArray evaluateAll(const PathEvalCtx& ctx, const QJsonValue& root)
+{
+    QJsonValue res = evaluate(ctx, root);
+    if (res.isArray()) return res.toArray();
+    if (res.isUndefined() || res.isNull()) return {};
+    return QJsonArray{res};
 }
 
 } // namespace json_query::json_path::detail
