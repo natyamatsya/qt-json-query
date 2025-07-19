@@ -21,30 +21,9 @@
 #include "../JSONPointer.hpp"
 #include "json-query/json-path/JSONPathOption.hpp"
 
-#include <ctre.hpp>
-
 using namespace Qt::StringLiterals;
-
-// Forward declaration for the detail namespace
-namespace json_query {
-    class JSONPath;
-}
-
-namespace json_query::json_path::detail {
-
-    class PathEvalCtx; // forward declaration for friend
-
-    // forward declarations of new evaluator free-functions
-    QJsonValue evaluate(const PathEvalCtx&, const json_query::JSONPath&, const QJsonValue&);
-    QJsonArray evaluateAll(const PathEvalCtx&, const json_query::JSONPath&, const QJsonValue&);
-
-    // (internal filter-parsing helpers moved to JSONPathFilter.cpp – no longer
-    //  forward-declared here)
-
-} // namespace json_query::json_path::detail
-
 // ======================================================================
-//  JSONPath  – public façade; now uses JSONPathCompiler internally
+//  JSONPath
 // ======================================================================
 namespace json_query {
 
@@ -83,8 +62,6 @@ public:
     using Token        = json_path::Token;
     using FilterFn     = json_path::FilterFn;
 
-    // (no friend declarations needed for pure evaluators)
-
 private:
     // -----------------------------------------------------------------
     //  Private "data" ctor – used only by factory                     ★
@@ -100,19 +77,6 @@ private:
             , m_tokens(std::move(tokens))
             , m_filters(std::move(filters))
         {}
-
-    // -----------------------------------------------------------------
-    //  Internal helpers
-    // -----------------------------------------------------------------
-    // Top-level evaluation helpers have been migrated to PathEvaluator.cpp.
-
-    [[nodiscard]] QJsonArray evaluateToken     (const Token& tk, const QJsonValue& v) const;
-    [[nodiscard]] QJsonArray evaluateRecursive (const QJsonValue& value, int)  const;
-    [[nodiscard]] QJsonArray evalSlice         (const QJsonArray& arr,
-                                      const Slice& s) const;
-    [[nodiscard]] int        normalizeIndex    (int idx, int size) const;
-    [[nodiscard]] QJsonArray wildcardObject    (const QJsonObject& obj) const;
-    [[nodiscard]] QJsonArray wildcardArray     (const QJsonArray&  arr) const;
 
     // -----------------------------------------------------------------
     //  Data members
