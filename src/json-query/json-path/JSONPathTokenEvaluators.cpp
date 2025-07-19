@@ -1,5 +1,5 @@
 #include "json-query/json-path/JSONPathTokenEvaluators.hpp"
-#include "json-query/json-path/PathEvaluator.hpp"  // normalizeIndex, evalSlice
+#include "json-query/json-path/JSONPathEvaluate.hpp"  // normalizeIndex, evalSlice
 
 namespace json_query::json_path::detail {
 

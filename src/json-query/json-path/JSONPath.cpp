@@ -1,6 +1,6 @@
 #include "json-query/json-path/JSONPath.hpp"
 #include "json-query/json-path/JSONPathTokenEvaluators.hpp"
-#include "json-query/json-path/PathEvaluator.hpp"
+#include "json-query/json-path/JSONPathEvaluate.hpp"
 
 #include <vector>
 #include <deque>
