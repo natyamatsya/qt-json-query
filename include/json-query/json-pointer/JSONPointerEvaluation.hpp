@@ -5,6 +5,7 @@
 #include <QJsonArray>
 #include <QVector>
 #include "json-query/json-pointer/JSONPointerParsing.hpp"
+#include "json-query/json-pointer/PointerEvalCtx.hpp"
 #include <expected>
 
 namespace json_query::json_pointer::detail {
@@ -60,6 +61,13 @@ evaluatePointer(const QVector<Token>& tokens, const QJsonValue& root) noexcept
         }
     }
     return current; // success
+}
+
+// Convenience overload taking a PointerEvalCtx to mirror JSONPath's API
+[[nodiscard]] inline std::expected<QJsonValue, EvalError>
+evaluatePointer(const PointerEvalCtx& ctx, const QJsonValue& root) noexcept
+{
+    return evaluatePointer(ctx.tokens, root);
 }
 
 } // namespace json_query::json_pointer::detail

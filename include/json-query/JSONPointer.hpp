@@ -37,9 +37,6 @@ private:
 
     using Token = json_query::json_pointer::detail::Token;
     QVector<Token>   m_tokens;
-
-    [[nodiscard]] std::expected<void, Error> parsePointer(QStringView);
-    static void decodeAndStore(QStringView raw, QVector<Token>& out);
 };
 
 } // namespace json_query

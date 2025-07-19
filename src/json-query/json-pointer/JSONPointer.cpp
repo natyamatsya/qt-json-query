@@ -14,18 +14,9 @@ namespace json_query {
 JSONPointer::Result JSONPointer::create(QStringView pointer)
 {
     JSONPointer jp;
-    auto res = jp.parsePointer(pointer);
-    if (!res)
+    if (auto res = json_pointer::detail::parsePointer(pointer, jp.m_tokens); !res)
         return std::unexpected(res.error());
     return jp;
-}
-
-std::expected<void, JSONPointer::Error> JSONPointer::parsePointer(QStringView ptr)
-{
-    auto res = json_pointer::detail::parsePointer(ptr, m_tokens);
-    if (!res)
-        return std::unexpected(res.error());
-    return {};
 }
 
 // ────────────────────────────────────────────────────────────
