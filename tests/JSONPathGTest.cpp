@@ -3,24 +3,12 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
-#include "../include/json-query/json-path/JSONPath.hpp"
+#include "framework/JSONMatchersGTest.hpp"
 #include "json-query/JSONPointer.hpp"
 
 // Using declarations for convenience
 using json_query::JSONPath;
 using json_query::JSONPointer;
-
-// Helper to evaluate a JSONPath on a doc and assert single value equality
-static QJsonValue evalSingle(const JSONPath &path, const QJsonDocument &doc)
-{
-    const QJsonValue res = path.evaluate(doc);
-    if (res.isArray()) {
-        const auto arr = res.toArray();
-        EXPECT_EQ(arr.size(), 1);
-        return arr[0];
-    }
-    return res;
-}
 
 TEST(JSONPathBasic, RootAccess)
 {
@@ -28,32 +16,25 @@ TEST(JSONPathBasic, RootAccess)
     QJsonDocument doc(obj);
     auto path{ JSONPath::create(u"$") };
     ASSERT_TRUE(path);
-    QJsonValue res = path->evaluate(doc);
-    if (res.isArray()) {
-        ASSERT_EQ(res.toArray().size(), 1);
-        res = res.toArray()[0];
-    }
-    EXPECT_EQ(res.toObject(), obj);
+    QJsonArray res = evalArray(*path, doc);
+    ASSERT_EQ(res.size(), 1);
+    EXPECT_EQ(res[0].toObject(), obj);
 }
 
 TEST(JSONPathBasic, PropertyAccess)
 {
     QJsonObject obj{{"foo", "bar"}, {"baz", 42}};
     QJsonDocument doc(obj);
-    auto path{ JSONPath::create(u"$.foo") };
-    EXPECT_EQ(evalSingle(*path, doc).toString(), QStringLiteral("bar"));
-    auto path2{ JSONPath::create(u"$['baz']") };
-    EXPECT_EQ(evalSingle(*path2, doc).toInt(), 42);
+    EXPECT_THAT( eval(u"$.foo", doc), IsJsonString(u"bar") );
+    EXPECT_THAT( eval(u"$['baz']", doc), IsJsonInt(42) );
 }
 
 TEST(JSONPathBasic, ArrayIndex)
 {
     QJsonArray arr = QJsonArray::fromVariantList({"zero", "one", "two"});
     QJsonDocument doc(arr);
-    auto idx{ JSONPath::create(u"$[1]") };
-    EXPECT_EQ(evalSingle(*idx, doc).toString(), QStringLiteral("one"));
-    auto neg{ JSONPath::create(u"$[-1]") };
-    EXPECT_EQ(evalSingle(*neg, doc).toString(), QStringLiteral("two"));
+    EXPECT_THAT( eval(u"$[1]", doc), IsJsonString(u"one") );
+    EXPECT_THAT( eval(u"$[-1]", doc), IsJsonString(u"two") );
 }
 
 TEST(JSONPathPointerInterop, CompareWithJSONPointer)
@@ -61,6 +42,5 @@ TEST(JSONPathPointerInterop, CompareWithJSONPointer)
     QJsonObject obj{{"items", QJsonArray{ QJsonObject{{"id", 1}, {"name", "Item1"}} }}};
     QJsonDocument doc(obj);
     JSONPointer ptr("/items/0/name");
-    auto path{ JSONPath::create(u"$.items[0].name") };
-    EXPECT_EQ(evalSingle(*path, doc), ptr.evaluate(doc));
+    EXPECT_EQ(eval(u"$.items[0].name", doc), ptr.evaluate(doc));
 }

@@ -14,7 +14,6 @@ namespace jayway_parity
     using namespace json_query::json_path;
     using json_query::JSONPath;
     using namespace ::testing;
-    using namespace jp;
 
 // Helper macro to create disabled parity stubs quickly
 #define PATHCOMPILER_STUB(name, reason) \

@@ -16,7 +16,6 @@ using json_query::JSONPath;
 
 namespace jayway_parity {
 using namespace ::testing;
-using namespace jp;
 
 TEST(JaywayEscapeParity, UrlsAreNotEscaped)
 {

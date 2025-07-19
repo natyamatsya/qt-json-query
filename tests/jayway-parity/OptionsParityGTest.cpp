@@ -13,7 +13,6 @@
 namespace jayway_parity {
 
 using namespace ::testing;
-using namespace jp;
 using json_query::JSONPath;
 
 // -----------------------------------------------------------------------------
@@ -24,7 +23,7 @@ using json_query::JSONPath;
 TEST(JaywayOptionsParity, PathEvaluationReturnedAsValueByDefault)
 {
     const char* json = R"({"foo" : "bar"})";
-    QJsonValue res = jp::eval(u"$.foo", parseJson(json));
+    QJsonValue res = eval(u"$.foo", parseJson(json));
     EXPECT_THAT(res, IsJsonString("bar"));
 }
 

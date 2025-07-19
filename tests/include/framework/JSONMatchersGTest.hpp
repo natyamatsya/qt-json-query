@@ -8,13 +8,13 @@
 //
 // Usage example:
 //   #include "framework/JSONMatchersGTest.hpp"
-//   auto doc  = jp::parseJson(R"({"foo": "bar"})");
+//   auto doc  = parseJson(R"({"foo": "bar"})");
 //   auto path = *JSONPath::create(u"$.foo");
-//   QJsonValue v = jp::eval(path, doc);
-//   EXPECT_TRUE(jp::IsString(v, u"bar"));
+//   QJsonValue v = eval(path, doc);
+//   EXPECT_TRUE(IsString(v, u"bar"));
 //
-//   QJsonArray arr = jp::evalArray(*JSONPath::create(u"$[*]"), doc);
-//   EXPECT_TRUE(jp::ContainsOnly(arr, 1, 2, 3));
+//   QJsonArray arr = evalArray(*JSONPath::create(u"$[*]"), doc);
+//   EXPECT_TRUE(ContainsOnly(arr, 1, 2, 3));
 // ---------------------------------------------------------------------------
 
 #include <gtest/gtest.h>
@@ -33,7 +33,6 @@
 using json_query::JSONPath;
 using json_query::json_path::Error;
 
-namespace jp {
 // Parse raw JSON C-string into a QJsonDocument.
 inline QJsonDocument parseJson(const char* src)
 {
@@ -92,13 +91,11 @@ inline EvalResult evalExp(QStringView path,
 // specific json_query::Error code.
 #define EXPECT_PATH_ERROR(expr, errEnum)                        \
     do {                                                        \
-        auto _res = (expr);                                    \
-        ASSERT_FALSE(_res.has_value())                         \
-            << "Expected error but got success";              \
-        EXPECT_EQ(_res.error(), (errEnum));                    \
+        auto _res = (expr);                                     \
+        ASSERT_FALSE(_res.has_value())                          \
+            << "Expected error but got success";                \
+        EXPECT_EQ(_res.error(), (errEnum));                     \
     } while (false)
-
-} // namespace jp
 
 // ---------------------------------------------------------------------------
 // Custom GoogleTest matchers ------------------------------------------------

@@ -12,7 +12,6 @@
 
 using json_query::JSONPath;
 using namespace ::testing;
-using namespace jp;
 
 namespace jayway_parity {
 

@@ -16,7 +16,6 @@ using json_query::JSONPath;
 namespace jayway_parity
 {
     using namespace ::testing;
-    using namespace jp;
 
 TEST(JaywayDeepScanParity, NonArraySubscriptionIgnored)
 {
@@ -32,7 +31,7 @@ TEST(JaywayDeepScanParity, NonArraySubscriptionIgnored)
         EXPECT_THAT(result, ElementsAre(IsJsonInt(3)));
     }
     {
-        QJsonArray result = jp::evalArray(*path, jp::parseJson(R"({"x": [0,1,[0,1,2],null], "y": [0,1,2]})"));
+        QJsonArray result = evalArray(*path, parseJson(R"({"x": [0,1,[0,1,2],null], "y": [0,1,2]})"));
         EXPECT_THAT(result, IsEmpty());
     }
 }

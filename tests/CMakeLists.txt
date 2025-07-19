@@ -25,6 +25,7 @@ target_include_directories(json_query_tests PRIVATE
 target_link_libraries(json_query_tests PRIVATE
     json_query
     GTest::gtest
+    GTest::gmock
     GTest::gtest_main
     Qt6::Core
 )
