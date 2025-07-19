@@ -1,11 +1,12 @@
 #include "json-query/json-path/JSONPathTokenEvaluators.hpp"
-#include "json-query/json-path/JSONPath.hpp"
+#include "json-query/json-path/PathEvaluator.hpp"  // normalizeIndex, evalSlice
+#include "json-query/json-path/JSONPathEvaluate.hpp" // wildcard*, evaluateRecursive
 
 namespace json_query::json_path::detail {
 
 // --- Key -------------------------------------------------------------------
 template<>
-QJsonArray eval<Token::Kind::Key>(const json_query::JSONPath&,
+QJsonArray eval<Token::Kind::Key>(const PathEvalCtx& /*ctx*/,
                                   const Token& tk,
                                   const QJsonValue& v)
 {
@@ -19,14 +20,14 @@ QJsonArray eval<Token::Kind::Key>(const json_query::JSONPath&,
 
 // --- Index -----------------------------------------------------------------
 template<>
-QJsonArray eval<Token::Kind::Index>(const json_query::JSONPath& jp,
+QJsonArray eval<Token::Kind::Index>(const PathEvalCtx& ctx,
                                     const Token& tk,
                                     const QJsonValue& v)
 {
     QJsonArray out;
     if (!v.isArray()) return out;
     const auto arr = v.toArray();
-    const int idx = jp.normalizeIndex(tk.index, arr.size());
+    const int idx = normalizeIndex(tk.index, arr.size());
     if (idx >= 0 && idx < arr.size())
         out.append(arr[idx]);
     return out;
@@ -34,45 +35,45 @@ QJsonArray eval<Token::Kind::Index>(const json_query::JSONPath& jp,
 
 // --- Slice -----------------------------------------------------------------
 template<>
-QJsonArray eval<Token::Kind::Slice>(const json_query::JSONPath& jp,
+QJsonArray eval<Token::Kind::Slice>(const PathEvalCtx& /*ctx*/,
                                     const Token& tk,
                                     const QJsonValue& v)
 {
     if (v.isArray())
-        return jp.evalSlice(v.toArray(), tk.slice);
+        return evalSlice(v.toArray(), tk.slice);
     return {};
 }
 
 // --- Wildcard --------------------------------------------------------------
 template<>
-QJsonArray eval<Token::Kind::Wildcard>(const json_query::JSONPath& jp,
+QJsonArray eval<Token::Kind::Wildcard>(const PathEvalCtx& /*ctx*/,
                                        const Token&,
                                        const QJsonValue& v)
 {
-    if (v.isObject()) return jp.wildcardObject(v.toObject());
-    if (v.isArray())  return jp.wildcardArray (v.toArray());
+    if (v.isObject()) return wildcardObject(v.toObject());
+    if (v.isArray())  return wildcardArray (v.toArray());
     return {};
 }
 
 // --- Recursive -------------------------------------------------------------
 template<>
-QJsonArray eval<Token::Kind::Recursive>(const json_query::JSONPath& jp,
+QJsonArray eval<Token::Kind::Recursive>(const PathEvalCtx& /*ctx*/,
                                         const Token&,
                                         const QJsonValue& v)
 {
-    return jp.evaluateRecursive(v, 0);
+    return evaluateRecursive(v);
 }
 
 // --- Filter ----------------------------------------------------------------
 template<>
-QJsonArray eval<Token::Kind::Filter>(const json_query::JSONPath& jp,
+QJsonArray eval<Token::Kind::Filter>(const PathEvalCtx& ctx,
                                      const Token& tk,
                                      const QJsonValue& v)
 {
     QJsonArray out;
-    if (tk.filterId >= jp.m_filters.size()) return out;
+    if (tk.filterId >= ctx.filters.size()) return out;
 
-    const auto& filterFn = jp.m_filters[tk.filterId];
+    const auto& filterFn = ctx.filters[tk.filterId];
     if (v.isArray()) {
         for (const auto& item : v.toArray()) {
             if (filterFn(item))

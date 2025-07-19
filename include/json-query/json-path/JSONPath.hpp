@@ -163,9 +163,9 @@ private:
 
     // friend declarations for new functional evaluator (phase B)
     friend QJsonValue json_query::json_path::detail::evaluate(
-        const json_query::json_path::detail::PathEvalCtx&, const JSONPath&, const QJsonValue&);
+        const json_query::json_path::detail::PathEvalCtx&, const json_query::JSONPath&, const QJsonValue&);
     friend QJsonArray json_query::json_path::detail::evaluateAll(
-        const json_query::json_path::detail::PathEvalCtx&, const JSONPath&, const QJsonValue&);
+        const json_query::json_path::detail::PathEvalCtx&, const json_query::JSONPath&, const QJsonValue&);
 
 }; // end class JSONPath
 
