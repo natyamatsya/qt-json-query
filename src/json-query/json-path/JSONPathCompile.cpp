@@ -1,6 +1,10 @@
 #include "json-query/json-path/JSONPathCompile.hpp"
+
+#include <iostream>
+
 #include "json-query/json-path/internal/QtHash.hpp"
 #include "json-query/JSONQueryUtils.hpp"  // For qt_hash
+#include "json-query/json-path/JSONPathFilter.hpp"  // For compileFilter implementation
 
 #include <limits>
 
@@ -160,8 +164,14 @@ std::expected<qsizetype, Error> parseBracket(qsizetype pos,
     if (++pos >= n) return std::unexpected(Error::UnmatchedBracket);
 
     qsizetype start = pos;
-    while (pos < n && sv[pos] != u']') {
-        if (sv[pos] == u'\'' || sv[pos] == u'"') {
+    int bracketLevel = 0;
+    while (pos < n) {
+        if (sv[pos] == u'[') {
+            ++bracketLevel;
+        } else if (sv[pos] == u']') {
+            if (bracketLevel == 0) break; // Found the matching closing bracket
+            --bracketLevel;
+        } else if (sv[pos] == u'\'' || sv[pos] == u'"') {
             QChar quote = sv[pos++];
             while (pos < n && sv[pos] != quote) ++pos;
             if (pos >= n) return std::unexpected(Error::UnmatchedQuote);
