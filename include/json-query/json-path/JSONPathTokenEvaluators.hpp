@@ -28,16 +28,6 @@ QJsonArray eval(const json_query::json_path::detail::PathEvalCtx& ctx,
                 const Token& tk,
                 const QJsonValue& v);
 
-// Transitional wrapper keeping old signature functional until call sites migrate
-template<Token::Kind K>
-inline QJsonArray eval(const json_query::JSONPath& jp,
-                       const Token& tk,
-                       const QJsonValue& v)
-{
-    json_query::json_path::detail::PathEvalCtx ctx{jp.m_tokens, jp.m_filters, jp.m_option, jp.m_func};
-    return eval<K>(ctx, tk, v);
-}
-
 // Explicit template specialization declarations
 template<>
 QJsonArray eval<Token::Kind::Key>(const json_query::json_path::detail::PathEvalCtx& ctx,

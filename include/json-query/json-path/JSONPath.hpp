@@ -151,21 +151,19 @@ private:
     QVector<Token>             m_tokens;
     QVector<FilterFn> m_filters;
 
-    template<Token::Kind K>
-        friend QJsonArray json_query::json_path::detail::eval(const JSONPath&,
-                    const Token&,
-                    const QJsonValue&);
-
-    // Give the rule parsers access to the private static compileFilter()
-    friend QJsonArray json_query::json_path::detail::fanOut(const JSONPath&,
-                                     const Token&,
-                                     const QJsonArray&);
+    // Previous friendship for eval<> and fanOut no longer required after
+    // functional refactor; removed.
 
     // friend declarations for new functional evaluator (phase B)
     friend QJsonValue json_query::json_path::detail::evaluate(
         const json_query::json_path::detail::PathEvalCtx&, const json_query::JSONPath&, const QJsonValue&);
     friend QJsonArray json_query::json_path::detail::evaluateAll(
         const json_query::json_path::detail::PathEvalCtx&, const json_query::JSONPath&, const QJsonValue&);
+
+    // fanOut still needs access to private evaluateToken
+    friend QJsonArray json_query::json_path::detail::fanOut(const JSONPath&,
+                                     const Token&,
+                                     const QJsonArray&);
 
 }; // end class JSONPath
 

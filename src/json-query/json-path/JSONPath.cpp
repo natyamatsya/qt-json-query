@@ -44,8 +44,9 @@ inline QJsonArray JSONPath::evaluateToken(const Token& tk,
 {
     using enum Token::Kind;
     // NB: keep the order in sync with the enum!
+    using Ctx = json_path::detail::PathEvalCtx;
     constexpr std::array<
-        QJsonArray (*)(const json_query::JSONPath&, const Token&, const QJsonValue&), 6> lut = {
+        QJsonArray (*)(const Ctx&, const Token&, const QJsonValue&), 6> lut = {
         json_path::detail::eval<Key>,
         json_path::detail::eval<Index>,
         json_path::detail::eval<Slice>,
@@ -58,7 +59,8 @@ inline QJsonArray JSONPath::evaluateToken(const Token& tk,
     if (static_cast<std::size_t>(tk.kind) >= lut.size())
         return {};
 
-    return lut[static_cast<std::size_t>(tk.kind)](*this, tk, v);
+    Ctx ctx{m_tokens, m_filters, m_option, m_func};
+    return lut[static_cast<std::size_t>(tk.kind)](ctx, tk, v);
 }
 
 QJsonArray JSONPath::evaluateAll(const QJsonDocument &document) const
