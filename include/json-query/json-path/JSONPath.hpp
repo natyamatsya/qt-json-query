@@ -69,7 +69,6 @@ public:
     [[nodiscard]] QJsonArray evaluateAll (const QJsonDocument& doc  ) const;
     [[nodiscard]] QJsonArray evaluateAll (const QJsonValue&    value) const;
 
-    [[nodiscard]] bool    isValid()  const { return m_valid; }
     [[nodiscard]] QString toString() const { return m_originalPath; }
 
     //  Move / copy remain defaulted
@@ -95,8 +94,7 @@ private:
                   QString                     original,
                   QVector<Token>              tokens,
                   QVector<FilterFn> filters ) noexcept
-            : m_valid(true)
-            , m_func(func)
+            : m_func(func)
             , m_option(opt)
             , m_originalPath(std::move(original))
             , m_tokens(std::move(tokens))
@@ -115,15 +113,10 @@ private:
     [[nodiscard]] int        normalizeIndex    (int idx, int size) const;
     [[nodiscard]] QJsonArray wildcardObject    (const QJsonObject& obj) const;
     [[nodiscard]] QJsonArray wildcardArray     (const QJsonArray&  arr) const;
-    [[nodiscard]] QJsonArray recursiveDescend  (const QJsonValue& v,
-                                      const QString& prop) const;
-    [[nodiscard]] QString     segmentToPointer (const QString& seg) const;
-    [[nodiscard]] static QString escapePointerSegment(const QString&);
 
     // -----------------------------------------------------------------
     //  Data members
     // -----------------------------------------------------------------
-    bool                       m_valid   {true};
     FunctionType               m_func    {FunctionType::None};
     Option                     m_option  {Option::None};
     QString                    m_originalPath;
