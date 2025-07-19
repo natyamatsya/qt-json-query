@@ -59,8 +59,6 @@ namespace detail {
 
     struct KeyBuilder;   // new
 
-    std::optional<Token> callCompileFilter(const QString&, QVector<FilterFn>&);
-
     std::expected<qsizetype, Error>
     parseBracket(qsizetype, QStringView,
                  KeyBuilder&, QVector<Token>&,
@@ -172,6 +170,4 @@ private:
            detail::parseBracket(qsizetype, QStringView,
                                 detail::KeyBuilder&, QVector<Token>&,
                                 QVector<FilterFn>&);
-
-    friend std::optional<Token> detail::callCompileFilter(const QString&, QVector<FilterFn>&);
 };
