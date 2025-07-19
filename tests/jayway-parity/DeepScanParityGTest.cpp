@@ -8,7 +8,7 @@
 #include <gmock/gmock.h>
 #include <QJsonDocument>
 #include "json-query/json-path/JSONPath.hpp"
-#include "JaywayParityGTestHelpers.hpp"
+#include "framework/JSONMatchersGTest.hpp"
 #include <QJsonValue>
 
 using json_query::JSONPath;

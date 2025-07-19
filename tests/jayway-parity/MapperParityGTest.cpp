@@ -7,8 +7,9 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QJsonValue>
+
 #include "json-query/json-path/JSONPath.hpp"
-#include "JaywayParityGTestHelpers.hpp"
+#include "framework/JSONMatchersGTest.hpp"
 
 namespace jayway_parity {
 using namespace ::testing;

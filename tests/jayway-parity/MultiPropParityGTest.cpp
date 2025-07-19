@@ -9,7 +9,7 @@
 #include <QJsonObject>
 #include <QJsonValue>
 #include "json-query/json-path/JSONPath.hpp"
-#include "JaywayParityGTestHelpers.hpp"
+#include "framework/JSONMatchersGTest.hpp"
 
 using json_query::JSONPath;
 
