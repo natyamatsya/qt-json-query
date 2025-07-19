@@ -19,6 +19,7 @@
 #include "JSONPathCompile.hpp"
 #include "../JSONQueryUtils.hpp"
 #include "../JSONPointer.hpp"
+#include "json-query/json-path/JSONPathOption.hpp"
 
 #include <ctre.hpp>
 
@@ -63,7 +64,7 @@ namespace json_query {
 class JSONPath
 {
 public:
-    enum class Option { None = 0, AsPathList = 1 };
+    using Option = json_query::json_path::Option;
 
     // -----------------------------------------------------------------
     //  Factory (replaces throwing constructor)                    ★

@@ -4,7 +4,7 @@
 #include <QString>
 
 #include "json-query/json-path/JSONPathCompile.hpp" // for Token, FunctionType, Slice
-#include "json-query/json-path/JSONPath.hpp"        // for Option
+#include "json-query/json-path/JSONPathOption.hpp"
 
 namespace json_query::json_path::detail {
 
@@ -21,7 +21,7 @@ public:
     using Token      = json_path::Token;
     using FilterFn   = json_path::FilterFn;
     using Function   = json_path::FunctionType;
-    using Option     = json_query::JSONPath::Option;
+    using Option     = json_query::json_path::Option;
 
     PathEvalCtx(const QVector<Token>&   t,
                 const QVector<FilterFn>& f,
