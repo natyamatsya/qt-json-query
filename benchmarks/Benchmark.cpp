@@ -4,11 +4,18 @@
 #include <QString>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QStringView>
 
-#include "json-query/JSONPath.hpp"
+#include "json-query/json-path/JSONPath.hpp"
 #include "json-query/JSONPointer.hpp"
 
-// Helper to build a moderately large test document
+#include <utility>
+
+using json_query::JSONPath;
+using json_query::JSONPointer;
+using namespace Qt::StringLiterals;
+
+// Helper to build a moderately large test document for benchmarking
 static QJsonDocument prepareTestDocument()
 {
     QJsonArray books;
@@ -96,7 +103,7 @@ static void BM_Plain_Nested(benchmark::State &state)
     {
         const QJsonObject root = doc.object();
         const QString city = root.value("location").toObject().value("city").toString();
-        benchmark::DoNotOptimize(city);
+        benchmark::DoNotOptimize(city.constData());
     }
 }
 BENCHMARK(BM_Plain_Nested);
@@ -108,7 +115,7 @@ static void BM_Plain_Array(benchmark::State &state)
     {
         const QJsonArray inv = doc.object().value("inventory").toArray();
         const QString title = inv.at(5).toObject().value("title").toString();
-        benchmark::DoNotOptimize(title);
+        benchmark::DoNotOptimize(title.constData());
     }
 }
 BENCHMARK(BM_Plain_Array);
@@ -156,8 +163,10 @@ static void BM_JSONPath_Simple(benchmark::State &state)
     QJsonDocument doc = prepareTestDocument();
     for (auto _ : state)
     {
-        JSONPath path("$.name");
-        benchmark::DoNotOptimize(path.evaluate(doc));
+        auto pathRes = JSONPath::create(u"$.name");
+        if (!pathRes.has_value())
+            state.SkipWithError("Failed to compile path");
+        benchmark::DoNotOptimize(pathRes->evaluate(doc));
     }
 }
 BENCHMARK(BM_JSONPath_Simple);
@@ -167,8 +176,9 @@ static void BM_JSONPath_Nested(benchmark::State &state)
     QJsonDocument doc = prepareTestDocument();
     for (auto _ : state)
     {
-        JSONPath path("$.location.city");
-        benchmark::DoNotOptimize(path.evaluate(doc));
+        auto p = JSONPath::create(u"$.location.city");
+        if (!p) state.SkipWithError("compile fail");
+        benchmark::DoNotOptimize(p->evaluate(doc));
     }
 }
 BENCHMARK(BM_JSONPath_Nested);
@@ -178,8 +188,9 @@ static void BM_JSONPath_Array(benchmark::State &state)
     QJsonDocument doc = prepareTestDocument();
     for (auto _ : state)
     {
-        JSONPath path("$.inventory[5].title");
-        benchmark::DoNotOptimize(path.evaluate(doc));
+        auto p = JSONPath::create(u"$.inventory[5].title");
+        if (!p) state.SkipWithError("compile fail");
+        benchmark::DoNotOptimize(p->evaluate(doc));
     }
 }
 BENCHMARK(BM_JSONPath_Array);
@@ -189,8 +200,9 @@ static void BM_JSONPath_Filter(benchmark::State &state)
     QJsonDocument doc = prepareTestDocument();
     for (auto _ : state)
     {
-        JSONPath path("$.inventory[?(@.price > 20)].title");
-        benchmark::DoNotOptimize(path.evaluate(doc));
+        auto p = JSONPath::create(u"$.inventory[?(@.price > 20)].title");
+        if (!p) state.SkipWithError("compile fail");
+        benchmark::DoNotOptimize(p->evaluate(doc));
     }
 }
 BENCHMARK(BM_JSONPath_Filter);
@@ -200,8 +212,9 @@ static void BM_JSONPath_Recursive(benchmark::State &state)
     QJsonDocument doc = prepareTestDocument();
     for (auto _ : state)
     {
-        JSONPath path("$..title");
-        benchmark::DoNotOptimize(path.evaluate(doc));
+        auto p = JSONPath::create(u"$..title");
+        if (!p) state.SkipWithError("compile fail");
+        benchmark::DoNotOptimize(p->evaluate(doc));
     }
 }
 BENCHMARK(BM_JSONPath_Recursive);
@@ -221,8 +234,7 @@ static void BM_JSONPath_Creation(benchmark::State &state)
 {
     for (auto _ : state)
     {
-        JSONPath path("$.inventory[25].categories[1]");
-        benchmark::DoNotOptimize(path);
+        benchmark::DoNotOptimize(JSONPath::create(u"$.inventory[25].categories[1]"));
     }
 }
 BENCHMARK(BM_JSONPath_Creation);
@@ -235,7 +247,7 @@ BENCHMARK_MAIN();
                            {"year", 1900 + i % 100}}},
             {"price", 9.99 + (i % 20) * 0.5},
             {"categories", QJsonArray::fromVariantList({QString("category%1").arg(i % 5), QString("category%1").arg((i + 2) % 5), QString("category%1").arg((i + 4) % 5)})},
-            {"inStock", i % 3 == 0}});
+            {"inStock", i % 3 == 0}};
     }
 
     QJsonObject store{
