@@ -16,27 +16,15 @@ namespace json_query
 class JSONPointer
 {
 public:
-    enum class Error : std::uint8_t {
-        MissingLeadingSlash,
-        EmptyNonTerminalToken,
-        InvalidEscapeSequence,
-        ArrayIndexOverflow
-    };
-
-    // Evaluation-time errors
-    enum class EvalError : std::uint8_t {
-        TypeMismatchObject,
-        TypeMismatchArray,
-        KeyNotFound,
-        IndexOutOfRange
-    };
+    using Error      = json_pointer::detail::ParseError; // alias internal
+    using EvalError  = json_pointer::detail::EvalError;  // alias internal
 
     // Factory function mirroring JSONPath
-    using Result = std::expected<JSONPointer, Error>;
-    static Result create(QStringView pointer);
-
-    // Alias for evaluation result with error
+    using Result     = std::expected<JSONPointer, Error>;
     using EvalResult = std::expected<QJsonValue, EvalError>;
+
+    // Factory function mirroring JSONPath
+    static Result create(QStringView pointer);
 
     // Detailed-error variants
     [[nodiscard]] EvalResult evaluate(QJsonDocument const&) const;
@@ -51,8 +39,6 @@ private:
     QVector<Token>   m_tokens;
 
     [[nodiscard]] std::expected<void, Error> parsePointer(QStringView);
-    static EvalError          mapEvalError(json_pointer::detail::EvalError);
-    static Error              mapError(json_pointer::detail::ParseError);
     static void decodeAndStore(QStringView raw, QVector<Token>& out);
 };
 

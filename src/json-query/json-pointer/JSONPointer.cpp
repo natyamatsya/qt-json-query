@@ -24,7 +24,7 @@ std::expected<void, JSONPointer::Error> JSONPointer::parsePointer(QStringView pt
 {
     auto res = json_pointer::detail::parsePointer(ptr, m_tokens);
     if (!res)
-        return std::unexpected(mapError(res.error()));
+        return std::unexpected(res.error());
     return {};
 }
 
@@ -49,7 +49,7 @@ JSONPointer::EvalResult JSONPointer::evaluate(QJsonValue const& value) const
     auto res = json_pointer::detail::evaluatePointer(m_tokens, value);
     if (res)
         return res.value();
-    return std::unexpected(mapEvalError(res.error()));
+    return std::unexpected(res.error());
 }
 
 QString JSONPointer::toString() const
@@ -110,31 +110,6 @@ QString JSONPointer::toString() const
 
     out.truncate(wr);
     return out;
-}
-
-// Mapping evaluation error
-JSONPointer::EvalError JSONPointer::mapEvalError(json_pointer::detail::EvalError ee)
-{
-    using DE = json_pointer::detail::EvalError;
-    switch (ee) {
-    case DE::TypeMismatchObject: return EvalError::TypeMismatchObject;
-    case DE::TypeMismatchArray:  return EvalError::TypeMismatchArray;
-    case DE::KeyNotFound:        return EvalError::KeyNotFound;
-    case DE::IndexOutOfRange:    return EvalError::IndexOutOfRange;
-    default:                     return EvalError::TypeMismatchObject;
-    }
-}
-
-JSONPointer::Error JSONPointer::mapError(json_pointer::detail::ParseError pe)
-{
-    using PE = json_pointer::detail::ParseError;
-    switch (pe) {
-    case PE::MissingLeadingSlash:    return Error::MissingLeadingSlash;
-    case PE::EmptyNonTerminalToken:  return Error::EmptyNonTerminalToken;
-    case PE::InvalidEscapeSequence:  return Error::InvalidEscapeSequence;
-    case PE::ArrayIndexOverflow:     return Error::ArrayIndexOverflow;
-    default:                         return Error::InvalidEscapeSequence; // fallback
-    }
 }
 
 } // namespace json_query
