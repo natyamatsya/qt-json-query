@@ -222,9 +222,8 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
                     if (!obj.contains(k)) { all=false; break; }
                 if (!all) continue;
 
-                bool includeParent = obj.size() > keys.size();
-                if (includeParent)
-                    next.append(v);  // parent object first
+                if (!isLeaf)
+                    next.append(v);  // parent object first (for further traversal)
 
                 // Append member values (order after parent) for further traversal
                 for (const QString& k : keys)
