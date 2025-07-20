@@ -1,4 +1,6 @@
-#include "json-query/json-path/JSONPathEvaluate.hpp"
+#include "json-query/json-path/JSONPathEvaluate.hpp"  // normalizeIndex, evalSlice
+#include <expected>
+#include "json-query/json-path/JSONPathEvalError.hpp"
 #include "json-query/json-path/JSONPathTokenEvaluators.hpp"
 #include "json-query/json-path/JSONPathPointerConversion.hpp"
 

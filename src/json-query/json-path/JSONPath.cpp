@@ -1,6 +1,7 @@
 #include "json-query/json-path/JSONPath.hpp"
 #include "json-query/json-path/JSONPathTokenEvaluators.hpp"
 #include "json-query/json-path/JSONPathEvaluate.hpp"
+#include "json-query/json-path/JSONPathExpected.hpp"
 
 #include <vector>
 #include <deque>
@@ -42,5 +43,21 @@ QJsonArray JSONPath::evaluateAll(const QJsonValue &value) const
     return json_path::detail::evaluateAll(ctx, value);
 }
 
-} // namespace json_query
+// ─────────────────────────────────────────────────────────────────────
+//  evaluateExpected – sequential, definite-path only for now
+// ─────────────────────────────────────────────────────────────────────
 
+JSONPath::EvalResult JSONPath::evaluateExpected(const QJsonDocument& doc) const
+{
+    const QJsonValue root = doc.isArray() ? QJsonValue(doc.array())
+                                          : QJsonValue(doc.object());
+    return evaluateExpected(root);
+}
+
+JSONPath::EvalResult JSONPath::evaluateExpected(const QJsonValue& value) const
+{
+    // Currently handles definite paths only (no wildcard/filter/recursive)
+    return json_path::detail::evaluateDefinite(m_tokens, value);
+}
+
+} // namespace json_query

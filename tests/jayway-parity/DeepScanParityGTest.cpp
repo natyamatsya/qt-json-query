@@ -78,7 +78,25 @@ TEST(JaywayDeepScanParity, DISABLED_ArrayIndexOobIgnored)
     EXPECT_THAT(r2, ElementsAre(IsJsonInt(3)));
 }
 
-PARITY_TEST(DefiniteUpstreamIllegalArrayAccessThrows, "Awaiting PathNotFoundException support.");
+// Jayway throws PathNotFoundException when an upstream segment resolves to a
+// non-array or an array index is out of bounds in a definite path.  Our RFC-9535
+// interpretation should surface an error via std::expected.  The failure path
+// is not yet wired, so we add a disabled placeholder that compiles without
+// relying on exceptions.
+TEST(JaywayDeepScanParity, DISABLED_DefiniteUpstreamIllegalArrayAccessThrows)
+{
+    const char* doc = R"({"foo": {"bar": 4}})";
+    auto jp = JSONPath::create(u"$.foo.bar[5]");
+    ASSERT_TRUE(jp);
+
+    // Future behaviour: evaluating should return an unexpected<ErrorCode>.
+    // For now we merely ensure evaluation produces an empty result and does
+    // not crash.  Replace with EXPECT_FALSE(res) once evaluate() returns
+    // std::expected.
+    QJsonArray result = evalArray(*jp, parseJson(doc));
+    EXPECT_TRUE(result.isEmpty());
+}
+
 // Jayway ignores missing object members when access is definite (not via scan). The
 // RFC mandates an error. Disabled for standards compliance.
 TEST(JaywayDeepScanParity, DISABLED_IllegalPropertyAccessIgnored)

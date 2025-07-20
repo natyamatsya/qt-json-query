@@ -36,3 +36,29 @@ TEST(RFC9535_JSONPath, NonArraySubscriptionYieldsEmpty)
     QJsonArray r3 = evalArray(*path, parseJson(R"({"x": [0,1,[0,1,2],null], "y": [0,1,2]})"));
     EXPECT_TRUE(r3.isEmpty());
 }
+
+// Definite path where upstream token is non-array or index out-of-bounds should
+// yield an error per RFC 9535. Until full error propagation is implemented we
+// verify that evaluation returns an empty result (TODO: switch to EXPECT_FALSE
+// on expected once std::expected error surfaces).
+TEST(RFC9535_JSONPath, UpstreamArrayIndexOOB)
+{
+    auto path = JSONPath::create(u"$.foo.bar[5]");
+    ASSERT_TRUE(path);
+
+    {
+        auto res = path->evaluateExpected(parseJson(R"({"foo":{"bar":null}})"));
+        ASSERT_FALSE(res);
+        EXPECT_EQ(res.error(), json_query::json_path::EvalError::TypeMismatchArray);
+    }
+    {
+        auto res = path->evaluateExpected(parseJson(R"({"foo":{"bar":4}})"));
+        ASSERT_FALSE(res);
+        EXPECT_EQ(res.error(), json_query::json_path::EvalError::TypeMismatchArray);
+    }
+    {
+        auto res = path->evaluateExpected(parseJson(R"({"foo":{"bar":[]}})"));
+        ASSERT_FALSE(res);
+        EXPECT_EQ(res.error(), json_query::json_path::EvalError::IndexOutOfRange);
+    }
+}

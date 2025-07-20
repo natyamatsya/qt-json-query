@@ -17,9 +17,10 @@
 
 // ────────────────────────────── Project
 #include "JSONPathCompile.hpp"
-#include "../utils/JSONQueryUtils.hpp"
-#include "../json-pointer/JSONPointer.hpp"
+#include "json-query/utils/JSONQueryUtils.hpp"
+#include "json-query/json-pointer/JSONPointer.hpp"
 #include "json-query/json-path/JSONPathOption.hpp"
+#include "json-query/json-path/JSONPathEvalError.hpp"
 
 using namespace Qt::StringLiterals;
 // ======================================================================
@@ -47,6 +48,14 @@ public:
     [[nodiscard]] QJsonValue evaluate    (const QJsonValue&    value) const;
     [[nodiscard]] QJsonArray evaluateAll (const QJsonDocument& doc  ) const;
     [[nodiscard]] QJsonArray evaluateAll (const QJsonValue&    value) const;
+
+    // -----------------------------------------------------------------
+    //  Evaluation with error reporting (std::expected)
+    // -----------------------------------------------------------------
+    using EvalResult = std::expected<QJsonValue, json_path::EvalError>;
+
+    [[nodiscard]] EvalResult evaluateExpected(const QJsonDocument& doc) const;
+    [[nodiscard]] EvalResult evaluateExpected(const QJsonValue&    value) const;
 
     [[nodiscard]] QString toString() const { return m_originalPath; }
 
