@@ -54,14 +54,72 @@ TEST(JaywayPathCompilerParity, CompileAtSymbol)
 PATHCOMPILER_STUB(PathMustStartWithDollarOrAt, "$ or @ requirement not yet validated");
 PATHCOMPILER_STUB(SquareBracketMayNotFollowPeriod, "Structural validator pending");
 PATHCOMPILER_STUB(RootPathMustBeFollowedByPeriodOrBracket, "Validator pending");
-PATHCOMPILER_STUB(PathMayNotEndWithPeriod, "Trailing period validation pending");
-PATHCOMPILER_STUB(PathMayNotEndWithPeriod2, "Trailing period validation pending");
+TEST(JaywayPathCompilerParity, PathMayNotEndWithPeriod)
+{
+    auto res = compile(u"$.");
+    ASSERT_FALSE(res.has_value());
+    EXPECT_EQ(res.error(), Error::TrailingDot);
+}
+
+TEST(JaywayPathCompilerParity, PathMayNotEndWithPeriod2)
+{
+    auto res = compile(u"$.prop.");
+    ASSERT_FALSE(res.has_value());
+    EXPECT_EQ(res.error(), Error::TrailingDot);
+}
+
+// -----------------------------------------------------------------------------
+// Property token compilations --------------------------------------------------
+
+TEST(JaywayPathCompilerParity, PropertyTokenCanBeCompiled)
+{
+    auto res1 = compile(u"$.prop");
+    ASSERT_TRUE(res1.has_value());
+    ASSERT_EQ(res1->compiled.tokens.size(), 2);
+    EXPECT_EQ(res1->compiled.tokens[1].key, "prop");
+
+    auto res2 = compile(u"$.1prop");
+    ASSERT_TRUE(res2.has_value());
+    EXPECT_EQ(res2->compiled.tokens[1].key, "1prop");
+
+    auto res3 = compile(u"$.@prop");
+    ASSERT_TRUE(res3.has_value());
+    EXPECT_EQ(res3->compiled.tokens[1].key, "@prop");
+}
+
+TEST(JaywayPathCompilerParity, BracketNotationPropertyTokenCanBeCompiled)
+{
+    auto check = [](QStringView path, QStringView expect){
+        auto res = compile(path);
+        ASSERT_TRUE(res.has_value()) << "Compilation failed for " << path.toString().toStdString();
+        ASSERT_EQ(res->compiled.tokens.size(), 2);
+        EXPECT_EQ(res->compiled.tokens[1].key, expect);
+    };
+
+    check(u"$['prop']",  u"prop");
+    check(u"$['1prop']", u"1prop");
+    check(u"$['@prop']", u"@prop");
+    check(u"$[  '@prop'  ]", u"@prop");
+    check(u"$[\"prop\"]", u"prop");
+}
+
+TEST(JaywayPathCompilerParity, MultiPropertyTokenCanBeCompiled)
+{
+    auto res1 = compile(u"$['prop0', 'prop1']");
+    ASSERT_TRUE(res1.has_value());
+    ASSERT_EQ(res1->compiled.tokens.size(), 3);
+    EXPECT_EQ(res1->compiled.tokens[1].key, "prop0");
+    EXPECT_EQ(res1->compiled.tokens[2].key, "prop1");
+
+    auto res2 = compile(u"$[  'prop0'  , 'prop1'  ]");
+    ASSERT_TRUE(res2.has_value());
+    ASSERT_EQ(res2->compiled.tokens.size(), 3);
+    EXPECT_EQ(res2->compiled.tokens[1].key, "prop0");
+    EXPECT_EQ(res2->compiled.tokens[2].key, "prop1");
+}
+
 PATHCOMPILER_STUB(PathMayNotEndWithScan, "Trailing scan validation pending");
 PATHCOMPILER_STUB(PathMayNotEndWithScan2, "Trailing scan validation pending");
-PATHCOMPILER_STUB(PropertyTokenCanBeCompiled, "Tokenizer parity pending");
-PATHCOMPILER_STUB(BracketNotationPropertyTokenCanBeCompiled, "Tokenizer parity pending");
-PATHCOMPILER_STUB(MultiPropertyTokenCanBeCompiled, "Tokenizer parity pending");
-PATHCOMPILER_STUB(PropertyChainCanBeCompiled, "Tokenizer parity pending");
 PATHCOMPILER_STUB(PropertyMayNotContainBlanks, "Validation pending");
 PATHCOMPILER_STUB(WildcardCanBeCompiled, "Wildcard tokenizer pending");
 PATHCOMPILER_STUB(WildcardCanFollowProperty, "Wildcard tokenizer pending");
@@ -85,6 +143,74 @@ PATHCOMPILER_STUB(ArrayIndexesMustBeSeparatedByCommas, "Array index validation")
 PATHCOMPILER_STUB(TrailingCommaAfterListNotAccepted, "Array index validation");
 PATHCOMPILER_STUB(AcceptOnlySingleCommaBetweenIndexes, "Array index validation");
 PATHCOMPILER_STUB(PropertyMustBeSeparatedByCommas, "Property list validation");
+
+TEST(JaywayPathCompilerParity, PropertyChainCanBeCompiled)
+{
+    auto chain = compile(u"$.aaa.bbb.ccc");
+    ASSERT_TRUE(chain.has_value());
+    ASSERT_EQ(chain->compiled.tokens.size(), 4);
+    EXPECT_EQ(chain->compiled.tokens[1].key, "aaa");
+    EXPECT_EQ(chain->compiled.tokens[2].key, "bbb");
+    EXPECT_EQ(chain->compiled.tokens[3].key, "ccc");
+}
+
+// -----------------------------------------------------------------------------
+// Wildcard tests --------------------------------------------------------------
+TEST(JaywayPathCompilerParity, WildcardCanBeCompiled)
+{
+    auto res1 = compile(u"$.*");
+    ASSERT_TRUE(res1.has_value());
+    ASSERT_EQ(res1->compiled.tokens.size(), 2);
+    EXPECT_EQ(res1->compiled.tokens[1].kind, Token::Kind::Wildcard);
+
+    auto res2 = compile(u"$[*]");
+    ASSERT_TRUE(res2.has_value());
+    ASSERT_EQ(res2->compiled.tokens[1].kind, Token::Kind::Wildcard);
+
+    auto res3 = compile(u"$[ * ]");
+    ASSERT_TRUE(res3.has_value());
+    ASSERT_EQ(res3->compiled.tokens[1].kind, Token::Kind::Wildcard);
+}
+
+TEST(JaywayPathCompilerParity, WildcardCanFollowProperty)
+{
+    auto res1 = compile(u"$.prop[*]");
+    ASSERT_TRUE(res1.has_value());
+    ASSERT_EQ(res1->compiled.tokens.size(), 3);
+    EXPECT_EQ(res1->compiled.tokens[1].key, "prop");
+    EXPECT_EQ(res1->compiled.tokens[2].kind, Token::Kind::Wildcard);
+
+    auto res2 = compile(u"$['prop'][*]");
+    ASSERT_TRUE(res2.has_value());
+    ASSERT_EQ(res2->compiled.tokens.size(), 3);
+    EXPECT_EQ(res2->compiled.tokens[1].key, "prop");
+    EXPECT_EQ(res2->compiled.tokens[2].kind, Token::Kind::Wildcard);
+}
+
+// -----------------------------------------------------------------------------
+// Array index path ------------------------------------------------------------
+TEST(JaywayPathCompilerParity, ArrayIndexPathCanBeCompiled)
+{
+    auto res1 = compile(u"$[1]");
+    ASSERT_TRUE(res1.has_value());
+    ASSERT_EQ(res1->compiled.tokens.size(), 2);
+    EXPECT_EQ(res1->compiled.tokens[1].kind, Token::Kind::Index);
+    EXPECT_EQ(res1->compiled.tokens[1].index, 1);
+
+    auto res2 = compile(u"$[1,2,3]");
+    ASSERT_TRUE(res2.has_value());
+    ASSERT_EQ(res2->compiled.tokens.size(), 4);
+    EXPECT_EQ(res2->compiled.tokens[1].index, 1);
+    EXPECT_EQ(res2->compiled.tokens[2].index, 2);
+    EXPECT_EQ(res2->compiled.tokens[3].index, 3);
+
+    auto res3 = compile(u"$[ 1 , 2 , 3 ]");
+    ASSERT_TRUE(res3.has_value());
+    ASSERT_EQ(res3->compiled.tokens.size(), 4);
+    EXPECT_EQ(res3->compiled.tokens[1].index, 1);
+    EXPECT_EQ(res3->compiled.tokens[2].index, 2);
+    EXPECT_EQ(res3->compiled.tokens[3].index, 3);
+}
 
 #undef PATHCOMPILER_STUB
 
