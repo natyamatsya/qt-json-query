@@ -224,12 +224,24 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
                     if (!obj.contains(k)) { all=false; break; }
                 if (!all) continue;
 
-                if (!isLeaf)
-                    next.append(v);  // parent object first (for further traversal)
-
-                // Append member values (order after parent) for further traversal
-                for (const QString& k : keys)
-                    next.append(obj.value(k));
+                if (isLeaf) {
+                    if (tk.kind == Token::Kind::KeyList) {
+                        // For multi-prop leaf: return parent object only (Jayway semantics)
+                        next.append(v);
+                    } else {
+                        // Single key leaf: value(s) first
+                        for (const QString& k : keys)
+                            next.append(obj.value(k));
+                        // Append parent object only if it contains exactly the selected key(s)
+                        if (obj.size() == keys.size())
+                            next.append(v);
+                    }
+                } else {
+                    // Non-leaf: parent first, then member values for traversal
+                    next.append(v);
+                    for (const QString& k : keys)
+                        next.append(obj.value(k));
+                }
             }
 
             if (next.isEmpty())
@@ -237,6 +249,25 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
 
             working.swap(next);
             // This does NOT add multiplicity; collapse stays at previous state
+
+            // Deduplicate at leaf too to avoid duplicate parent objects/values
+            if (isLeaf) {
+                QSet<uint> seen;
+                QJsonArray dedup;
+                for (const auto& v2 : working) {
+                    if (v2.isObject()) {
+                        uint h = qt_hash(QJsonDocument(v2.toObject()).toJson());
+                        if (seen.contains(h)) continue;
+                        seen.insert(h);
+                    } else if (v2.isArray()) {
+                        uint h = qt_hash(QJsonDocument(v2.toArray()).toJson());
+                        if (seen.contains(h)) continue;
+                        seen.insert(h);
+                    }
+                    dedup.append(v2);
+                }
+                working.swap(dedup);
+            }
         } else {
             working = fanOut(ctx, tk, working);
             bool multiAfter = multi || addsMultiplicity(tk);
