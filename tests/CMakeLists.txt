@@ -77,6 +77,10 @@ target_link_libraries(rfc9535_tests PRIVATE
     GTest::gtest_main
     Qt6::Core)
 
+# Provide project source dir to tests so they can locate compliance JSON files
+target_compile_definitions(rfc9535_tests PRIVATE
+    JSON_QUERY_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+
 # ---------------------------------------------------------------------------
 # Test discovery via CTest / GoogleTest module
 # ---------------------------------------------------------------------------
