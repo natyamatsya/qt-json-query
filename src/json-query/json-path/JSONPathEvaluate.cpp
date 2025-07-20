@@ -13,6 +13,7 @@
 #include <QStringList>
 #include <QString>
 #include <QDebug>
+#include <algorithm>
 
 namespace json_query::json_path::detail {
 
@@ -27,18 +28,53 @@ int normalizeIndex(int idx, int size)
 QJsonArray evalSlice(const QJsonArray& array, const Slice& s)
 {
     QJsonArray out;
-    if (s.step <= 0) return out;
+
+    if (s.step == 0)
+        return out; // invalid slice already filtered by compiler but guard anyway
 
     const int size = array.size();
-    auto norm = [size](int i) { return i < 0 ? size + i : i; };
+    constexpr qsizetype SENTINEL = std::numeric_limits<qsizetype>::max();
 
-    int begin = norm(static_cast<int>(s.start));
-    int end   = (s.end == std::numeric_limits<qsizetype>::max())
-                ? size
-                : norm(static_cast<int>(s.end));
+    const bool forward = s.step > 0;
 
-    for (int i = begin; i < end && i < size; i += static_cast<int>(s.step))
-        if (i >= 0) out.append(array[i]);
+    auto norm = [size](qsizetype idx){
+        if (idx == SENTINEL)
+            return idx; // leave sentinel untouched for later
+        int v = static_cast<int>(idx);
+        if (v < 0) v += size;
+        return static_cast<qsizetype>(v);
+    };
+
+    qsizetype startRaw = norm(s.start);
+    qsizetype endRaw   = norm(s.end);
+
+    // Apply defaults when omitted (sentinel)
+    qsizetype start = (startRaw == SENTINEL)
+                        ? (forward ? 0 : size - 1)
+                        : startRaw;
+
+    qsizetype end = (endRaw == SENTINEL)
+                        ? (forward ? size : -1)
+                        : endRaw;
+
+    // Clamp to bounds
+    auto clamp = [size](qsizetype v){
+        return std::clamp<qsizetype>(v, -1, size); // allow -1 for reverse stopping
+    };
+    start = clamp(start);
+    end   = clamp(end);
+
+    // Iterate
+    int step = static_cast<int>(s.step);
+
+    if (forward) {
+        for (int i = static_cast<int>(start); i < end && i < size; i += step)
+            if (i >= 0) out.append(array[i]);
+    } else {
+        for (int i = static_cast<int>(start); i > end && i >= 0; i += step) // step is negative
+            if (i < size) out.append(array[i]);
+    }
+
     return out;
 }
 

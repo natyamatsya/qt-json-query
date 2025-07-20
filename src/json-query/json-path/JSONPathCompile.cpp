@@ -9,6 +9,7 @@
 #include "json-query/json-path/JSONPathFilter.hpp"  // For compileFilter implementation
 
 #include <limits>
+#include <QRegularExpression>
 
 namespace json_query::json_path
 {
@@ -19,22 +20,59 @@ namespace json_query::json_path
 namespace
 {
     // Parse start:end:step  (parts may be empty) --------------------------------
-    [[nodiscard]] static inline Slice makeSlice(QStringView v)
+    [[nodiscard]] static inline std::optional<Slice> makeSlice(QStringView v)
     {
-        auto toInt = [](QStringView part, int def){
-            if(part.isEmpty()) return def;
-            bool ok=false; int x=part.toInt(&ok); return ok?x:def;
+        constexpr qsizetype SENTINEL = std::numeric_limits<qsizetype>::max();
+
+        static const QRegularExpression re("^-?(0|[1-9][0-9]*)$");
+
+        auto strictParse = [&](QStringView part, std::optional<qsizetype>& out)->bool{
+            part = part.trimmed();
+            if (part.isEmpty()) {
+                out.reset();
+                return true; // omitted component
+            }
+
+            if (!re.matchView(part).hasMatch())
+                return false; // not a valid integer literal per RFC
+
+            // Try fast path 64-bit conversion first.
+            bool ok = false;
+            qlonglong v = part.toLongLong(&ok, 10);
+
+            if (ok) {
+                out = static_cast<qsizetype>(v);
+                return true;
+            }
+
+            // Overflow – treat as "very large" positive / negative so that later clamping
+            // logic will simply clamp it to array boundaries per RFC 9535 (§4.2.3).
+            if (part.startsWith(u'-'))
+                out = std::numeric_limits<qsizetype>::min();
+            else
+                out = std::numeric_limits<qsizetype>::max();
+            return true;
         };
 
-        const auto parts = v.split(u':');
-        const QStringView a = parts.size()>0 ? parts[0].trimmed() : QStringView{};
-        const QStringView b = parts.size()>1 ? parts[1].trimmed() : QStringView{};
-        const QStringView c = parts.size()>2 ? parts[2].trimmed() : QStringView{};
+        static const QRegularExpression sliceFull(R"(^\s*-?(?:0|[1-9][0-9]*)?\s*(?::\s*-?(?:0|[1-9][0-9]*)?\s*(?::\s*-?(?:0|[1-9][0-9]*)?\s*)?)?\s*$)");
+        if (!sliceFull.matchView(v).hasMatch())
+            return std::nullopt;
 
-        const int start = toInt(a, 0);
-        const int end   = toInt(b, std::numeric_limits<int>::max());
-        const int step  = toInt(c, 1);
-        return {start,end,step};
+        const auto parts = v.split(u':');
+        if (parts.size() > 3)
+            return std::nullopt; // too many colons
+        std::optional<qsizetype> startOpt, endOpt, stepOpt;
+
+        if (parts.size()>0 && !strictParse(parts[0].trimmed(), startOpt)) return std::nullopt;
+        if (parts.size()>1 && !strictParse(parts[1].trimmed(), endOpt))   return std::nullopt;
+        if (parts.size()>2 && !strictParse(parts[2].trimmed(), stepOpt))  return std::nullopt;
+
+        qsizetype step = stepOpt.value_or(1);
+
+        qsizetype start = startOpt.has_value() ? *startOpt : SENTINEL;
+        qsizetype end   = endOpt.has_value()   ? *endOpt   : SENTINEL;
+
+        return Slice{start,end,step};
     }
 } // namespace
 
@@ -188,8 +226,13 @@ static const std::array<BrRule,9> BR_RULES = {{
     // 3.  1:3:2  ----------------------------------------------------
     [](QStringView content, BracketSink& out)->std::optional<Error> {
         if (!content.contains(u':')) return std::nullopt;
-        out.slice(makeSlice(content));
-        return Error::Ok;
+        {
+            if (auto maybe = makeSlice(content)) {
+                out.slice(*maybe);
+                return Error::Ok;
+            }
+            return Error::InvalidSlice;
+        }
     },
 
     // 4.  ?(...) ----------------------------------------------------
