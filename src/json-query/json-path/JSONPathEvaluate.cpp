@@ -6,6 +6,7 @@
 #include <deque>
 #include <QSet>
 #include <QJsonDocument>
+#include "json-query/json-path/internal/QtHash.hpp"
 
 #include <QStringList>
 #include <QString>
@@ -189,65 +190,65 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
     QJsonArray working{root};
     bool multi = false;
 
-    auto unionKeys = [](const QJsonValue& v,
-                       const std::vector<QString>& keys,
-                       bool requireAll)->QJsonValue {
-        if (!v.isObject()) return QJsonValue(QJsonValue::Undefined);
+    using json_query::json_path::internal::qt_hash;
 
-        const QJsonObject obj = v.toObject();
-
-        if (requireAll) {
-            for (const auto& k : keys)
-                if (!obj.contains(k))
-                    return QJsonValue(QJsonValue::Undefined);
-            return v; // contains every requested key
-        } else {
-            for (const auto& k : keys)
-                if (obj.contains(k))
-                    return v; // at least one key matches
-            return QJsonValue(QJsonValue::Undefined);
-        }
-    };
-
-    auto jsonHash = [](const QJsonValue& v){ return qHash(QJsonDocument(v.toObject()).toJson()); };
-
-    for (qsizetype i = 1; i < ctx.tokens.size() && !working.isEmpty(); )
+    for (qsizetype i = 1; i < ctx.tokens.size() && !working.isEmpty(); ++i)
     {
         const Token& tk = ctx.tokens[i];
 
-        using enum Token::Kind;
+        bool prevRecursive = (i>0 && ctx.tokens[i-1].kind == Token::Kind::Recursive);
 
-        if (tk.kind == Key) {
-            // collect consecutive keys to form union
-            std::vector<QString> keys;
-            qsizetype j = i;
-            while (j < ctx.tokens.size() && ctx.tokens[j].kind == Key) {
-                keys.push_back(ctx.tokens[j].key);
-                ++j;
-            }
+        if (prevRecursive && tk.kind == Token::Kind::KeyList) {
+            // Branch-unique selection: keep the parent object if it (fully) contains the requested key(s)
+            const QStringList keys = tk.key.split(u'\n');
 
-            bool requireAll = (i>0 && ctx.tokens[i-1].kind == Recursive);
-
-            QJsonArray next;
             QSet<uint> seen;
+            QJsonArray next;
             for (const auto& v : working) {
-                const QJsonValue sel = unionKeys(v, keys, requireAll);
-                if (sel.isUndefined()) continue;
-                uint h = jsonHash(sel);
+                if (!v.isObject()) continue;
+                const QJsonObject obj = v.toObject();
+
+                bool all=true;
+                for (const QString& k : keys)
+                    if (!obj.contains(k)) { all=false; break; }
+                if (!all) continue;
+
+                uint h = qt_hash(QJsonDocument(obj).toJson());
                 if (seen.contains(h)) continue;
                 seen.insert(h);
-                next.append(sel);
+                next.append(v);
             }
 
-            working = std::move(next);
-            // selecting multiple keys from same object does not increase multiplicity
-            i = j;
+            if (next.isEmpty())
+                return QJsonValue(QJsonValue::Undefined);
+
+            working.swap(next);
+            // This does NOT add multiplicity; collapse stays at previous state
         } else {
             working = fanOut(ctx, tk, working);
             if (working.isEmpty())
                 return QJsonValue(QJsonValue::Undefined);
+
+            // Deduplicate containers after normal fan-out when preceded by Recursive
+            if (prevRecursive) {
+                QSet<uint> seen;
+                QJsonArray dedup;
+                for (const auto& v : working) {
+                    if (v.isObject()) {
+                        uint h = qt_hash(QJsonDocument(v.toObject()).toJson());
+                        if (seen.contains(h)) continue;
+                        seen.insert(h);
+                    } else if (v.isArray()) {
+                        uint h = qt_hash(QJsonDocument(v.toArray()).toJson());
+                        if (seen.contains(h)) continue;
+                        seen.insert(h);
+                    }
+                    dedup.append(v);
+                }
+                working.swap(dedup);
+            }
+
             multi |= addsMultiplicity(tk);
-            ++i;
         }
     }
 

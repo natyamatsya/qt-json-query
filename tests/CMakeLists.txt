@@ -59,6 +59,25 @@ target_link_libraries(jayway_parity_tests PRIVATE
 )
 
 # ---------------------------------------------------------------------------
+# RFC 9535 compliance test suite
+# ---------------------------------------------------------------------------
+file(GLOB RFC_9535_SOURCES
+     ${CMAKE_CURRENT_SOURCE_DIR}/rfc-9535/*.cpp)
+
+add_executable(rfc9535_tests ${RFC_9535_SOURCES})
+
+target_include_directories(rfc9535_tests PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/tests/include)
+
+target_link_libraries(rfc9535_tests PRIVATE
+    json_query
+    GTest::gtest
+    GTest::gmock
+    GTest::gtest_main
+    Qt6::Core)
+
+# ---------------------------------------------------------------------------
 # Test discovery via CTest / GoogleTest module
 # ---------------------------------------------------------------------------
 include(GoogleTest)
@@ -72,3 +91,7 @@ gtest_discover_tests(jayway_parity_tests
     DISCOVERY_MODE PRE_TEST
     TEST_PREFIX "jayway-parity/"
 )
+
+gtest_discover_tests(rfc9535_tests
+    DISCOVERY_MODE PRE_TEST
+    TEST_PREFIX "RFC9535/")
