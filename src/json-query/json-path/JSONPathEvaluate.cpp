@@ -4,6 +4,8 @@
 
 #include <array>
 #include <deque>
+#include <QSet>
+#include <QJsonDocument>
 
 #include <QStringList>
 #include <QString>
@@ -187,15 +189,27 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
     QJsonArray working{root};
     bool multi = false;
 
-    auto unionKeys = [](const QJsonValue& v, const std::vector<QString>& keys)->QJsonValue {
+    auto unionKeys = [](const QJsonValue& v,
+                       const std::vector<QString>& keys,
+                       bool requireAll)->QJsonValue {
         if (!v.isObject()) return QJsonValue(QJsonValue::Undefined);
+
         const QJsonObject obj = v.toObject();
-        QJsonObject out;
-        for (const auto& k: keys) {
-            if (obj.contains(k)) out.insert(k, obj[k]);
+
+        if (requireAll) {
+            for (const auto& k : keys)
+                if (!obj.contains(k))
+                    return QJsonValue(QJsonValue::Undefined);
+            return v; // contains every requested key
+        } else {
+            for (const auto& k : keys)
+                if (obj.contains(k))
+                    return v; // at least one key matches
+            return QJsonValue(QJsonValue::Undefined);
         }
-        return out.isEmpty() ? QJsonValue(QJsonValue::Undefined) : QJsonValue(out);
     };
+
+    auto jsonHash = [](const QJsonValue& v){ return qHash(QJsonDocument(v.toObject()).toJson()); };
 
     for (qsizetype i = 1; i < ctx.tokens.size() && !working.isEmpty(); )
     {
@@ -212,10 +226,17 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
                 ++j;
             }
 
+            bool requireAll = (i>0 && ctx.tokens[i-1].kind == Recursive);
+
             QJsonArray next;
+            QSet<uint> seen;
             for (const auto& v : working) {
-                const QJsonValue sel = unionKeys(v, keys);
-                if (!sel.isUndefined()) next.append(sel);
+                const QJsonValue sel = unionKeys(v, keys, requireAll);
+                if (sel.isUndefined()) continue;
+                uint h = jsonHash(sel);
+                if (seen.contains(h)) continue;
+                seen.insert(h);
+                next.append(sel);
             }
 
             working = std::move(next);
