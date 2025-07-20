@@ -1,6 +1,8 @@
 #include "json-query/json-path/JSONPathCompile.hpp"
 
 #include <iostream>
+#include <QDebug>
+#include "json-query/json-path/JSONPathLog.hpp"
 
 #include "json-query/json-path/internal/QtHash.hpp"
 #include "../../../include/json-query/utils/JSONQueryUtils.hpp"
@@ -63,6 +65,7 @@ struct KeyBuilder {
 parseDot(qsizetype pos, QStringView sv,
          KeyBuilder& kb, QVector<Token>& tokens)
 {
+    qCDebug(jsonPathLog) << "parseDot pos=" << pos;
     const qsizetype n = sv.size();
     if (++pos >= n) return std::unexpected(Error::TrailingDot);
 
@@ -92,14 +95,12 @@ struct BracketSink {
     std::expected<void,Error> key(QStringView k, bool allow=false) { return kb.push(k, allow); }
     void keyList(const QVector<QStringView>& keys)
     {
-        if (keys.isEmpty()) return;
-        Token t;
-        t.kind = Token::Kind::KeyList;
-        // store keys joined by '\n' to reuse existing split logic
-        QStringList list;
-        for (QStringView k : keys) list.append(k.toString());
-        t.key = list.join(u"\n");
-        tk.append(std::move(t));
+        for (const QStringView k : keys) {
+            Token t;
+            t.kind = Token::Kind::Key;
+            t.key = QString(k);
+            tk.append(std::move(t));
+        }
     }
     void wild()                 { tk.append(Token{Token::Kind::Wildcard}); }
     void slice(const Slice& s)   { tk.append(Token{Token::Kind::Slice,0,s,0u}); }
@@ -188,7 +189,11 @@ static const std::array<BrRule,9> BR_RULES = {{
         if (!content.startsWith(u"?(") || !content.endsWith(u')'))
             return std::nullopt;
 
+        std::cout << "[bracket ?(] raw content=" << content.toString().toStdString() << std::endl;
+
         QString expr = content.sliced(2, content.size() - 3).toString();
+        std::cout << "[bracket ?(] extracted expr=" << expr.toStdString() << std::endl;
+
         if (auto tok = json_query::json_path::compileFilter(expr, out.filters)) {
             out.pushFilter(*tok);
             return Error::Ok;
@@ -247,6 +252,7 @@ std::expected<qsizetype, Error> parseBracket(qsizetype pos,
          QVector<Token>&      tokens,
          QVector<FilterFn>&   filters)
 {
+    qCDebug(jsonPathLog) << "parseBracket pos=" << pos;
     const qsizetype n = sv.size();
     if (++pos >= n) return std::unexpected(Error::UnmatchedBracket);
 
@@ -255,17 +261,43 @@ std::expected<qsizetype, Error> parseBracket(qsizetype pos,
     while (pos < n) {
         if (sv[pos] == u'[') {
             ++bracketLevel;
+            qCDebug(jsonPathLog) << "scan '[' level=" << bracketLevel << " at pos=" << pos;
         } else if (sv[pos] == u']') {
             if (bracketLevel == 0) break; // Found the matching closing bracket
+            qCDebug(jsonPathLog) << "scan ']' level=" << bracketLevel << " at pos=" << pos;
             --bracketLevel;
         } else if (sv[pos] == u'\'' || sv[pos] == u'"') {
-            QChar quote = sv[pos++];
-            while (pos < n && sv[pos] != quote) ++pos;
-            if (pos >= n) return std::unexpected(Error::UnmatchedQuote);
+            const QChar quote = sv[pos++];
+            qCDebug(jsonPathLog) << "enter quote" << quote << " at pos=" << pos - 1;
+
+            // Search for the next *unescaped* matching quote.
+            while (pos < n) {
+                // Find next occurrence of the quote
+                qsizetype next = sv.indexOf(quote, pos);
+                if (next == -1) {
+                    return std::unexpected(Error::UnmatchedQuote);
+                }
+
+                // Count preceding backslashes to determine if the quote is escaped.
+                int backslashCount = 0;
+                for (qsizetype k = next - 1; k >= 0 && sv[k] == u'\\'; --k) {
+                    ++backslashCount;
+                }
+                if (backslashCount % 2 == 0) {
+                    // even number of backslashes → quote is *not* escaped
+                    pos = next; // leave pos at the quote; the outer ++pos will move past it
+                    break;
+                }
+                // Quote was escaped – continue searching after it
+                pos = next + 1;
+            }
+
+            qCDebug(jsonPathLog) << "exit quote at pos=" << pos;
         }
         ++pos;
     }
     if (pos >= n) return std::unexpected(Error::UnmatchedBracket);
+    qCDebug(jsonPathLog) << "matched bracket end at pos=" << pos;
 
     QStringView raw = sv.sliced(start, pos - start);
     // trim leading/trailing whitespace
@@ -273,6 +305,8 @@ std::expected<qsizetype, Error> parseBracket(qsizetype pos,
     while (l<r && raw[l].isSpace()) ++l;
     while (r>l && raw[r-1].isSpace()) --r;
     QStringView content = raw.sliced(l, r - l);
+
+    qCDebug(jsonPathLog) << "parseBracket content=" << content.toString();
 
     BracketSink sink{tokens, kb, filters};
 
@@ -326,6 +360,7 @@ FunctionType detectTrailingFunction(QString& path)
 // ──────────────────────────────────────────────────────────────────────
 std::expected<Compiled, Error> compilePath(QStringView sv)
 {
+    qCDebug(jsonPathLog) << "compilePath() sv=" << sv;
     using K = Token::Kind;
     QVector<Token> tokens;
     QVector<FilterFn> filters;
@@ -362,6 +397,7 @@ std::expected<Compiled, Error> compilePath(QStringView sv)
 // ──────────────────────────────────────────────────────────────────────
 std::expected<CompilationResult, Error> compile(QStringView rawPath)
 {
+    qCDebug(jsonPathLog) << "compile() rawPath=" << rawPath;
     QString path = rawPath.toString();
     
     // Extract any trailing function → updates `path` and yields `func`

@@ -207,12 +207,26 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
         bool prevRecursive = (i>0 && ctx.tokens[i-1].kind == Token::Kind::Recursive);
 
         if (prevRecursive && (tk.kind == Token::Kind::KeyList || tk.kind == Token::Kind::Key)) {
-            // Branch-unique selection: keep the parent object if it (fully) contains the requested key(s)
-            const QStringList keys = (tk.kind==Token::Kind::Key)
-                                    ? QStringList{tk.key}
-                                    : tk.key.split(u'\n');
+            // ------------------------------------------------------------------
+            // Branch-unique selection after a recursive descent.
+            // Handles both a single KeyList token and a run of consecutive Key tokens
+            // that originated from a bracket-notation union like ['a','b'].
+            // ------------------------------------------------------------------
 
-            bool isLeaf = (i == ctx.tokens.size()-1);
+            // Gather all contiguous Key tokens starting at i (for union case)
+            QStringList keys;
+            qsizetype j = i;
+            if (tk.kind == Token::Kind::KeyList) {
+                keys = tk.key.split(u'\n');
+                j = i + 1;
+            } else { // tk.kind == Key
+                while (j < ctx.tokens.size() && ctx.tokens[j].kind == Token::Kind::Key) {
+                    keys.append(ctx.tokens[j].key);
+                    ++j;
+                }
+            }
+
+            bool isLeaf = (j == ctx.tokens.size());
 
             QJsonArray next;
             for (const auto& v : working) {
@@ -225,19 +239,17 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
                 if (!all) continue;
 
                 if (isLeaf) {
-                    if (tk.kind == Token::Kind::KeyList) {
-                        // For multi-prop leaf: return parent object only (Jayway semantics)
+                    if (keys.size() > 1) {
+                        // Multi-property leaf union ⇒ return parent only (Jayway)
                         next.append(v);
                     } else {
-                        // Single key leaf: value(s) first
-                        for (const QString& k : keys)
-                            next.append(obj.value(k));
-                        // Append parent object only if it contains exactly the selected key(s)
-                        if (obj.size() == keys.size())
+                        // Single-property leaf: value then possibly parent
+                        next.append(obj.value(keys.first()));
+                        if (obj.size() == 1)
                             next.append(v);
                     }
                 } else {
-                    // Non-leaf: parent first, then member values for traversal
+                    // Non-leaf: parent first, then properties for traversal
                     next.append(v);
                     for (const QString& k : keys)
                         next.append(obj.value(k));
@@ -248,9 +260,8 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
                 return multi ? QJsonArray{} : QJsonValue(QJsonValue::Undefined);
 
             working.swap(next);
-            // This does NOT add multiplicity; collapse stays at previous state
 
-            // Deduplicate at leaf too to avoid duplicate parent objects/values
+            // Deduplicate container nodes at leaf to avoid duplicates
             if (isLeaf) {
                 QSet<uint> seen;
                 QJsonArray dedup;
@@ -268,6 +279,10 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
                 }
                 working.swap(dedup);
             }
+
+            // Skip over any extra Key tokens we have just consumed
+            i = j - 1;
+            continue;
         } else {
             working = fanOut(ctx, tk, working);
             bool multiAfter = multi || addsMultiplicity(tk);

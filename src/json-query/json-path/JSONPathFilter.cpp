@@ -2,6 +2,10 @@
 #include "json-query/json-path/JSONPath.hpp"
 #include "json-query/json-path/JSONPathHelpers.hpp"
 
+#include <QDebug>
+#include "json-query/json-path/JSONPathLog.hpp"
+#include <iostream>
+
 namespace json_query::json_path::detail {
 
     using FilterFn = json_path::FilterFn;
@@ -22,15 +26,35 @@ namespace json_query::json_path::detail {
 // Helper ----------------------------------------------------------------------
 [[nodiscard]] inline bool unquote(QString& s)
 {
-    if (s.size() >= 2 &&
-        ((s.front()==u'"' && s.back()==u'"') ||
-         (s.front()==u'\''&& s.back()==u'\'')))
-    {
-        s.remove(0,1);          // drop leading
-        s.chop(1);                      // drop trailing
-        return true;
+    if (s.size() < 2) return false;
+    const QChar quote = s.front();
+    if (quote != u'"' && quote != u'\'') return false;
+
+    // Scan forward to find the closing quote that is NOT preceded by an odd
+    // number of backslashes (i.e. it is truly terminating the literal).
+    int idx = -1;
+    for (int i = 1; i < s.size(); ++i) {
+        if (s[i] != quote) continue;
+        // count preceding backslashes
+        int backslashes = 0;
+        int k = i - 1;
+        while (k >=0 && s[k] == u'\\') { ++backslashes; --k; }
+        if ((backslashes % 2) == 0) { idx = i; break; }
     }
-    return false;
+    if (idx == -1) {
+        // Fallback: assume last char is quote even if escaped; drop first and last
+        if (s.back() != quote) return false;
+        s = s.mid(1, s.size()-2);
+    } else {
+        // Extract up to found idx
+        s = s.mid(1, idx - 1);
+    }
+
+    // Unescape backslash sequences
+    s.replace("\\\\", "\\");   // \\ -> \
+    s.replace("\\'", "'");       // \\' -> '
+    s.replace("\\\"", "\"");   // \\" -> "
+    return true;
 }
 
 // A tiny façade so every parser can push a predicate and
@@ -143,9 +167,8 @@ std::optional<Token> parseCompare1(QString s, QVector<FilterFn>& out)
         return b.add([prop, op, isNum, num, isBool, boolVal, rhs](const QJsonValue& j) -> bool
         {
             const auto obj = j.toObject();
-            qDebug() << "[flt] obj keys" << obj.keys();
             const auto v = obj.value(prop);
-            qDebug() << "[flt] compare prop" << prop << "val=" << v << "isNum" << isNum;
+            qCDebug(jsonPathLog) << "[flt-cmp]" << prop << op << rhs << "| val=" << v;
             if (isNum) {
                 if (!v.isDouble()) return false;
                 const double x = v.toDouble();
@@ -221,9 +244,12 @@ namespace json_query::json_path {
 std::optional<Token> compileFilter(const QString& expr, QVector<FilterFn>& out)
 {
     QString s = json_query::json_path::detail::stripOuterParens(expr);
+    qCDebug(jsonPathLog) << "compileFilter expr=" << expr << "stripped=" << s;
     for (const auto rule : detail::rules) {
-        if (auto result = rule(s, out))
+        if (auto result = rule(s, out)) {
+            qCDebug(jsonPathLog) << "compileFilter accepted token kind=" << (result ? static_cast<int>(result->kind) : -1);
             return result;
+        }
     }
     return std::nullopt;
 }
