@@ -75,7 +75,7 @@ TEST(JaywayDeepScanParity, ArrayIndexOobIgnored)
 }
 
 PARITY_TEST(DefiniteUpstreamIllegalArrayAccessThrows, "Awaiting PathNotFoundException support.");
-TEST(JaywayDeepScanParity, DISABLED_IllegalPropertyAccessIgnored)
+TEST(JaywayDeepScanParity, IllegalPropertyAccessIgnored)
 {
     // $..foo should collect both objects and scalars
     QJsonArray r1 = evalArray(*JSONPath::create(u"$..foo"),

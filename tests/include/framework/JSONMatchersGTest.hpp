@@ -62,6 +62,8 @@ inline QJsonValue eval(QStringView path, const QJsonDocument& doc)
 inline QJsonArray evalArray(const JSONPath& path, const QJsonDocument& doc)
 {
     QJsonValue v = path.evaluate(doc);
+    if (v.isUndefined() || v.isNull())
+        return {};
     return v.isArray() ? v.toArray() : QJsonArray{v};
 }
 
