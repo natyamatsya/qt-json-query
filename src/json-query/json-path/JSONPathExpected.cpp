@@ -9,8 +9,18 @@ evaluateDefinite(const QVector<Token>& tokens, const QJsonValue& root) noexcept
     using enum Token::Kind;
 
     QJsonValue cur = root;
-    for (const Token& tk : tokens)
+    // Skip leading root token ('$' or '@') if present
+    int startIdx = 0;
+    if (!tokens.isEmpty() && tokens.front().kind == Token::Kind::Key) {
+        const QString& k = tokens.front().key;
+        if (k == u"$" || k == u"@") {
+            startIdx = 1;
+        }
+    }
+
+    for (int i = startIdx; i < tokens.size(); ++i)
     {
+        const Token& tk = tokens[i];
         switch (tk.kind)
         {
         case Key: {
