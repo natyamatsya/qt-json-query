@@ -10,6 +10,7 @@
 
 #include <QStringList>
 #include <QString>
+#include <QDebug>
 
 namespace json_query::json_path::detail {
 
@@ -126,6 +127,8 @@ QJsonArray fanOut(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src
     QJsonArray dst;
     for (const auto& v : src) {
         const QJsonArray seg = evaluateToken(ctx, tk, v);
+        qDebug() << "[fanOut] kind=" << static_cast<int>(tk.kind) << "srcType"
+                 << v.type() << "seg size=" << seg.size();
         for (const auto& e : seg)
             dst.append(e);
     }
@@ -196,14 +199,20 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
     for (qsizetype i = 1; i < ctx.tokens.size() && !working.isEmpty(); ++i)
     {
         const Token& tk = ctx.tokens[i];
+        qDebug() << "[stage] token" << i << ": kind=" << static_cast<int>(tk.kind)
+                 << "working size=" << working.size();
 
         bool prevRecursive = (i>0 && ctx.tokens[i-1].kind == Token::Kind::Recursive);
 
-        if (prevRecursive && tk.kind == Token::Kind::KeyList) {
+        if (prevRecursive && (tk.kind == Token::Kind::KeyList || tk.kind == Token::Kind::Key)) {
             // Branch-unique selection: keep the parent object if it (fully) contains the requested key(s)
-            const QStringList keys = tk.key.split(u'\n');
+            const QStringList keys = (tk.kind==Token::Kind::Key)
+                                    ? QStringList{tk.key}
+                                    : tk.key.split(u'\n');
 
-            QSet<uint> seen;
+            bool isLeaf = (i == ctx.tokens.size()-1);
+
+            QSet<uint> seenObjs;
             QJsonArray next;
             for (const auto& v : working) {
                 if (!v.isObject()) continue;
@@ -215,9 +224,28 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
                 if (!all) continue;
 
                 uint h = qt_hash(QJsonDocument(obj).toJson());
-                if (seen.contains(h)) continue;
-                seen.insert(h);
-                next.append(v);
+                if (seenObjs.contains(h)) continue;
+                seenObjs.insert(h);
+
+                // Leaf step differentiation:
+                if (isLeaf) {
+                    if (tk.kind == Token::Kind::KeyList) {
+                        // For multi-property union at leaf, return the parent object only
+                        next.append(v);
+                    } else { // single Key
+                        // Return only the member value, no parent object
+                        next.append(obj.value(keys.first()));
+                    }
+                    continue; // stop processing this source value
+                }
+
+                bool includeParent = obj.size() > keys.size();
+                if (includeParent)
+                    next.append(v);  // parent object first
+
+                // Append member values (order after parent) for further traversal
+                for (const QString& k : keys)
+                    next.append(obj.value(k));
             }
 
             if (next.isEmpty())

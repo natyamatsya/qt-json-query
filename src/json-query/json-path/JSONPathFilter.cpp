@@ -135,10 +135,12 @@ std::optional<Token> parseCompare1(QString s, QVector<FilterFn>& out)
 
         bool isNum = false;
         const double num = rhs.toDouble(&isNum);
-        if (!isNum) (void)unquote(rhs);
+        const bool isBool = (!isNum && (rhs == "true" || rhs == "false"));
+        const bool boolVal = isBool ? (rhs == "true") : false;
+        if (!isNum && !isBool) (void)unquote(rhs);
 
         Builder b{out};
-        return b.add([prop, op, isNum, num, rhs](const QJsonValue& j) -> bool
+        return b.add([prop, op, isNum, num, isBool, boolVal, rhs](const QJsonValue& j) -> bool
         {
             const auto v = j[prop];
             if (isNum) {
@@ -151,6 +153,13 @@ std::optional<Token> parseCompare1(QString s, QVector<FilterFn>& out)
                 if (op==">=") return x >= num;
                 if (op=="<=") return x <= num;
                 return false;
+            }
+            if (isBool) {
+                if (!v.isBool()) return false;
+                const bool b = v.toBool();
+                return op=="==" ? b == boolVal
+                                 : op=="!=" ? b != boolVal
+                                 : false;
             }
             const QString vs = v.toString();
             return op=="==" ? vs == rhs
