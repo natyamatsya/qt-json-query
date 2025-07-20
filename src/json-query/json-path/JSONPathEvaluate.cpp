@@ -212,7 +212,6 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
 
             bool isLeaf = (i == ctx.tokens.size()-1);
 
-            QSet<uint> seenObjs;
             QJsonArray next;
             for (const auto& v : working) {
                 if (!v.isObject()) continue;
@@ -222,24 +221,6 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
                 for (const QString& k : keys)
                     if (!obj.contains(k)) { all=false; break; }
                 if (!all) continue;
-
-                uint h = qt_hash(QJsonDocument(obj).toJson());
-                if (seenObjs.contains(h)) continue;
-                seenObjs.insert(h);
-
-                // Leaf step differentiation:
-                if (isLeaf) {
-                    if (tk.kind == Token::Kind::KeyList) {
-                        // For multi-property union at leaf, return the parent object only
-                        next.append(v);
-                    } else { // single Key
-                        bool includeParent = obj.size() > 1; // at least one extra member
-                        if (includeParent)
-                            next.append(v);
-                        next.append(obj.value(keys.first()));
-                    }
-                    continue; // stop processing this source value
-                }
 
                 bool includeParent = obj.size() > keys.size();
                 if (includeParent)

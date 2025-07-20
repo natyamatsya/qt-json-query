@@ -75,11 +75,15 @@ QJsonArray eval<Token::Kind::Filter>(const PathEvalCtx& ctx,
     const auto& filterFn = ctx.filters[tk.filterId];
     if (v.isArray()) {
         for (const auto& item : v.toArray()) {
-            if (filterFn(item))
+            const bool pass = filterFn(item);
+            qDebug() << "[filter] array item" << item << "pass=" << pass;
+            if (pass)
                 out.append(item);
         }
     } else if (v.isObject()) {
-        if (filterFn(v))
+        const bool pass = filterFn(v);
+        qDebug() << "[filter] object" << v << "pass=" << pass;
+        if (pass)
             out.append(v);
     }
     return out;

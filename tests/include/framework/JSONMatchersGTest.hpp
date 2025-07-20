@@ -36,7 +36,10 @@ using json_query::json_path::Error;
 // Parse raw JSON C-string into a QJsonDocument.
 inline QJsonDocument parseJson(const char* src)
 {
-    return QJsonDocument::fromJson(QByteArray(src));
+    QByteArray data(src);
+    // Convenience: allow tests to use \" to embed quotes inside raw strings.
+    data.replace("\\\"", "\"");
+    return QJsonDocument::fromJson(data);
 }
 
 // ---------------------------------------------------------------------------

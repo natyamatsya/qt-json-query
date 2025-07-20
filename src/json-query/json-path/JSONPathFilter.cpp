@@ -142,7 +142,10 @@ std::optional<Token> parseCompare1(QString s, QVector<FilterFn>& out)
         Builder b{out};
         return b.add([prop, op, isNum, num, isBool, boolVal, rhs](const QJsonValue& j) -> bool
         {
-            const auto v = j[prop];
+            const auto obj = j.toObject();
+            qDebug() << "[flt] obj keys" << obj.keys();
+            const auto v = obj.value(prop);
+            qDebug() << "[flt] compare prop" << prop << "val=" << v << "isNum" << isNum;
             if (isNum) {
                 if (!v.isDouble()) return false;
                 const double x = v.toDouble();
@@ -192,7 +195,8 @@ std::optional<Token> parseRegex1(QString s, QVector<FilterFn>& out)
 
         Builder b{out};
         return b.add([prop, rx](const QJsonValue& j){
-            return j[prop].toString().contains(rx);
+            const auto obj = j.toObject();
+            return obj.value(prop).toString().contains(rx);
         }, prop);
     }
     return std::nullopt;
