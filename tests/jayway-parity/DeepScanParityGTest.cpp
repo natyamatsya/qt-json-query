@@ -107,8 +107,6 @@ TEST(JaywayDeepScanParity, DISABLED_IllegalPredicateIgnored)
     EXPECT_THAT(result, ElementsAre(IsJsonInt(4)));
 }
 
-PARITY_TEST(RequirePropertiesIgnoredOnScanTarget, "Requires Option::REQUIRE_PROPERTIES flag handling.");
-PARITY_TEST(RequirePropertiesIgnoredOnScanTargetButNotChildren, "Requires Option::REQUIRE_PROPERTIES nested handling.");
 TEST(JaywayDeepScanParity, LeafMultiPropsWork)
 {
     const char* jsonSrc = R"([
@@ -123,10 +121,6 @@ TEST(JaywayDeepScanParity, LeafMultiPropsWork)
     EXPECT_THAT(result, ElementsAre(JsonObjContains(kvlist(kv("a","a-val"), kv("b","b-val"), kv("c","c-val")))));
 }
 
-PARITY_TEST(RequireSinglePropertyOk, "Requires property requirement enforcement.");
-PARITY_TEST(RequireSingleProperty, "Requires property requirement enforcement.");
-PARITY_TEST(RequireMultiPropertyAllMatch, "Requires multi-property all-match enforcement.");
-PARITY_TEST(RequireMultiPropertySomeMatch, "Requires multi-property partial-match enforcement.");
 TEST(JaywayDeepScanParity, ScanForSingleProperty)
 {
     const char* jsonSrc = R"([
@@ -175,6 +169,22 @@ PARITY_TEST(ScanWithFunctionFilter, "Requires function filter implementation.");
 PARITY_TEST(DeepScanPathDefault, "Pending executeScanPath default implementation.");
 PARITY_TEST(DeepScanPathRequireProperties, "Pending executeScanPath with REQUIRE_PROPERTIES option.");
 
-#undef PARITY_TEST
+// -----------------------------------------------------------------------------
+// The following placeholder tests relate to Jayway's non-standard extension
+// `Option.REQUIRE_PROPERTIES`.  This option forces deep-scan (`..`) to include
+// only nodes that contain *all* requested properties.  RFC 9535 does not define
+// such behaviour, so these cases are commented out and collected here for
+// reference.  When/if we decide to support the extension they can be revived
+// by removing the comment markers and the DISABLED_ prefix.
+// -----------------------------------------------------------------------------
+
+/*
+PARITY_TEST(RequirePropertiesIgnoredOnScanTarget, "Requires Option::REQUIRE_PROPERTIES flag handling.");
+PARITY_TEST(RequirePropertiesIgnoredOnScanTargetButNotChildren, "Requires Option::REQUIRE_PROPERTIES nested handling.");
+PARITY_TEST(RequireSinglePropertyOk, "Requires property requirement enforcement.");
+PARITY_TEST(RequireSingleProperty, "Requires property requirement enforcement.");
+PARITY_TEST(RequireMultiPropertyAllMatch, "Requires multi-property all-match enforcement.");
+PARITY_TEST(RequireMultiPropertySomeMatch, "Requires multi-property partial-match enforcement.");
+*/
 
 }
