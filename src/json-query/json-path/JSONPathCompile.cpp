@@ -16,25 +16,23 @@ namespace json_query::json_path
 // ──────────────────────────────────────────────────────────────────────
 namespace
 {
-    // Parse [start:end:step]   (empty parts get defaults)
+    // Parse start:end:step  (parts may be empty) --------------------------------
     [[nodiscard]] static inline Slice makeSlice(QStringView v)
     {
-        auto readInt = [](QStringView part, int def) {
-            if (part.isEmpty()) return def;
-            bool ok = false;  int x = part.toInt(&ok);
-            return ok ? x : def;
+        auto toInt = [](QStringView part, int def){
+            if(part.isEmpty()) return def;
+            bool ok=false; int x=part.toInt(&ok); return ok?x:def;
         };
 
-        const qsizetype c1 = v.indexOf(u':');
-        const qsizetype c2 = v.indexOf(u':', c1 + 1);
+        const auto parts = v.split(u':');
+        const QStringView a = parts.size()>0 ? parts[0].trimmed() : QStringView{};
+        const QStringView b = parts.size()>1 ? parts[1].trimmed() : QStringView{};
+        const QStringView c = parts.size()>2 ? parts[2].trimmed() : QStringView{};
 
-        const int start = readInt(v.sliced(1, c1 - 1),                  0);
-        const int end   = readInt(c2 == -1 ? v.sliced(c1 + 1, v.size()-c1-2)
-                                           : v.sliced(c1 + 1, c2 - c1 - 1),
-                                  std::numeric_limits<int>::max());
-        const int step  = c2 == -1 ? 1
-                                   : readInt(v.sliced(c2 + 1, v.size()-c2-2), 1);
-        return { start, end, step };
+        const int start = toInt(a, 0);
+        const int end   = toInt(b, std::numeric_limits<int>::max());
+        const int step  = toInt(c, 1);
+        return {start,end,step};
     }
 } // namespace
 
@@ -101,7 +99,38 @@ struct BracketSink {
 // A helper to iterate over the content and run rules.
 using BrRule = std::function<std::optional<Error>(QStringView, BracketSink&)>;
 
-static const std::array<BrRule,6> BR_RULES = {{
+static const std::array<BrRule,9> BR_RULES = {{
+    // 0.  'a', 'b'  -----------------------------------------------
+    [](QStringView content, BracketSink& out)->std::optional<Error> {
+        // Detect presence of comma outside quotes
+        int quoteCount = 0;
+        for (QChar c : content)
+            if (c == u'\'' || c == u'"') quoteCount ^= 1; // toggle simple state
+            else if (c == u',' && quoteCount == 0)
+            {
+                // Split by ',' respecting simple quote tracking (we only toggle, assumes same quote type)
+                qsizetype start = 0;
+                quoteCount = 0;
+                for (qsizetype i=0;i<=content.size();++i)
+                {
+                    if (i==content.size() || (content[i]==u',' && quoteCount==0))
+                    {
+                        QStringView part = content.sliced(start, i-start).trimmed();
+                        if (part.isEmpty()) return Error::EmptySegment;
+                        // reuse BR rule 4 logic: quoted key expected
+                        if (part.size()<2) return std::optional<Error>{};
+                        QChar q=part.front();
+                        if ((q!=u'\'' && q!=u'\"') || part.back()!=q) return std::optional<Error>{};
+                        QStringView key = part.sliced(1, part.size()-2);
+                        if (auto r = out.key(key); !r) return r.error();
+                        start = i+1;
+                    } else if (content[i]==u'\'' || content[i]==u'\"') quoteCount ^=1;
+                }
+                return Error::Ok;
+            }
+        return std::nullopt;
+    },
+
     // 1.  *      ----------------------------------------------------
     [](QStringView content, BracketSink& out)->std::optional<Error> {
         if (content != u"*") return std::nullopt;
@@ -118,6 +147,23 @@ static const std::array<BrRule,6> BR_RULES = {{
         return Error::Ok;
     },
 
+    // 2b.  1,2,3  --------------------------------------------------
+    [](QStringView content, BracketSink& out)->std::optional<Error> {
+        if (!content.contains(u',')) return std::nullopt;
+        // Quick check: no quotes or slice colons
+        if (content.contains(u'\'') || content.contains(u'"') || content.contains(u':'))
+            return std::nullopt;
+        const auto parts = content.split(u',');
+        for (QStringView p : parts)
+        {
+            QStringView t = p.trimmed();
+            bool ok=false; int idx = t.toInt(&ok);
+            if (!ok) return std::nullopt; // not pure index list
+            out.index(idx);
+        }
+        return Error::Ok;
+    },
+
     // 3.  1:3:2  ----------------------------------------------------
     [](QStringView content, BracketSink& out)->std::optional<Error> {
         if (!content.contains(u':')) return std::nullopt;
@@ -125,20 +171,7 @@ static const std::array<BrRule,6> BR_RULES = {{
         return Error::Ok;
     },
 
-    // 4.  'key'  ----------------------------------------------------
-    [](QStringView content, BracketSink& out)->std::optional<Error> {
-        if (content.size() < 2) return std::nullopt;
-        QChar q = content.front();
-        if ((q != u'\'' && q != u'"') || content.back() != q)
-            return std::nullopt;
-
-        QStringView unquoted = content.sliced(1, content.size() - 2);
-        if (auto r = out.key(unquoted); !r)
-            return r.error();
-        return Error::Ok;
-    },
-
-    // 5.  ?(...) ----------------------------------------------------
+    // 4.  ?(...) ----------------------------------------------------
     [](QStringView content, BracketSink& out)->std::optional<Error> {
         if (!content.startsWith(u"?(") || !content.endsWith(u')'))
             return std::nullopt;
@@ -151,8 +184,42 @@ static const std::array<BrRule,6> BR_RULES = {{
         return Error::UnsupportedFilter;
     },
 
-    // 6.  key    ----------------------------------------------------
+    // 5.  placeholder '?' or list '?,?' ------------------------------
     [](QStringView content, BracketSink& out)->std::optional<Error> {
+        if (!content.contains(u'?')) return std::nullopt;
+        // verify pattern consists only of '?' separated by commas/spaces
+        for (QStringView part : content.split(u',')) {
+            if (part.trimmed() != u"?") return std::nullopt; // not pure placeholder list
+        }
+        // For each placeholder, create a no-op filter token that will be
+        // resolved later (currently always-true).
+        for ([[maybe_unused]] QStringView _ : content.split(u',')) {
+            auto alwaysTrue = [](const QJsonValue&) { return true; };
+            out.filters.append(alwaysTrue);
+            Token t{Token::Kind::Filter};
+            t.filterId = out.filters.size() - 1;
+            out.pushFilter(t);
+        }
+        return Error::Ok;
+    },
+
+    // 6.  'key'  ----------------------------------------------------
+    [](QStringView content, BracketSink& out)->std::optional<Error> {
+        if (content.size() < 2) return std::nullopt;
+        QChar q = content.front();
+        if ((q != u'\'' && q != u'"') || content.back() != q)
+            return std::nullopt;
+
+        QStringView unquoted = content.sliced(1, content.size() - 2);
+        if (auto r = out.key(unquoted); !r)
+            return r.error();
+        return Error::Ok;
+    },
+
+    // 7.  key (unquoted) -------------------------------------------
+    [](QStringView content, BracketSink& out)->std::optional<Error> {
+        if (content.contains(u'\'') || content.contains(u'"') || content.contains(u':') || content.contains(u','))
+            return std::nullopt; // avoid other kinds
         if (auto r = out.key(content); !r)
             return r.error();
         return Error::Ok;
@@ -188,7 +255,13 @@ std::expected<qsizetype, Error> parseBracket(qsizetype pos,
     }
     if (pos >= n) return std::unexpected(Error::UnmatchedBracket);
 
-    QStringView content = sv.sliced(start, pos - start);
+    QStringView raw = sv.sliced(start, pos - start);
+    // trim leading/trailing whitespace
+    qsizetype l=0, r=raw.size();
+    while (l<r && raw[l].isSpace()) ++l;
+    while (r>l && raw[r-1].isSpace()) --r;
+    QStringView content = raw.sliced(l, r - l);
+
     BracketSink sink{tokens, kb, filters};
 
     for (auto& rule : BR_RULES) {
