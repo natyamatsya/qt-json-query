@@ -65,6 +65,13 @@ inline QJsonArray evalArray(const JSONPath& path, const QJsonDocument& doc)
     return v.isArray() ? v.toArray() : QJsonArray{v};
 }
 
+inline QJsonArray evalArray(QStringView path, const QJsonDocument& doc)
+{
+    auto p = JSONPath::create(path);
+    if (!p) return {};
+    return evalArray(*p, doc);
+}
+
 // ---------------------------------------------------------------------------
 // Exception expectation ------------------------------------------------------
 // ---------------------------------------------------------------------------

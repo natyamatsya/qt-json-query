@@ -7,7 +7,7 @@
 #include <QStringView>
 
 #include "json-query/json-path/JSONPath.hpp"
-#include "json-query/JSONPointer.hpp"
+#include "json-query/json-pointer/JSONPointer.hpp"
 
 #include <utility>
 
