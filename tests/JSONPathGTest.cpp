@@ -4,7 +4,7 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include "framework/JSONMatchersGTest.hpp"
-#include "json-query/JSONPointer.hpp"
+#include "../include/json-query/json-pointer/JSONPointer.hpp"
 
 // Using declarations for convenience
 using json_query::JSONPath;

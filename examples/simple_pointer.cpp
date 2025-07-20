@@ -4,7 +4,7 @@
 #include <QJsonValue>
 #include <QDebug>
 
-#include "json-query/JSONPointer.hpp"
+#include "../include/json-query/json-pointer/JSONPointer.hpp"
 
 using json_query::JSONPointer;
 

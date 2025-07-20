@@ -4,7 +4,7 @@
 #include <QJsonArray>
 #include <QJsonObject>
 
-#include "json-query/json-path/PathEvalCtx.hpp"
+#include "internal/PathEvalCtx.hpp"
 #include "json-query/json-path/JSONPathCompile.hpp"
 
 // (legacy JSONPath bridge removed)

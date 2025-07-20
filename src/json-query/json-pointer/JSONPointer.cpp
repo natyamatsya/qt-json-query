@@ -1,5 +1,5 @@
-#include "json-query/JSONPointer.hpp"
-#include "json-query/JSONQueryUtils.hpp"
+#include "../../../include/json-query/json-pointer/JSONPointer.hpp"
+#include "../../../include/json-query/utils/JSONQueryUtils.hpp"
 #include "json-query/json-pointer/JSONPointerParsing.hpp"
 #include "json-query/json-pointer/JSONPointerEvaluation.hpp"
 #include <charconv>   // std::to_chars

@@ -3,7 +3,7 @@
 #include <iostream>
 
 #include "json-query/json-path/internal/QtHash.hpp"
-#include "json-query/JSONQueryUtils.hpp"  // For qt_hash
+#include "../../../include/json-query/utils/JSONQueryUtils.hpp"
 #include "json-query/json-path/JSONPathFilter.hpp"  // For compileFilter implementation
 
 #include <limits>

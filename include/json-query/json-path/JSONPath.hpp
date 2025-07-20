@@ -17,8 +17,8 @@
 
 // ────────────────────────────── Project
 #include "JSONPathCompile.hpp"
-#include "../JSONQueryUtils.hpp"
-#include "../JSONPointer.hpp"
+#include "../utils/JSONQueryUtils.hpp"
+#include "../json-pointer/JSONPointer.hpp"
 #include "json-query/json-path/JSONPathOption.hpp"
 
 using namespace Qt::StringLiterals;

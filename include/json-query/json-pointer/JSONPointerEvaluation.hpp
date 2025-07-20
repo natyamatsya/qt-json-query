@@ -5,7 +5,7 @@
 #include <QJsonArray>
 #include <QVector>
 #include "json-query/json-pointer/JSONPointerParsing.hpp"
-#include "json-query/json-pointer/PointerEvalCtx.hpp"
+#include "internal/PointerEvalCtx.hpp"
 #include <expected>
 
 namespace json_query::json_pointer::detail {

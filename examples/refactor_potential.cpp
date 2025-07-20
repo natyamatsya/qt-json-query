@@ -14,7 +14,7 @@
 #include <QElapsedTimer>
 #include <QRandomGenerator>
 
-#include "../include/json-query/JSONPointer.hpp"
+#include "../include/json-query/json-pointer/JSONPointer.hpp"
 #include "../include/json-query/json-path/JSONPath.hpp"
 
 using json_query::JSONPointer;

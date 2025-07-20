@@ -3,7 +3,7 @@
 #include <QJsonArray>
 #include <QJsonValue>
 #include "JSONPathCompile.hpp"
-#include "json-query/json-path/PathEvalCtx.hpp"
+#include "internal/PathEvalCtx.hpp"
 
 namespace json_query {
     class JSONPath; // Forward declaration
