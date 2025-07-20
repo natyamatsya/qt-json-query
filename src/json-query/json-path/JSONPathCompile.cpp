@@ -50,6 +50,8 @@ struct KeyBuilder {
     {
         if (key.isEmpty())
             return std::unexpected(Error::EmptySegment);
+        if (key.contains(u' '))
+            return std::unexpected(Error::BlankInKey);
 
         tgt.append(Token{Token::Kind::Key, 0, {}, qt_hash(key), key.toString()});
         return {};
@@ -67,7 +69,12 @@ parseDot(qsizetype pos, QStringView sv,
     if (++pos >= n) return std::unexpected(Error::TrailingDot);
 
     QChar nxt = sv[pos];
-    if (nxt == u'.') { tokens.append(Token{Token::Kind::Recursive}); ++pos; return pos; }
+    if (nxt == u'.') {
+        tokens.append(Token{Token::Kind::Recursive});
+        ++pos;
+        if (pos >= n) return std::unexpected(Error::TrailingRecursive);
+        return pos;
+    }
     if (nxt == u'*') { tokens.append(Token{Token::Kind::Wildcard }); ++pos; return pos; }
 
     qsizetype start = pos;
@@ -244,6 +251,10 @@ std::expected<Compiled, Error> compilePath(QStringView sv)
         return std::unexpected(Error::MissingRoot);
     tokens.append(Token{ K::Key, 0, {}, qt_hash(sv.first(1)),
                          sv.first(1).toString(), 0 });
+
+    // must be followed by '.' or '[' unless path ends here
+    if (sv.size() > 1 && sv[1] != u'.' && sv[1] != u'[')
+        return std::unexpected(Error::UnexpectedAfterRoot);
 
     detail::KeyBuilder kb{tokens};
 

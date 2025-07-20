@@ -45,12 +45,15 @@ enum class Error : std::uint8_t {
     Ok = 0,               // not used in expected<T,E>
     MissingRoot,
     TrailingDot,
+    TrailingRecursive,
     EmptySegment,
+    BlankInKey,
     UnmatchedBracket,
     UnmatchedQuote,
     UnsupportedFilter,
     InvalidSlice,
-    InvalidIndex
+    InvalidIndex,
+    UnexpectedAfterRoot
 };
 
 [[nodiscard]] inline constexpr std::string_view
@@ -61,12 +64,15 @@ toString(Error e) noexcept
     {
         case MissingRoot      : return "path must start with '$' or '@'";
         case TrailingDot      : return "trailing '.'";
+        case TrailingRecursive: return "trailing '..'";
         case EmptySegment     : return "empty property segment";
+        case BlankInKey       : return "blank in property name";
         case UnmatchedBracket : return "unmatched '['";
         case UnmatchedQuote   : return "unmatched quote inside [...]";
         case UnsupportedFilter: return "unsupported filter expression";
         case InvalidSlice     : return "bad array slice";
         case InvalidIndex     : return "bad numeric index";
+        case UnexpectedAfterRoot: return "root must be followed by '.' or '['";
         default               : return "unknown error";
     }
 }

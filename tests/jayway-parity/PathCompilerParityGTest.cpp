@@ -118,16 +118,47 @@ TEST(JaywayPathCompilerParity, MultiPropertyTokenCanBeCompiled)
     EXPECT_EQ(res2->compiled.tokens[2].key, "prop1");
 }
 
-PATHCOMPILER_STUB(PathMayNotEndWithScan, "Trailing scan validation pending");
-PATHCOMPILER_STUB(PathMayNotEndWithScan2, "Trailing scan validation pending");
-PATHCOMPILER_STUB(PropertyMayNotContainBlanks, "Validation pending");
-PATHCOMPILER_STUB(WildcardCanBeCompiled, "Wildcard tokenizer pending");
-PATHCOMPILER_STUB(WildcardCanFollowProperty, "Wildcard tokenizer pending");
-PATHCOMPILER_STUB(ArrayIndexPathCanBeCompiled, "Array index tokenizer pending");
+TEST(JaywayPathCompilerParity, PropertyMayNotContainBlanks)
+{
+    auto res = compile(u"$.foo bar");
+    ASSERT_FALSE(res.has_value());
+    EXPECT_EQ(res.error(), Error::BlankInKey);
+}
+
+// -----------------------------------------------------------------------------
+// Scan trailing validation -----------------------------------------------------
+
+TEST(JaywayPathCompilerParity, PathMayNotEndWithScan)
+{
+    auto res = compile(u"$..");
+    ASSERT_FALSE(res.has_value());
+    EXPECT_EQ(res.error(), Error::TrailingRecursive);
+}
+
+TEST(JaywayPathCompilerParity, PathMayNotEndWithScan2)
+{
+    auto res = compile(u"$.prop..");
+    ASSERT_FALSE(res.has_value());
+    EXPECT_EQ(res.error(), Error::TrailingRecursive);
+}
+
+TEST(JaywayPathCompilerParity, ScanTokenCanBeParsed)
+{
+    auto res = compile(u"$..['prop']..[*]");
+    ASSERT_TRUE(res.has_value());
+
+    bool hasRecursive = false;
+    bool endsWithWildcard = (res->compiled.tokens.back().kind == Token::Kind::Wildcard);
+    for (const auto& t : res->compiled.tokens)
+        if (t.kind == Token::Kind::Recursive) { hasRecursive = true; break; }
+
+    EXPECT_TRUE(hasRecursive);
+    EXPECT_TRUE(endsWithWildcard);
+}
+
 PATHCOMPILER_STUB(ArraySlicePathCanBeCompiled, "Array slice tokenizer pending");
 PATHCOMPILER_STUB(InlineCriteriaCanBeParsed, "Predicate parser pending");
 PATHCOMPILER_STUB(PlaceholderCriteriaCanBeParsed, "Predicate parser pending");
-PATHCOMPILER_STUB(ScanTokenCanBeParsed, "Scan tokenizer pending");
 PATHCOMPILER_STUB(IssuePredicateEscapedBackslashInProp, "Issue regression pending");
 PATHCOMPILER_STUB(IssuePredicateBracketInRegex, "Issue regression pending");
 PATHCOMPILER_STUB(IssuePredicateAndInRegex, "Issue regression pending");
@@ -165,7 +196,8 @@ TEST(JaywayPathCompilerParity, WildcardCanBeCompiled)
 
     auto res2 = compile(u"$[*]");
     ASSERT_TRUE(res2.has_value());
-    ASSERT_EQ(res2->compiled.tokens[1].kind, Token::Kind::Wildcard);
+    ASSERT_EQ(res2->compiled.tokens.size(), 2);
+    EXPECT_EQ(res2->compiled.tokens[1].kind, Token::Kind::Wildcard);
 
     auto res3 = compile(u"$[ * ]");
     ASSERT_TRUE(res3.has_value());
@@ -210,6 +242,94 @@ TEST(JaywayPathCompilerParity, ArrayIndexPathCanBeCompiled)
     EXPECT_EQ(res3->compiled.tokens[1].index, 1);
     EXPECT_EQ(res3->compiled.tokens[2].index, 2);
     EXPECT_EQ(res3->compiled.tokens[3].index, 3);
+}
+
+// -----------------------------------------------------------------------------
+// Array slice path -------------------------------------------------------------
+TEST(JaywayPathCompilerParity, ArraySlicePathCanBeCompiled)
+{
+    auto slice1 = compile(u"$[-1:]");
+    ASSERT_TRUE(slice1.has_value());
+    EXPECT_EQ(slice1->compiled.tokens.back().kind, Token::Kind::Slice);
+
+    auto slice2 = compile(u"$[1:2]");
+    ASSERT_TRUE(slice2.has_value());
+    EXPECT_EQ(slice2->compiled.tokens.back().kind, Token::Kind::Slice);
+
+    auto slice3 = compile(u"$[:2]");
+    ASSERT_TRUE(slice3.has_value());
+    EXPECT_EQ(slice3->compiled.tokens.back().kind, Token::Kind::Slice);
+}
+
+// -----------------------------------------------------------------------------
+// Inline criteria / filter parsing -------------------------------------------
+TEST(JaywayPathCompilerParity, InlineCriteriaCanBeParsed)
+{
+    auto res1 = compile(u"$[?(@.foo == 'bar')]");
+    ASSERT_TRUE(res1.has_value());
+    EXPECT_EQ(res1->compiled.tokens.back().kind, Token::Kind::Filter);
+
+    auto res2 = compile(u"$[?(@.foo == \"bar\")]");
+    ASSERT_TRUE(res2.has_value());
+    EXPECT_EQ(res2->compiled.tokens.back().kind, Token::Kind::Filter);
+}
+
+TEST(JaywayPathCompilerParity, PlaceholderCriteriaCanBeParsed)
+{
+    auto res1 = compile(u"$[?]");
+    ASSERT_TRUE(res1.has_value());
+    EXPECT_EQ(res1->compiled.tokens.back().kind, Token::Kind::Filter);
+
+    auto res2 = compile(u"$[?,?]");
+    ASSERT_TRUE(res2.has_value());
+    EXPECT_EQ(res2->compiled.tokens.back().kind, Token::Kind::Filter);
+
+    auto res3 = compile(u"$[?,?,?]");
+    ASSERT_TRUE(res3.has_value());
+    EXPECT_EQ(res3->compiled.tokens.back().kind, Token::Kind::Filter);
+}
+
+// -----------------------------------------------------------------------------
+// Additional root and bracket validation tests --------------------------------
+
+TEST(JaywayPathCompilerParity, PathMustStartWithRootToken)
+{
+    auto res = compile(u"x");
+    ASSERT_FALSE(res.has_value());
+    EXPECT_EQ(res.error(), Error::MissingRoot);
+}
+
+TEST(JaywayPathCompilerParity, SquareBracketMayNotFollowPeriod)
+{
+    auto res = compile(u"$.[");
+    ASSERT_FALSE(res.has_value());
+    // Currently results in EmptySegment (unexpected blank key)
+    EXPECT_EQ(res.error(), Error::EmptySegment);
+}
+
+TEST(JaywayPathCompilerParity, RootPathMustBeFollowedByPeriodOrBracket)
+{
+    auto res = compile(u"$X");
+    ASSERT_FALSE(res.has_value());
+    EXPECT_EQ(res.error(), Error::UnexpectedAfterRoot);
+}
+
+TEST(JaywayPathCompilerParity, RootPathCanBeCompiled)
+{
+    auto res1 = compile(u"$");
+    ASSERT_TRUE(res1.has_value());
+    EXPECT_EQ(res1->compiled.tokens.size(), 1);
+
+    auto res2 = compile(u"@");
+    ASSERT_TRUE(res2.has_value());
+    EXPECT_EQ(res2->compiled.tokens.size(), 1);
+}
+
+TEST(JaywayPathCompilerParity, UnmatchedBracketIsError)
+{
+    auto res = compile(u"$[");
+    ASSERT_FALSE(res.has_value());
+    EXPECT_EQ(res.error(), Error::UnmatchedBracket);
 }
 
 #undef PATHCOMPILER_STUB
