@@ -143,7 +143,8 @@ static bool addsMultiplicity(const Token& tk)
 
 static QJsonValue squash(QJsonArray arr, bool multi)
 {
-    if (arr.isEmpty())           return QJsonValue(QJsonValue::Undefined);
+    if (arr.isEmpty())
+        return multi ? QJsonArray{} : QJsonValue(QJsonValue::Undefined);
     if (!multi && arr.size()==1) return arr.first();
     return arr;
 }
@@ -220,14 +221,15 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
             }
 
             if (next.isEmpty())
-                return QJsonValue(QJsonValue::Undefined);
+                return multi ? QJsonArray{} : QJsonValue(QJsonValue::Undefined);
 
             working.swap(next);
             // This does NOT add multiplicity; collapse stays at previous state
         } else {
             working = fanOut(ctx, tk, working);
+            bool multiAfter = multi || addsMultiplicity(tk);
             if (working.isEmpty())
-                return QJsonValue(QJsonValue::Undefined);
+                return multiAfter ? QJsonArray{} : QJsonValue(QJsonValue::Undefined);
 
             // Deduplicate containers after normal fan-out when preceded by Recursive
             if (prevRecursive) {
@@ -248,7 +250,7 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
                 working.swap(dedup);
             }
 
-            multi |= addsMultiplicity(tk);
+            multi = multiAfter;
         }
     }
 
