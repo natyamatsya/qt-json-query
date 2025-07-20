@@ -95,12 +95,20 @@ struct BracketSink {
     std::expected<void,Error> key(QStringView k, bool allow=false) { return kb.push(k, allow); }
     void keyList(const QVector<QStringView>& keys)
     {
-        for (const QStringView k : keys) {
-            Token t;
-            t.kind = Token::Kind::Key;
-            t.key = QString(k);
-            tk.append(std::move(t));
-        }
+        if (keys.isEmpty()) return;
+
+        Token t;
+        t.kind = Token::Kind::KeyList;
+
+        // Pack the keys into a single QString separated by '\n' so that the
+        // evaluator can split them later without ambiguity.
+        QStringList list;
+        list.reserve(keys.size());
+        for (QStringView k : keys)
+            list.append(QString(k));
+
+        t.key = list.join(u"\n");
+        tk.append(std::move(t));
     }
     void wild()                 { tk.append(Token{Token::Kind::Wildcard}); }
     void slice(const Slice& s)   { tk.append(Token{Token::Kind::Slice,0,s,0u}); }

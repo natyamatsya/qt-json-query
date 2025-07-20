@@ -206,25 +206,19 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
 
         bool prevRecursive = (i>0 && ctx.tokens[i-1].kind == Token::Kind::Recursive);
 
+        // Branch-unique selection handling only when a KeyList follows a Recursive token.
+        // This covers expressions like $..['a','b'] where we must avoid returning each
+        // property value separately. For ordinary single-key access like $..['a'].x we
+        // fall through to normal fan-out.
         if (prevRecursive && (tk.kind == Token::Kind::KeyList || tk.kind == Token::Kind::Key)) {
-            // ------------------------------------------------------------------
-            // Branch-unique selection after a recursive descent.
-            // Handles both a single KeyList token and a run of consecutive Key tokens
-            // that originated from a bracket-notation union like ['a','b'].
-            // ------------------------------------------------------------------
-
-            // Gather all contiguous Key tokens starting at i (for union case)
             QStringList keys;
             qsizetype j = i;
             if (tk.kind == Token::Kind::KeyList) {
                 keys = tk.key.split(u'\n');
-                j = i + 1;
-            } else { // tk.kind == Key
-                while (j < ctx.tokens.size() && ctx.tokens[j].kind == Token::Kind::Key) {
-                    keys.append(ctx.tokens[j].key);
-                    ++j;
-                }
+            } else { // single Key
+                keys.append(tk.key);
             }
+            j = i + 1;
 
             bool isLeaf = (j == ctx.tokens.size());
 
@@ -280,7 +274,7 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
                 working.swap(dedup);
             }
 
-            // Skip over any extra Key tokens we have just consumed
+            // Skip over tokens we have just processed
             i = j - 1;
             continue;
         } else {
