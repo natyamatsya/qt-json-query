@@ -85,4 +85,25 @@ QJsonArray eval<Token::Kind::Filter>(const PathEvalCtx& ctx,
     return out;
 }
 
+// --- KeyList ---------------------------------------------------------------
+template<>
+QJsonArray eval<Token::Kind::KeyList>(const PathEvalCtx& /*ctx*/,
+                                     const Token& tk,
+                                     const QJsonValue& v)
+{
+    QJsonArray out;
+    if (!v.isObject()) return out;
+
+    const QJsonObject obj = v.toObject();
+    const QStringList keys = tk.key.split(u'\n');
+    QJsonObject sel;
+    for (const QString& k : keys) {
+        if (obj.contains(k))
+            sel.insert(k, obj[k]);
+    }
+    if (!sel.isEmpty())
+        out.append(sel);
+    return out;
+}
+
 } // namespace json_query::json_path::detail

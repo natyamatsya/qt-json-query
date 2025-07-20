@@ -105,8 +105,8 @@ namespace json_query::json_path::detail {
 QJsonArray evaluateToken(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
 {
     using enum Token::Kind;
-    constexpr std::array<QJsonArray (*)(const PathEvalCtx&, const Token&, const QJsonValue&), 6> lut = {
-        eval<Key>, eval<Index>, eval<Slice>, eval<Wildcard>, eval<Recursive>, eval<Filter>
+    constexpr std::array<QJsonArray (*)(const PathEvalCtx&, const Token&, const QJsonValue&), 7> lut = {
+        eval<Key>, eval<KeyList>, eval<Index>, eval<Slice>, eval<Wildcard>, eval<Recursive>, eval<Filter>
     };
 
     if (static_cast<size_t>(tk.kind) >= lut.size())
@@ -135,7 +135,7 @@ QJsonArray fanOut(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src
 static bool addsMultiplicity(const Token& tk)
 {
     using enum Token::Kind;
-    return tk.kind != Key && tk.kind != Index;
+    return tk.kind != Key && tk.kind != KeyList && tk.kind != Index;
 }
 
 static QJsonValue squash(QJsonArray arr, bool multi)
@@ -187,14 +187,47 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
     QJsonArray working{root};
     bool multi = false;
 
-    for (qsizetype i = 1; i < ctx.tokens.size() && !working.isEmpty(); ++i)
+    auto unionKeys = [](const QJsonValue& v, const std::vector<QString>& keys)->QJsonValue {
+        if (!v.isObject()) return QJsonValue(QJsonValue::Undefined);
+        const QJsonObject obj = v.toObject();
+        QJsonObject out;
+        for (const auto& k: keys) {
+            if (obj.contains(k)) out.insert(k, obj[k]);
+        }
+        return out.isEmpty() ? QJsonValue(QJsonValue::Undefined) : QJsonValue(out);
+    };
+
+    for (qsizetype i = 1; i < ctx.tokens.size() && !working.isEmpty(); )
     {
         const Token& tk = ctx.tokens[i];
-        working = fanOut(ctx, tk, working);
-        if (working.isEmpty())
-            return QJsonValue(QJsonValue::Undefined);
 
-        multi |= addsMultiplicity(tk);
+        using enum Token::Kind;
+
+        if (tk.kind == Key) {
+            // collect consecutive keys to form union
+            std::vector<QString> keys;
+            qsizetype j = i;
+            while (j < ctx.tokens.size() && ctx.tokens[j].kind == Key) {
+                keys.push_back(ctx.tokens[j].key);
+                ++j;
+            }
+
+            QJsonArray next;
+            for (const auto& v : working) {
+                const QJsonValue sel = unionKeys(v, keys);
+                if (!sel.isUndefined()) next.append(sel);
+            }
+
+            working = std::move(next);
+            // selecting multiple keys from same object does not increase multiplicity
+            i = j;
+        } else {
+            working = fanOut(ctx, tk, working);
+            if (working.isEmpty())
+                return QJsonValue(QJsonValue::Undefined);
+            multi |= addsMultiplicity(tk);
+            ++i;
+        }
     }
 
     QJsonValue collapsed = squash(std::move(working), multi);

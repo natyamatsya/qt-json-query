@@ -90,6 +90,14 @@ struct BracketSink {
     QVector<FilterFn>& filters;
 
     std::expected<void,Error> key(QStringView k, bool allow=false) { return kb.push(k, allow); }
+    void keyList(const QVector<QStringView>& keys)
+    {
+        for (const QStringView& key : keys)
+        {
+            if (auto r = kb.push(key); !r)
+                return;
+        }
+    }
     void wild()                 { tk.append(Token{Token::Kind::Wildcard}); }
     void slice(const Slice& s)   { tk.append(Token{Token::Kind::Slice,0,s,0u}); }
     void index(int i)            { tk.append(Token{Token::Kind::Index,i}); }
@@ -111,21 +119,22 @@ static const std::array<BrRule,9> BR_RULES = {{
                 // Split by ',' respecting simple quote tracking (we only toggle, assumes same quote type)
                 qsizetype start = 0;
                 quoteCount = 0;
+                QVector<QStringView> keys;
                 for (qsizetype i=0;i<=content.size();++i)
                 {
                     if (i==content.size() || (content[i]==u',' && quoteCount==0))
                     {
                         QStringView part = content.sliced(start, i-start).trimmed();
                         if (part.isEmpty()) return Error::EmptySegment;
-                        // reuse BR rule 4 logic: quoted key expected
                         if (part.size()<2) return std::optional<Error>{};
                         QChar q=part.front();
                         if ((q!=u'\'' && q!=u'\"') || part.back()!=q) return std::optional<Error>{};
                         QStringView key = part.sliced(1, part.size()-2);
-                        if (auto r = out.key(key, true); !r) return r.error();
+                        keys.append(key);
                         start = i+1;
                     } else if (content[i]==u'\'' || content[i]==u'\"') quoteCount ^=1;
                 }
+                out.keyList(keys);
                 return Error::Ok;
             }
         return std::nullopt;

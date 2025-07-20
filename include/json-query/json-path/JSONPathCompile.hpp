@@ -28,13 +28,13 @@ namespace json_query::json_path
 
     struct Token {
         enum class Kind : quint8 {
-            Key, Index, Slice, Wildcard, Recursive, Filter
+            Key, KeyList, Index, Slice, Wildcard, Recursive, Filter
         };
         Kind          kind {Kind::Key};
         qsizetype     index{};          // for Kind::Index
         Slice         slice{};          // for Kind::Slice
         quint32       hash{};           // cached object-key hash
-        QString       key{};            // for Kind::Key / Filter
+        QString       key{};            // for Kind::Key / KeyList (joined by '\n') / Filter
         std::size_t   filterId{};       // index into filter table
     };   
 

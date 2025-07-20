@@ -59,4 +59,9 @@ QJsonArray eval<Token::Kind::Filter>(const json_query::json_path::detail::PathEv
                                      const Token& tk,
                                      const QJsonValue& v);
 
+template<>
+QJsonArray eval<Token::Kind::KeyList>(const json_query::json_path::detail::PathEvalCtx& ctx,
+                                      const Token& tk,
+                                      const QJsonValue& v);
+
 } // namespace json_query::json_path::detail
