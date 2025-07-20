@@ -233,7 +233,9 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
                         // For multi-property union at leaf, return the parent object only
                         next.append(v);
                     } else { // single Key
-                        // Return only the member value, no parent object
+                        bool includeParent = obj.size() > 1; // at least one extra member
+                        if (includeParent)
+                            next.append(v);
                         next.append(obj.value(keys.first()));
                     }
                     continue; // stop processing this source value
