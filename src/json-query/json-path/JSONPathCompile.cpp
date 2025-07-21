@@ -70,6 +70,10 @@ namespace
         if (parts.size()>1 && !strictParse(parts[1].trimmed(), endOpt))   return std::nullopt;
         if (parts.size()>2 && !strictParse(parts[2].trimmed(), stepOpt))  return std::nullopt;
 
+        // Step of zero is invalid per RFC 9535 (§4.2.3)
+        if (stepOpt.has_value() && *stepOpt == 0)
+            return std::nullopt;
+
         qsizetype step = stepOpt.value_or(1);
 
         qsizetype start = startOpt.has_value() ? *startOpt : SENTINEL;

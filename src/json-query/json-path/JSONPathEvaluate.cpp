@@ -29,50 +29,45 @@ QJsonArray evalSlice(const QJsonArray& array, const Slice& s)
 {
     QJsonArray out;
 
-    if (s.step == 0)
-        return out; // invalid slice already filtered by compiler but guard anyway
-
-    const int size = array.size();
+    const int len = array.size();
     constexpr qsizetype SENTINEL = std::numeric_limits<qsizetype>::max();
 
-    const bool forward = s.step > 0;
-
-    auto norm = [size](qsizetype idx){
-        if (idx == SENTINEL)
-            return idx; // leave sentinel untouched for later
-        int v = static_cast<int>(idx);
-        if (v < 0) v += size;
-        return static_cast<qsizetype>(v);
-    };
-
-    qsizetype startRaw = norm(s.start);
-    qsizetype endRaw   = norm(s.end);
-
-    // Apply defaults when omitted (sentinel)
-    qsizetype start = (startRaw == SENTINEL)
-                        ? (forward ? 0 : size - 1)
-                        : startRaw;
-
-    qsizetype end = (endRaw == SENTINEL)
-                        ? (forward ? size : -1)
-                        : endRaw;
-
-    // Clamp to bounds
-    auto clamp = [size](qsizetype v){
-        return std::clamp<qsizetype>(v, -1, size); // allow -1 for reverse stopping
-    };
-    start = clamp(start);
-    end   = clamp(end);
-
-    // Iterate
     int step = static_cast<int>(s.step);
+    if (step == 0) // should already be filtered by compiler
+        return out;
 
+    // Normalize indices according to Python's slice semantics -------------
+    qsizetype start = s.start;
+    qsizetype stop  = s.end;
+
+    const bool forward = step > 0;
+
+    auto norm_index = [&](qsizetype &idx, bool isStart){
+        // Convert omitted to defaults first
+        if (idx == SENTINEL)
+            idx = forward ? (isStart ? 0 : len) : (isStart ? len - 1 : -1);
+
+        // Translate negative
+        if (idx < 0) idx += len;
+
+        // Clamp to bounds with std::clamp --------------------------------
+        if (forward) {
+            idx = std::clamp(idx, qsizetype{0}, qsizetype{len});
+        } else {
+            idx = std::clamp(idx, qsizetype{-1}, qsizetype{len - 1});
+        }
+    };
+
+    norm_index(start, /*isStart=*/true);
+    norm_index(stop,  /*isStart=*/false);
+
+    // Iterate -------------------------------------------------------------
     if (forward) {
-        for (int i = static_cast<int>(start); i < end && i < size; i += step)
-            if (i >= 0) out.append(array[i]);
+        for (int i = static_cast<int>(start); i < stop; i += step)
+            out.append(array[i]);
     } else {
-        for (int i = static_cast<int>(start); i > end && i >= 0; i += step) // step is negative
-            if (i < size) out.append(array[i]);
+        for (int i = static_cast<int>(start); i > stop; i += step) // step negative
+            if (i >=0) out.append(array[i]);
     }
 
     return out;
