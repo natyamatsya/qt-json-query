@@ -43,23 +43,22 @@ namespace
             if (!re.matchView(part).hasMatch())
                 return false; // not a valid integer literal per RFC
 
-            // Try fast path 64-bit conversion first.
+            // Fast path 64-bit conversion first.
             bool ok = false;
-            qlonglong v = part.toLongLong(&ok, 10);
+            const qlonglong v64 = part.toLongLong(&ok, 10);
 
-            if (ok) {
-                // Accept any 64-bit value; values outside qsizetype range are
-                // clamped to fit. This still preserves ordering semantics.
+            if (!ok)
+                return false; // overflow beyond 64-bit – invalid selector (§4.2.1)
 
-                out = static_cast<qsizetype>(std::clamp(v,
-                            static_cast<qlonglong>(std::numeric_limits<qsizetype>::min()),
-                            static_cast<qlonglong>(std::numeric_limits<qsizetype>::max())));
-                return true;
-            }
+            // RFC 9535 §4.2.3: each literal MUST fit in signed-32-bit range.
+            static constexpr qlonglong INT32_MIN_LL = static_cast<qlonglong>(std::numeric_limits<int>::min());
+            static constexpr qlonglong INT32_MAX_LL = static_cast<qlonglong>(std::numeric_limits<int>::max());
+            if (v64 < INT32_MIN_LL || v64 > INT32_MAX_LL)
+                return false; // out-of-range literal ⇒ invalid selector
 
-            // Overflow (value does not fit into signed 64-bit) – RFC 9535 §4.2.1
-            // requires the selector to be treated as invalid.
-            return false;
+            // Store as qsizetype (≥ 32 bit on all supported platforms).
+            out = static_cast<qsizetype>(v64);
+            return true;
         };
 
         static const QRegularExpression sliceFull(
@@ -85,9 +84,7 @@ namespace
 
         qsizetype step = stepOpt.value_or(1);
 
-        // RFC 9535 allows any 32-bit signed literal; values outside range are
-        // clamped at evaluation time following Python semantics, so we no
-        // longer reject out-of-range literals here.
+        // All literals already validated to be within signed-32-bit range.
 
         qsizetype start = startOpt.has_value() ? *startOpt : SENTINEL;
         qsizetype end   = endOpt.has_value()   ? *endOpt   : SENTINEL;
