@@ -32,34 +32,58 @@ QJsonArray evalSlice(const QJsonArray& array, const Slice& s)
     const int len = array.size();
     constexpr qsizetype SENTINEL = std::numeric_limits<qsizetype>::max();
 
-    int step = static_cast<int>(s.step);
-    if (step == 0) // should already be filtered by compiler
-        return out;
+    // Step normalisation ----------------------------------------------------
+    long long stepLL = s.step;
+    if (stepLL == 0)
+        return out; // zero-step ⇒ empty result
 
-    // Normalize indices according to Python's slice semantics -------------
+    // Clamp to int to avoid UB when casting; beyond INT_MAX we just use len+1 so
+    // that at most one iteration happens.
+    if (stepLL > std::numeric_limits<int>::max())
+        stepLL = std::numeric_limits<int>::max();
+    if (stepLL < std::numeric_limits<int>::min())
+        stepLL = std::numeric_limits<int>::min();
+
+    int step = static_cast<int>(stepLL);
+
+    // Fully follow Python's slice.indices() behaviour
+    // ----------------------------------------------------
     qsizetype start = s.start;
     qsizetype stop  = s.end;
 
     const bool forward = step > 0;
 
-    auto norm_index = [&](qsizetype &idx, bool isStart){
-        // Convert omitted to defaults first
-        if (idx == SENTINEL)
-            idx = forward ? (isStart ? 0 : len) : (isStart ? len - 1 : -1);
-
-        // Translate negative
-        if (idx < 0) idx += len;
-
-        // Clamp to bounds with std::clamp --------------------------------
-        if (forward) {
-            idx = std::clamp(idx, qsizetype{0}, qsizetype{len});
-        } else {
-            idx = std::clamp(idx, qsizetype{-1}, qsizetype{len - 1});
-        }
+    // Helper lambdas -------------------------------------------------------
+    auto asInf = [SENTINEL](qsizetype v, bool positive){
+        return (v == SENTINEL) ? (positive ? std::numeric_limits<qsizetype>::max()
+                                           : std::numeric_limits<qsizetype>::min())
+                               : v;
     };
 
-    norm_index(start, /*isStart=*/true);
-    norm_index(stop,  /*isStart=*/false);
+    // Treat SENTINEL as +∞ / -∞ so comparisons work
+    start = asInf(start, false);
+    stop  = asInf(stop,  true);
+
+    // Fill omitted defaults -----------------------------------------------
+    if (s.start == SENTINEL) {
+        start = forward ? 0 : len - 1;
+    }
+    if (s.end == SENTINEL) {
+        stop = forward ? len : -1;
+    }
+
+    // Translate negatives --------------------------------------------------
+    if (start < 0) start += len;
+    if (stop  < 0) stop  += len;
+
+    // Clamp to bounds ------------------------------------------------------
+    if (forward) {
+        start = std::clamp(start, qsizetype{0}, qsizetype{len});
+        stop  = std::clamp(stop,  qsizetype{0}, qsizetype{len});
+    } else {
+        start = std::clamp(start, qsizetype{-1}, qsizetype{len - 1});
+        stop  = std::clamp(stop,  qsizetype{-1}, qsizetype{len - 1});
+    }
 
     // Iterate -------------------------------------------------------------
     if (forward) {
@@ -67,7 +91,7 @@ QJsonArray evalSlice(const QJsonArray& array, const Slice& s)
             out.append(array[i]);
     } else {
         for (int i = static_cast<int>(start); i > stop; i += step) // step negative
-            if (i >=0) out.append(array[i]);
+            if (i >= 0 && i < len) out.append(array[i]);
     }
 
     return out;

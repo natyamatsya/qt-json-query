@@ -27,7 +27,7 @@ namespace
     {
         constexpr qsizetype SENTINEL = std::numeric_limits<qsizetype>::max();
 
-        static const QRegularExpression re("^-?(0|[1-9][0-9]*)$");
+        static const QRegularExpression re("^[+-]?(0|[1-9][0-9]*)$");
 
         auto strictParse = [&](QStringView part, std::optional<qsizetype>& out)->bool{
             part = part.trimmed();
@@ -44,21 +44,26 @@ namespace
             qlonglong v = part.toLongLong(&ok, 10);
 
             if (ok) {
-                constexpr auto I32_MIN = static_cast<qlonglong>(std::numeric_limits<int>::min());
-                constexpr auto I32_MAX = static_cast<qlonglong>(std::numeric_limits<int>::max());
+                // RFC 9535: numeric literals may exceed 32-bit range; extremely
+                // large values are interpreted as ±∞ and will be clamped later
+                // during slice normalisation.  Therefore we *never* reject solely
+                // on magnitude – we store whatever 64-bit value we parsed.
 
-                if (v < I32_MIN || v > I32_MAX)
-                    return false; // numeric literal out of valid range -> invalid selector
-
-                out = static_cast<qsizetype>(v);
+                out = static_cast<qsizetype>(std::clamp(v,
+                            static_cast<qlonglong>(std::numeric_limits<qsizetype>::min()),
+                            static_cast<qlonglong>(std::numeric_limits<qsizetype>::max())));
                 return true;
             }
 
-            // 64-bit conversion itself overflowed → treat as ±∞
-            return false;
+            // 64-bit conversion overflowed → treat as ±∞ by using the
+            // extreme qsizetype limits so that evaluation will clamp.
+            bool neg = part.startsWith(u'-');
+            out = neg ? std::numeric_limits<qsizetype>::min()
+                      : std::numeric_limits<qsizetype>::max();
+            return true;
         };
 
-        static const QRegularExpression sliceFull(R"(^\s*-?(?:0|[1-9][0-9]*)?\s*(?::\s*-?(?:0|[1-9][0-9]*)?\s*(?::\s*-?(?:0|[1-9][0-9]*)?\s*)?)?\s*$)");
+        static const QRegularExpression sliceFull(R"(^\s*[+-]?(?:0|[1-9][0-9]*)?\s*(?::\s*[+-]?(?:0|[1-9][0-9]*)?\s*(?::\s*[+-]?(?:0|[1-9][0-9]*)?\s*)?)?\s*$)");
         if (!sliceFull.matchView(v).hasMatch())
             return std::nullopt;
 
@@ -71,11 +76,15 @@ namespace
         if (parts.size()>1 && !strictParse(parts[1].trimmed(), endOpt))   return std::nullopt;
         if (parts.size()>2 && !strictParse(parts[2].trimmed(), stepOpt))  return std::nullopt;
 
-        // Step of zero is invalid per RFC 9535 (§4.2.3)
-        if (stepOpt.has_value() && *stepOpt == 0)
-            return std::nullopt;
+        // Zero-step slices are *valid* but yield an empty result (§4.2.3).
+        // We pass them through to the evaluator unchanged.
 
         qsizetype step = stepOpt.value_or(1);
+
+        // RFC 9535 §4.2.3: the step must fit within a 32-bit signed integer
+        // range; overflow/underflow render the selector invalid.
+        if (step < std::numeric_limits<int>::min() || step > std::numeric_limits<int>::max())
+            return std::nullopt;
 
         qsizetype start = startOpt.has_value() ? *startOpt : SENTINEL;
         qsizetype end   = endOpt.has_value()   ? *endOpt   : SENTINEL;
