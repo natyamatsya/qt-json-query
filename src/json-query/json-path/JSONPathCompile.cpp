@@ -40,15 +40,27 @@ namespace
                 return true; // omitted component
             }
 
-            if (!re.matchView(part).hasMatch())
-                return false; // not a valid integer literal per RFC
+            // Manual integer-literal validation per RFC 9535 ----------
+            qsizetype idx = 0;
+            if (part[idx] == u'-') ++idx; // optional minus
+            if (idx >= part.size() || !part[idx].isDigit()) return false;
+            if (part[idx] == u'0' && (part.size() - idx) > 1) return false; // leading zero forbidden
+            for (qsizetype j = idx; j < part.size(); ++j) {
+                if (!part[j].isDigit()) return false;
+            }
 
             // Fast path 64-bit conversion first.
             bool ok = false;
-            const qlonglong v64 = part.toLongLong(&ok, 10);
+            qlonglong v64 = part.toLongLong(&ok, 10);
 
-            if (!ok)
-                return false; // overflow beyond 64-bit – invalid selector (§4.2.1)
+            if (!ok) {
+                // Conversion overflowed 64-bit; decide sign and clamp to sentinel
+                if (!part.isEmpty() && part.front() == u'-')
+                    out = std::numeric_limits<qsizetype>::min();
+                else
+                    out = std::numeric_limits<qsizetype>::max();
+                return true;
+            }
 
             // RFC 9535 §4.2.3: each literal MUST fit in signed-32-bit range.
             static constexpr qlonglong INT32_MIN_LL = static_cast<qlonglong>(std::numeric_limits<int>::min());
@@ -148,22 +160,43 @@ namespace
     {
         // RFC 9535 allows empty string
         for (qsizetype i = 0; i < key.size(); ++i) {
-            if (key[i] != u'\\') continue;
-            if (i + 1 >= key.size()) return false; // dangling
-            QChar esc = key[i + 1];
-            // Accept standard JSON escapes and unicode
-            if (QStringLiteral("\\\"'/bfnrtu").indexOf(esc) == -1)
+            QChar ch = key[i];
+
+            // Reject literal control code characters U+0000–U+001F
+            if (ch.unicode() < 0x20)
                 return false;
+
+            if (ch != u'\\')
+                continue;
+
+            // Escape sequence handling -------------------------------------
+            if (i + 1 >= key.size()) return false; // dangling backslash
+            QChar esc = key[i + 1];
+
+            // List of permitted single-char escapes per RFC 9535 (same as JSON)
+            static const QStringView allowedEsc = QStringView{u"\\\"'/bfnrtu"};
+            if (!allowedEsc.contains(esc))
+                return false; // unknown escape
+
             if (esc == u'u') {
+                // Expect exactly four hex digits
                 if (i + 5 >= key.size()) return false;
+                ushort code = 0;
                 for (int k = 1; k <= 4; ++k) {
-                    QChar h = key[i + k + 1];
-                    if (!h.isDigit() && (h.toLower() < u'a' || h.toLower() > u'f'))
-                        return false;
+                    QChar h = key[i + 1 + k];
+                    int val = -1;
+                    if (h.isDigit()) val = h.digitValue();
+                    else if (h.toLower() >= u'a' && h.toLower() <= u'f') val = 10 + (h.toLower().unicode() - u'a');
+                    if (val < 0) return false;
+                    code = static_cast<ushort>((code << 4) | val);
                 }
-                i += 5; // skip '\uXXXX'
+                // Reject control codes after decoding
+                if (code < 0x20)
+                    return false;
+                i += 5; // consumed \uXXXX
             } else {
-                ++i; // skip escape char
+                // Skip the escaped char (e.g. \", \\ etc.)
+                ++i;
             }
         }
         return true;
