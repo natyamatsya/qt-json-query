@@ -27,7 +27,11 @@ namespace
     {
         constexpr qsizetype SENTINEL = std::numeric_limits<qsizetype>::max();
 
-        static const QRegularExpression re("^[+-]?(0|[1-9][0-9]*)$");
+        // integer literal per RFC 9535: optional *minus* sign followed by digits.
+        // Plus sign is NOT allowed. Leading zeros forbidden unless the value is exactly 0.
+        static const QRegularExpression re(R"(^(?:0|-[1-9][0-9]*|[1-9][0-9]*)$)");
+
+        qCDebug(jsonPathLog).noquote() << "makeSlice(" << v << ")";
 
         auto strictParse = [&](QStringView part, std::optional<qsizetype>& out)->bool{
             part = part.trimmed();
@@ -44,10 +48,8 @@ namespace
             qlonglong v = part.toLongLong(&ok, 10);
 
             if (ok) {
-                // RFC 9535: numeric literals may exceed 32-bit range; extremely
-                // large values are interpreted as ±∞ and will be clamped later
-                // during slice normalisation.  Therefore we *never* reject solely
-                // on magnitude – we store whatever 64-bit value we parsed.
+                // Accept any 64-bit value; values outside qsizetype range are
+                // clamped to fit. This still preserves ordering semantics.
 
                 out = static_cast<qsizetype>(std::clamp(v,
                             static_cast<qlonglong>(std::numeric_limits<qsizetype>::min()),
@@ -55,36 +57,37 @@ namespace
                 return true;
             }
 
-            // 64-bit conversion overflowed → treat as ±∞ by using the
-            // extreme qsizetype limits so that evaluation will clamp.
-            bool neg = part.startsWith(u'-');
-            out = neg ? std::numeric_limits<qsizetype>::min()
-                      : std::numeric_limits<qsizetype>::max();
-            return true;
+            // Overflow (value does not fit into signed 64-bit) – RFC 9535 §4.2.1
+            // requires the selector to be treated as invalid.
+            return false;
         };
 
-        static const QRegularExpression sliceFull(R"(^\s*[+-]?(?:0|[1-9][0-9]*)?\s*(?::\s*[+-]?(?:0|[1-9][0-9]*)?\s*(?::\s*[+-]?(?:0|[1-9][0-9]*)?\s*)?)?\s*$)");
+        static const QRegularExpression sliceFull(
+            R"(^\s*(?:(?:0|-[1-9][0-9]*|[1-9][0-9]*))?\s*(?::\s*(?:(?:0|-[1-9][0-9]*|[1-9][0-9]*))?\s*(?::\s*(?:(?:0|-[1-9][0-9]*|[1-9][0-9]*))?\s*)?)?\s*$)");
+        if (!sliceFull.matchView(v).hasMatch()) {
+            qCDebug(jsonPathLog) << "sliceFull regex failed";
+        }
         if (!sliceFull.matchView(v).hasMatch())
             return std::nullopt;
-
         const auto parts = v.split(u':');
         if (parts.size() > 3)
             return std::nullopt; // too many colons
         std::optional<qsizetype> startOpt, endOpt, stepOpt;
 
-        if (parts.size()>0 && !strictParse(parts[0].trimmed(), startOpt)) return std::nullopt;
-        if (parts.size()>1 && !strictParse(parts[1].trimmed(), endOpt))   return std::nullopt;
-        if (parts.size()>2 && !strictParse(parts[2].trimmed(), stepOpt))  return std::nullopt;
+        if (parts.size()>0 && !strictParse(parts[0].trimmed(), startOpt)) { qCDebug(jsonPathLog) << "strictParse failed for start"; return std::nullopt; }
+        if (parts.size()>1 && !strictParse(parts[1].trimmed(), endOpt))   { qCDebug(jsonPathLog) << "strictParse failed for end"; return std::nullopt; }
+        if (parts.size()>2 && !strictParse(parts[2].trimmed(), stepOpt))  { qCDebug(jsonPathLog) << "strictParse failed for step"; return std::nullopt; }
+
+        qCDebug(jsonPathLog) << "parsed slice startOpt="<<startOpt<<" endOpt="<<endOpt<<" stepOpt="<<stepOpt;
 
         // Zero-step slices are *valid* but yield an empty result (§4.2.3).
         // We pass them through to the evaluator unchanged.
 
         qsizetype step = stepOpt.value_or(1);
 
-        // RFC 9535 §4.2.3: the step must fit within a 32-bit signed integer
-        // range; overflow/underflow render the selector invalid.
-        if (step < std::numeric_limits<int>::min() || step > std::numeric_limits<int>::max())
-            return std::nullopt;
+        // RFC 9535 allows any 32-bit signed literal; values outside range are
+        // clamped at evaluation time following Python semantics, so we no
+        // longer reject out-of-range literals here.
 
         qsizetype start = startOpt.has_value() ? *startOpt : SENTINEL;
         qsizetype end   = endOpt.has_value()   ? *endOpt   : SENTINEL;

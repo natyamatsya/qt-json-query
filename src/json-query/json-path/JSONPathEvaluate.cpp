@@ -14,6 +14,7 @@
 #include <QString>
 #include <QDebug>
 #include <algorithm>
+#include "json-query/json-path/JSONPathLog.hpp"
 
 namespace json_query::json_path::detail {
 
@@ -33,18 +34,11 @@ QJsonArray evalSlice(const QJsonArray& array, const Slice& s)
     constexpr qsizetype SENTINEL = std::numeric_limits<qsizetype>::max();
 
     // Step normalisation ----------------------------------------------------
-    long long stepLL = s.step;
-    if (stepLL == 0)
+    qsizetype step = s.step;
+    if (step == 0)
         return out; // zero-step ⇒ empty result
 
-    // Clamp to int to avoid UB when casting; beyond INT_MAX we just use len+1 so
-    // that at most one iteration happens.
-    if (stepLL > std::numeric_limits<int>::max())
-        stepLL = std::numeric_limits<int>::max();
-    if (stepLL < std::numeric_limits<int>::min())
-        stepLL = std::numeric_limits<int>::min();
-
-    int step = static_cast<int>(stepLL);
+    // No need to clamp step; we operate with qsizetype to avoid overflow.
 
     // Fully follow Python's slice.indices() behaviour
     // ----------------------------------------------------
@@ -60,39 +54,70 @@ QJsonArray evalSlice(const QJsonArray& array, const Slice& s)
                                : v;
     };
 
-    // Treat SENTINEL as +∞ / -∞ so comparisons work
-    start = asInf(start, false);
-    stop  = asInf(stop,  true);
+    // --- Python slice.indices() emulation ---------------------------------
+    // Reference: CPython's PySlice_AdjustIndices (Objects/sliceobject.c)
 
-    // Fill omitted defaults -----------------------------------------------
-    if (s.start == SENTINEL) {
-        start = forward ? 0 : len - 1;
-    }
-    if (s.end == SENTINEL) {
-        stop = forward ? len : -1;
-    }
+    auto adjust = [&](qsizetype &idx, bool isStart){
+        if (idx == SENTINEL) {
+            idx = forward ? (isStart ? 0 : len) : (isStart ? len - 1 : -1);
+            return;
+        }
 
-    // Translate negatives --------------------------------------------------
-    if (start < 0) start += len;
-    if (stop  < 0) stop  += len;
+        // Translate negative
+        if (idx < 0) idx += len;
 
-    // Clamp to bounds ------------------------------------------------------
-    if (forward) {
-        start = std::clamp(start, qsizetype{0}, qsizetype{len});
-        stop  = std::clamp(stop,  qsizetype{0}, qsizetype{len});
-    } else {
-        start = std::clamp(start, qsizetype{-1}, qsizetype{len - 1});
-        stop  = std::clamp(stop,  qsizetype{-1}, qsizetype{len - 1});
-    }
+        // Clamp
+        if (forward) {
+            if (idx < 0) idx = 0;
+            if (idx > len) idx = len;
+        } else {
+            if (idx < -1) idx = -1;
+            if (idx >= len) idx = len - 1;
+        }
+    };
+
+    adjust(start, /*isStart=*/true);
+    adjust(stop,  /*isStart=*/false);
+
+    // When step<0, CPython makes stop = -1 if it ends up >= len after clamp & default.
+    if (!forward && s.end == SENTINEL)
+        stop = -1;
+
+    qCDebug(jsonPathLog) << "evalSlice start="<<s.start<<" stop="<<s.end<<" step="<<s.step<<" len="<<array.size();
+
+    qCDebug(jsonPathLog) << "normalised start="<<start<<" stop="<<stop;
 
     // Iterate -------------------------------------------------------------
     if (forward) {
-        for (int i = static_cast<int>(start); i < stop; i += step)
-            out.append(array[i]);
+        qCDebug(jsonPathLog) << "iterating forward";
+        qsizetype i = start;
+        while (i < stop) {
+            if (i >= 0 && i < len) {
+                qCDebug(jsonPathLog) << "  visiting i="<<i;
+                out.append(array[static_cast<int>(i)]);
+            }
+            // Prevent overflow and infinite loops when step is huge
+            if (step <= 0 || step > std::numeric_limits<qsizetype>::max() - i) break;
+            qsizetype next = i + step;
+            if (next <= i) break; // safety guard
+            i = next;
+        }
     } else {
-        for (int i = static_cast<int>(start); i > stop; i += step) // step negative
-            if (i >= 0 && i < len) out.append(array[i]);
+        qCDebug(jsonPathLog) << "iterating backward";
+        qsizetype i = start;
+        while (i > stop) {
+            if (i >= 0 && i < len) {
+                qCDebug(jsonPathLog) << "  visiting i="<<i;
+                out.append(array[static_cast<int>(i)]);
+            }
+            if (step >= 0 || step < std::numeric_limits<qsizetype>::min() - i) break;
+            qsizetype next = i + step; // step negative
+            if (next >= i) break; // safety
+            i = next;
+        }
     }
+
+    qCDebug(jsonPathLog) << "evalSlice result size="<<out.size();
 
     return out;
 }
