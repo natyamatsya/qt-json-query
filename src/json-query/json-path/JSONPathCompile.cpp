@@ -98,6 +98,7 @@ namespace
             case u'\\': out.append(u'\\'); break;
             case u'"':  out.append(u'"');  break;
             case u'\'': out.append(u'\''); break;
+            case u'/':  out.append(u'/');   break;
             case u'b':  out.append(u'\b'); break;
             case u'f':  out.append(u'\f'); break;
             case u'n':  out.append(u'\n'); break;
@@ -112,6 +113,21 @@ namespace
                 ushort code = QString(key.mid(i + 1, 4)).toUShort(&ok, 16);
                 if (!ok) {
                     out.append(QStringLiteral("\\u"));
+                    break;
+                }
+                out.append(QChar(code));
+                i += 4;
+                break;
+            }
+            case u'U': {
+                if (i + 4 >= key.size()) {
+                    out.append(QStringLiteral("\\U"));
+                    break;
+                }
+                bool ok = false;
+                ushort code = QString(key.mid(i + 1, 4)).toUShort(&ok, 16);
+                if (!ok) {
+                    out.append(QStringLiteral("\\U"));
                     break;
                 }
                 out.append(QChar(code));
@@ -135,16 +151,16 @@ namespace
             if (i + 1 >= key.size()) return false; // dangling
             QChar esc = key[i + 1];
             // Accept standard JSON escapes and unicode
-            if (QStringLiteral("\\\"'bfnrtu").indexOf(esc) == -1)
+            if (QStringLiteral("\\\"'/bfnrtuU").indexOf(esc) == -1)
                 return false;
-            if (esc == u'u') {
+            if (esc == u'u' || esc == u'U') {
                 if (i + 5 >= key.size()) return false;
                 for (int k = 1; k <= 4; ++k) {
                     QChar h = key[i + k + 1];
                     if (!h.isDigit() && (h.toLower() < u'a' || h.toLower() > u'f'))
                         return false;
                 }
-                i += 5; // skip '\uXXXX'
+                i += 5; // skip '\uXXXX' or '\UXXXX'
             } else {
                 ++i; // skip escape char
             }
