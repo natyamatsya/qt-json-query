@@ -36,37 +36,29 @@ QJsonArray evalSlice(const QJsonArray& array, const Slice& s)
     // Step normalisation ----------------------------------------------------
     qsizetype step = s.step;
     if (step == 0)
-        return out; // zero-step ⇒ empty result
+        return out; // zero-step ⇒ empty result per RFC & Python
 
-    // No need to clamp step; we operate with qsizetype to avoid overflow.
-
-    // Fully follow Python's slice.indices() behaviour
-    // ----------------------------------------------------
     qsizetype start = s.start;
     qsizetype stop  = s.end;
 
     const bool forward = step > 0;
 
-    // Helper lambdas -------------------------------------------------------
-    auto asInf = [SENTINEL](qsizetype v, bool positive){
-        return (v == SENTINEL) ? (positive ? std::numeric_limits<qsizetype>::max()
-                                           : std::numeric_limits<qsizetype>::min())
-                               : v;
+    // ---------------- Python's PySlice_AdjustIndices ----------------------
+    auto translate_default = [&](qsizetype &idx, bool isStart){
+        if (idx != SENTINEL) return;
+        if (forward)
+            idx = isStart ? 0 : len;
+        else
+            idx = isStart ? (len - 1) : -1;
     };
 
-    // --- Python slice.indices() emulation ---------------------------------
-    // Reference: CPython's PySlice_AdjustIndices (Objects/sliceobject.c)
+    translate_default(start, /*isStart=*/true);
+    translate_default(stop,  /*isStart=*/false);
 
-    auto adjust = [&](qsizetype &idx, bool isStart){
-        if (idx == SENTINEL) {
-            idx = forward ? (isStart ? 0 : len) : (isStart ? len - 1 : -1);
-            return;
-        }
-
-        // Translate negative
+    // Convert negatives, then clamp
+    auto fix_index = [&](qsizetype &idx, bool isStart){
         if (idx < 0) idx += len;
 
-        // Clamp
         if (forward) {
             if (idx < 0) idx = 0;
             if (idx > len) idx = len;
@@ -76,20 +68,26 @@ QJsonArray evalSlice(const QJsonArray& array, const Slice& s)
         }
     };
 
-    adjust(start, /*isStart=*/true);
-    adjust(stop,  /*isStart=*/false);
+    fix_index(start, /*isStart=*/true);
+    fix_index(stop , /*isStart=*/false);
 
-    // When step<0, CPython makes stop = -1 if it ends up >= len after clamp & default.
+    // Final CPython-style clamp on stop depending on step sign
+    if (forward) {
+        if (stop > len) stop = len;
+    } else {
+        if (stop < -1) stop = -1;
+    }
+
+    // If stop was omitted (SENTINEL) and we have negative step, Python sets stop = -1 after adjustments
     if (!forward && s.end == SENTINEL)
         stop = -1;
 
-    qCDebug(jsonPathLog) << "evalSlice start="<<s.start<<" stop="<<s.end<<" step="<<s.step<<" len="<<array.size();
+    qCDebug(jsonPathLog) << "evalSlice norm start="<<start<<" stop="<<stop<<" step="<<step;
 
-    qCDebug(jsonPathLog) << "normalised start="<<start<<" stop="<<stop;
+    qCDebug(jsonPathLog) << "iterating " << (forward ? "forward" : "backward");
 
     // Iterate -------------------------------------------------------------
     if (forward) {
-        qCDebug(jsonPathLog) << "iterating forward";
         qsizetype i = start;
         while (i < stop) {
             if (i >= 0 && i < len) {
@@ -103,7 +101,6 @@ QJsonArray evalSlice(const QJsonArray& array, const Slice& s)
             i = next;
         }
     } else {
-        qCDebug(jsonPathLog) << "iterating backward";
         qsizetype i = start;
         while (i > stop) {
             if (i >= 0 && i < len) {
