@@ -53,11 +53,13 @@ namespace
             // RFC 9535 §4.2.3: each literal MUST fit in signed-32-bit range.
             static constexpr qlonglong INT32_MIN_LL = static_cast<qlonglong>(std::numeric_limits<int>::min());
             static constexpr qlonglong INT32_MAX_LL = static_cast<qlonglong>(std::numeric_limits<int>::max());
-            if (v64 < INT32_MIN_LL || v64 > INT32_MAX_LL)
-                return false; // out-of-range literal ⇒ invalid selector
-
-            // Store as qsizetype (≥ 32 bit on all supported platforms).
-            out = static_cast<qsizetype>(v64);
+            // If outside 32-bit range, treat as ±∞ sentinel by clamping to qsizetype min/max
+            if (v64 < INT32_MIN_LL)
+                out = std::numeric_limits<qsizetype>::min();
+            else if (v64 > INT32_MAX_LL)
+                out = std::numeric_limits<qsizetype>::max();
+            else
+                out = static_cast<qsizetype>(v64);
             return true;
         };
 
@@ -84,7 +86,7 @@ namespace
 
         qsizetype step = stepOpt.value_or(1);
 
-        // All literals already validated to be within signed-32-bit range.
+        // Out-of-range literals are clamped to ±∞ above; evaluation will handle them.
 
         qsizetype start = startOpt.has_value() ? *startOpt : SENTINEL;
         qsizetype end   = endOpt.has_value()   ? *endOpt   : SENTINEL;
