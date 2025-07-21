@@ -19,6 +19,9 @@ namespace json_query::json_path
 // ──────────────────────────────────────────────────────────────────────
 namespace
 {
+    // ─── Quoted-key validator (RFC 9535) ───────────────────────────────
+    enum class QuoteStyle { Single, Double };
+
     // Parse start:end:step  (parts may be empty) --------------------------------
     [[nodiscard]] static inline std::optional<Slice> makeSlice(QStringView v)
     {
@@ -74,6 +77,80 @@ namespace
 
         return Slice{start,end,step};
     }
+
+    // --- Helper: unescape quoted key according to RFC 9535 ----------------
+    static QString unescapeQuotedKey(QStringView key)
+    {
+        QString out;
+        out.reserve(key.size());
+        for (qsizetype i = 0; i < key.size(); ++i) {
+            QChar c = key[i];
+            if (c != u'\\') {
+                out.append(c);
+                continue;
+            }
+            if (i + 1 >= key.size()) { // dangling backslash, keep literally
+                out.append(QStringLiteral("\\"));
+                break;
+            }
+            QChar n = key[++i];
+            switch (n.unicode()) {
+            case u'\\': out.append(u'\\'); break;
+            case u'"':  out.append(u'"');  break;
+            case u'\'': out.append(u'\''); break;
+            case u'b':  out.append(u'\b'); break;
+            case u'f':  out.append(u'\f'); break;
+            case u'n':  out.append(u'\n'); break;
+            case u'r':  out.append(u'\r'); break;
+            case u't':  out.append(u'\t'); break;
+            case u'u': {
+                if (i + 4 >= key.size()) {
+                    out.append(QStringLiteral("\\u"));
+                    break;
+                }
+                bool ok = false;
+                ushort code = QString(key.mid(i + 1, 4)).toUShort(&ok, 16);
+                if (!ok) {
+                    out.append(QStringLiteral("\\u"));
+                    break;
+                }
+                out.append(QChar(code));
+                i += 4;
+                break;
+            }
+            default:
+                // Unknown escape, keep literally
+                out.append(n);
+            }
+        }
+        return out;
+    }
+
+    // Adjusted validation to allow escapes and empty key
+    [[nodiscard]] static bool isValidQuotedKey(QStringView key, QuoteStyle /*style*/)
+    {
+        // RFC 9535 allows empty string
+        for (qsizetype i = 0; i < key.size(); ++i) {
+            if (key[i] != u'\\') continue;
+            if (i + 1 >= key.size()) return false; // dangling
+            QChar esc = key[i + 1];
+            // Accept standard JSON escapes and unicode
+            if (QStringLiteral("\\\"'bfnrtu").indexOf(esc) == -1)
+                return false;
+            if (esc == u'u') {
+                if (i + 5 >= key.size()) return false;
+                for (int k = 1; k <= 4; ++k) {
+                    QChar h = key[i + k + 1];
+                    if (!h.isDigit() && (h.toLower() < u'a' || h.toLower() > u'f'))
+                        return false;
+                }
+                i += 5; // skip '\uXXXX'
+            } else {
+                ++i; // skip escape char
+            }
+        }
+        return true;
+    }
 } // namespace
 
 namespace detail {
@@ -84,14 +161,11 @@ namespace detail {
 struct KeyBuilder {
     QVector<Token>& tgt;
 
-    std::expected<void,Error> push(QStringView key, bool allowSpace = false)
+    std::expected<void,Error> push(QString key, bool allowSpace = false)
     {
-        if (key.isEmpty())
-            return std::unexpected(Error::EmptySegment);
         if (!allowSpace && key.contains(u' '))
             return std::unexpected(Error::BlankInKey);
-
-        tgt.append(Token{Token::Kind::Key, 0, {}, qt_hash(key), key.toString()});
+        tgt.append(Token{Token::Kind::Key, 0, {}, qt_hash(key), key});
         return {};
     }
 };
@@ -118,7 +192,7 @@ parseDot(qsizetype pos, QStringView sv,
 
     qsizetype start = pos;
     while (pos < n && sv[pos] != u'.' && sv[pos] != u'[') ++pos;
-    if (auto r = kb.push(sv.sliced(start, pos - start)); !r)
+    if (auto r = kb.push(sv.sliced(start, pos - start).toString()); !r)
         return std::unexpected(r.error());
     return pos;
 }
@@ -130,8 +204,8 @@ struct BracketSink {
     KeyBuilder&       kb;
     QVector<FilterFn>& filters;
 
-    std::expected<void,Error> key(QStringView k, bool allow=false) { return kb.push(k, allow); }
-    void keyList(const QVector<QStringView>& keys)
+    std::expected<void,Error> key(QString key, bool allow=false) { return kb.push(key, allow); }
+    void keyList(const QVector<QString>& keys)
     {
         if (keys.isEmpty()) return;
 
@@ -142,8 +216,8 @@ struct BracketSink {
         // evaluator can split them later without ambiguity.
         QStringList list;
         list.reserve(keys.size());
-        for (QStringView k : keys)
-            list.append(QString(k));
+        for (const QString& k : keys)
+            list.append(k);
 
         t.key = list.join(u"\n");
         tk.append(std::move(t));
@@ -169,7 +243,7 @@ static const std::array<BrRule,9> BR_RULES = {{
                 // Split by ',' respecting simple quote tracking (we only toggle, assumes same quote type)
                 qsizetype start = 0;
                 quoteCount = 0;
-                QVector<QStringView> keys;
+                QVector<QString> keys;
                 for (qsizetype i=0;i<=content.size();++i)
                 {
                     if (i==content.size() || (content[i]==u',' && quoteCount==0))
@@ -179,10 +253,13 @@ static const std::array<BrRule,9> BR_RULES = {{
                         if (part.size()<2) return std::optional<Error>{};
                         QChar q=part.front();
                         if ((q!=u'\'' && q!=u'\"') || part.back()!=q) return std::optional<Error>{};
-                        QStringView key = part.sliced(1, part.size()-2);
-                        keys.append(key);
+                        QStringView keyView = part.sliced(1, part.size()-2);
+                        QuoteStyle st = (q==u'\'') ? QuoteStyle::Single : QuoteStyle::Double;
+                        if (!isValidQuotedKey(keyView, st)) return std::optional<Error>{};
+                        QString unescaped = unescapeQuotedKey(keyView);
+                        keys.append(unescaped);
                         start = i+1;
-                    } else if (content[i]==u'\'' || content[i]==u'\"') quoteCount ^=1;
+                    } else if (content[i]==u'\'' || content[i]==u'"') quoteCount ^=1;
                 }
                 out.keyList(keys);
                 return Error::Ok;
@@ -279,7 +356,11 @@ static const std::array<BrRule,9> BR_RULES = {{
             return std::nullopt;
 
         QStringView unquoted = content.sliced(1, content.size() - 2);
-        if (auto r = out.key(unquoted, true); !r)
+        QuoteStyle st = (q==u'\'') ? QuoteStyle::Single : QuoteStyle::Double;
+        if (!isValidQuotedKey(unquoted, st))
+            return Error::InvalidSlice; // reuse generic
+        QString unesc = unescapeQuotedKey(unquoted);
+        if (auto r = out.key(unesc, true); !r)
             return r.error();
         return Error::Ok;
     },
@@ -288,7 +369,7 @@ static const std::array<BrRule,9> BR_RULES = {{
     [](QStringView content, BracketSink& out)->std::optional<Error> {
         if (content.contains(u'\'') || content.contains(u'"') || content.contains(u':') || content.contains(u','))
             return std::nullopt; // avoid other kinds
-        if (auto r = out.key(content); !r)
+        if (auto r = out.key(content.toString()); !r)
             return r.error();
         return Error::Ok;
     }
@@ -376,7 +457,7 @@ std::expected<qsizetype,Error> parseBare(qsizetype pos, QStringView sv, KeyBuild
     qsizetype start = pos;
     while (pos < sv.size() && sv[pos] != u'.' && sv[pos] != u'[') ++pos;
     if (pos == start) return std::unexpected(Error::EmptySegment);
-    if (auto r = kb.push(sv.sliced(start, pos - start)); !r)
+    if (auto r = kb.push(sv.sliced(start, pos - start).toString()); !r)
         return std::unexpected(r.error());
     return pos;
 }

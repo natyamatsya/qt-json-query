@@ -2,6 +2,8 @@
 # This assumes that GoogleTest has already been fetched and available targets
 # created by the top-level script (see cmake/GoogleTests.cmake).
 
+option(JSON_QUERY_ENABLE_JAYWAY_PARITY_TESTS "Build Jayway JSONPath parity test suite" OFF)
+
 # ---------------------------------------------------------------------------
 # Unit-test executable aggregating the core library tests
 # ---------------------------------------------------------------------------
@@ -33,30 +35,32 @@ target_link_libraries(json_query_tests PRIVATE
 # ---------------------------------------------------------------------------
 # Jayway JSONPath parity suite
 # ---------------------------------------------------------------------------
-set(JAYWAY_PARITY_SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/jayway-parity/DeepScanParityGTest.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/jayway-parity/MultiPropParityGTest.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/jayway-parity/FilterParityGTest.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/jayway-parity/EscapeParityGTest.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/jayway-parity/OptionsParityGTest.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/jayway-parity/MapperParityGTest.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/jayway-parity/PathCompilerParityGTest.cpp
-)
+if(JSON_QUERY_ENABLE_JAYWAY_PARITY_TESTS)
+    set(JAYWAY_PARITY_SOURCES
+        ${CMAKE_CURRENT_SOURCE_DIR}/jayway-parity/DeepScanParityGTest.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/jayway-parity/MultiPropParityGTest.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/jayway-parity/FilterParityGTest.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/jayway-parity/EscapeParityGTest.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/jayway-parity/OptionsParityGTest.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/jayway-parity/MapperParityGTest.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/jayway-parity/PathCompilerParityGTest.cpp
+    )
 
-add_executable(jayway_parity_tests ${JAYWAY_PARITY_SOURCES})
+    add_executable(jayway_parity_tests ${JAYWAY_PARITY_SOURCES})
 
-target_include_directories(jayway_parity_tests PRIVATE
-    ${PROJECT_SOURCE_DIR}/include
-    ${PROJECT_SOURCE_DIR}/tests/include
-)
+    target_include_directories(jayway_parity_tests PRIVATE
+        ${PROJECT_SOURCE_DIR}/include
+        ${PROJECT_SOURCE_DIR}/tests/include
+    )
 
-target_link_libraries(jayway_parity_tests PRIVATE
-    json_query
-    GTest::gtest
-    GTest::gmock
-    GTest::gtest_main
-    Qt6::Core
-)
+    target_link_libraries(jayway_parity_tests PRIVATE
+        json_query
+        GTest::gtest
+        GTest::gmock
+        GTest::gtest_main
+        Qt6::Core
+    )
+endif()
 
 # ---------------------------------------------------------------------------
 # RFC 9535 compliance test suite
@@ -91,10 +95,12 @@ gtest_discover_tests(json_query_tests
     TEST_PREFIX "JsonQuery/"
 )
 
-gtest_discover_tests(jayway_parity_tests
-    DISCOVERY_MODE PRE_TEST
-    TEST_PREFIX "jayway-parity/"
-)
+if(JSON_QUERY_ENABLE_JAYWAY_PARITY_TESTS)
+    gtest_discover_tests(jayway_parity_tests
+        DISCOVERY_MODE PRE_TEST
+        TEST_PREFIX "jayway-parity/"
+    )
+endif()
 
 gtest_discover_tests(rfc9535_tests
     DISCOVERY_MODE PRE_TEST
