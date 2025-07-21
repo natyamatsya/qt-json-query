@@ -44,17 +44,18 @@ namespace
             qlonglong v = part.toLongLong(&ok, 10);
 
             if (ok) {
+                constexpr auto I32_MIN = static_cast<qlonglong>(std::numeric_limits<int>::min());
+                constexpr auto I32_MAX = static_cast<qlonglong>(std::numeric_limits<int>::max());
+
+                if (v < I32_MIN || v > I32_MAX)
+                    return false; // numeric literal out of valid range -> invalid selector
+
                 out = static_cast<qsizetype>(v);
                 return true;
             }
 
-            // Overflow – treat as "very large" positive / negative so that later clamping
-            // logic will simply clamp it to array boundaries per RFC 9535 (§4.2.3).
-            if (part.startsWith(u'-'))
-                out = std::numeric_limits<qsizetype>::min();
-            else
-                out = std::numeric_limits<qsizetype>::max();
-            return true;
+            // 64-bit conversion itself overflowed → treat as ±∞
+            return false;
         };
 
         static const QRegularExpression sliceFull(R"(^\s*-?(?:0|[1-9][0-9]*)?\s*(?::\s*-?(?:0|[1-9][0-9]*)?\s*(?::\s*-?(?:0|[1-9][0-9]*)?\s*)?)?\s*$)");
@@ -123,21 +124,6 @@ namespace
                 i += 4;
                 break;
             }
-            case u'U': {
-                if (i + 4 >= key.size()) {
-                    out.append(QStringLiteral("\\U"));
-                    break;
-                }
-                bool ok = false;
-                ushort code = QString(key.mid(i + 1, 4)).toUShort(&ok, 16);
-                if (!ok) {
-                    out.append(QStringLiteral("\\U"));
-                    break;
-                }
-                out.append(QChar(code));
-                i += 4;
-                break;
-            }
             default:
                 // Unknown escape, keep literally
                 out.append(n);
@@ -155,16 +141,16 @@ namespace
             if (i + 1 >= key.size()) return false; // dangling
             QChar esc = key[i + 1];
             // Accept standard JSON escapes and unicode
-            if (QStringLiteral("\\\"'/bfnrtuU").indexOf(esc) == -1)
+            if (QStringLiteral("\\\"'/bfnrtu").indexOf(esc) == -1)
                 return false;
-            if (esc == u'u' || esc == u'U') {
+            if (esc == u'u') {
                 if (i + 5 >= key.size()) return false;
                 for (int k = 1; k <= 4; ++k) {
                     QChar h = key[i + k + 1];
                     if (!h.isDigit() && (h.toLower() < u'a' || h.toLower() > u'f'))
                         return false;
                 }
-                i += 5; // skip '\uXXXX' or '\UXXXX'
+                i += 5; // skip '\uXXXX'
             } else {
                 ++i; // skip escape char
             }
