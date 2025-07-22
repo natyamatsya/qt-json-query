@@ -421,19 +421,10 @@ static const std::array<BrRule,10> BR_RULES = {{
     [](QStringView content, BracketSink& out)->std::optional<Error> {
         if (!content.contains(u',')) return std::nullopt;
 
-        // Parse comma-separated selectors
-        using json_query::json_path::detail::splitTopLevel;
-        auto parts = splitTopLevel(content.toString(), QLatin1StringView(","));
+        // Parse comma-separated selectors using multi-part splitting
+        using json_query::json_path::detail::splitTopLevelMultiple;
+        auto parts = splitTopLevelMultiple(content, QLatin1StringView(","));
         if (!parts) return std::nullopt;
-
-        // Handle multiple parts
-        QVector<QStringView> segs;
-        const auto& [lhs, rhs] = *parts;
-        segs.push_back(lhs.trimmed());
-        segs.push_back(rhs.trimmed());
-        
-        // TODO: splitTopLevel currently only handles two parts, but RFC 9535 allows more
-        // For now, we handle the common two-part case correctly
 
         // Helper lambda to route a single segment through existing rules (skip union rule to prevent recursion)
         auto compileOne = [&](QStringView seg)->std::optional<Error> {
@@ -457,8 +448,10 @@ static const std::array<BrRule,10> BR_RULES = {{
             return std::nullopt; // no rule matched
         };
 
-        for (auto sv : segs) {
-            if (auto maybe = compileOne(sv); !maybe) return std::nullopt;
+        // Process all parts
+        for (const QString& part : *parts) {
+            QStringView seg = QStringView(part).trimmed();
+            if (auto maybe = compileOne(seg); !maybe) return std::nullopt;
             else if (*maybe != Error::Ok) return maybe; // propagate
         }
         return Error::Ok;

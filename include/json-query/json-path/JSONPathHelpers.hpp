@@ -10,6 +10,7 @@
 #include <QLatin1String>
 #include <optional>
 #include <utility>
+#include <QVector>
 
 namespace json_query::json_path::detail {
 
@@ -40,6 +41,38 @@ splitTopLevel(QStringView sv, QLatin1StringView delim)
                 QString(sv.mid(i + nDelim)) };
         }
     }
+    return std::nullopt;
+}
+
+// Split at all occurrences of `delim` that are *not* inside parentheses.
+// Returns vector of parts if any delimiters found; otherwise std::nullopt.
+inline std::optional<QVector<QString>>
+splitTopLevelMultiple(QStringView sv, QLatin1StringView delim)
+{
+    const qsizetype nDelim = delim.size();
+    int parenDepth = 0;
+    QVector<QString> parts;
+    qsizetype lastStart = 0;
+    
+    for (qsizetype i = 0, N = sv.size() - nDelim + 1; i < N; ++i)
+    {
+        const QChar c = sv[i];
+        if      (c == u'(') ++parenDepth;
+        else if (c == u')') --parenDepth;
+        else if (parenDepth == 0 && sv.mid(i, nDelim) == delim)
+        {
+            // Found delimiter at top level - add part
+            parts.append(QString(sv.mid(lastStart, i - lastStart)));
+            lastStart = i + nDelim;
+        }
+    }
+    
+    // Add final part after last delimiter
+    if (!parts.isEmpty()) {
+        parts.append(QString(sv.mid(lastStart)));
+        return parts;
+    }
+    
     return std::nullopt;
 }
 
