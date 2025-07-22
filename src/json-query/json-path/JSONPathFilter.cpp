@@ -265,6 +265,31 @@ std::optional<Token> parseCompare1(QString s, QVector<FilterFn>& out)
             qCDebug(jsonPathLog).nospace() << "[flt-cmp] prop='" << prop << "' op='" << op
                                           << "' rhs=" << (isNum ? QString::number(num) : rhs)
                                           << " | v=" << v << " (type=" << v.type() << ")";
+            
+            // Handle missing properties per RFC 9535: missing properties are treated as null
+            if (v.type() == QJsonValue::Undefined) {
+                // For != operator, missing property != any value is true (except null)
+                if (op == "!=") {
+                    if (isNum) return true;  // missing != number is true
+                    if (isBool) return true; // missing != boolean is true
+                    if (rhsQuoted) {
+                        // Check if RHS is "null" - missing != null is false, missing != anything else is true
+                        return rhs != "null";
+                    }
+                    return true; // missing != unquoted non-null is true
+                }
+                // For == operator, missing property == any value is false (except null)
+                if (op == "==") {
+                    if (isNum || isBool) return false; // missing == number/boolean is false
+                    if (rhsQuoted) {
+                        return rhs == "null"; // missing == null is true, missing == anything else is false
+                    }
+                    return false; // missing == unquoted non-null is false
+                }
+                // For ordering operators, missing property comparisons are always false
+                return false;
+            }
+            
             if (isNum) {
                 if (!v.isDouble()) return false;
                 const double x = v.toDouble();
@@ -380,9 +405,33 @@ std::optional<Token> parseCompareIndex(QString s, QVector<FilterFn>& out)
             const auto arr = j.toArray();
             if (idx < 0 || idx >= arr.size()) return false;
             const auto v = arr[idx];
-            qCDebug(jsonPathLog).nospace() << "[flt-cmp] idx=" << idx << " op='" << op
+            qCDebug(jsonPathLog).nospace() << "[flt-cmp-idx] idx=" << idx << " op='" << op
                                           << "' rhs=" << (isNum ? QString::number(num) : rhs)
                                           << " | v=" << v << " (type=" << v.type() << ")";
+            
+            // Handle missing array elements per RFC 9535: out-of-bounds access is treated as null
+            if (v.type() == QJsonValue::Undefined) {
+                // For != operator, missing element != any value is true (except null)
+                if (op == "!=") {
+                    if (isNum) return true;  // missing != number is true
+                    if (isBool) return true; // missing != boolean is true
+                    if (rhsQuoted) {
+                        return rhs != "null"; // missing != null is false, missing != anything else is true
+                    }
+                    return true; // missing != unquoted non-null is true
+                }
+                // For == operator, missing element == any value is false (except null)
+                if (op == "==") {
+                    if (isNum || isBool) return false; // missing == number/boolean is false
+                    if (rhsQuoted) {
+                        return rhs == "null"; // missing == null is true, missing == anything else is false
+                    }
+                    return false; // missing == unquoted non-null is false
+                }
+                // For ordering operators, missing element comparisons are always false
+                return false;
+            }
+            
             if (isNum) {
                 if (!v.isDouble()) return false;
                 const double x = v.toDouble();
@@ -459,7 +508,7 @@ std::optional<Token> parseRegex1(QString s, QVector<FilterFn>& out)
 std::optional<Token> parseRegex(QString s, QVector<FilterFn>& out)
 {
     constexpr auto dotPat = ctll::fixed_string{R"(@\.([\w$]+)\s*=~\s*/(.+)/)"};
-    constexpr auto brkPat = ctll::fixed_string{R"(@\[['\"]([^'\"]+)['\"]\]\s*=~\s*/(.+)/)"};
+    constexpr auto brkPat = ctll::fixed_string{R"(@\[['\"]([^'"]+)['\"]\]\s*=~\s*/(.+)/)"};
 
     if (auto t = parseRegex1<dotPat>(s, out)) return t;
     return        parseRegex1<brkPat>(s, out);
@@ -595,16 +644,12 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
     auto makeToken = [&](QString prop)->Token {
         Builder b{out};
         return b.add([prop](const QJsonValue& j){
-            const auto v = j.toObject().value(prop);
-            switch (v.type()) {
-            case QJsonValue::Null:   return false;
-            case QJsonValue::Bool:   return v.toBool();
-            case QJsonValue::Double: return v.toDouble() != 0.0;
-            case QJsonValue::String: return !v.toString().isEmpty();
-            case QJsonValue::Array:  return !v.toArray().isEmpty();
-            case QJsonValue::Object: return !v.toObject().isEmpty();
-            default: return false;
-            }
+            const auto obj = j.toObject();
+            const auto v = obj.value(prop);
+            // RFC 9535: existence filters check for property presence, not truthiness
+            // A property exists if it's present in the object, regardless of its value (including false, 0, "", [], {})
+            // Only undefined (missing) properties are considered non-existent
+            return v.type() != QJsonValue::Undefined;
         }, prop);
     };
 
@@ -615,15 +660,9 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
             const auto arr = j.toArray();
             if (index < 0 || index >= arr.size()) return false;
             const auto& v = arr[index];
-            switch (v.type()) {
-            case QJsonValue::Null:   return false;
-            case QJsonValue::Bool:   return v.toBool();
-            case QJsonValue::Double: return v.toDouble() != 0.0;
-            case QJsonValue::String: return !v.toString().isEmpty();
-            case QJsonValue::Array:  return !v.toArray().isEmpty();
-            case QJsonValue::Object: return !v.toObject().isEmpty();
-            default: return false;
-            }
+            // RFC 9535: existence filters check for element presence, not truthiness
+            // An array element exists if it's within bounds, regardless of its value (including false, 0, "", [], {})
+            return v.type() != QJsonValue::Undefined;
         }, QString("@[%1]").arg(index));
     };
 
@@ -634,51 +673,29 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
             const auto arr = j.toArray();
             int actualStart = start < 0 ? 0 : start;
             int actualEnd = end < 0 ? arr.size() : qMin(end, arr.size());
-            // Check if slice has any truthy elements
-            for (int i = actualStart; i < actualEnd; ++i) {
-                const auto& v = arr[i];
-                switch (v.type()) {
-                case QJsonValue::Null:   continue;
-                case QJsonValue::Bool:   if (v.toBool()) return true; break;
-                case QJsonValue::Double: if (v.toDouble() != 0.0) return true; break;
-                case QJsonValue::String: if (!v.toString().isEmpty()) return true; break;
-                case QJsonValue::Array:  if (!v.toArray().isEmpty()) return true; break;
-                case QJsonValue::Object: if (!v.toObject().isEmpty()) return true; break;
-                default: continue;
-                }
-            }
-            return false;
+            // RFC 9535: existence filters check for element presence, not truthiness
+            // A slice exists if it contains any elements within bounds, regardless of their values
+            return actualStart < actualEnd && actualStart < arr.size();
         }, QString("@[%1:%2]").arg(start).arg(end));
     };
 
     auto makeRootToken = [&]()->Token {
         Builder b{out};
         return b.add([](const QJsonValue& j){
-            switch (j.type()) {
-            case QJsonValue::Null:   return false;
-            case QJsonValue::Bool:   return j.toBool();
-            case QJsonValue::Double: return j.toDouble() != 0.0;
-            case QJsonValue::String: return !j.toString().isEmpty();
-            case QJsonValue::Array:  return !j.toArray().isEmpty();
-            case QJsonValue::Object: return !j.toObject().isEmpty();
-            default: return false;
-            }
+            // RFC 9535: root existence filter checks if the root value exists
+            // The root always exists unless it's explicitly undefined
+            return j.type() != QJsonValue::Undefined;
         }, "@");
     };
 
     auto makeNegatedToken = [&](QString prop)->Token {
         Builder b{out};
         return b.add([prop](const QJsonValue& j){
-            const auto v = j.toObject().value(prop);
-            switch (v.type()) {
-            case QJsonValue::Null:   return true;  // negated: null is falsy, so !null is true
-            case QJsonValue::Bool:   return !v.toBool();
-            case QJsonValue::Double: return v.toDouble() == 0.0;
-            case QJsonValue::String: return v.toString().isEmpty();
-            case QJsonValue::Array:  return v.toArray().isEmpty();
-            case QJsonValue::Object: return v.toObject().isEmpty();
-            default: return true; // undefined is falsy, so !undefined is true
-            }
+            const auto obj = j.toObject();
+            const auto v = obj.value(prop);
+            // RFC 9535: negated existence filters check for property absence, not falsy values
+            // A property is absent only if it's undefined (missing from the object)
+            return v.type() == QJsonValue::Undefined;
         }, "!" + prop);
     };
 
@@ -687,17 +704,10 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
         return b.add([index](const QJsonValue& j){
             if (!j.isArray()) return true; // non-arrays don't have indices
             const auto arr = j.toArray();
-            if (index < 0 || index >= arr.size()) return true; // out of bounds is falsy
+            if (index < 0 || index >= arr.size()) return true; // out of bounds is absent
             const auto& v = arr[index];
-            switch (v.type()) {
-            case QJsonValue::Null:   return true;  // negated: null is falsy
-            case QJsonValue::Bool:   return !v.toBool();
-            case QJsonValue::Double: return v.toDouble() == 0.0;
-            case QJsonValue::String: return v.toString().isEmpty();
-            case QJsonValue::Array:  return v.toArray().isEmpty();
-            case QJsonValue::Object: return v.toObject().isEmpty();
-            default: return true; // undefined is falsy
-            }
+            // RFC 9535: negated existence filters check for element absence
+            return v.type() == QJsonValue::Undefined;
         }, QString("!@[%1]").arg(index));
     };
 
@@ -708,35 +718,17 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
             const auto arr = j.toArray();
             int actualStart = start < 0 ? 0 : start;
             int actualEnd = end < 0 ? arr.size() : qMin(end, arr.size());
-            // Check if slice has NO truthy elements (negated)
-            for (int i = actualStart; i < actualEnd; ++i) {
-                const auto& v = arr[i];
-                switch (v.type()) {
-                case QJsonValue::Null:   continue; // null is falsy, doesn't affect result
-                case QJsonValue::Bool:   if (v.toBool()) return false; break; // found truthy, so negated is false
-                case QJsonValue::Double: if (v.toDouble() != 0.0) return false; break;
-                case QJsonValue::String: if (!v.toString().isEmpty()) return false; break;
-                case QJsonValue::Array:  if (!v.toArray().isEmpty()) return false; break;
-                case QJsonValue::Object: if (!v.toObject().isEmpty()) return false; break;
-                default: continue;
-                }
-            }
-            return true; // No truthy elements found, so negated is true
+            // Check if slice has NO elements within bounds (negated)
+            return !(actualStart < actualEnd && actualStart < arr.size());
         }, QString("!@[%1:%2]").arg(start).arg(end));
     };
 
     auto makeNegatedRootToken = [&]()->Token {
         Builder b{out};
         return b.add([](const QJsonValue& j){
-            switch (j.type()) {
-            case QJsonValue::Null:   return true;  // negated: null is falsy, so !null is true
-            case QJsonValue::Bool:   return !j.toBool();
-            case QJsonValue::Double: return j.toDouble() == 0.0;
-            case QJsonValue::String: return j.toString().isEmpty();
-            case QJsonValue::Array:  return j.toArray().isEmpty();
-            case QJsonValue::Object: return j.toObject().isEmpty();
-            default: return true; // undefined is falsy, so !undefined is true
-            }
+            // RFC 9535: negated root existence filter checks if the root value is absent
+            // The root is absent only if it's explicitly undefined
+            return j.type() == QJsonValue::Undefined;
         }, "!@");
     };
 
