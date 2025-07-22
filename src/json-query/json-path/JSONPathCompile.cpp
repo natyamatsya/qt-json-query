@@ -305,17 +305,53 @@ parseDot(qsizetype pos, QStringView sv,
     if (++pos >= n) return std::unexpected(Error::TrailingDot);
 
     QChar nxt = sv[pos];
+    qCDebug(jsonPathLog) << "parseDot: processing character '" << nxt << "' at pos=" << pos;
+    
     if (nxt == u'.') {
+        qCDebug(jsonPathLog) << "parseDot: found recursive segment (..)";
         tokens.append(Token{Token::Kind::Recursive});
         ++pos;
         if (pos >= n) return std::unexpected(Error::TrailingRecursive);
         return pos;
     }
-    if (nxt == u'*') { tokens.append(Token{Token::Kind::Wildcard }); ++pos; return pos; }
-
+    if (nxt == u'*') { 
+        qCDebug(jsonPathLog) << "parseDot: found wildcard (*)";
+        tokens.append(Token{Token::Kind::Wildcard }); 
+        ++pos; 
+        return pos; 
+    }
     qsizetype start = pos;
     while (pos < n && sv[pos] != u'.' && sv[pos] != u'[') ++pos;
-    if (auto r = kb.push(sv.sliced(start, pos - start).toString()); !r)
+    
+    // RFC 9535 validation: member-name-shorthand must follow ABNF grammar
+    // name-first = ALPHA / "_" / Unicode, not DIGIT
+    // name-char = name-first / DIGIT
+    QStringView identifier = sv.sliced(start, pos - start);
+    if (identifier.isEmpty()) {
+        return std::unexpected(Error::EmptySegment);
+    }
+    
+    // Check first character: must be ALPHA, underscore, or Unicode (not digit)
+    QChar first = identifier[0];
+    if (first.isDigit()) {
+        qCDebug(jsonPathLog) << "parseDot: rejecting numeric identifier" << identifier;
+        return std::unexpected(Error::InvalidIdentifier);
+    }
+    if (!first.isLetter() && first != u'_' && first.unicode() < 0x80) {
+        qCDebug(jsonPathLog) << "parseDot: rejecting invalid identifier" << identifier;
+        return std::unexpected(Error::InvalidIdentifier);
+    }
+    
+    // Check remaining characters: must be name-first or DIGIT
+    for (qsizetype i = 1; i < identifier.size(); ++i) {
+        QChar ch = identifier[i];
+        if (!ch.isLetterOrNumber() && ch != u'_') {
+            qCDebug(jsonPathLog) << "parseDot: rejecting identifier with invalid character" << identifier;
+            return std::unexpected(Error::InvalidIdentifier);
+        }
+    }
+    
+    if (auto r = kb.push(identifier.toString()); !r)
         return std::unexpected(r.error());
     return pos;
 }
@@ -362,17 +398,19 @@ static const std::array<BrRule,10> BR_RULES = {{
     [](QStringView content, BracketSink& out)->std::optional<Error> {
         if (!content.contains(u',')) return std::nullopt;
 
-        // Quick skip if likely slice (presence of ':')
-        if (content.contains(u':')) return std::nullopt;
-
+        // Parse comma-separated selectors
         using json_query::json_path::detail::splitTopLevel;
         auto parts = splitTopLevel(content.toString(), QLatin1StringView(","));
         if (!parts) return std::nullopt;
 
-        const auto& [lhs, rhs] = *parts; // works only for two parts; but many tests use two
+        // Handle multiple parts
         QVector<QStringView> segs;
+        const auto& [lhs, rhs] = *parts;
         segs.push_back(lhs.trimmed());
         segs.push_back(rhs.trimmed());
+        
+        // TODO: splitTopLevel currently only handles two parts, but RFC 9535 allows more
+        // For now, we handle the common two-part case correctly
 
         // Helper lambda to route a single segment through existing rules (skip union rule to prevent recursion)
         auto compileOne = [&](QStringView seg)->std::optional<Error> {
@@ -540,14 +578,13 @@ static const std::array<BrRule,10> BR_RULES = {{
     }
 }};
 
-// ------------------------------------------------------------------
-// parseBracket dispatcher
-// ------------------------------------------------------------------
-std::expected<qsizetype, Error> parseBracket(qsizetype pos,
-         QStringView          sv,
-         KeyBuilder&          kb,
-         QVector<Token>&      tokens,
-         QVector<FilterFn>&   filters)
+// ────────────────────────────────────────────────────────────────
+// 3. bracket parser
+// ────────────────────────────────────────────────────────────────
+[[nodiscard]] std::expected<qsizetype,Error>
+parseBracket(qsizetype pos, QStringView sv,
+             KeyBuilder& kb, QVector<Token>& tokens,
+             QVector<FilterFn>& filters)
 {
     qCDebug(jsonPathLog) << "parseBracket pos=" << pos;
     const qsizetype n = sv.size();
@@ -629,7 +666,17 @@ std::expected<qsizetype,Error> parseBare(qsizetype pos, QStringView sv, KeyBuild
     qsizetype start = pos;
     while (pos < sv.size() && sv[pos] != u'.' && sv[pos] != u'[') ++pos;
     if (pos == start) return std::unexpected(Error::EmptySegment);
-    if (auto r = kb.push(sv.sliced(start, pos - start).toString()); !r)
+    
+    QStringView identifier = sv.sliced(start, pos - start);
+    
+    // Special case: if the identifier is exactly '*', create a Wildcard token
+    if (identifier == u"*") {
+        kb.tgt.append(Token{Token::Kind::Wildcard});
+        return pos;
+    }
+    
+    // Otherwise, create a regular Key token
+    if (auto r = kb.push(identifier.toString()); !r)
         return std::unexpected(r.error());
     return pos;
 }

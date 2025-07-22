@@ -53,6 +53,7 @@ enum class Error : std::uint8_t {
     UnsupportedFilter,
     InvalidSlice,
     InvalidIndex,
+    InvalidIdentifier,    // RFC 9535: invalid member-name-shorthand
     UnexpectedAfterRoot
 };
 
@@ -72,6 +73,7 @@ toString(Error e) noexcept
         case UnsupportedFilter: return "unsupported filter expression";
         case InvalidSlice     : return "bad array slice";
         case InvalidIndex     : return "bad numeric index";
+        case InvalidIdentifier: return "invalid identifier";
         case UnexpectedAfterRoot: return "root must be followed by '.' or '['";
         default               : return "unknown error";
     }

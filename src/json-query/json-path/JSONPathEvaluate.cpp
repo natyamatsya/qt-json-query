@@ -138,26 +138,47 @@ QJsonArray __evaluateRecursiveImpl(const QJsonValue& value)
     if (!value.isArray() && !value.isObject())
         return out;
 
-    std::deque<QJsonValue> queue;
-    queue.push_back(value);
-    while (!queue.empty())
+    // Use depth-first traversal with stack for RFC 9535 compliance
+    std::vector<QJsonValue> stack;
+    stack.push_back(value);
+    
+    while (!stack.empty())
     {
-        QJsonValue cur = queue.front();
-        queue.pop_front();
+        QJsonValue cur = stack.back();
+        stack.pop_back();
         out.append(cur);
 
         if (cur.isObject()) {
             const QJsonObject obj = cur.toObject();
+            // Add children in reverse order for correct depth-first traversal
+            QVector<QJsonValue> children;
             for (auto it = obj.begin(); it != obj.end(); ++it) {
-                const QJsonValue& child = it.value();
-                if (child.isArray() || child.isObject())
-                    queue.push_back(child);
+                children.append(it.value());
             }
-        } else {
+            // Add in reverse order so they're processed in correct order
+            for (int i = children.size() - 1; i >= 0; --i) {
+                const QJsonValue& child = children[i];
+                // Add ALL values to the result, but only traverse containers
+                if (child.isArray() || child.isObject()) {
+                    stack.push_back(child);
+                } else {
+                    // Add primitive values directly to output for completeness
+                    out.append(child);
+                }
+            }
+        } else if (cur.isArray()) {
             const QJsonArray arr = cur.toArray();
-            for (const auto& child : arr)
-                if (child.isArray() || child.isObject())
-                    queue.push_back(child);
+            // Add children in reverse order for correct depth-first traversal
+            for (int i = arr.size() - 1; i >= 0; --i) {
+                const QJsonValue& child = arr[i];
+                // Add ALL values to the result, but only traverse containers
+                if (child.isArray() || child.isObject()) {
+                    stack.push_back(child);
+                } else {
+                    // Add primitive values directly to output for completeness
+                    out.append(child);
+                }
+            }
         }
     }
     return out;
@@ -284,6 +305,62 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
 
         bool prevRecursive = (i>0 && ctx.tokens[i-1].kind == Token::Kind::Recursive);
 
+        // Check for union semantics: consecutive tokens that should be evaluated together
+        // This handles both same-kind unions (e.g., $[0,2]) and mixed-type unions (e.g., $[?@.a,1])
+        if (tk.kind == Token::Kind::Index || tk.kind == Token::Kind::Key || 
+            tk.kind == Token::Kind::Filter || tk.kind == Token::Kind::Wildcard ||
+            tk.kind == Token::Kind::Slice) {
+            
+            // Look ahead to see if we have consecutive tokens that should be unioned
+            QVector<qsizetype> unionTokens;
+            unionTokens.append(i);
+            
+            qsizetype j = i + 1;
+            while (j < ctx.tokens.size()) {
+                const Token& nextTk = ctx.tokens[j];
+                // Include any selector token type that can appear in brackets
+                if (nextTk.kind == Token::Kind::Index || nextTk.kind == Token::Kind::Key ||
+                    nextTk.kind == Token::Kind::Filter || nextTk.kind == Token::Kind::Wildcard ||
+                    nextTk.kind == Token::Kind::Slice) {
+                    unionTokens.append(j);
+                    ++j;
+                } else {
+                    break; // Stop at non-selector tokens (e.g., Recursive)
+                }
+            }
+            
+            // If we have multiple consecutive selector tokens, apply union semantics
+            if (unionTokens.size() > 1) {
+                qDebug() << "[union] processing" << unionTokens.size() << "consecutive selector tokens";
+                
+                QJsonArray unionResult;
+                for (qsizetype tokenIdx : unionTokens) {
+                    const Token& unionTk = ctx.tokens[tokenIdx];
+                    QJsonArray tokenResult = fanOut(ctx, unionTk, working);
+                    qDebug() << "[union] token" << tokenIdx << "kind" << static_cast<int>(unionTk.kind) 
+                             << "produced" << tokenResult.size() << "results";
+                    
+                    // Combine results (union semantics)
+                    for (const auto& result : tokenResult) {
+                        unionResult.append(result);
+                    }
+                }
+                
+                working = unionResult;
+                qDebug() << "[union] combined result size:" << working.size();
+                
+                // Skip the tokens we just processed
+                i = j - 1;
+                
+                bool multiAfter = multi || addsMultiplicity(tk);
+                if (working.isEmpty())
+                    return QJsonArray{}; // RFC 9535: empty result list when no matches
+
+                multi = multiAfter;
+                continue;
+            }
+        }
+
         // Branch-unique selection handling only when a KeyList follows a Recursive token.
         // This covers expressions like $..['a','b'] where we must avoid returning each
         // property value separately. For ordinary single-key access like $..['a'].x we
@@ -315,10 +392,10 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
                         // Multi-property leaf union ⇒ return parent only (Jayway)
                         next.append(v);
                     } else {
-                        // Single-property leaf: value then possibly parent
+                        // Single-property leaf: return only the value, not the parent
                         next.append(obj.value(keys.first()));
-                        if (obj.size() == 1)
-                            next.append(v);
+                        // RFC 9535: Don't include parent containers for single-key descendant selectors
+                        // Removed: if (obj.size() == 1) next.append(v);
                     }
                 } else {
                     // Non-leaf: parent first, then properties for traversal

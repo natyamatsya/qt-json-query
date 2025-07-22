@@ -181,6 +181,26 @@ TEST_P(CtsJsonPathTest, EvaluatesPerSpec)
         }
     }
 
+    if (!matched) {
+        qDebug() << "=== TEST MISMATCH DEBUG ===";
+        qDebug() << "Test name:" << tc.name;
+        qDebug() << "Selector:" << tc.selector;
+        qDebug() << "Document:" << QJsonDocument(tc.document.toObject()).toJson(QJsonDocument::Compact);
+        qDebug() << "Actual result (" << actual.size() << " items):";
+        for (int i = 0; i < actual.size(); ++i) {
+            qDebug() << "  [" << i << "]" << QJsonDocument(QJsonArray{actual[i]}).toJson(QJsonDocument::Compact);
+        }
+        qDebug() << "Expected result sets:";
+        for (int setIdx = 0; setIdx < tc.resultSets.size(); ++setIdx) {
+            const QJsonArray& expected = tc.resultSets[setIdx];
+            qDebug() << "  Set" << setIdx << "(" << expected.size() << " items):";
+            for (int i = 0; i < expected.size(); ++i) {
+                qDebug() << "    [" << i << "]" << QJsonDocument(QJsonArray{expected[i]}).toJson(QJsonDocument::Compact);
+            }
+        }
+        qDebug() << "=========================";
+    }
+
     EXPECT_TRUE(matched) << "No expected result set matched for test '" << tc.name.toStdString() << "'";
 }
 
