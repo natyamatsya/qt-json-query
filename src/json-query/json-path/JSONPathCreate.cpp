@@ -18,11 +18,12 @@ namespace json_query {
         }
         qCDebug(jsonPathLog) << "JSONPath::create() compile succeeded, creating JSONPath object";
 
-        return JSONPath(opt,
-                        result.value().function,
+        return JSONPath(result.value().function,
+                        opt,
                         rawPath.toString(),
                         std::move(result.value().compiled.tokens),
-                        std::move(result.value().compiled.filters));
+                        std::move(result.value().compiled.filters),
+                        std::move(result.value().compiled.contextFilters));
     }
 
 } // namespace json_query

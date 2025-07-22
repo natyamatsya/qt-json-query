@@ -2,6 +2,7 @@
 
 #include <QVector>
 #include <QString>
+#include <QJsonValue>
 
 #include "json-query/json-path/JSONPathCompile.hpp" // for Token, FunctionType, Slice
 #include "json-query/json-path/JSONPathOption.hpp"
@@ -18,20 +19,25 @@ namespace json_query::json_path::detail {
 class PathEvalCtx
 {
 public:
-    using Token      = json_path::Token;
-    using FilterFn   = json_path::FilterFn;
-    using Function   = json_path::FunctionType;
-    using Option     = json_query::json_path::Option;
+    using Token              = json_path::Token;
+    using FilterFn           = json_path::FilterFn;
+    using ContextFilterFn    = json_path::ContextFilterFn;
+    using Function           = json_path::FunctionType;
+    using Option             = json_query::json_path::Option;
 
     PathEvalCtx(const QVector<Token>&   t,
                 const QVector<FilterFn>& f,
+                const QVector<ContextFilterFn>& cf,
+                const QJsonValue& root,
                 Option                   opt,
                 Function                 fn) noexcept
-        : tokens{t}, filters{f}, option{opt}, trailingFn{fn} {}
+        : tokens{t}, filters{f}, contextFilters{cf}, rootDocument{root}, option{opt}, trailingFn{fn} {}
 
     // Data members are intentionally const refs – PathEvalCtx is just a view.
     const QVector<Token>&   tokens;
     const QVector<FilterFn>& filters;
+    const QVector<ContextFilterFn>& contextFilters;
+    const QJsonValue& rootDocument;
     Option                   option {Option::None};
     Function                 trailingFn {Function::None};
 };

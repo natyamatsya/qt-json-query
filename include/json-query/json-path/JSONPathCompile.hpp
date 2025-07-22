@@ -19,6 +19,10 @@ namespace json_query::json_path
     // Filter function type - moved here for better organization
     using FilterFn = std::function<bool (const QJsonValue&)>;
 
+    // Context-aware filter function type for absolute path references
+    // Receives both current node and root document context
+    using ContextFilterFn = std::function<bool (const QJsonValue& currentNode, const QJsonValue& rootDocument)>;
+
     enum class FunctionType { None, Length, Min, Max };
 
     // ======================================================================
@@ -36,6 +40,7 @@ namespace json_query::json_path
         quint32       hash{};           // cached object-key hash
         QString       key{};            // for Kind::Key / KeyList (joined by '\n') / Filter
         std::size_t   filterId{};       // index into filter table
+        std::size_t   contextFilterId{SIZE_MAX}; // index into context filter table (SIZE_MAX = not used)
         
         // Bracket group metadata for union vs sequential evaluation
         int           bracketGroupId{-1}; // -1 = not from bracket, >0 = bracket group ID
@@ -94,6 +99,7 @@ toString(Error e) noexcept
 struct Compiled { 
     QVector<Token> tokens; 
     QVector<FilterFn> filters; 
+    QVector<ContextFilterFn> contextFilters; 
 };
 
 // ──────────────────────────────────────────────────────────────────────
@@ -118,6 +124,14 @@ detectTrailingFunction(QString& path);
 /// @return Token representing the filter, or nullopt if compilation failed
 [[nodiscard]] std::optional<Token> 
 compileFilter(const QString& expr, QVector<FilterFn>& filters);
+
+/// Context-aware filter compilation for absolute path references
+[[nodiscard]] std::optional<Token> 
+compileContextFilter(const QString& expr, QVector<ContextFilterFn>& contextFilters, QVector<FilterFn>& filters);
+
+/// Parse absolute path references in filter expressions (context-aware)
+[[nodiscard]] std::optional<Token>
+parseAbsolutePathContext(QString s, QVector<ContextFilterFn>& out);
 
 // ──────────────────────────────────────────────────────────────────────
 //  Convenience API

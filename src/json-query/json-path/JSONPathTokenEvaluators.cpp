@@ -70,13 +70,24 @@ QJsonArray eval<Token::Kind::Filter>(const PathEvalCtx& ctx,
                                      const QJsonValue& v)
 {
     QJsonArray out;
-    if (tk.filterId >= ctx.filters.size()) return out;
+    if (tk.filterId >= ctx.filters.size() && tk.contextFilterId >= ctx.contextFilters.size()) return out;
 
-    const auto& filterFn = ctx.filters[tk.filterId];
+    // Determine which type of filter to use
+    bool useContextFilter = (tk.contextFilterId != SIZE_MAX && tk.contextFilterId < ctx.contextFilters.size());
+    
     if (v.isArray()) {
         for (const auto& item : v.toArray()) {
-            const bool pass = filterFn(item);
-            qDebug() << "[filter] array item" << item << "pass=" << pass;
+            bool pass;
+            if (useContextFilter) {
+                const auto& contextFilterFn = ctx.contextFilters[tk.contextFilterId];
+                pass = contextFilterFn(item, ctx.rootDocument);
+                qDebug() << "[context-filter] array item" << item << "pass=" << pass;
+            } else {
+                if (tk.filterId >= ctx.filters.size()) continue;
+                const auto& filterFn = ctx.filters[tk.filterId];
+                pass = filterFn(item);
+                qDebug() << "[filter] array item" << item << "pass=" << pass;
+            }
             if (pass)
                 out.append(item);
         }
@@ -84,8 +95,17 @@ QJsonArray eval<Token::Kind::Filter>(const PathEvalCtx& ctx,
         QJsonObject obj = v.toObject();
         for (auto it = obj.constBegin(); it != obj.constEnd(); ++it) {
             const QJsonValue &val = it.value();
-            const bool pass = filterFn(val);
-            qDebug() << "[filter] object value" << val << "pass=" << pass;
+            bool pass;
+            if (useContextFilter) {
+                const auto& contextFilterFn = ctx.contextFilters[tk.contextFilterId];
+                pass = contextFilterFn(val, ctx.rootDocument);
+                qDebug() << "[context-filter] object value" << val << "pass=" << pass;
+            } else {
+                if (tk.filterId >= ctx.filters.size()) continue;
+                const auto& filterFn = ctx.filters[tk.filterId];
+                pass = filterFn(val);
+                qDebug() << "[filter] object value" << val << "pass=" << pass;
+            }
             if (pass)
                 out.append(val);
         }

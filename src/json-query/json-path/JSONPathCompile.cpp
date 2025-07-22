@@ -251,7 +251,8 @@ namespace
         }
 
         // If we ended expecting a low surrogate, invalid
-        if (expectLowSurrogate) return false;
+        if (expectLowSurrogate)
+            return false;
 
         return true;
     }
@@ -358,6 +359,7 @@ parseDot(qsizetype pos, QStringView sv,
 struct BracketSink {
     QVector<Token>&   tk;
     KeyBuilder&       kb;
+    QVector<ContextFilterFn>& contextFilters;
     QVector<FilterFn>& filters;
     int               currentBracketGroupId; // Track current bracket group ID
 
@@ -439,7 +441,7 @@ static const std::array<BrRule,10> BR_RULES = {{
             if (seg.startsWith(u'?')) {
                 QString expr = QString(seg.mid(1)).trimmed();
                 if (expr.isEmpty()) return std::optional<Error>{};
-                if (auto tok = json_query::json_path::compileFilter(expr, out.filters)) {
+                if (auto tok = json_query::json_path::compileContextFilter(expr, out.contextFilters, out.filters)) {
                     out.pushFilter(*tok);
                     return Error::Ok;
                 }
@@ -535,7 +537,7 @@ static const std::array<BrRule,10> BR_RULES = {{
         QString expr = content.sliced(2, content.size() - 3).toString();
         std::cout << "[bracket ?(] extracted expr=" << expr.toStdString() << std::endl;
 
-        if (auto tok = json_query::json_path::compileFilter(expr, out.filters)) {
+        if (auto tok = json_query::json_path::compileContextFilter(expr, out.contextFilters, out.filters)) {
             out.pushFilter(*tok);
             return Error::Ok;
         }
@@ -552,10 +554,13 @@ static const std::array<BrRule,10> BR_RULES = {{
         if (exprView.isEmpty()) return std::nullopt; // Could be placeholder handled later
 
         QString expr = exprView.toString();
-        if (auto tok = json_query::json_path::compileFilter(expr, out.filters)) {
+        qCDebug(jsonPathLog) << "BR_RULE 6: calling compileContextFilter with expr:" << expr;
+        if (auto tok = json_query::json_path::compileContextFilter(expr, out.contextFilters, out.filters)) {
+            qCDebug(jsonPathLog) << "BR_RULE 6: compileContextFilter succeeded";
             out.pushFilter(*tok);
             return Error::Ok;
         }
+        qCDebug(jsonPathLog) << "BR_RULE 6: compileContextFilter failed, returning UnsupportedFilter";
         return Error::UnsupportedFilter;
     },
 
@@ -569,10 +574,10 @@ static const std::array<BrRule,10> BR_RULES = {{
         // For each placeholder, create a no-op filter token that will be
         // resolved later (currently always-true).
         for ([[maybe_unused]] QStringView _ : content.split(u',')) {
-            auto alwaysTrue = [](const QJsonValue&) { return true; };
-            out.filters.append(alwaysTrue);
+            auto alwaysTrue = [](const QJsonValue& currentNode, const QJsonValue& /*root*/) { return true; };
+            out.contextFilters.append(alwaysTrue);
             Token t{Token::Kind::Filter};
-            t.filterId = out.filters.size() - 1;
+            t.contextFilterId = out.contextFilters.size() - 1;
             out.pushFilter(t);
         }
         return Error::Ok;
@@ -607,6 +612,7 @@ static const std::array<BrRule,10> BR_RULES = {{
 [[nodiscard]] std::expected<qsizetype,Error>
 parseBracket(qsizetype pos, QStringView sv,
              KeyBuilder& kb, QVector<Token>& tokens,
+             QVector<ContextFilterFn>& contextFilters,
              QVector<FilterFn>& filters)
 {
     qCDebug(jsonPathLog) << "parseBracket pos=" << pos;
@@ -648,7 +654,6 @@ parseBracket(qsizetype pos, QStringView sv,
                 // Quote was escaped – continue searching after it
                 pos = next + 1;
             }
-
             qCDebug(jsonPathLog) << "exit quote at pos=" << pos;
         }
         ++pos;
@@ -665,7 +670,7 @@ parseBracket(qsizetype pos, QStringView sv,
 
     qCDebug(jsonPathLog) << "parseBracket content=" << content.toString();
 
-    BracketSink sink{tokens, kb, filters};
+    BracketSink sink{tokens, kb, contextFilters, filters};
     sink.currentBracketGroupId = tokens.size(); // Set unique bracket group ID
 
     int ruleIndex = 0;
@@ -738,6 +743,7 @@ std::expected<Compiled, Error> compilePath(QStringView sv)
     qCDebug(jsonPathLog) << "compilePath() sv=" << sv;
     using K = Token::Kind;
     QVector<Token> tokens;
+    QVector<ContextFilterFn> contextFilters;
     QVector<FilterFn> filters;
     tokens.reserve(sv.count('.') + sv.count('[') + 4);
 
@@ -758,7 +764,7 @@ std::expected<Compiled, Error> compilePath(QStringView sv)
     {
         std::expected<qsizetype,Error> next =
             (sv[pos] == u'.') ? detail::parseDot    (pos, sv, kb, tokens)
-          : (sv[pos] == u'[') ? detail::parseBracket(pos, sv, kb, tokens, filters)
+          : (sv[pos] == u'[') ? detail::parseBracket(pos, sv, kb, tokens, contextFilters, filters)
           :                    detail::parseBare   (pos, sv, kb);
 
         if (!next) {
@@ -767,7 +773,7 @@ std::expected<Compiled, Error> compilePath(QStringView sv)
         }
         pos = *next;
     }
-    return Compiled{ std::move(tokens), std::move(filters) };
+    return Compiled{ std::move(tokens), std::move(filters), std::move(contextFilters) };
 }
 
 // ──────────────────────────────────────────────────────────────────────
@@ -795,6 +801,28 @@ std::expected<CompilationResult, Error> compile(QStringView rawPath)
         func,
         std::move(*compiled)
     };
+}
+
+std::optional<Token> compileFilter(const QString& expr, QVector<FilterFn>& filters)
+{
+    // For backward compatibility, wrap context-aware compilation
+    QVector<ContextFilterFn> contextFilters;
+    auto result = json_query::json_path::compileContextFilter(expr, contextFilters, filters);
+    
+    if (result && result->contextFilterId < contextFilters.size()) {
+        // Extract the context filter and create a regular filter wrapper
+        const auto& contextFilter = contextFilters[result->contextFilterId];
+        filters.push_back([contextFilter](const QJsonValue& currentNode) -> bool {
+            // Call context filter with dummy root (backward compatibility)
+            return contextFilter(currentNode, QJsonValue{});
+        });
+        
+        // Update token to use regular filter
+        result->filterId = filters.size() - 1;
+        result->contextFilterId = SIZE_MAX;
+    }
+    
+    return result;
 }
 
 } // namespace json_query::json_path

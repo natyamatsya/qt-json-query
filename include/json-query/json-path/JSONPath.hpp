@@ -70,21 +70,25 @@ public:
     using Slice        = json_path::Slice;
     using Token        = json_path::Token;
     using FilterFn     = json_path::FilterFn;
+    using ContextFilterFn = json_path::ContextFilterFn;
+    using Error = json_path::Error;
 
 private:
     // -----------------------------------------------------------------
     //  Private "data" ctor – used only by factory                     ★
     // -----------------------------------------------------------------
-    JSONPath( Option                      opt,
-                  FunctionType                func,
+    JSONPath( FunctionType                func,
+                  Option                        opt,
                   QString                     original,
                   QVector<Token>              tokens,
-                  QVector<FilterFn> filters ) noexcept
+                  QVector<FilterFn> filters,
+                  QVector<ContextFilterFn> contextFilters ) noexcept
             : m_func(func)
             , m_option(opt)
             , m_originalPath(std::move(original))
             , m_tokens(std::move(tokens))
             , m_filters(std::move(filters))
+            , m_contextFilters(std::move(contextFilters))
         {}
 
     // -----------------------------------------------------------------
@@ -95,6 +99,7 @@ private:
     QString                    m_originalPath;
     QVector<Token>             m_tokens;
     QVector<FilterFn> m_filters;
+    QVector<ContextFilterFn> m_contextFilters;
 
 }; // end class JSONPath
 

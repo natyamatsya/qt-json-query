@@ -25,7 +25,7 @@ QJsonValue JSONPath::evaluate(const QJsonDocument &document) const
 // ─────────────────────────────────────────────────────────────────────
 QJsonValue JSONPath::evaluate(const QJsonValue& root) const
 {
-    json_path::detail::PathEvalCtx ctx{m_tokens, m_filters, m_option, m_func};
+    json_path::detail::PathEvalCtx ctx{m_tokens, m_filters, m_contextFilters, root, m_option, m_func};
     return json_path::detail::evaluate(ctx, root);
 }
 
@@ -33,13 +33,13 @@ QJsonArray JSONPath::evaluateAll(const QJsonDocument &document) const
 {
     const QJsonValue root = document.isArray() ? QJsonValue(document.array())
                                                : QJsonValue(document.object());
-    json_path::detail::PathEvalCtx ctx{m_tokens, m_filters, m_option, m_func};
+    json_path::detail::PathEvalCtx ctx{m_tokens, m_filters, m_contextFilters, root, m_option, m_func};
     return json_path::detail::evaluateAll(ctx, root);
 }
 
 QJsonArray JSONPath::evaluateAll(const QJsonValue &value) const
 {
-    json_path::detail::PathEvalCtx ctx{m_tokens, m_filters, m_option, m_func};
+    json_path::detail::PathEvalCtx ctx{m_tokens, m_filters, m_contextFilters, value, m_option, m_func};
     return json_path::detail::evaluateAll(ctx, value);
 }
 

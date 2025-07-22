@@ -10,6 +10,7 @@ set(JSON_QUERY_SOURCES
     json-path/JSONPathCreate.cpp
     json-path/JSONPathCompile.cpp
     json-path/JSONPathFilter.cpp
+    json-path/JSONPathContextFilter.cpp
     json-path/JSONPathTokenEvaluators.cpp
     json-path/JSONPathEvaluate.cpp
     json-path/JSONPathExpected.cpp
