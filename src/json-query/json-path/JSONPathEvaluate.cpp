@@ -94,11 +94,11 @@ QJsonArray evalSlice(const QJsonArray& array, const Slice& s)
                 qCDebug(jsonPathLog) << "  visiting i="<<i;
                 out.append(array[static_cast<int>(i)]);
             }
-            // Prevent overflow and infinite loops when step is huge
-            if (step <= 0 || step > std::numeric_limits<qsizetype>::max() - i) break;
-            qsizetype next = i + step;
-            if (next <= i) break; // safety guard
-            i = next;
+            // Prevent overflow when i + step would wrap
+            if (step <= 0) break; // should not happen, guard
+            if (i > std::numeric_limits<qsizetype>::max() - step)
+                break;
+            i += step;
         }
     } else {
         qsizetype i = start;
@@ -107,10 +107,11 @@ QJsonArray evalSlice(const QJsonArray& array, const Slice& s)
                 qCDebug(jsonPathLog) << "  visiting i="<<i;
                 out.append(array[static_cast<int>(i)]);
             }
-            if (step >= 0 || step < std::numeric_limits<qsizetype>::min() - i) break;
-            qsizetype next = i + step; // step negative
-            if (next >= i) break; // safety
-            i = next;
+            // Prevent underflow when i + step would wrap
+            if (step >= 0) break; // should not happen, guard
+            if (i < std::numeric_limits<qsizetype>::min() - step)
+                break;
+            i += step;
         }
     }
 

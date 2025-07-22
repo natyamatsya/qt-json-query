@@ -33,7 +33,7 @@ namespace
 
         qCDebug(jsonPathLog).noquote() << "makeSlice(" << v << ")";
 
-        auto strictParse = [&](QStringView part, std::optional<qsizetype>& out, bool requireInt32 = false)->bool{
+        auto strictParse = [&](QStringView part, std::optional<qsizetype>& out, bool overflowInvalid=false)->bool{
             part = part.trimmed();
             if (part.isEmpty()) {
                 out.reset();
@@ -55,10 +55,10 @@ namespace
 
             if (!ok) {
                 // Conversion overflowed 64-bit
-                if (requireInt32)
-                    return false; // step must be int32, overflow invalid
+                if (overflowInvalid)
+                    return false; // illegal for this component
 
-                // Otherwise, clamp to sentinel
+                // Otherwise, clamp to sentinel (treat as ±∞)
                 if (!part.isEmpty() && part.front() == u'-')
                     out = std::numeric_limits<qsizetype>::min();
                 else
@@ -67,25 +67,20 @@ namespace
             }
 
             // RFC 9535 §4.2.3: each literal MUST fit in signed-32-bit range.
-            static constexpr qlonglong INT32_MIN_LL = static_cast<qlonglong>(std::numeric_limits<int>::min());
-            static constexpr qlonglong INT32_MAX_LL = static_cast<qlonglong>(std::numeric_limits<int>::max());
             static constexpr qlonglong MAX_EXACT = 9007199254740991LL; // 2^53-1
             // RFC 9535: literals outside 32-bit range are accepted but treated as ±∞ (sentinel)
             if (v64 < -MAX_EXACT || v64 > MAX_EXACT)
                 return false; // totally out of supported range – selector invalid
 
-            if (requireInt32) {
-                if (v64 < INT32_MIN_LL || v64 > INT32_MAX_LL)
-                    return false;
+            static constexpr qlonglong INT32_MIN_LL = static_cast<qlonglong>(std::numeric_limits<int>::min());
+            static constexpr qlonglong INT32_MAX_LL = static_cast<qlonglong>(std::numeric_limits<int>::max());
+
+            if (v64 < INT32_MIN_LL)
+                out = std::numeric_limits<qsizetype>::min();
+            else if (v64 > INT32_MAX_LL)
+                out = std::numeric_limits<qsizetype>::max();
+            else
                 out = static_cast<qsizetype>(v64);
-            } else {
-                if (v64 < INT32_MIN_LL)
-                    out = std::numeric_limits<qsizetype>::min();
-                else if (v64 > INT32_MAX_LL)
-                    out = std::numeric_limits<qsizetype>::max();
-                else
-                    out = static_cast<qsizetype>(v64);
-            }
             return true;
         };
 
@@ -101,9 +96,9 @@ namespace
             return std::nullopt; // too many colons
         std::optional<qsizetype> startOpt, endOpt, stepOpt;
 
-        if (parts.size()>0 && !strictParse(parts[0].trimmed(), startOpt)) { qCDebug(jsonPathLog) << "strictParse failed for start"; return std::nullopt; }
-        if (parts.size()>1 && !strictParse(parts[1].trimmed(), endOpt))   { qCDebug(jsonPathLog) << "strictParse failed for end"; return std::nullopt; }
-        if (parts.size()>2 && !strictParse(parts[2].trimmed(), stepOpt, /*requireInt32=*/true))  { qCDebug(jsonPathLog) << "strictParse failed for step"; return std::nullopt; }
+        if (parts.size()>0 && !strictParse(parts[0].trimmed(), startOpt, /*overflowInvalid=*/true)) { qCDebug(jsonPathLog) << "strictParse failed for start"; return std::nullopt; }
+        if (parts.size()>1 && !strictParse(parts[1].trimmed(), endOpt,   /*overflowInvalid=*/true))   { qCDebug(jsonPathLog) << "strictParse failed for end"; return std::nullopt; }
+        if (parts.size()>2 && !strictParse(parts[2].trimmed(), stepOpt, /*overflowInvalid=*/true))  { qCDebug(jsonPathLog) << "strictParse failed for step"; return std::nullopt; }
 
         qCDebug(jsonPathLog) << "parsed slice startOpt="<<startOpt<<" endOpt="<<endOpt<<" stepOpt="<<stepOpt;
 
