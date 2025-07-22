@@ -66,10 +66,9 @@ namespace
                 return true;
             }
 
-            // RFC 9535 §4.2.3: each literal MUST fit in signed-32-bit range.
-            static constexpr qlonglong MAX_EXACT = 9007199254740991LL; // 2^53-1
-            // RFC 9535: literals outside 32-bit range are accepted but treated as ±∞ (sentinel)
-            if (v64 < -MAX_EXACT || v64 > MAX_EXACT)
+            // RFC 9535 §4.2.3: each literal MUST fit in safe-int range.
+            constexpr qlonglong SAFE_INT = 9007199254740991LL; // 2^53-1 per RFC 9535
+            if (v64 < -SAFE_INT || v64 > SAFE_INT)
                 return false; // totally out of supported range – selector invalid
 
             static constexpr qlonglong INT32_MIN_LL = static_cast<qlonglong>(std::numeric_limits<int>::min());
@@ -256,6 +255,25 @@ namespace
         return true;
     }
 
+    // Helper to validate integer literals per RFC 9535 §4.2.3
+    [[nodiscard]] static bool isValidIndexLiteral(QStringView content)
+    {
+        static const QRegularExpression re(R"(^(?:0|-[1-9][0-9]*|[1-9][0-9]*)$)");
+        auto m = re.match(content.toString());
+        if (!m.hasMatch()) {
+            qCDebug(jsonPathLog) << "isValidIndexLiteral(" << content << ") match=false";
+            return false;
+        }
+        bool ok=false; qlonglong val = content.toLongLong(&ok);
+        qCDebug(jsonPathLog) << "isValidIndexLiteral(" << content << ") match=true ok=" << ok << " val=" << (ok?QString::number(val):QStringLiteral("n/a"));
+        constexpr qlonglong SAFE_INT = 9007199254740991LL; // 2^53-1 per RFC 9535
+        if (!ok || val < -SAFE_INT || val > SAFE_INT) {
+            qCDebug(jsonPathLog) << " -> exceeds safe-int range";
+            return false;
+        }
+        return true;
+    }
+
 } // namespace
 
 namespace detail {
@@ -381,9 +399,11 @@ static const std::array<BrRule,10> BR_RULES = {{
 
     // 2.  123    ----------------------------------------------------
     [](QStringView content, BracketSink& out)->std::optional<Error> {
-        bool ok = false;
-        int idx = content.toInt(&ok);
-        if (!ok) return std::nullopt;
+        if (!isValidIndexLiteral(content)) return std::nullopt;
+        bool ok=false; qlonglong val = content.toLongLong(&ok);
+        int idx = (val > std::numeric_limits<int>::max()) ? std::numeric_limits<int>::max()
+                 : (val < std::numeric_limits<int>::min()) ? std::numeric_limits<int>::min()
+                 : static_cast<int>(val);
         out.index(idx);
         return Error::Ok;
     },
@@ -398,8 +418,11 @@ static const std::array<BrRule,10> BR_RULES = {{
         for (QStringView p : parts)
         {
             QStringView t = p.trimmed();
-            bool ok=false; int idx = t.toInt(&ok);
-            if (!ok) return std::nullopt; // not pure index list
+            if (!isValidIndexLiteral(t)) return std::nullopt; // not pure index list
+            bool ok=false; qlonglong val = t.toLongLong(&ok);
+            int idx = (val > std::numeric_limits<int>::max()) ? std::numeric_limits<int>::max()
+                     : (val < std::numeric_limits<int>::min()) ? std::numeric_limits<int>::min()
+                     : static_cast<int>(val);
             out.index(idx);
         }
         return Error::Ok;
@@ -491,6 +514,10 @@ static const std::array<BrRule,10> BR_RULES = {{
     [](QStringView content, BracketSink& out)->std::optional<Error> {
         if (content.contains(u'\'') || content.contains(u'"') || content.contains(u':') || content.contains(u','))
             return std::nullopt; // avoid other kinds
+        // If the content looks purely numeric (optional sign + digits), treat as invalid index not key
+        static const QRegularExpression numLike(R"(^[+-]?[0-9]+$)");
+        if (numLike.match(content.toString()).hasMatch())
+            return std::nullopt;
         if (auto r = out.key(content.toString()); !r)
             return r.error();
         return Error::Ok;
