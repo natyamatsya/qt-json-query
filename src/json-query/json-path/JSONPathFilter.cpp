@@ -230,13 +230,14 @@ struct Builder {
 };
 
 // Forward‑declare the individual parsers ------------------------
-[[nodiscard]] std::optional<Token> parseOr       (QString, QVector<FilterFn>&);
-[[nodiscard]] std::optional<Token> parseAnd      (QString, QVector<FilterFn>&);
-[[nodiscard]] std::optional<Token> parseIn       (QString, QVector<FilterFn>&);
-[[nodiscard]] std::optional<Token> parseCompare  (QString, QVector<FilterFn>&);
-[[nodiscard]] std::optional<Token> parseRegex    (QString, QVector<FilterFn>&);
-[[nodiscard]] std::optional<Token> parseExists   (QString, QVector<FilterFn>&);
-[[nodiscard]] std::optional<Token> parseSelfCmp  (QString, QVector<FilterFn>&);
+[[nodiscard]] std::optional<Token> parseOr      (QString, QVector<FilterFn>&);
+[[nodiscard]] std::optional<Token> parseAnd     (QString, QVector<FilterFn>&);
+[[nodiscard]] std::optional<Token> parseIn      (QString, QVector<FilterFn>&);
+[[nodiscard]] std::optional<Token> parseCompare (QString, QVector<FilterFn>&);
+[[nodiscard]] std::optional<Token> parseRegex   (QString, QVector<FilterFn>&);
+[[nodiscard]] std::optional<Token> parseExists  (QString, QVector<FilterFn>&);
+[[nodiscard]] std::optional<Token> parseSelfCmp (QString, QVector<FilterFn>&);
+[[nodiscard]] std::optional<Token> parseNot     (QString, QVector<FilterFn>&);
 
 // Template function forward declarations
 template<auto PAT> [[nodiscard]] std::optional<Token> parseCompare1     (QString, QVector<FilterFn>&);
@@ -253,6 +254,7 @@ using RuleFn = std::optional<Token>(*)(QString, QVector<FilterFn>&);
 constexpr std::array rules = {
     &parseOr,      // lowest precedence first
     &parseAnd,
+    &parseNot,     // Add negation parser with high precedence
     &parseIn,
     &parseExists,
     &parseSelfCmp,
@@ -757,15 +759,15 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
     constexpr auto negRootPat = ctll::fixed_string{R"(^!@$)"};
     constexpr auto negWildcardPat = ctll::fixed_string{R"(^!@\.\*$)"};
     constexpr auto negDotPat = ctll::fixed_string{R"(^!@\.([\w$]+)$)"};
-    constexpr auto negBrkPat = ctll::fixed_string{R"(^!@\[['\"]([^'\"]+)['\"]\]$)"};
+    constexpr auto negBrkPat = ctll::fixed_string{R"(^!@\[['\"]([^'"]+)['\"]\]$)"};
+    constexpr auto negRootRefPat = ctll::fixed_string{R"(^!\$$)"};
     
-    // Complex access patterns
-    constexpr auto arrayIndexPat = ctll::fixed_string{R"(^@\[(\d+)\]$)"};
-    constexpr auto arraySlicePat = ctll::fixed_string{R"(^@\[(\d*):(\d*)\]$)"};
-    constexpr auto negArrayIndexPat = ctll::fixed_string{R"(^!@\[(\d+)\]$)"};
-    constexpr auto negArraySlicePat = ctll::fixed_string{R"(^!@\[(\d*):(\d*)\]$)"};
-
-    auto makeToken = [&](QString prop)->Token {
+    // Array slice patterns for existence tests
+    constexpr auto arraySlicePat = ctll::fixed_string{R"(^@\[(-?\d+):(-?\d+)\]$)"};
+    constexpr auto negArraySlicePat = ctll::fixed_string{R"(^!@\[(-?\d+):(-?\d+)\]$)"};
+    
+    // Function to create existence test token
+    auto makeExistenceToken = [&](const QString& prop) -> Token {
         Builder b{out};
         return b.add([prop](const QJsonValue& j){
             const auto obj = j.toObject();
@@ -812,7 +814,24 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
         }, "@");
     };
 
-    auto makeNegatedToken = [&](QString prop)->Token {
+    auto makeWildcardToken = [&]()->Token {
+        Builder b{out};
+        return b.add([](const QJsonValue& j){
+            // RFC 9535: wildcard existence filters check for element/property presence
+            if (j.isObject()) {
+                const auto obj = j.toObject();
+                // Any property that exists (is not undefined) should match
+                return !obj.isEmpty(); // If object has any properties, wildcard existence is true
+            } else if (j.isArray()) {
+                const auto arr = j.toArray();
+                // Any array element that exists should match
+                return !arr.isEmpty(); // If array has any elements, wildcard existence is true
+            }
+            return false; // Primitives have no properties or elements
+        }, "@.*");
+    };
+
+    auto makeNegatedToken = [&](const QString& prop)->Token {
         Builder b{out};
         return b.add([prop](const QJsonValue& j){
             const auto obj = j.toObject();
@@ -856,23 +875,6 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
         }, "!@");
     };
 
-    auto makeWildcardToken = [&]()->Token {
-        Builder b{out};
-        return b.add([](const QJsonValue& j){
-            // RFC 9535: wildcard existence filters check for element/property presence
-            if (j.isObject()) {
-                const auto obj = j.toObject();
-                // Any property that exists (is not undefined) should match
-                return !obj.isEmpty(); // If object has any properties, wildcard existence is true
-            } else if (j.isArray()) {
-                const auto arr = j.toArray();
-                // Any array element that exists should match
-                return !arr.isEmpty(); // If array has any elements, wildcard existence is true
-            }
-            return false; // Primitives have no properties or elements
-        }, "@.*");
-    };
-
     auto makeNegatedWildcardToken = [&]()->Token {
         Builder b{out};
         return b.add([](const QJsonValue& j){
@@ -895,10 +897,6 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
         return makeNegatedRootToken();
     if (auto m = ctre::match<negWildcardPat>(to_sv(s)))
         return makeNegatedWildcardToken();
-    if (auto m = ctre::match<negArrayIndexPat>(to_sv(s))) {
-        int index = to_qstr(m.template get<1>().to_view()).toInt();
-        return makeNegatedArrayIndexToken(index);
-    }
     if (auto m = ctre::match<negArraySlicePat>(to_sv(s))) {
         QString startStr = to_qstr(m.template get<1>().to_view());
         QString endStr = to_qstr(m.template get<2>().to_view());
@@ -910,6 +908,15 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
         return makeNegatedToken(to_qstr(m.template get<1>().to_view()));
     if (auto m = ctre::match<negBrkPat>(to_sv(s)))
         return makeNegatedToken(to_qstr(m.template get<1>().to_view()));
+    if (auto m = ctre::match<negArraySlicePat>(to_sv(s))) {
+        QString startStr = to_qstr(m.template get<1>().to_view());
+        QString endStr = to_qstr(m.template get<2>().to_view());
+        int start = startStr.isEmpty() ? 0 : startStr.toInt();
+        int end = endStr.isEmpty() ? -1 : endStr.toInt();
+        return makeNegatedArraySliceToken(start, end);
+    }
+    if (auto m = ctre::match<negRootRefPat>(to_sv(s)))
+        return makeNegatedRootToken();
 
     // Root self-comparison pattern for $[?$==$] - compares root to itself
     constexpr auto rootSelfPat = ctll::fixed_string{R"(^\$\s*(==|!=)\s*\$$)"};
@@ -942,10 +949,6 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
         return makeWildcardToken();
     
     // Check for array access patterns
-    if (auto m = ctre::match<arrayIndexPat>(to_sv(s))) {
-        int index = to_qstr(m.template get<1>().to_view()).toInt();
-        return makeArrayIndexToken(index);
-    }
     if (auto m = ctre::match<arraySlicePat>(to_sv(s))) {
         QString startStr = to_qstr(m.template get<1>().to_view());
         QString endStr = to_qstr(m.template get<2>().to_view());
@@ -958,72 +961,85 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
     // The distinction is context-dependent and handled by the parsing order
     
     if (auto m = ctre::match<dotPat>(to_sv(s)))
-        return makeToken(to_qstr(m.template get<1>().to_view()));
+        return makeExistenceToken(to_qstr(m.template get<1>().to_view()));
     if (auto m = ctre::match<brkPat>(to_sv(s)))
-        return makeToken(to_qstr(m.template get<1>().to_view()));
+        return makeExistenceToken(to_qstr(m.template get<1>().to_view()));
     
     return std::nullopt;
 }
 
 std::optional<Token> parseSelfCmp(QString s, QVector<FilterFn>& out)
 {
-    static constexpr auto pat = ctll::fixed_string{R"(^@\s*(==|!=|>=|<=|>|<)\s*(.+)$)"};
+    static constexpr auto pat = ctll::fixed_string{R"(^@\s*(==|!=|>=|<=|>|<)\s*@$)"};
+    
     if (auto m = ctre::match<pat>(to_sv(s)))
     {
-        const QString op  = to_qstr(m.template get<1>().to_view());
-        QString rhs       = to_qstr(m.template get<2>().to_view()).trimmed();
-
-        bool   isNum = false;
-        double num   = rhs.toDouble(&isNum);
-        const bool rhsQuoted = (rhs.startsWith('\'') && rhs.endsWith('\'')) || (rhs.startsWith('"') && rhs.endsWith('"'));
-        const bool isBool  = (rhs.compare("true", Qt::CaseSensitive)==0 || rhs.compare("false", Qt::CaseSensitive)==0);
-        bool boolVal = false;
-        if (isBool) boolVal = (rhs.compare("true", Qt::CaseSensitive)==0);
-
-        const bool isNull = (!isNum && !isBool && (rhs.compare("null", Qt::CaseSensitive)==0));
-
-        if (!isNum && !isBool && !isNull && !rhsQuoted)
-            return std::nullopt;
-
-        if (!isNum && !isBool && !isNull)
-            (void)unquote(rhs);
-
-        ComparisonContext ctx;
-        ctx.op = op;
-        ctx.rhs = rhs;
-        ctx.type = isNum ? ComparisonType::Numeric : 
-                    isBool ? ComparisonType::Boolean : 
-                    isNull ? ComparisonType::Null : 
-                    rhsQuoted ? ComparisonType::DeepEquality : ComparisonType::String;
-        ctx.numVal = num;
-        ctx.boolVal = boolVal;
-        ctx.rhsQuoted = rhsQuoted;
-
-        auto cmpScalar=[ctx](const QJsonValue& v)->bool{
-            return ctx.compare(v);
-        };
-
+        const QString op = to_qstr(m.template get<1>().to_view());
+        
         Builder b{out};
-        return b.add([cmpScalar](const QJsonValue& j){
-            std::function<bool(const QJsonValue&)> visit = [&](const QJsonValue& v)->bool {
-                switch (v.type()) {
-                case QJsonValue::Array:
-                    for (const auto& elem : v.toArray())
-                        if (visit(elem)) return true;
-                    return false;
-                case QJsonValue::Object: {
-                    const auto obj = v.toObject();
-                    for (auto it = obj.constBegin(); it != obj.constEnd(); ++it)
-                        if (visit(it.value())) return true;
-                    return false;
-                }
-                default:
-                    return cmpScalar(v);
-                }
-            };
-            return visit(j);
-        });
+        return b.add([op](const QJsonValue& j){
+            // Self-comparison: compare the value to itself
+            // This is always true for == and always false for !=
+            // For ordering operators, it depends on the value type
+            if (op == "==") return true;
+            if (op == "!=") return false;
+            
+            // For ordering operators, self-comparison is always false
+            // (a value cannot be less than, greater than itself)
+            return false;
+        }, QString("@%1@").arg(op));
     }
+    
+    return std::nullopt;
+}
+
+// Parse negated expressions like !(@.a=='b')
+std::optional<Token> parseNot(QString s, QVector<FilterFn>& out)
+{
+    // Handle negation with parentheses: !(...) 
+    constexpr auto negParenPat = ctll::fixed_string{R"(^!\s*\(\s*(.*)\s*\)$)"};
+    
+    if (auto m = ctre::match<negParenPat>(to_sv(s)))
+    {
+        QString innerExpr = to_qstr(m.template get<1>().to_view()).trimmed();
+        
+        // Recursively parse the inner expression
+        QVector<FilterFn> innerFilters;
+        if (auto innerToken = compileFilter(innerExpr, innerFilters))
+        {
+            // Create a negated version of the inner filter
+            Builder b{out};
+            return b.add([innerFilters](const QJsonValue& j) -> bool {
+                // Apply the inner filter and negate the result
+                if (!innerFilters.empty()) {
+                    return !innerFilters[0](j);
+                }
+                return false;
+            }, QString("!(%1)").arg(innerExpr));
+        }
+    }
+    
+    // Handle simple negation: !@.prop, !@['prop'], etc.
+    if (s.startsWith('!') && s.length() > 1)
+    {
+        QString innerExpr = s.mid(1).trimmed();
+        
+        // Recursively parse the inner expression
+        QVector<FilterFn> innerFilters;
+        if (auto innerToken = compileFilter(innerExpr, innerFilters))
+        {
+            // Create a negated version of the inner filter
+            Builder b{out};
+            return b.add([innerFilters](const QJsonValue& j) -> bool {
+                // Apply the inner filter and negate the result
+                if (!innerFilters.empty()) {
+                    return !innerFilters[0](j);
+                }
+                return false;
+            }, QString("!%1").arg(innerExpr));
+        }
+    }
+    
     return std::nullopt;
 }
 
