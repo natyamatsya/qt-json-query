@@ -771,20 +771,9 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
         return b.add([](const QJsonValue& j){
             if (!j.isObject()) return false;
             const auto obj = j.toObject();
-            // Check if any property exists and is truthy
-            for (auto it = obj.constBegin(); it != obj.constEnd(); ++it) {
-                const auto& v = it.value();
-                switch (v.type()) {
-                case QJsonValue::Null:   continue; // null is falsy
-                case QJsonValue::Bool:   if (v.toBool()) return true; break;
-                case QJsonValue::Double: if (v.toDouble() != 0.0) return true; break;
-                case QJsonValue::String: if (!v.toString().isEmpty()) return true; break;
-                case QJsonValue::Array:  if (!v.toArray().isEmpty()) return true; break;
-                case QJsonValue::Object: if (!v.toObject().isEmpty()) return true; break;
-                default: continue;
-                }
-            }
-            return false; // No truthy properties found
+            // RFC 9535: wildcard existence filters check for property presence, not truthiness
+            // Any property that exists (is not undefined) should match
+            return !obj.isEmpty(); // If object has any properties, wildcard existence is true
         }, "@.*");
     };
 
@@ -793,20 +782,9 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
         return b.add([](const QJsonValue& j){
             if (!j.isObject()) return true; // non-objects don't have properties, so !@.* is true
             const auto obj = j.toObject();
-            // Check if NO property exists and is truthy (negated wildcard)
-            for (auto it = obj.constBegin(); it != obj.constEnd(); ++it) {
-                const auto& v = it.value();
-                switch (v.type()) {
-                case QJsonValue::Null:   continue; // null is falsy, doesn't affect result
-                case QJsonValue::Bool:   if (v.toBool()) return false; break; // found truthy, so !@.* is false
-                case QJsonValue::Double: if (v.toDouble() != 0.0) return false; break;
-                case QJsonValue::String: if (!v.toString().isEmpty()) return false; break;
-                case QJsonValue::Array:  if (!v.toArray().isEmpty()) return false; break;
-                case QJsonValue::Object: if (!v.toObject().isEmpty()) return false; break;
-                default: continue;
-                }
-            }
-            return true; // No truthy properties found, so !@.* is true
+            // RFC 9535: negated wildcard existence filters check for property absence
+            // If object has no properties, then !@.* is true
+            return obj.isEmpty(); // If object is empty, negated wildcard existence is true
         }, "!@.*");
     };
 
