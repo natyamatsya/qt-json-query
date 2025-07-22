@@ -302,7 +302,7 @@ std::optional<Token> parseAnd(QString s, QVector<FilterFn>& out)
 std::optional<Token> parseIn(QString s, QVector<FilterFn>& out)
 {
     constexpr auto pat = ctll::fixed_string{
-        R"('\s*([^']+?)\s*'\s+in\s+@\[['\"]([^'\"]+)['\"]\])"};
+        R"('\s*([^']+?)\s*'\s+in\s+@\[['\"]([^'"]+)['\"]\])"};
     if (auto m = ctre::match<pat>(to_sv(s)))
     {
         const QString want  = to_qstr(m.template get<1>().to_view());
@@ -941,6 +941,9 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
         int end = endStr.isEmpty() ? -1 : endStr.toInt();
         return makeArraySliceToken(start, end);
     }
+    
+    // RFC 9535: Support existence filters like $[?@.a] but reject incomplete predicates
+    // The distinction is context-dependent and handled by the parsing order
     
     if (auto m = ctre::match<dotPat>(to_sv(s)))
         return makeToken(to_qstr(m.template get<1>().to_view()));
