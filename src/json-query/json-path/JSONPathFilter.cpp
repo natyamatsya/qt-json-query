@@ -1232,9 +1232,22 @@ std::optional<Token> parseAbsolutePath(QString s, QVector<FilterFn>& out)
         return std::nullopt;
     }
     
-    // For now, implement basic existence test for absolute paths
-    // This handles patterns like $.*.a, $.foo.bar, etc.
+    // RFC 9535: Reject expressions that contain comparison operators
+    // These should be handled by other filter rules, not absolute path parsing
+    if (s.contains("==") || s.contains("!=") || s.contains("<=") || s.contains(">=") || 
+        s.contains("<") || s.contains(">") || s.contains("&&") || s.contains("||")) {
+        return std::nullopt;
+    }
+    
+    // Only accept simple absolute path references like $, $.foo, $.*.a, etc.
+    // Not complex expressions or comparisons
     using json_query::JSONPath;
+    
+    // Try to create the JSONPath - if it fails, the pattern is invalid
+    auto testPath = JSONPath::create(s);
+    if (!testPath) {
+        return std::nullopt; // Invalid absolute path pattern
+    }
     
     Builder b{out};
     return b.add([s](const QJsonValue& rootValue) -> bool {

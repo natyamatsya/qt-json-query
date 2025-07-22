@@ -10,11 +10,74 @@ std::optional<Token> parseAbsolutePathContext(QString s, QVector<ContextFilterFn
 {
     qCDebug(jsonPathLog) << "parseAbsolutePathContext called with:" << s;
     
-    // Pattern for absolute path references starting with $
-    static const auto absolutePathPat = ctre::match<R"(\$.*)">;
+    // RFC 9535 compliant patterns for absolute path references in filters
+    // According to RFC 9535, absolute path references should be simple path expressions,
+    // NOT comparison expressions or complex operations
     
-    if (absolutePathPat(s.toStdString())) {
-        qCDebug(jsonPathLog) << "parseAbsolutePathContext: matched absolute path pattern for:" << s;
+    // Reject expressions that contain comparison operators - these should be handled by regular filters
+    if (s.contains("==") || s.contains("!=") || s.contains("<=") || s.contains(">=") || 
+        s.contains("<") || s.contains(">") || s.contains("&&") || s.contains("||")) {
+        qCDebug(jsonPathLog) << "parseAbsolutePathContext: rejecting comparison expression:" << s;
+        return std::nullopt;
+    }
+    
+    // Only accept simple absolute path references
+    static const auto rootOnlyPat = ctre::match<R"(\$)">;  // Just "$"
+    static const auto simpleAbsPathPat = ctre::match<R"(\$(\.[a-zA-Z_][a-zA-Z0-9_]*|\.\*|\[.*\])*)">;  // Simple absolute paths like $.foo, $.*, etc.
+    
+    // Check for root-only reference first
+    if (rootOnlyPat(s.toStdString())) {
+        qCDebug(jsonPathLog) << "parseAbsolutePathContext: matched root-only pattern for:" << s;
+        
+        // Create a context-aware filter that uses the root document
+        // For now, implement basic absolute path evaluation
+        struct ContextBuilder {
+            QVector<ContextFilterFn>& fns;
+            
+            [[nodiscard]] Token add(ContextFilterFn fn, QString key = {})
+            {
+                fns.push_back(std::move(fn));
+                const std::size_t id = fns.size() - 1;
+                Token token{Token::Kind::Filter, 0, {}, 0u, std::move(key), 0};
+                token.contextFilterId = id;
+                return token;
+            }
+        };
+        
+        ContextBuilder b{out};
+        return b.add([s](const QJsonValue& node, const QJsonValue& root) -> bool {
+            qCDebug(jsonPathLog) << "Evaluating absolute path filter:" << s << "on root:" << root;
+            
+            // Basic implementation for simple absolute path references
+            if (s == "$") {
+                // Root existence filter: always true if root exists
+                return !root.isUndefined();
+            }
+            
+            // Handle simple absolute path patterns
+            if (s.startsWith("$.")) {
+                // For patterns like "$.a", "$.*.a", etc., try to evaluate against root
+                try {
+                    // Create a temporary JSONPath to evaluate the absolute path
+                    auto absolutePath = json_query::JSONPath::create(s);
+                    if (absolutePath) {
+                        auto results = absolutePath->evaluateAll(root);
+                        // Return true if the absolute path yields any results
+                        bool hasResults = !results.isEmpty();
+                        qCDebug(jsonPathLog) << "Absolute path" << s << "evaluation result:" << hasResults << "(" << results.size() << "results)";
+                        return hasResults;
+                    }
+                } catch (...) {
+                    qCDebug(jsonPathLog) << "Failed to evaluate absolute path:" << s;
+                }
+            }
+            
+            // Fallback for unimplemented patterns
+            qCDebug(jsonPathLog) << "Absolute path pattern not yet fully implemented:" << s;
+            return false;
+        });
+    } else if (simpleAbsPathPat(s.toStdString())) {
+        qCDebug(jsonPathLog) << "parseAbsolutePathContext: matched simple absolute path pattern for:" << s;
         
         // Create a context-aware filter that uses the root document
         // For now, implement basic absolute path evaluation
