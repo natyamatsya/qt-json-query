@@ -333,21 +333,44 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
             // Apply union semantics only if we have multiple consecutive selector tokens
             // AND we're not in a sequential context (after Recursive)
             // AND it's not sequential property access (consecutive Key tokens from dot notation)
-            // AND it's not wildcard + property access (wildcard followed by Key tokens)
             bool isSequentialPropertyAccess = (unionTokens.size() > 1 && 
                                                std::all_of(unionTokens.begin(), unionTokens.end(), 
                                                           [&ctx](qsizetype idx) { 
                                                               return ctx.tokens[idx].kind == Token::Kind::Key; 
                                                           }));
             
-            bool isWildcardPropertyAccess = (unionTokens.size() > 1 && 
-                                             ctx.tokens[unionTokens[0]].kind == Token::Kind::Wildcard &&
-                                             std::all_of(unionTokens.begin() + 1, unionTokens.end(), 
-                                                        [&ctx](qsizetype idx) { 
-                                                            return ctx.tokens[idx].kind == Token::Kind::Key; 
-                                                        }));
+            // For wildcard + key patterns, we need to distinguish between:
+            // 1. Dot notation: $.*.a (sequential - key applied to wildcard results)
+            // 2. Bracket union: $[*,'a'] (union - both applied to same input)
+            // 
+            // Strategy: Try sequential evaluation first. If the key produces no results when
+            // applied to wildcard results, but would produce results when applied to the original
+            // input, then it's likely a bracket union pattern.
+            bool isWildcardSequentialAccess = false;
+            if (unionTokens.size() == 2 && 
+                ctx.tokens[unionTokens[0]].kind == Token::Kind::Wildcard &&
+                ctx.tokens[unionTokens[1]].kind == Token::Kind::Key) {
+                
+                // Test sequential evaluation: apply key to wildcard results
+                QJsonArray wildcardResults = fanOut(ctx, ctx.tokens[unionTokens[0]], working);
+                QJsonArray keyOnWildcardResults = fanOut(ctx, ctx.tokens[unionTokens[1]], wildcardResults);
+                
+                // Test union evaluation: apply key to original input
+                QJsonArray keyOnOriginalInput = fanOut(ctx, ctx.tokens[unionTokens[1]], working);
+                
+                // If key produces results on wildcard results, it's likely sequential (dot notation)
+                // If key produces no results on wildcard results but results on original input, it's likely union (bracket)
+                if (!keyOnWildcardResults.isEmpty()) {
+                    isWildcardSequentialAccess = true; // Dot notation like $.*.a
+                } else if (!keyOnOriginalInput.isEmpty()) {
+                    isWildcardSequentialAccess = false; // Bracket union like $[*,'a']
+                } else {
+                    // Both produce no results - default to sequential for consistency
+                    isWildcardSequentialAccess = true;
+                }
+            }
             
-            if (unionTokens.size() > 1 && !prevRecursive && !isSequentialPropertyAccess && !isWildcardPropertyAccess) {
+            if (unionTokens.size() > 1 && !prevRecursive && !isSequentialPropertyAccess && !isWildcardSequentialAccess) {
                 qDebug() << "[union] processing" << unionTokens.size() << "consecutive selector tokens";
                 
                 QJsonArray unionResult;
