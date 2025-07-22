@@ -250,15 +250,17 @@ std::optional<Token> parseCompare1(QString s, QVector<FilterFn>& out)
         const bool isBool = (!isNum && (rhs.compare("true", Qt::CaseSensitive)==0 || rhs.compare("false", Qt::CaseSensitive)==0));
         const bool boolVal = isBool ? (rhs.compare("true", Qt::CaseSensitive)==0) : false;
 
-        // Reject unquoted RHS that is neither valid number nor boolean
-        if (!isNum && !isBool && !rhsQuoted)
+        const bool isNull = (!isNum && !isBool && (rhs.compare("null", Qt::CaseSensitive)==0));
+
+        // Reject unquoted RHS that is neither valid number, boolean, nor null
+        if (!isNum && !isBool && !isNull && !rhsQuoted)
             return std::nullopt;
 
-        if (!isNum && !isBool)
+        if (!isNum && !isBool && !isNull)
             (void)unquote(rhs);
 
         Builder b{out};
-        return b.add([prop, op, isNum, numVal, isBool, boolVal, rhs, rhsQuoted](const QJsonValue& j) -> bool
+        return b.add([prop, op, isNum, numVal, isBool, boolVal, rhs, rhsQuoted, isNull](const QJsonValue& j) -> bool
         {
             const auto obj = j.toObject();
             const auto v = obj.value(prop);
@@ -325,6 +327,15 @@ std::optional<Token> parseCompare1(QString s, QVector<FilterFn>& out)
                 if (op=="<=") return !b || boolVal;  // false <= anything, true <= true
                 if (op==">=") return b || !boolVal;  // true >= anything, false >= false
                 return false;
+            }
+            
+            if (isNull) {
+                // RFC 9535: null comparisons
+                if (op=="==") return v.isNull();
+                if (op=="!=") return !v.isNull();
+                if (op=="<=") return v.isNull(); // null <= null is true
+                if (op==">=") return v.isNull(); // null >= null is true
+                return false; // null < null and null > null are false
             }
             
             // Handle array/object deep equality comparisons
@@ -409,15 +420,17 @@ std::optional<Token> parseCompareIndex(QString s, QVector<FilterFn>& out)
         const bool isBool = (!isNum && (rhs.compare("true", Qt::CaseSensitive)==0 || rhs.compare("false", Qt::CaseSensitive)==0));
         const bool boolVal = isBool ? (rhs.compare("true", Qt::CaseSensitive)==0) : false;
 
-        // Reject unquoted RHS that is neither valid number nor boolean
-        if (!isNum && !isBool && !rhsQuoted)
+        const bool isNull = (!isNum && !isBool && (rhs.compare("null", Qt::CaseSensitive)==0));
+
+        // Reject unquoted RHS that is neither valid number, boolean, nor null
+        if (!isNum && !isBool && !isNull && !rhsQuoted)
             return std::nullopt;
 
-        if (!isNum && !isBool)
+        if (!isNum && !isBool && !isNull)
             (void)unquote(rhs);
 
         Builder b{out};
-        return b.add([idx, op, isNum, numVal, isBool, boolVal, rhs, rhsQuoted](const QJsonValue& j) -> bool
+        return b.add([idx, op, isNum, numVal, isBool, boolVal, rhs, rhsQuoted, isNull](const QJsonValue& j) -> bool
         {
             const auto arr = j.toArray();
             if (idx < 0 || idx >= arr.size()) return false;
@@ -484,6 +497,15 @@ std::optional<Token> parseCompareIndex(QString s, QVector<FilterFn>& out)
                 if (op=="<=") return !b || boolVal;  // false <= anything, true <= true
                 if (op==">=") return b || !boolVal;  // true >= anything, false >= false
                 return false;
+            }
+            
+            if (isNull) {
+                // RFC 9535: null comparisons
+                if (op=="==") return v.isNull();
+                if (op=="!=") return !v.isNull();
+                if (op=="<=") return v.isNull(); // null <= null is true
+                if (op==">=") return v.isNull(); // null >= null is true
+                return false; // null < null and null > null are false
             }
             
             // Handle array/object deep equality comparisons
@@ -951,13 +973,15 @@ std::optional<Token> parseSelfCmp(QString s, QVector<FilterFn>& out)
         bool boolVal = false;
         if (isBool) boolVal = (rhs.compare("true", Qt::CaseSensitive)==0);
 
-        if (!isNum && !isBool && !rhsQuoted)
+        const bool isNull = (!isNum && !isBool && (rhs.compare("null", Qt::CaseSensitive)==0));
+
+        if (!isNum && !isBool && !isNull && !rhsQuoted)
             return std::nullopt;
 
-        if (!isNum && !isBool)
+        if (!isNum && !isBool && !isNull)
             (void)unquote(rhs);
 
-        auto cmpScalar=[op,isNum,num,isBool,boolVal,rhs](const QJsonValue& v)->bool{
+        auto cmpScalar=[op,isNum,num,isBool,boolVal,rhs,isNull](const QJsonValue& v)->bool{
             if (isNum) {
                 if (!v.isDouble()) return false;
                 const double x=v.toDouble();
@@ -979,6 +1003,14 @@ std::optional<Token> parseSelfCmp(QString s, QVector<FilterFn>& out)
                 if (op=="<=") return !b || boolVal;  // false <= anything, true <= true
                 if (op==">=") return b || !boolVal;  // true >= anything, false >= false
                 return false;
+            }
+            if (isNull) {
+                // RFC 9535: null comparisons
+                if (op=="==") return v.isNull();
+                if (op=="!=") return !v.isNull();
+                if (op=="<=") return v.isNull(); // null <= null is true
+                if (op==">=") return v.isNull(); // null >= null is true
+                return false; // null < null and null > null are false
             }
             QString s=v.toString();
             return op=="=="?s==rhs: op=="!="?s!=rhs:false;
