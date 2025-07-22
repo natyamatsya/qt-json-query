@@ -374,10 +374,21 @@ static const std::array<BrRule,11> BR_RULES = {{
 
         // Helper lambda to route a single segment through existing rules (skip union rule to prevent recursion)
         auto compileOne = [&](QStringView seg)->std::optional<Error> {
+            // Case A: segment starts with '?'  → standalone filter expression
+            if (seg.startsWith(u'?')) {
+                QString expr = QString(seg.mid(1)).trimmed();
+                if (expr.isEmpty()) return std::optional<Error>{};
+                if (auto tok = json_query::json_path::compileFilter(expr, out.filters)) {
+                    out.pushFilter(*tok);
+                    return Error::Ok;
+                }
+                return std::optional<Error>{}; // treat as non-match so other rules can try
+            }
+
+            // Case B: delegate to other bracket rules (skip union rule itself)
             for (size_t i = 1; i < std::size(BR_RULES); ++i) {
                 if (auto err = BR_RULES[i](seg, out)) {
-                    if (*err == Error::Ok) return err;
-                    else return err; // propagate error
+                    return err; // either Ok or specific error
                 }
             }
             return std::nullopt; // no rule matched
@@ -460,8 +471,8 @@ static const std::array<BrRule,11> BR_RULES = {{
     // 4b.  ?expr (no outer parentheses) --------------------------------
     [](QStringView content, BracketSink& out)->std::optional<Error> {
         // Accept syntax like ?@.a==1  or ?$==null (no wrapping parens)
-        if (!content.startsWith(u'?') || content.startsWith(u"?(") )
-            return std::nullopt; // Already handled by 4 or not a filter
+        if (!content.startsWith(u'?'))
+            return std::nullopt; // Not a filter expression
 
         QStringView exprView = content.sliced(1).trimmed();
         if (exprView.isEmpty()) return std::nullopt; // Could be placeholder handled later

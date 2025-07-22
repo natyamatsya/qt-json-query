@@ -81,10 +81,14 @@ QJsonArray eval<Token::Kind::Filter>(const PathEvalCtx& ctx,
                 out.append(item);
         }
     } else if (v.isObject()) {
-        const bool pass = filterFn(v);
-        qDebug() << "[filter] object" << v << "pass=" << pass;
-        if (pass)
-            out.append(v);
+        QJsonObject obj = v.toObject();
+        for (auto it = obj.constBegin(); it != obj.constEnd(); ++it) {
+            const QJsonValue &val = it.value();
+            const bool pass = filterFn(val);
+            qDebug() << "[filter] object value" << val << "pass=" << pass;
+            if (pass)
+                out.append(val);
+        }
     }
     return out;
 }

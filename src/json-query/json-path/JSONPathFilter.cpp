@@ -77,6 +77,7 @@ struct Builder {
 [[nodiscard]] std::optional<Token> parseCompare  (QString, QVector<FilterFn>&);
 [[nodiscard]] std::optional<Token> parseRegex    (QString, QVector<FilterFn>&);
 [[nodiscard]] std::optional<Token> parseExists   (QString, QVector<FilterFn>&);
+[[nodiscard]] std::optional<Token> parseSelfCmp  (QString, QVector<FilterFn>&);
 
 // Table‑driven dispatch  ----------------------------------------
 using RuleFn = std::optional<Token>(*)(QString, QVector<FilterFn>&);
@@ -86,6 +87,7 @@ constexpr std::array rules = {
     &parseAnd,
     &parseIn,
     &parseExists,
+    &parseSelfCmp,
     &parseCompare,
     &parseRegex
 };
@@ -305,6 +307,72 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
         return makeToken(to_qstr(m.template get<1>().to_view()));
     if (auto m = ctre::match<brkPat>(to_sv(s)))
         return makeToken(to_qstr(m.template get<1>().to_view()));
+    return std::nullopt;
+}
+
+std::optional<Token> parseSelfCmp(QString s, QVector<FilterFn>& out)
+{
+    static constexpr auto pat = ctll::fixed_string{R"(^@\s*(==|!=|>=|<=|>|<)\s*(.+)$)"};
+    if (auto m = ctre::match<pat>(to_sv(s)))
+    {
+        const QString op  = to_qstr(m.template get<1>().to_view());
+        QString rhs       = to_qstr(m.template get<2>().to_view()).trimmed();
+
+        bool   isNum = false;
+        double num   = rhs.toDouble(&isNum);
+        const bool rhsQuoted = rhs.startsWith('\'') && rhs.endsWith('\'');
+        const bool isBool  = (rhs.compare("true", Qt::CaseInsensitive)==0 || rhs.compare("false", Qt::CaseInsensitive)==0);
+        bool boolVal = false;
+        if (isBool) boolVal = (rhs.compare("true", Qt::CaseInsensitive)==0);
+
+        if (!isNum && !isBool && !rhsQuoted)
+            return std::nullopt;
+
+        if (!isNum && !isBool)
+            (void)unquote(rhs);
+
+        auto cmpScalar=[op,isNum,num,isBool,boolVal,rhs](const QJsonValue& v)->bool{
+            if (isNum) {
+                if (!v.isDouble()) return false;
+                const double x=v.toDouble();
+                if (op=="==") return x==num;
+                if (op=="!=") return x!=num;
+                if (op==">") return x>num;
+                if (op=="<") return x<num;
+                if (op==">=") return x>=num;
+                if (op=="<=") return x<=num;
+                return false;
+            }
+            if (isBool){
+                if(!v.isBool()) return false;
+                bool b=v.toBool();
+                return op=="=="?b==boolVal: op=="!="?b!=boolVal:false;
+            }
+            QString s=v.toString();
+            return op=="=="?s==rhs: op=="!="?s!=rhs:false;
+        };
+
+        Builder b{out};
+        return b.add([cmpScalar](const QJsonValue& j){
+            std::function<bool(const QJsonValue&)> visit = [&](const QJsonValue& v)->bool {
+                switch (v.type()) {
+                case QJsonValue::Array:
+                    for (const auto& elem : v.toArray())
+                        if (visit(elem)) return true;
+                    return false;
+                case QJsonValue::Object: {
+                    const auto obj = v.toObject();
+                    for (auto it = obj.constBegin(); it != obj.constEnd(); ++it)
+                        if (visit(it.value())) return true;
+                    return false;
+                }
+                default:
+                    return cmpScalar(v);
+                }
+            };
+            return visit(j);
+        });
+    }
     return std::nullopt;
 }
 
