@@ -120,6 +120,9 @@ struct Builder {
 [[nodiscard]] std::optional<Token> parseExists   (QString, QVector<FilterFn>&);
 [[nodiscard]] std::optional<Token> parseSelfCmp  (QString, QVector<FilterFn>&);
 
+// Template function forward declarations
+template<auto PAT> [[nodiscard]] std::optional<Token> parseCompareIndex(QString, QVector<FilterFn>&);
+
 // Table‑driven dispatch  ----------------------------------------
 using RuleFn = std::optional<Token>(*)(QString, QVector<FilterFn>&);
 
@@ -284,16 +287,98 @@ std::optional<Token> parseCompare1(QString s, QVector<FilterFn>& out)
     return std::nullopt;
 }
 
-std::optional<Token> parseCompare(QString s, QVector<FilterFn>& out)
+template<auto PAT>
+std::optional<Token> parseCompareIndex(QString s, QVector<FilterFn>& out)
 {
-    constexpr auto dotPat = ctll::fixed_string{R"(@\.([\w$]+)\s*(==|!=|>=|<=|>|<)\s*(.+))"};
-    constexpr auto brkPat = ctll::fixed_string{R"(@\[['\"]([^'\"]+)['\"]\]\s*(==|!=|>=|<=|>|<)\s*(.+))"};
+    if (auto m = ctre::match<PAT>(to_sv(s)))
+    {
+        const int idx = to_qstr(m.template get<1>().to_view()).toInt();
+        const QString op   = to_qstr(m.template get<2>().to_view());
+        QString rhs        = to_qstr(m.template get<3>().to_view()).trimmed();
 
-    if (auto t = parseCompare1<dotPat>(s, out)) return t;
-    return        parseCompare1<brkPat>(s, out);
+        // Runtime numeric literal validator (RFC 8259 style)
+        auto isValidNumberLiteral = [](QStringView v)->bool {
+            if (v.isEmpty()) return false;
+            int i = 0;
+            if (v[i] == u'-') {
+                ++i;
+                if (i==v.size()) return false; // just '-'
+            }
+            // int part
+            if (!v[i].isDigit()) return false;
+            if (v[i]==u'0' && i+1< v.size() && v[i+1].isDigit()) return false; // leading zero
+            while (i < v.size() && v[i].isDigit()) ++i;
+            // frac part
+            if (i < v.size() && v[i]==u'.') {
+                ++i;
+                int fracStart=i;
+                while (i< v.size() && v[i].isDigit()) ++i;
+                if (i==fracStart) return false; // no digits after '.'
+            }
+            // exponent part
+            if (i < v.size() && (v[i]==u'e' || v[i]==u'E')) {
+                ++i;
+                if (i==v.size()) return false;
+                if (v[i]==u'+' || v[i]==u'-') ++i;
+                int expStart=i;
+                while (i< v.size() && v[i].isDigit()) ++i;
+                if (i==expStart) return false; // no digits in exponent
+            }
+            return i==v.size();
+        };
+
+        const bool rhsQuoted = (rhs.size() >= 2) && ((rhs.front()==u'\'' && rhs.back()==u'\'') || (rhs.front()==u'\"' && rhs.back()==u'\"'));
+
+        bool isNum = isValidNumberLiteral(rhs);
+        double num = isNum ? rhs.toDouble() : 0.0;
+
+        const bool isBool = (!isNum && (rhs.compare("true", Qt::CaseSensitive)==0 || rhs.compare("false", Qt::CaseSensitive)==0));
+        const bool boolVal = isBool ? (rhs.compare("true", Qt::CaseSensitive)==0) : false;
+
+        // Reject unquoted RHS that is neither valid number nor boolean
+        if (!isNum && !isBool && !rhsQuoted)
+            return std::nullopt;
+
+        if (!isNum && !isBool)
+            (void)unquote(rhs);
+
+        Builder b{out};
+        return b.add([idx, op, isNum, num, isBool, boolVal, rhs](const QJsonValue& j) -> bool
+        {
+            const auto arr = j.toArray();
+            if (idx < 0 || idx >= arr.size()) return false;
+            const auto v = arr[idx];
+            qCDebug(jsonPathLog).nospace() << "[flt-cmp] idx=" << idx << " op='" << op
+                                          << "' rhs=" << (isNum ? QString::number(num) : rhs)
+                                          << " | v=" << v << " (type=" << v.type() << ")";
+            if (isNum) {
+                if (!v.isDouble()) return false;
+                const double x = v.toDouble();
+                qCDebug(jsonPathLog).nospace() << "  -> numeric compare lhs=" << x;
+                if (op=="==") return x == num;
+                if (op=="!=") return x != num;
+                if (op==">")  return x >  num;
+                if (op=="<")  return x <  num;
+                if (op==">=") return x >= num;
+                if (op=="<=") return x <= num;
+                return false;
+            }
+            if (isBool) {
+                if (!v.isBool()) return false;
+                const bool b = v.toBool();
+                return op=="==" ? b == boolVal
+                                 : op=="!=" ? b != boolVal
+                                 : false;
+            }
+            const QString vs = v.toString();
+            return op=="==" ? vs == rhs
+                 : op=="!=" ? vs != rhs
+                 : false;
+        });
+    }
+    return std::nullopt;
 }
 
-// -----------------------------------------------------------------------------
 template<auto PAT>
 std::optional<Token> parseRegex1(QString s, QVector<FilterFn>& out)
 {
@@ -320,6 +405,17 @@ std::optional<Token> parseRegex(QString s, QVector<FilterFn>& out)
 
     if (auto t = parseRegex1<dotPat>(s, out)) return t;
     return        parseRegex1<brkPat>(s, out);
+}
+
+std::optional<Token> parseCompare(QString s, QVector<FilterFn>& out)
+{
+    constexpr auto dotPat = ctll::fixed_string{R"(@\.([\w$]+)\s*(==|!=|>=|<=|>|<)\s*(.+))"};
+    constexpr auto brkPat = ctll::fixed_string{R"(@\[['\"]([^'\"]+)['\"]\]\s*(==|!=|>=|<=|>|<)\s*(.+))"};
+    constexpr auto idxPat = ctll::fixed_string{R"(@\[(-?\d+)\]\s*(==|!=|>=|<=|>|<)\s*(.+))"};
+
+    if (auto t = parseCompare1<dotPat>(s, out)) return t;
+    if (auto t = parseCompare1<brkPat>(s, out)) return t;
+    return        parseCompareIndex<idxPat>(s, out);
 }
 
 // Existence / truthiness: "@.prop" or "@['prop']" (no operator)
