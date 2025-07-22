@@ -50,10 +50,51 @@ namespace json_query::json_path::detail {
         s = s.mid(1, idx - 1);
     }
 
-    // Unescape backslash sequences
-    s.replace("\\\\", "\\");   // \\ -> \
-    s.replace("\\'", "'");       // \\' -> '
-    s.replace("\\\"", "\"");   // \\" -> "
+    // RFC 9535-compliant escape sequence processing (Table 4)
+    QString result;
+    result.reserve(s.size());
+    
+    for (int i = 0; i < s.size(); ++i) {
+        if (s[i] == u'\\' && i + 1 < s.size()) {
+            const QChar next = s[i + 1];
+            switch (next.unicode()) {
+                case u'b':  result += u'\b'; i++; break;  // backspace
+                case u't':  result += u'\t'; i++; break;  // horizontal tab
+                case u'n':  result += u'\n'; i++; break;  // line feed
+                case u'f':  result += u'\f'; i++; break;  // form feed
+                case u'r':  result += u'\r'; i++; break;  // carriage return
+                case u'"':  result += u'"';  i++; break;  // quotation mark
+                case u'\'': result += u'\''; i++; break;  // apostrophe
+                case u'/':  result += u'/';  i++; break;  // solidus
+                case u'\\': result += u'\\'; i++; break;  // reverse solidus
+                case u'u':  // Unicode escape \uXXXX
+                    if (i + 5 < s.size()) {
+                        bool ok = false;
+                        const QString hexStr = s.mid(i + 2, 4);
+                        const ushort codePoint = hexStr.toUShort(&ok, 16);
+                        if (ok) {
+                            result += QChar(codePoint);
+                            i += 5;  // skip \uXXXX
+                        } else {
+                            // Invalid Unicode escape, keep as-is
+                            result += s[i];
+                        }
+                    } else {
+                        // Incomplete Unicode escape, keep as-is
+                        result += s[i];
+                    }
+                    break;
+                default:
+                    // Unknown escape sequence, keep as-is (RFC 9535 behavior)
+                    result += s[i];
+                    break;
+            }
+        } else {
+            result += s[i];
+        }
+    }
+    
+    s = result;
     return true;
 }
 
@@ -197,8 +238,8 @@ std::optional<Token> parseCompare1(QString s, QVector<FilterFn>& out)
         bool isNum = isValidNumberLiteral(rhs);
         double num = isNum ? rhs.toDouble() : 0.0;
 
-        const bool isBool = (!isNum && (rhs == "true" || rhs == "false"));
-        const bool boolVal = isBool ? (rhs == "true") : false;
+        const bool isBool = (!isNum && (rhs.compare("true", Qt::CaseSensitive)==0 || rhs.compare("false", Qt::CaseSensitive)==0));
+        const bool boolVal = isBool ? (rhs.compare("true", Qt::CaseSensitive)==0) : false;
 
         // Reject unquoted RHS that is neither valid number nor boolean
         if (!isNum && !isBool && !rhsQuoted)
@@ -320,10 +361,10 @@ std::optional<Token> parseSelfCmp(QString s, QVector<FilterFn>& out)
 
         bool   isNum = false;
         double num   = rhs.toDouble(&isNum);
-        const bool rhsQuoted = rhs.startsWith('\'') && rhs.endsWith('\'');
-        const bool isBool  = (rhs.compare("true", Qt::CaseInsensitive)==0 || rhs.compare("false", Qt::CaseInsensitive)==0);
+        const bool rhsQuoted = (rhs.startsWith('\'') && rhs.endsWith('\'')) || (rhs.startsWith('"') && rhs.endsWith('"'));
+        const bool isBool  = (rhs.compare("true", Qt::CaseSensitive)==0 || rhs.compare("false", Qt::CaseSensitive)==0);
         bool boolVal = false;
-        if (isBool) boolVal = (rhs.compare("true", Qt::CaseInsensitive)==0);
+        if (isBool) boolVal = (rhs.compare("true", Qt::CaseSensitive)==0);
 
         if (!isNum && !isBool && !rhsQuoted)
             return std::nullopt;

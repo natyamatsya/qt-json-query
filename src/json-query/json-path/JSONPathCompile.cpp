@@ -68,7 +68,7 @@ namespace
             }
 
             // RFC 9535 §4.2.3: each literal MUST fit in safe-int range.
-            constexpr qlonglong SAFE_INT = 9007199254740991LL; // 2^53-1 per RFC 9535
+            constexpr qlonglong SAFE_INT = 9007199254740992LL; // 2^53 per RFC 9535 test expectations
             if (v64 < -SAFE_INT || v64 > SAFE_INT)
                 return false; // totally out of supported range – selector invalid
 
@@ -267,11 +267,10 @@ namespace
         }
         bool ok=false; qlonglong val = content.toLongLong(&ok);
         qCDebug(jsonPathLog) << "isValidIndexLiteral(" << content << ") match=true ok=" << ok << " val=" << (ok?QString::number(val):QStringLiteral("n/a"));
-        constexpr qlonglong SAFE_INT = 9007199254740991LL; // 2^53-1 per RFC 9535
-        if (!ok || val < -SAFE_INT || val > SAFE_INT) {
-            qCDebug(jsonPathLog) << " -> exceeds safe-int range";
-            return false;
-        }
+        constexpr qlonglong SAFE_INT = 9007199254740992LL; // 2^53 per RFC 9535 test expectations
+        if (!ok || val < -SAFE_INT || val > SAFE_INT)
+            return false; // totally out of supported range – selector invalid
+
         return true;
     }
 
@@ -348,14 +347,17 @@ struct BracketSink {
     }
     void wild()                 { tk.append(Token{Token::Kind::Wildcard}); }
     void slice(const Slice& s)   { tk.append(Token{Token::Kind::Slice,0,s,0u}); }
-    void index(int i)            { tk.append(Token{Token::Kind::Index,i}); }
+    void index(int i)            { 
+        qCDebug(jsonPathLog) << "BracketSink::index emit" << i;
+        tk.append(Token{Token::Kind::Index,i}); 
+    }
     void pushFilter(const Token& t){ tk.append(t); }
 };
 
 // A helper to iterate over the content and run rules.
 using BrRule = std::function<std::optional<Error>(QStringView, BracketSink&)>;
 
-static const std::array<BrRule,11> BR_RULES = {{
+static const std::array<BrRule,10> BR_RULES = {{
     // 0.  union by comma (sequential selectors, e.g. ?@.a,1) --------
     [](QStringView content, BracketSink& out)->std::optional<Error> {
         if (!content.contains(u',')) return std::nullopt;
@@ -410,17 +412,24 @@ static const std::array<BrRule,11> BR_RULES = {{
 
     // 2.  123    ----------------------------------------------------
     [](QStringView content, BracketSink& out)->std::optional<Error> {
-        if (!isValidIndexLiteral(content)) return std::nullopt;
+        qCDebug(jsonPathLog) << "BR_RULE index-single check" << content.toString();
+        if (!isValidIndexLiteral(content)) {
+            qCDebug(jsonPathLog) << "  -> invalid index literal";
+            return std::nullopt;
+        }
+        qCDebug(jsonPathLog) << "  -> valid index literal";
         bool ok=false; qlonglong val = content.toLongLong(&ok);
         int idx = (val > std::numeric_limits<int>::max()) ? std::numeric_limits<int>::max()
                  : (val < std::numeric_limits<int>::min()) ? std::numeric_limits<int>::min()
                  : static_cast<int>(val);
+        qCDebug(jsonPathLog) << "  emitting index token" << idx;
         out.index(idx);
         return Error::Ok;
     },
 
     // 2b.  1,2,3  --------------------------------------------------
     [](QStringView content, BracketSink& out)->std::optional<Error> {
+        qCDebug(jsonPathLog) << "BR_RULE index-list raw" << content.toString();
         if (!content.contains(u',')) return std::nullopt;
         // Quick check: no quotes or slice colons
         if (content.contains(u'\'') || content.contains(u'"') || content.contains(u':'))
@@ -429,11 +438,15 @@ static const std::array<BrRule,11> BR_RULES = {{
         for (QStringView p : parts)
         {
             QStringView t = p.trimmed();
-            if (!isValidIndexLiteral(t)) return std::nullopt; // not pure index list
+            if (!isValidIndexLiteral(t)) {
+                qCDebug(jsonPathLog) << "  list element invalid" << t.toString();
+                return std::nullopt; // not pure index list
+            }
             bool ok=false; qlonglong val = t.toLongLong(&ok);
             int idx = (val > std::numeric_limits<int>::max()) ? std::numeric_limits<int>::max()
                      : (val < std::numeric_limits<int>::min()) ? std::numeric_limits<int>::min()
                      : static_cast<int>(val);
+            qCDebug(jsonPathLog) << "  list element emit" << idx;
             out.index(idx);
         }
         return Error::Ok;
@@ -521,17 +534,9 @@ static const std::array<BrRule,11> BR_RULES = {{
         return Error::Ok;
     },
 
-    // 7.  key (unquoted) -------------------------------------------
-    [](QStringView content, BracketSink& out)->std::optional<Error> {
-        if (content.contains(u'\'') || content.contains(u'"') || content.contains(u':') || content.contains(u','))
-            return std::nullopt; // avoid other kinds
-        // If the content looks purely numeric (optional sign + digits), treat as invalid index not key
-        static const QRegularExpression numLike(R"(^[+-]?[0-9]+$)");
-        if (numLike.match(content.toString()).hasMatch())
-            return std::nullopt;
-        if (auto r = out.key(content.toString()); !r)
-            return r.error();
-        return Error::Ok;
+    // 7.  key (unquoted) — RFC 9535 forbids unquoted string literals inside []
+    [](QStringView /*content*/, BracketSink& /*out*/)->std::optional<Error> {
+        return std::nullopt; // disallowed per spec
     }
 }};
 
@@ -602,12 +607,19 @@ std::expected<qsizetype, Error> parseBracket(qsizetype pos,
 
     BracketSink sink{tokens, kb, filters};
 
+    int ruleIndex = 0;
     for (auto& rule : BR_RULES) {
+        qCDebug(jsonPathLog) << "trying BR_RULE" << ruleIndex;
         if (auto err = rule(content, sink)) {
+            qCDebug(jsonPathLog) << "BR_RULE" << ruleIndex << "returned error" << static_cast<int>(*err);
             if (*err != Error::Ok) return std::unexpected(*err);
+            qCDebug(jsonPathLog) << "BR_RULE" << ruleIndex << "succeeded, returning pos" << (pos + 1);
             return pos + 1;
         }
+        qCDebug(jsonPathLog) << "BR_RULE" << ruleIndex << "returned nullopt (no match)";
+        ++ruleIndex;
     }
+    qCDebug(jsonPathLog) << "all BR_RULES failed, returning UnsupportedFilter";
     return std::unexpected(Error::UnsupportedFilter);
 }
 
@@ -678,7 +690,10 @@ std::expected<Compiled, Error> compilePath(QStringView sv)
           : (sv[pos] == u'[') ? detail::parseBracket(pos, sv, kb, tokens, filters)
           :                    detail::parseBare   (pos, sv, kb);
 
-        if (!next) return std::unexpected(next.error());
+        if (!next) {
+            qCDebug(jsonPathLog) << "compilePath: parser returned error" << static_cast<int>(next.error());
+            return std::unexpected(next.error());
+        }
         pos = *next;
     }
     return Compiled{ std::move(tokens), std::move(filters) };
@@ -700,8 +715,10 @@ std::expected<CompilationResult, Error> compile(QStringView rawPath)
 
     // Compile into tokens + filter list
     auto compiled = compilePath(path);
-    if (!compiled)
+    if (!compiled) {
+        qCDebug(jsonPathLog) << "compile: compilePath failed with error" << static_cast<int>(compiled.error());
         return std::unexpected(compiled.error());
+    }
 
     return CompilationResult{
         func,
