@@ -866,6 +866,10 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
     constexpr auto multiSelectorPat = ctll::fixed_string{R"(^@\[([^:]+)\]$)"};
     constexpr auto negMultiSelectorPat = ctll::fixed_string{R"(^!@\[([^:]+)\]$)"};
     
+    // Nested filter pattern for tests like @[?@>1] - apply filter to current array/object
+    constexpr auto nestedFilterPat = ctll::fixed_string{R"(^@\[\?(.+)\]$)"};
+    constexpr auto negNestedFilterPat = ctll::fixed_string{R"(^!@\[\?(.+)\]$)"};
+    
     // Function to create existence test token
     auto makeExistenceToken = [&](const QString& prop) -> Token {
         Builder b{out};
@@ -1063,6 +1067,38 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
         }, QString("!@[%1]").arg(selectorsStr));
     };
 
+    auto makeNestedFilterToken = [&](const QString& filterExpr)->Token {
+        Builder b{out};
+        return b.add([filterExpr](const QJsonValue& j){
+            // Nested filter existence test: apply the filter to the current value
+            QVector<FilterFn> innerFilters;
+            if (auto innerToken = json_query::json_path::compileFilter(filterExpr, innerFilters)) {
+                // If the filter is valid, apply it to the current value
+                if (!innerFilters.empty()) {
+                    return innerFilters[0](j);
+                }
+                return false;
+            }
+            return false; // Invalid filter expression
+        }, QString("@[%1]").arg(filterExpr));
+    };
+
+    auto makeNegatedNestedFilterToken = [&](const QString& filterExpr)->Token {
+        Builder b{out};
+        return b.add([filterExpr](const QJsonValue& j){
+            // Negated nested filter existence test: apply the filter to the current value and negate the result
+            QVector<FilterFn> innerFilters;
+            if (auto innerToken = json_query::json_path::compileFilter(filterExpr, innerFilters)) {
+                // If the filter is valid, apply it to the current value and negate the result
+                if (!innerFilters.empty()) {
+                    return !innerFilters[0](j);
+                }
+                return false;
+            }
+            return false; // Invalid filter expression
+        }, QString("!@[%1]").arg(filterExpr));
+    };
+
     // Check negated patterns first (more specific)
     if (auto m = ctre::match<negRootPat>(to_sv(s)))
         return makeNegatedRootToken();
@@ -1144,6 +1180,16 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
     if (auto m = ctre::match<negMultiSelectorPat>(to_sv(s))) {
         QString selectorsStr = to_qstr(m.template get<1>().to_view());
         return makeNegatedMultiSelectorToken(selectorsStr);
+    }
+
+    // Nested filter patterns
+    if (auto m = ctre::match<nestedFilterPat>(to_sv(s))) {
+        QString filterExpr = to_qstr(m.template get<1>().to_view());
+        return makeNestedFilterToken(filterExpr);
+    }
+    if (auto m = ctre::match<negNestedFilterPat>(to_sv(s))) {
+        QString filterExpr = to_qstr(m.template get<1>().to_view());
+        return makeNegatedNestedFilterToken(filterExpr);
     }
 
     return std::nullopt;
