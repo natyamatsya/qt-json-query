@@ -333,13 +333,21 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
             // Apply union semantics only if we have multiple consecutive selector tokens
             // AND we're not in a sequential context (after Recursive)
             // AND it's not sequential property access (consecutive Key tokens from dot notation)
+            // AND it's not wildcard + property access (wildcard followed by Key tokens)
             bool isSequentialPropertyAccess = (unionTokens.size() > 1 && 
                                                std::all_of(unionTokens.begin(), unionTokens.end(), 
                                                           [&ctx](qsizetype idx) { 
                                                               return ctx.tokens[idx].kind == Token::Kind::Key; 
                                                           }));
             
-            if (unionTokens.size() > 1 && !prevRecursive && !isSequentialPropertyAccess) {
+            bool isWildcardPropertyAccess = (unionTokens.size() > 1 && 
+                                             ctx.tokens[unionTokens[0]].kind == Token::Kind::Wildcard &&
+                                             std::all_of(unionTokens.begin() + 1, unionTokens.end(), 
+                                                        [&ctx](qsizetype idx) { 
+                                                            return ctx.tokens[idx].kind == Token::Kind::Key; 
+                                                        }));
+            
+            if (unionTokens.size() > 1 && !prevRecursive && !isSequentialPropertyAccess && !isWildcardPropertyAccess) {
                 qDebug() << "[union] processing" << unionTokens.size() << "consecutive selector tokens";
                 
                 QJsonArray unionResult;

@@ -859,22 +859,34 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
     auto makeWildcardToken = [&]()->Token {
         Builder b{out};
         return b.add([](const QJsonValue& j){
-            if (!j.isObject()) return false;
-            const auto obj = j.toObject();
-            // RFC 9535: wildcard existence filters check for property presence, not truthiness
-            // Any property that exists (is not undefined) should match
-            return !obj.isEmpty(); // If object has any properties, wildcard existence is true
+            // RFC 9535: wildcard existence filters check for element/property presence
+            if (j.isObject()) {
+                const auto obj = j.toObject();
+                // Any property that exists (is not undefined) should match
+                return !obj.isEmpty(); // If object has any properties, wildcard existence is true
+            } else if (j.isArray()) {
+                const auto arr = j.toArray();
+                // Any array element that exists should match
+                return !arr.isEmpty(); // If array has any elements, wildcard existence is true
+            }
+            return false; // Primitives have no properties or elements
         }, "@.*");
     };
 
     auto makeNegatedWildcardToken = [&]()->Token {
         Builder b{out};
         return b.add([](const QJsonValue& j){
-            if (!j.isObject()) return true; // non-objects don't have properties, so !@.* is true
-            const auto obj = j.toObject();
-            // RFC 9535: negated wildcard existence filters check for property absence
-            // If object has no properties, then !@.* is true
-            return obj.isEmpty(); // If object is empty, negated wildcard existence is true
+            // RFC 9535: negated wildcard existence filters check for element/property absence
+            if (j.isObject()) {
+                const auto obj = j.toObject();
+                // If object has no properties, then !@.* is true
+                return obj.isEmpty();
+            } else if (j.isArray()) {
+                const auto arr = j.toArray();
+                // If array has no elements, then !@.* is true
+                return arr.isEmpty();
+            }
+            return true; // Primitives have no properties or elements, so !@.* is true
         }, "!@.*");
     };
 
