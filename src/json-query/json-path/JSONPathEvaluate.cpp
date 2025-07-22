@@ -329,8 +329,9 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
                 }
             }
             
-            // If we have multiple consecutive selector tokens, apply union semantics
-            if (unionTokens.size() > 1) {
+            // Apply union semantics only if we have multiple consecutive selector tokens
+            // AND we're not in a sequential context (after Recursive descent)
+            if (unionTokens.size() > 1 && !prevRecursive) {
                 qDebug() << "[union] processing" << unionTokens.size() << "consecutive selector tokens";
                 
                 QJsonArray unionResult;

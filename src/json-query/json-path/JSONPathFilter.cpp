@@ -663,6 +663,9 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
     constexpr auto rootPat = ctll::fixed_string{R"(^@$)"};
     constexpr auto wildcardPat = ctll::fixed_string{R"(^@\.\*$)"};
     
+    // Root reference pattern for $[?$] - checks if root document exists
+    constexpr auto rootRefPat = ctll::fixed_string{R"(^\$$)"};
+    
     // Negated patterns
     constexpr auto negDotPat = ctll::fixed_string{R"(^!@\.([\w$]+)$)"};
     constexpr auto negBrkPat = ctll::fixed_string{R"(^!@\[['\"]([^'"]+)['\"]\]$)"};
@@ -834,6 +837,16 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
         return makeToken(to_qstr(m.template get<1>().to_view()));
     if (auto m = ctre::match<brkPat>(to_sv(s)))
         return makeToken(to_qstr(m.template get<1>().to_view()));
+    
+    // Root reference existence filter: $[?$] - always true (root document always exists)
+    if (ctre::match<rootRefPat>(to_sv(s))) {
+        Builder b{out};
+        return b.add([](const QJsonValue& j){
+            // Root document always exists
+            return true;
+        }, QString("$"));
+    }
+
     return std::nullopt;
 }
 
