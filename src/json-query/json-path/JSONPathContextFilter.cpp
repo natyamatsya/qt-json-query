@@ -83,31 +83,10 @@ std::optional<Token> compileContextFilter(const QString& expr, QVector<ContextFi
     // Fall back to regular filter compilation
     qCDebug(jsonPathLog) << "compileContextFilter: falling back to regular filter";
     if (auto regularToken = compileFilter(expr, regularOut)) {
-        // Wrap regular filter as context-aware filter for backward compatibility
-        if (!regularOut.isEmpty()) {
-            FilterFn regularFilter = regularOut.last();
-            
-            struct ContextBuilder {
-                QVector<ContextFilterFn>& fns;
-                
-                [[nodiscard]] Token add(ContextFilterFn fn, QString key = {})
-                {
-                    fns.push_back(std::move(fn));
-                    const std::size_t id = fns.size() - 1;
-                    Token token{Token::Kind::Filter, 0, {}, 0u, std::move(key), 0};
-                    token.contextFilterId = id;
-                    return token;
-                }
-            };
-            
-            ContextBuilder b{contextOut};
-            auto wrappedToken = b.add([regularFilter](const QJsonValue& node, const QJsonValue& root) -> bool {
-                Q_UNUSED(root); // Ignore root context for regular filters
-                return regularFilter(node);
-            });
-            qCDebug(jsonPathLog) << "compileContextFilter: wrapped regular filter as context-aware";
-            return wrappedToken;
-        }
+        qCDebug(jsonPathLog) << "compileContextFilter: regular filter compiled successfully";
+        // Return the regular token as-is - no need to wrap for backward compatibility
+        // The evaluation logic will handle both regular and context-aware filters appropriately
+        return regularToken;
     }
     
     qCDebug(jsonPathLog) << "compileContextFilter: failed to compile filter";

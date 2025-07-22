@@ -803,26 +803,4 @@ std::expected<CompilationResult, Error> compile(QStringView rawPath)
     };
 }
 
-std::optional<Token> compileFilter(const QString& expr, QVector<FilterFn>& filters)
-{
-    // For backward compatibility, wrap context-aware compilation
-    QVector<ContextFilterFn> contextFilters;
-    auto result = json_query::json_path::compileContextFilter(expr, contextFilters, filters);
-    
-    if (result && result->contextFilterId < contextFilters.size()) {
-        // Extract the context filter and create a regular filter wrapper
-        const auto& contextFilter = contextFilters[result->contextFilterId];
-        filters.push_back([contextFilter](const QJsonValue& currentNode) -> bool {
-            // Call context filter with dummy root (backward compatibility)
-            return contextFilter(currentNode, QJsonValue{});
-        });
-        
-        // Update token to use regular filter
-        result->filterId = filters.size() - 1;
-        result->contextFilterId = SIZE_MAX;
-    }
-    
-    return result;
-}
-
 } // namespace json_query::json_path
