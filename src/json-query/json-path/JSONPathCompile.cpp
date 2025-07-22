@@ -336,7 +336,7 @@ struct BracketSink {
 // A helper to iterate over the content and run rules.
 using BrRule = std::function<std::optional<Error>(QStringView, BracketSink&)>;
 
-static const std::array<BrRule,9> BR_RULES = {{
+static const std::array<BrRule,10> BR_RULES = {{
     // 0.  'a', 'b'  -----------------------------------------------
     [](QStringView content, BracketSink& out)->std::optional<Error> {
         // Detect presence of comma outside quotes
@@ -427,6 +427,23 @@ static const std::array<BrRule,9> BR_RULES = {{
         QString expr = content.sliced(2, content.size() - 3).toString();
         std::cout << "[bracket ?(] extracted expr=" << expr.toStdString() << std::endl;
 
+        if (auto tok = json_query::json_path::compileFilter(expr, out.filters)) {
+            out.pushFilter(*tok);
+            return Error::Ok;
+        }
+        return Error::UnsupportedFilter;
+    },
+
+    // 4b.  ?expr (no outer parentheses) --------------------------------
+    [](QStringView content, BracketSink& out)->std::optional<Error> {
+        // Accept syntax like ?@.a==1  or ?$==null (no wrapping parens)
+        if (!content.startsWith(u'?') || content.startsWith(u"?(") )
+            return std::nullopt; // Already handled by 4 or not a filter
+
+        QStringView exprView = content.sliced(1).trimmed();
+        if (exprView.isEmpty()) return std::nullopt; // Could be placeholder handled later
+
+        QString expr = exprView.toString();
         if (auto tok = json_query::json_path::compileFilter(expr, out.filters)) {
             out.pushFilter(*tok);
             return Error::Ok;

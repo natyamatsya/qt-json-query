@@ -157,21 +157,64 @@ std::optional<Token> parseCompare1(QString s, QVector<FilterFn>& out)
         const QString op   = to_qstr(m.template get<2>().to_view());
         QString rhs        = to_qstr(m.template get<3>().to_view()).trimmed();
 
-        bool isNum = false;
-        const double num = rhs.toDouble(&isNum);
+        // Runtime numeric literal validator (RFC 8259 style)
+        auto isValidNumberLiteral = [](QStringView v)->bool {
+            if (v.isEmpty()) return false;
+            int i = 0;
+            if (v[i] == u'-') {
+                ++i;
+                if (i==v.size()) return false; // just '-'
+            }
+            // int part
+            if (!v[i].isDigit()) return false;
+            if (v[i]==u'0' && i+1< v.size() && v[i+1].isDigit()) return false; // leading zero
+            while (i < v.size() && v[i].isDigit()) ++i;
+            // frac part
+            if (i < v.size() && v[i]==u'.') {
+                ++i;
+                int fracStart=i;
+                while (i< v.size() && v[i].isDigit()) ++i;
+                if (i==fracStart) return false; // no digits after '.'
+            }
+            // exponent part
+            if (i < v.size() && (v[i]==u'e' || v[i]==u'E')) {
+                ++i;
+                if (i==v.size()) return false;
+                if (v[i]==u'+' || v[i]==u'-') ++i;
+                int expStart=i;
+                while (i< v.size() && v[i].isDigit()) ++i;
+                if (i==expStart) return false; // no digits in exponent
+            }
+            return i==v.size();
+        };
+
+        const bool rhsQuoted = (rhs.size() >= 2) && ((rhs.front()==u'\'' && rhs.back()==u'\'') || (rhs.front()==u'\"' && rhs.back()==u'\"'));
+
+        bool isNum = isValidNumberLiteral(rhs);
+        double num = isNum ? rhs.toDouble() : 0.0;
+
         const bool isBool = (!isNum && (rhs == "true" || rhs == "false"));
         const bool boolVal = isBool ? (rhs == "true") : false;
-        if (!isNum && !isBool) (void)unquote(rhs);
+
+        // Reject unquoted RHS that is neither valid number nor boolean
+        if (!isNum && !isBool && !rhsQuoted)
+            return std::nullopt;
+
+        if (!isNum && !isBool)
+            (void)unquote(rhs);
 
         Builder b{out};
         return b.add([prop, op, isNum, num, isBool, boolVal, rhs](const QJsonValue& j) -> bool
         {
             const auto obj = j.toObject();
             const auto v = obj.value(prop);
-            qCDebug(jsonPathLog) << "[flt-cmp]" << prop << op << rhs << "| val=" << v;
+            qCDebug(jsonPathLog).nospace() << "[flt-cmp] prop='" << prop << "' op='" << op
+                                          << "' rhs=" << (isNum ? QString::number(num) : rhs)
+                                          << " | v=" << v << " (type=" << v.type() << ")";
             if (isNum) {
                 if (!v.isDouble()) return false;
                 const double x = v.toDouble();
+                qCDebug(jsonPathLog).nospace() << "  -> numeric compare lhs=" << x;
                 if (op=="==") return x == num;
                 if (op=="!=") return x != num;
                 if (op==">")  return x >  num;
