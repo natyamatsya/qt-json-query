@@ -422,14 +422,28 @@ std::optional<Token> parseCompare(QString s, QVector<FilterFn>& out)
 std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
 {
     constexpr auto dotPat = ctll::fixed_string{R"(^@\.([\w$]+)$)"};
-    constexpr auto brkPat = ctll::fixed_string{R"(^@\[['\"]([^'\"]+)['\"]\]$)"};
+    constexpr auto brkPat = ctll::fixed_string{R"(^@\[['\"]([^'"]+)['\"]\]$)"};
+    constexpr auto rootPat = ctll::fixed_string{R"(^@$)"};
+    constexpr auto wildcardPat = ctll::fixed_string{R"(^@\.\*$)"};
+    
+    // Negated patterns
+    constexpr auto negDotPat = ctll::fixed_string{R"(^!@\.([\w$]+)$)"};
+    constexpr auto negBrkPat = ctll::fixed_string{R"(^!@\[['\"]([^'"]+)['\"]\]$)"};
+    constexpr auto negRootPat = ctll::fixed_string{R"(^!@$)"};
+    constexpr auto negWildcardPat = ctll::fixed_string{R"(^!@\.\*$)"};
+    
+    // Complex access patterns
+    constexpr auto arrayIndexPat = ctll::fixed_string{R"(^@\[(\d+)\]$)"};
+    constexpr auto arraySlicePat = ctll::fixed_string{R"(^@\[(\d*):(\d*)\]$)"};
+    constexpr auto negArrayIndexPat = ctll::fixed_string{R"(^!@\[(\d+)\]$)"};
+    constexpr auto negArraySlicePat = ctll::fixed_string{R"(^!@\[(\d*):(\d*)\]$)"};
 
     auto makeToken = [&](QString prop)->Token {
         Builder b{out};
         return b.add([prop](const QJsonValue& j){
             const auto v = j.toObject().value(prop);
-            if (v.isUndefined() || v.isNull()) return false;
             switch (v.type()) {
+            case QJsonValue::Null:   return false;
             case QJsonValue::Bool:   return v.toBool();
             case QJsonValue::Double: return v.toDouble() != 0.0;
             case QJsonValue::String: return !v.toString().isEmpty();
@@ -440,6 +454,224 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
         }, prop);
     };
 
+    auto makeArrayIndexToken = [&](int index)->Token {
+        Builder b{out};
+        return b.add([index](const QJsonValue& j){
+            if (!j.isArray()) return false;
+            const auto arr = j.toArray();
+            if (index < 0 || index >= arr.size()) return false;
+            const auto& v = arr[index];
+            switch (v.type()) {
+            case QJsonValue::Null:   return false;
+            case QJsonValue::Bool:   return v.toBool();
+            case QJsonValue::Double: return v.toDouble() != 0.0;
+            case QJsonValue::String: return !v.toString().isEmpty();
+            case QJsonValue::Array:  return !v.toArray().isEmpty();
+            case QJsonValue::Object: return !v.toObject().isEmpty();
+            default: return false;
+            }
+        }, QString("@[%1]").arg(index));
+    };
+
+    auto makeArraySliceToken = [&](int start, int end)->Token {
+        Builder b{out};
+        return b.add([start, end](const QJsonValue& j){
+            if (!j.isArray()) return false;
+            const auto arr = j.toArray();
+            int actualStart = start < 0 ? 0 : start;
+            int actualEnd = end < 0 ? arr.size() : qMin(end, arr.size());
+            // Check if slice has any truthy elements
+            for (int i = actualStart; i < actualEnd; ++i) {
+                const auto& v = arr[i];
+                switch (v.type()) {
+                case QJsonValue::Null:   continue;
+                case QJsonValue::Bool:   if (v.toBool()) return true; break;
+                case QJsonValue::Double: if (v.toDouble() != 0.0) return true; break;
+                case QJsonValue::String: if (!v.toString().isEmpty()) return true; break;
+                case QJsonValue::Array:  if (!v.toArray().isEmpty()) return true; break;
+                case QJsonValue::Object: if (!v.toObject().isEmpty()) return true; break;
+                default: continue;
+                }
+            }
+            return false;
+        }, QString("@[%1:%2]").arg(start).arg(end));
+    };
+
+    auto makeNegatedToken = [&](QString prop)->Token {
+        Builder b{out};
+        return b.add([prop](const QJsonValue& j){
+            const auto v = j.toObject().value(prop);
+            switch (v.type()) {
+            case QJsonValue::Null:   return true;  // negated: null is falsy, so !null is true
+            case QJsonValue::Bool:   return !v.toBool();
+            case QJsonValue::Double: return v.toDouble() == 0.0;
+            case QJsonValue::String: return v.toString().isEmpty();
+            case QJsonValue::Array:  return v.toArray().isEmpty();
+            case QJsonValue::Object: return v.toObject().isEmpty();
+            default: return true; // undefined is falsy, so !undefined is true
+            }
+        }, "!" + prop);
+    };
+
+    auto makeNegatedArrayIndexToken = [&](int index)->Token {
+        Builder b{out};
+        return b.add([index](const QJsonValue& j){
+            if (!j.isArray()) return true; // non-arrays don't have indices
+            const auto arr = j.toArray();
+            if (index < 0 || index >= arr.size()) return true; // out of bounds is falsy
+            const auto& v = arr[index];
+            switch (v.type()) {
+            case QJsonValue::Null:   return true;  // negated: null is falsy
+            case QJsonValue::Bool:   return !v.toBool();
+            case QJsonValue::Double: return v.toDouble() == 0.0;
+            case QJsonValue::String: return v.toString().isEmpty();
+            case QJsonValue::Array:  return v.toArray().isEmpty();
+            case QJsonValue::Object: return v.toObject().isEmpty();
+            default: return true; // undefined is falsy
+            }
+        }, QString("!@[%1]").arg(index));
+    };
+
+    auto makeNegatedArraySliceToken = [&](int start, int end)->Token {
+        Builder b{out};
+        return b.add([start, end](const QJsonValue& j){
+            if (!j.isArray()) return true; // non-arrays don't have slices
+            const auto arr = j.toArray();
+            int actualStart = start < 0 ? 0 : start;
+            int actualEnd = end < 0 ? arr.size() : qMin(end, arr.size());
+            // Check if slice has NO truthy elements (negated)
+            for (int i = actualStart; i < actualEnd; ++i) {
+                const auto& v = arr[i];
+                switch (v.type()) {
+                case QJsonValue::Null:   continue;
+                case QJsonValue::Bool:   if (v.toBool()) return false; break; // found truthy, so negated is false
+                case QJsonValue::Double: if (v.toDouble() != 0.0) return false; break;
+                case QJsonValue::String: if (!v.toString().isEmpty()) return false; break;
+                case QJsonValue::Array:  if (!v.toArray().isEmpty()) return false; break;
+                case QJsonValue::Object: if (!v.toObject().isEmpty()) return false; break;
+                default: continue;
+                }
+            }
+            return true; // No truthy elements found, so negated is true
+        }, QString("!@[%1:%2]").arg(start).arg(end));
+    };
+
+    auto makeRootToken = [&]()->Token {
+        Builder b{out};
+        return b.add([](const QJsonValue& j){
+            switch (j.type()) {
+            case QJsonValue::Null:   return false;
+            case QJsonValue::Bool:   return j.toBool();
+            case QJsonValue::Double: return j.toDouble() != 0.0;
+            case QJsonValue::String: return !j.toString().isEmpty();
+            case QJsonValue::Array:  return !j.toArray().isEmpty();
+            case QJsonValue::Object: return !j.toObject().isEmpty();
+            default: return false;
+            }
+        }, "@");
+    };
+
+    auto makeNegatedRootToken = [&]()->Token {
+        Builder b{out};
+        return b.add([](const QJsonValue& j){
+            switch (j.type()) {
+            case QJsonValue::Null:   return true;  // negated: null is falsy, so !null is true
+            case QJsonValue::Bool:   return !j.toBool();
+            case QJsonValue::Double: return j.toDouble() == 0.0;
+            case QJsonValue::String: return j.toString().isEmpty();
+            case QJsonValue::Array:  return j.toArray().isEmpty();
+            case QJsonValue::Object: return j.toObject().isEmpty();
+            default: return true; // undefined is falsy, so !undefined is true
+            }
+        }, "!@");
+    };
+
+    auto makeWildcardToken = [&]()->Token {
+        Builder b{out};
+        return b.add([](const QJsonValue& j){
+            if (!j.isObject()) return false;
+            const auto obj = j.toObject();
+            // Check if any property exists and is truthy
+            for (auto it = obj.constBegin(); it != obj.constEnd(); ++it) {
+                const auto& v = it.value();
+                switch (v.type()) {
+                case QJsonValue::Null:   continue; // null is falsy
+                case QJsonValue::Bool:   if (v.toBool()) return true; break;
+                case QJsonValue::Double: if (v.toDouble() != 0.0) return true; break;
+                case QJsonValue::String: if (!v.toString().isEmpty()) return true; break;
+                case QJsonValue::Array:  if (!v.toArray().isEmpty()) return true; break;
+                case QJsonValue::Object: if (!v.toObject().isEmpty()) return true; break;
+                default: continue;
+                }
+            }
+            return false; // No truthy properties found
+        }, "@.*");
+    };
+
+    auto makeNegatedWildcardToken = [&]()->Token {
+        Builder b{out};
+        return b.add([](const QJsonValue& j){
+            if (!j.isObject()) return true; // non-objects don't have properties, so !@.* is true
+            const auto obj = j.toObject();
+            // Check if NO property exists and is truthy (negated wildcard)
+            for (auto it = obj.constBegin(); it != obj.constEnd(); ++it) {
+                const auto& v = it.value();
+                switch (v.type()) {
+                case QJsonValue::Null:   continue; // null is falsy, doesn't affect result
+                case QJsonValue::Bool:   if (v.toBool()) return false; break; // found truthy, so !@.* is false
+                case QJsonValue::Double: if (v.toDouble() != 0.0) return false; break;
+                case QJsonValue::String: if (!v.toString().isEmpty()) return false; break;
+                case QJsonValue::Array:  if (!v.toArray().isEmpty()) return false; break;
+                case QJsonValue::Object: if (!v.toObject().isEmpty()) return false; break;
+                default: continue;
+                }
+            }
+            return true; // No truthy properties found, so !@.* is true
+        }, "!@.*");
+    };
+
+    // Check negated patterns first (more specific)
+    if (auto m = ctre::match<negRootPat>(to_sv(s)))
+        return makeNegatedRootToken();
+    if (auto m = ctre::match<negWildcardPat>(to_sv(s)))
+        return makeNegatedWildcardToken();
+    if (auto m = ctre::match<negArrayIndexPat>(to_sv(s))) {
+        int index = to_qstr(m.template get<1>().to_view()).toInt();
+        return makeNegatedArrayIndexToken(index);
+    }
+    if (auto m = ctre::match<negArraySlicePat>(to_sv(s))) {
+        QString startStr = to_qstr(m.template get<1>().to_view());
+        QString endStr = to_qstr(m.template get<2>().to_view());
+        int start = startStr.isEmpty() ? 0 : startStr.toInt();
+        int end = endStr.isEmpty() ? -1 : endStr.toInt();
+        return makeNegatedArraySliceToken(start, end);
+    }
+    if (auto m = ctre::match<negDotPat>(to_sv(s)))
+        return makeNegatedToken(to_qstr(m.template get<1>().to_view()));
+    if (auto m = ctre::match<negBrkPat>(to_sv(s)))
+        return makeNegatedToken(to_qstr(m.template get<1>().to_view()));
+
+    // Check for root existence filter
+    if (auto m = ctre::match<rootPat>(to_sv(s)))
+        return makeRootToken();
+    
+    // Check for wildcard existence filter
+    if (auto m = ctre::match<wildcardPat>(to_sv(s)))
+        return makeWildcardToken();
+    
+    // Check for array access patterns
+    if (auto m = ctre::match<arrayIndexPat>(to_sv(s))) {
+        int index = to_qstr(m.template get<1>().to_view()).toInt();
+        return makeArrayIndexToken(index);
+    }
+    if (auto m = ctre::match<arraySlicePat>(to_sv(s))) {
+        QString startStr = to_qstr(m.template get<1>().to_view());
+        QString endStr = to_qstr(m.template get<2>().to_view());
+        int start = startStr.isEmpty() ? 0 : startStr.toInt();
+        int end = endStr.isEmpty() ? -1 : endStr.toInt();
+        return makeArraySliceToken(start, end);
+    }
+    
     if (auto m = ctre::match<dotPat>(to_sv(s)))
         return makeToken(to_qstr(m.template get<1>().to_view()));
     if (auto m = ctre::match<brkPat>(to_sv(s)))
