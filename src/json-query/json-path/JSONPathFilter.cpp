@@ -860,6 +860,10 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
     constexpr auto arraySlicePat = ctll::fixed_string{R"(^@\[(-?\d+):(-?\d+)\]$)"};
     constexpr auto negArraySlicePat = ctll::fixed_string{R"(^!@\[(-?\d+):(-?\d+)\]$)"};
     
+    // Multi-selector existence patterns for tests like @[0, 0, 'a'] or @[1, 'key']
+    constexpr auto multiSelectorPat = ctll::fixed_string{R"(^@\[([^:]+)\]$)"};
+    constexpr auto negMultiSelectorPat = ctll::fixed_string{R"(^!@\[([^:]+)\]$)"};
+    
     // Function to create existence test token
     auto makeExistenceToken = [&](const QString& prop) -> Token {
         Builder b{out};
@@ -986,6 +990,77 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
         }, "!@.*");
     };
 
+    auto makeMultiSelectorToken = [&](const QString& selectorsStr)->Token {
+        Builder b{out};
+        return b.add([selectorsStr](const QJsonValue& j){
+            // Multi-selector existence test: check if any of the selectors can be applied to j
+            // Parse the selectors string and check each one
+            QStringList selectors = selectorsStr.split(',');
+            for (const QString& selectorRaw : selectors) {
+                QString selector = selectorRaw.trimmed();
+                bool exists = false;
+                
+                // Check if it's a quoted string selector
+                if ((selector.startsWith('"') && selector.endsWith('"')) || 
+                    (selector.startsWith('\'') && selector.endsWith('\''))) {
+                    QString key = selector.mid(1, selector.size()-2);
+                    if (j.isObject()) {
+                        const auto obj = j.toObject();
+                        exists = obj.contains(key);
+                    }
+                }
+                // Check if it's a numeric index selector
+                else {
+                    bool ok = false;
+                    int index = selector.toInt(&ok);
+                    if (ok && j.isArray()) {
+                        const auto arr = j.toArray();
+                        exists = (index >= 0 && index < arr.size()) || 
+                                (index < 0 && (-index) <= arr.size());
+                    }
+                }
+                
+                if (exists) return true; // If any selector exists, return true
+            }
+            return false; // None of the selectors exist
+        }, QString("@[%1]").arg(selectorsStr));
+    };
+
+    auto makeNegatedMultiSelectorToken = [&](const QString& selectorsStr)->Token {
+        Builder b{out};
+        return b.add([selectorsStr](const QJsonValue& j){
+            // Negated multi-selector existence test: check if none of the selectors can be applied to j
+            QStringList selectors = selectorsStr.split(',');
+            for (const QString& selectorRaw : selectors) {
+                QString selector = selectorRaw.trimmed();
+                bool exists = false;
+                
+                // Check if it's a quoted string selector
+                if ((selector.startsWith('"') && selector.endsWith('"')) || 
+                    (selector.startsWith('\'') && selector.endsWith('\''))) {
+                    QString key = selector.mid(1, selector.size()-2);
+                    if (j.isObject()) {
+                        const auto obj = j.toObject();
+                        exists = obj.contains(key);
+                    }
+                }
+                // Check if it's a numeric index selector
+                else {
+                    bool ok = false;
+                    int index = selector.toInt(&ok);
+                    if (ok && j.isArray()) {
+                        const auto arr = j.toArray();
+                        exists = (index >= 0 && index < arr.size()) || 
+                                (index < 0 && (-index) <= arr.size());
+                    }
+                }
+                
+                if (exists) return false; // If any selector exists, negation is false
+            }
+            return true; // None of the selectors exist, so negation is true
+        }, QString("!@[%1]").arg(selectorsStr));
+    };
+
     // Check negated patterns first (more specific)
     if (auto m = ctre::match<negRootPat>(to_sv(s)))
         return makeNegatedRootToken();
@@ -1059,6 +1134,16 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
     if (auto m = ctre::match<brkPat>(to_sv(s)))
         return makeExistenceToken(to_qstr(m.template get<1>().to_view()));
     
+    // Multi-selector existence patterns
+    if (auto m = ctre::match<multiSelectorPat>(to_sv(s))) {
+        QString selectorsStr = to_qstr(m.template get<1>().to_view());
+        return makeMultiSelectorToken(selectorsStr);
+    }
+    if (auto m = ctre::match<negMultiSelectorPat>(to_sv(s))) {
+        QString selectorsStr = to_qstr(m.template get<1>().to_view());
+        return makeNegatedMultiSelectorToken(selectorsStr);
+    }
+
     return std::nullopt;
 }
 
