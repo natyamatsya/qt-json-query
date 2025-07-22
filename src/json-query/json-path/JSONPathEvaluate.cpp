@@ -329,7 +329,7 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
             }
 
             if (next.isEmpty())
-                return multi ? QJsonArray{} : QJsonValue(QJsonValue::Undefined);
+                return QJsonArray{}; // RFC 9535: empty result list when no matches
 
             working.swap(next);
 
@@ -359,7 +359,7 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
             working = fanOut(ctx, tk, working);
             bool multiAfter = multi || addsMultiplicity(tk);
             if (working.isEmpty())
-                return multiAfter ? QJsonArray{} : QJsonValue(QJsonValue::Undefined);
+                return QJsonArray{}; // RFC 9535: empty result list when no matches
 
             // Deduplicate containers after normal fan-out when preceded by Recursive
             if (prevRecursive) {
@@ -385,6 +385,8 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
     }
 
     QJsonValue collapsed = squash(std::move(working), multi);
+    if (collapsed.isUndefined())
+        return QJsonArray{}; // RFC 9535: no matches ⇒ empty result list
     return applyTrailing(ctx.trailingFn, collapsed);
 }
 

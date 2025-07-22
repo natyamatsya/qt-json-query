@@ -165,26 +165,49 @@ namespace
     }
 
     // Adjusted validation to allow escapes and empty key
-    [[nodiscard]] static bool isValidQuotedKey(QStringView key, QuoteStyle /*style*/)
+    [[nodiscard]] static bool isValidQuotedKey(QStringView key, QuoteStyle style)
     {
-        // RFC 9535 allows empty string
+        // RFC 9535 allows empty string. We need to validate:
+        //  * no unescaped control chars (U+0000–U+001F)
+        //  * no unescaped quote char matching the surrounding quotes
+        //  * escape sequences limited to JSON set
+        //  * \uXXXX sequences must be valid and, if surrogate, appear in valid pairs
+
+        bool expectLowSurrogate = false;
+
+        const QChar quoteChar = (style == QuoteStyle::Single) ? QChar(u'\'') : QChar(u'"');
+
         for (qsizetype i = 0; i < key.size(); ++i) {
             QChar ch = key[i];
 
-            // Reject literal control code characters U+0000–U+001F
+            // Reject literal control codes
             if (ch.unicode() < 0x20)
                 return false;
 
-            if (ch != u'\\')
+            // Reject unescaped quote matching outer quotes
+            if (ch == quoteChar)
+                return false;
+
+            if (ch != u'\\') {
+                // If we expected a low surrogate but got a non-escape, invalid
+                if (expectLowSurrogate)
+                    return false;
                 continue;
+            }
 
             // Escape sequence handling -------------------------------------
             if (i + 1 >= key.size()) return false; // dangling backslash
             QChar esc = key[i + 1];
 
-            // List of permitted single-char escapes per RFC 9535 (same as JSON)
-            static const QStringView allowedEsc = QStringView{u"\\\"'/bfnrtu"};
-            if (!allowedEsc.contains(esc))
+            // List of permitted single-char escapes per RFC 9535 (JSON set) – but
+            // \" is only permitted inside double-quoted keys; \' only inside single-quoted keys.
+            const QStringView allowedCommon = QStringView{u"\\/bfnrtu"};
+            bool escOk = allowedCommon.contains(esc);
+            if (!escOk) {
+                if (style == QuoteStyle::Double && esc == u'\"') escOk = true;
+                else if (style == QuoteStyle::Single && esc == u'\'') escOk = true;
+            }
+            if (!escOk)
                 return false; // unknown escape
 
             if (esc == u'u') {
@@ -199,17 +222,40 @@ namespace
                     if (val < 0) return false;
                     code = static_cast<ushort>((code << 4) | val);
                 }
-                // Reject control codes after decoding
-                if (code < 0x20)
+
+                // Surrogate handling ------------------------------------
+                bool isHighSurrogate = (code >= 0xD800 && code <= 0xDBFF);
+                bool isLowSurrogate  = (code >= 0xDC00 && code <= 0xDFFF);
+
+                if (expectLowSurrogate) {
+                    // We were waiting for a low surrogate
+                    if (!isLowSurrogate)
+                        return false; // not a valid pair
+                    expectLowSurrogate = false; // pair satisfied
+                } else if (isHighSurrogate) {
+                    // Must be followed by another \uXXXX escape representing a low surrogate
+                    if (i + 11 >= key.size()) return false; // need another 6 chars: \uXXXX
+                    if (key[i + 6] != u'\\' || key[i + 7] != u'u') return false; // not another \u
+                    // We'll check the next loop iteration, set flag
+                    expectLowSurrogate = true;
+                } else if (isLowSurrogate) {
+                    // Low surrogate without preceding high surrogate
                     return false;
+                }
+
                 i += 5; // consumed \uXXXX
             } else {
-                // Skip the escaped char (e.g. \", \\ etc.)
-                ++i;
+                // Skip the escaped char (\", \\ etc.)
+                i += 1; // skip escape target
             }
         }
+
+        // If we ended expecting a low surrogate, invalid
+        if (expectLowSurrogate) return false;
+
         return true;
     }
+
 } // namespace
 
 namespace detail {
