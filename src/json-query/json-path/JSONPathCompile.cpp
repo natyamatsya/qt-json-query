@@ -69,7 +69,7 @@ namespace
 
             // RFC 9535 §4.2.3: each literal MUST fit in safe-int range.
             constexpr qlonglong SAFE_INT = 9007199254740992LL; // 2^53 per RFC 9535 test expectations
-            if (v64 < -SAFE_INT || v64 > SAFE_INT)
+            if (v64 <= -SAFE_INT || v64 >= SAFE_INT)
                 return false; // totally out of supported range – selector invalid
 
             static constexpr qlonglong INT32_MIN_LL = static_cast<qlonglong>(std::numeric_limits<int>::min());
@@ -268,7 +268,7 @@ namespace
         bool ok=false; qlonglong val = content.toLongLong(&ok);
         qCDebug(jsonPathLog) << "isValidIndexLiteral(" << content << ") match=true ok=" << ok << " val=" << (ok?QString::number(val):QStringLiteral("n/a"));
         constexpr qlonglong SAFE_INT = 9007199254740992LL; // 2^53 per RFC 9535 test expectations
-        if (!ok || val < -SAFE_INT || val > SAFE_INT)
+        if (!ok || val <= -SAFE_INT || val >= SAFE_INT)
             return false; // totally out of supported range – selector invalid
 
         return true;
