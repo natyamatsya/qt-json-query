@@ -307,8 +307,15 @@ std::optional<Token> parseCompare1(QString s, QVector<FilterFn>& out)
                 if (op==">=") return d >= numVal;
                 return false;
             }
+            
             if (isBool) {
-                if (!v.isBool()) return false;
+                // RFC 9535: strict type checking - no coercion between booleans and other types
+                if (!v.isBool()) {
+                    // Non-boolean values are not equal to booleans, but can be != 
+                    if (op == "==") return false;
+                    if (op == "!=") return true;
+                    return false; // ordering comparisons require same type
+                }
                 const bool b = v.toBool();
                 // RFC 9535: boolean ordering comparisons use false < true ordering
                 if (op=="==") return b == boolVal;
@@ -459,8 +466,15 @@ std::optional<Token> parseCompareIndex(QString s, QVector<FilterFn>& out)
                 if (op==">=") return d >= numVal;
                 return false;
             }
+            
             if (isBool) {
-                if (!v.isBool()) return false;
+                // RFC 9535: strict type checking - no coercion between booleans and other types
+                if (!v.isBool()) {
+                    // Non-boolean values are not equal to booleans, but can be != 
+                    if (op == "==") return false;
+                    if (op == "!=") return true;
+                    return false; // ordering comparisons require same type
+                }
                 const bool b = v.toBool();
                 // RFC 9535: boolean ordering comparisons use false < true ordering
                 if (op=="==") return b == boolVal;
@@ -881,7 +895,6 @@ std::optional<Token> parseSelfCmp(QString s, QVector<FilterFn>& out)
             if (isBool){
                 if(!v.isBool()) return false;
                 bool b=v.toBool();
-                // RFC 9535: boolean ordering comparisons use false < true ordering
                 if (op=="==") return b == boolVal;
                 if (op=="!=") return b != boolVal;
                 if (op=="<")  return !b && boolVal;  // false < true
