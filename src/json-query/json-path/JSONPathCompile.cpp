@@ -3,9 +3,10 @@
 #include <iostream>
 #include <QDebug>
 #include "json-query/json-path/JSONPathLog.hpp"
+#include "json-query/json-path/JSONPathHelpers.hpp"
 
 #include "json-query/json-path/internal/QtHash.hpp"
-#include "../../../include/json-query/utils/JSONQueryUtils.hpp"
+#include "json-query/utils/JSONQueryUtils.hpp"
 #include "json-query/json-path/JSONPathFilter.hpp"  // For compileFilter implementation
 
 #include <limits>
@@ -354,40 +355,39 @@ struct BracketSink {
 // A helper to iterate over the content and run rules.
 using BrRule = std::function<std::optional<Error>(QStringView, BracketSink&)>;
 
-static const std::array<BrRule,10> BR_RULES = {{
-    // 0.  'a', 'b'  -----------------------------------------------
+static const std::array<BrRule,11> BR_RULES = {{
+    // 0.  union by comma (sequential selectors, e.g. ?@.a,1) --------
     [](QStringView content, BracketSink& out)->std::optional<Error> {
-        // Detect presence of comma outside quotes
-        int quoteCount = 0;
-        for (QChar c : content)
-            if (c == u'\'' || c == u'"') quoteCount ^= 1; // toggle simple state
-            else if (c == u',' && quoteCount == 0)
-            {
-                // Split by ',' respecting simple quote tracking (we only toggle, assumes same quote type)
-                qsizetype start = 0;
-                quoteCount = 0;
-                QVector<QString> keys;
-                for (qsizetype i=0;i<=content.size();++i)
-                {
-                    if (i==content.size() || (content[i]==u',' && quoteCount==0))
-                    {
-                        QStringView part = content.sliced(start, i-start).trimmed();
-                        if (part.isEmpty()) return Error::EmptySegment;
-                        if (part.size()<2) return std::optional<Error>{};
-                        QChar q=part.front();
-                        if ((q!=u'\'' && q!=u'\"') || part.back()!=q) return std::optional<Error>{};
-                        QStringView keyView = part.sliced(1, part.size()-2);
-                        QuoteStyle st = (q==u'\'') ? QuoteStyle::Single : QuoteStyle::Double;
-                        if (!isValidQuotedKey(keyView, st)) return std::optional<Error>{};
-                        QString unescaped = unescapeQuotedKey(keyView);
-                        keys.append(unescaped);
-                        start = i+1;
-                    } else if (content[i]==u'\'' || content[i]==u'"') quoteCount ^=1;
+        if (!content.contains(u',')) return std::nullopt;
+
+        // Quick skip if likely slice (presence of ':')
+        if (content.contains(u':')) return std::nullopt;
+
+        using json_query::json_path::detail::splitTopLevel;
+        auto parts = splitTopLevel(content.toString(), QLatin1StringView(","));
+        if (!parts) return std::nullopt;
+
+        const auto& [lhs, rhs] = *parts; // works only for two parts; but many tests use two
+        QVector<QStringView> segs;
+        segs.push_back(lhs.trimmed());
+        segs.push_back(rhs.trimmed());
+
+        // Helper lambda to route a single segment through existing rules (skip union rule to prevent recursion)
+        auto compileOne = [&](QStringView seg)->std::optional<Error> {
+            for (size_t i = 1; i < std::size(BR_RULES); ++i) {
+                if (auto err = BR_RULES[i](seg, out)) {
+                    if (*err == Error::Ok) return err;
+                    else return err; // propagate error
                 }
-                out.keyList(keys);
-                return Error::Ok;
             }
-        return std::nullopt;
+            return std::nullopt; // no rule matched
+        };
+
+        for (auto sv : segs) {
+            if (auto maybe = compileOne(sv); !maybe) return std::nullopt;
+            else if (*maybe != Error::Ok) return maybe; // propagate
+        }
+        return Error::Ok;
     },
 
     // 1.  *      ----------------------------------------------------

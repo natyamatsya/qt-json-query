@@ -76,6 +76,7 @@ struct Builder {
 [[nodiscard]] std::optional<Token> parseIn       (QString, QVector<FilterFn>&);
 [[nodiscard]] std::optional<Token> parseCompare  (QString, QVector<FilterFn>&);
 [[nodiscard]] std::optional<Token> parseRegex    (QString, QVector<FilterFn>&);
+[[nodiscard]] std::optional<Token> parseExists   (QString, QVector<FilterFn>&);
 
 // Table‑driven dispatch  ----------------------------------------
 using RuleFn = std::optional<Token>(*)(QString, QVector<FilterFn>&);
@@ -84,6 +85,7 @@ constexpr std::array rules = {
     &parseOr,      // lowest precedence first
     &parseAnd,
     &parseIn,
+    &parseExists,
     &parseCompare,
     &parseRegex
 };
@@ -275,6 +277,35 @@ std::optional<Token> parseRegex(QString s, QVector<FilterFn>& out)
 
     if (auto t = parseRegex1<dotPat>(s, out)) return t;
     return        parseRegex1<brkPat>(s, out);
+}
+
+// Existence / truthiness: "@.prop" or "@['prop']" (no operator)
+std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
+{
+    constexpr auto dotPat = ctll::fixed_string{R"(^@\.([\w$]+)$)"};
+    constexpr auto brkPat = ctll::fixed_string{R"(^@\[['\"]([^'\"]+)['\"]\]$)"};
+
+    auto makeToken = [&](QString prop)->Token {
+        Builder b{out};
+        return b.add([prop](const QJsonValue& j){
+            const auto v = j.toObject().value(prop);
+            if (v.isUndefined() || v.isNull()) return false;
+            switch (v.type()) {
+            case QJsonValue::Bool:   return v.toBool();
+            case QJsonValue::Double: return v.toDouble() != 0.0;
+            case QJsonValue::String: return !v.toString().isEmpty();
+            case QJsonValue::Array:  return !v.toArray().isEmpty();
+            case QJsonValue::Object: return !v.toObject().isEmpty();
+            default: return false;
+            }
+        }, prop);
+    };
+
+    if (auto m = ctre::match<dotPat>(to_sv(s)))
+        return makeToken(to_qstr(m.template get<1>().to_view()));
+    if (auto m = ctre::match<brkPat>(to_sv(s)))
+        return makeToken(to_qstr(m.template get<1>().to_view()));
+    return std::nullopt;
 }
 
 } // namespace json_query::json_path::detail
