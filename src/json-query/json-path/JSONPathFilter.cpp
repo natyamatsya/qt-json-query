@@ -8,6 +8,124 @@
 
 namespace json_query::json_path::detail {
 
+// Enum to characterize comparison types for template specialization
+enum class ComparisonType {
+    Numeric,
+    Boolean, 
+    Null,
+    String,
+    DeepEquality
+};
+
+// Template functions for type-specific comparisons
+template<ComparisonType Type>
+bool compareValue(const QJsonValue& v, const QString& op, const auto& rhs) = delete;
+
+template<>
+bool compareValue<ComparisonType::Numeric>(const QJsonValue& v, const QString& op, const double& numVal) {
+    // RFC 9535: strict type checking - no coercion between strings and numbers
+    if (!v.isDouble()) {
+        // Non-numeric values are not equal to numbers, but can be != 
+        if (op == "==") return false;
+        if (op == "!=") return true;
+        return false; // ordering comparisons require same type
+    }
+    const double x = v.toDouble();
+    if (op=="==") return x == numVal;
+    if (op=="!=") return x != numVal;
+    if (op=="<")  return x < numVal;
+    if (op==">")  return x > numVal;
+    if (op=="<=") return x <= numVal;
+    if (op==">=") return x >= numVal;
+    return false;
+}
+
+template<>
+bool compareValue<ComparisonType::Boolean>(const QJsonValue& v, const QString& op, const bool& boolVal) {
+    // RFC 9535: strict type checking - no coercion between booleans and other types
+    if (!v.isBool()) {
+        // Non-boolean values are not equal to booleans, but can be != 
+        if (op == "==") return false;
+        if (op == "!=") return true;
+        return false; // ordering comparisons require same type
+    }
+    const bool b = v.toBool();
+    if (op=="==") return b == boolVal;
+    if (op=="!=") return b != boolVal;
+    if (op=="<")  return !b && boolVal;  // false < true
+    if (op==">")  return b && !boolVal;  // true > false
+    if (op=="<=") return !b || boolVal;  // false <= anything, true <= true
+    if (op==">=") return b || !boolVal;  // true >= anything, false >= false
+    return false;
+}
+
+template<>
+bool compareValue<ComparisonType::Null>(const QJsonValue& v, const QString& op, const std::nullptr_t&) {
+    if (op=="==") return v.isNull();
+    if (op=="!=") return !v.isNull();
+    if (op=="<=") return v.isNull(); // null <= null is true
+    if (op==">=") return v.isNull(); // null >= null is true
+    return false; // null < null and null > null are false
+}
+
+template<>
+bool compareValue<ComparisonType::String>(const QJsonValue& v, const QString& op, const QString& rhs) {
+    const QString vs = v.toString();
+    if (op=="==") return vs == rhs;
+    if (op=="!=") return vs != rhs;
+    if (op=="<")  return vs < rhs;
+    if (op==">")  return vs > rhs;
+    if (op=="<=") return vs <= rhs;
+    if (op==">=") return vs >= rhs;
+    return false;
+}
+
+template<>
+bool compareValue<ComparisonType::DeepEquality>(const QJsonValue& v, const QString& op, const QString& rhs) {
+    // Parse RHS as JSON for potential array/object comparison
+    QJsonParseError parseError;
+    QJsonDocument rhsDoc = QJsonDocument::fromJson(rhs.toUtf8(), &parseError);
+    if (parseError.error == QJsonParseError::NoError) {
+        QJsonValue rhsValue = rhsDoc.isArray() ? QJsonValue(rhsDoc.array()) : 
+                             rhsDoc.isObject() ? QJsonValue(rhsDoc.object()) : QJsonValue();
+        if (!rhsValue.isNull()) {
+            if (op=="==") return v == rhsValue;
+            if (op=="!=") return v != rhsValue;
+            // Arrays and objects don't support ordering comparisons
+            return false;
+        }
+    }
+    // Fallback to string comparison
+    return compareValue<ComparisonType::String>(v, op, rhs);
+}
+
+// Lightweight comparison context using template dispatch
+struct ComparisonContext {
+    QString op;
+    QString rhs;
+    double numVal = 0.0;
+    bool boolVal = false;
+    ComparisonType type;
+    bool rhsQuoted = false;
+    
+    // Template-based comparison dispatch
+    bool compare(const QJsonValue& v) const {
+        switch (type) {
+            case ComparisonType::Numeric:
+                return compareValue<ComparisonType::Numeric>(v, op, numVal);
+            case ComparisonType::Boolean:
+                return compareValue<ComparisonType::Boolean>(v, op, boolVal);
+            case ComparisonType::Null:
+                return compareValue<ComparisonType::Null>(v, op, nullptr);
+            case ComparisonType::String:
+                return compareValue<ComparisonType::String>(v, op, rhs);
+            case ComparisonType::DeepEquality:
+                return compareValue<ComparisonType::DeepEquality>(v, op, rhs);
+        }
+        return false;
+    }
+};
+
     using FilterFn = json_path::FilterFn;
     using Kind  = Token::Kind;
     using json_query::utils::to_sv;
@@ -259,32 +377,43 @@ std::optional<Token> parseCompare1(QString s, QVector<FilterFn>& out)
         if (!isNum && !isBool && !isNull)
             (void)unquote(rhs);
 
+        ComparisonContext ctx;
+        ctx.op = op;
+        ctx.rhs = rhs;
+        ctx.type = isNum ? ComparisonType::Numeric : 
+                    isBool ? ComparisonType::Boolean : 
+                    isNull ? ComparisonType::Null : 
+                    rhsQuoted ? ComparisonType::DeepEquality : ComparisonType::String;
+        ctx.numVal = numVal;
+        ctx.boolVal = boolVal;
+        ctx.rhsQuoted = rhsQuoted;
+
         Builder b{out};
-        return b.add([prop, op, isNum, numVal, isBool, boolVal, rhs, rhsQuoted, isNull](const QJsonValue& j) -> bool
+        return b.add([prop, ctx](const QJsonValue& j) -> bool
         {
             const auto obj = j.toObject();
             const auto v = obj.value(prop);
-            qCDebug(jsonPathLog).nospace() << "[flt-cmp] prop='" << prop << "' op='" << op
-                                          << "' rhs=" << (isNum ? QString::number(numVal) : rhs)
+            qCDebug(jsonPathLog).nospace() << "[flt-cmp] prop='" << prop << "' op='" << ctx.op
+                                          << "' rhs=" << (ctx.type == ComparisonType::Numeric ? QString::number(ctx.numVal) : ctx.rhs)
                                           << " | v=" << v << " (type=" << v.type() << ")";
             
             // Handle missing properties per RFC 9535: missing properties are treated as null
             if (v.type() == QJsonValue::Undefined) {
                 // For != operator, missing property != any value is true (except null)
-                if (op == "!=") {
-                    if (isNum) return true;  // missing != number is true
-                    if (isBool) return true; // missing != boolean is true
-                    if (rhsQuoted) {
+                if (ctx.op == "!=") {
+                    if (ctx.type == ComparisonType::Numeric) return true;  // missing != number is true
+                    if (ctx.type == ComparisonType::Boolean) return true; // missing != boolean is true
+                    if (ctx.rhsQuoted) {
                         // Check if RHS is "null" - missing != null is false, missing != anything else is true
-                        return rhs != "null";
+                        return ctx.rhs != "null";
                     }
                     return true; // missing != unquoted non-null is true
                 }
                 // For == operator, missing property == any value is false (except null)
-                if (op == "==") {
-                    if (isNum || isBool) return false; // missing == number/boolean is false
-                    if (rhsQuoted) {
-                        return rhs == "null"; // missing == null is true, missing == anything else is false
+                if (ctx.op == "==") {
+                    if (ctx.type == ComparisonType::Numeric || ctx.type == ComparisonType::Boolean) return false; // missing == number/boolean is false
+                    if (ctx.rhsQuoted) {
+                        return ctx.rhs == "null"; // missing == null is true, missing == anything else is false
                     }
                     return false; // missing == unquoted non-null is false
                 }
@@ -292,81 +421,7 @@ std::optional<Token> parseCompare1(QString s, QVector<FilterFn>& out)
                 return false;
             }
             
-            if (isNum) {
-                // RFC 9535: strict type checking - no coercion between strings and numbers
-                if (!v.isDouble()) {
-                    // Non-numeric values are not equal to numbers, but can be != 
-                    if (op == "==") return false;
-                    if (op == "!=") return true;
-                    return false; // ordering comparisons require same type
-                }
-                const double d = v.toDouble();
-                if (op=="==") return d == numVal;
-                if (op=="!=") return d != numVal;
-                if (op=="<")  return d < numVal;
-                if (op==">")  return d > numVal;
-                if (op=="<=") return d <= numVal;
-                if (op==">=") return d >= numVal;
-                return false;
-            }
-            
-            if (isBool) {
-                // RFC 9535: strict type checking - no coercion between booleans and other types
-                if (!v.isBool()) {
-                    // Non-boolean values are not equal to booleans, but can be != 
-                    if (op == "==") return false;
-                    if (op == "!=") return true;
-                    return false; // ordering comparisons require same type
-                }
-                const bool b = v.toBool();
-                // RFC 9535: boolean ordering comparisons use false < true ordering
-                if (op=="==") return b == boolVal;
-                if (op=="!=") return b != boolVal;
-                if (op=="<")  return !b && boolVal;  // false < true
-                if (op==">")  return b && !boolVal;  // true > false
-                if (op=="<=") return !b || boolVal;  // false <= anything, true <= true
-                if (op==">=") return b || !boolVal;  // true >= anything, false >= false
-                return false;
-            }
-            
-            if (isNull) {
-                // RFC 9535: null comparisons
-                if (op=="==") return v.isNull();
-                if (op=="!=") return !v.isNull();
-                if (op=="<=") return v.isNull(); // null <= null is true
-                if (op==">=") return v.isNull(); // null >= null is true
-                return false; // null < null and null > null are false
-            }
-            
-            // Handle array/object deep equality comparisons
-            if (rhsQuoted) {
-                // Parse RHS as JSON for potential array/object comparison
-                QJsonParseError parseError;
-                QJsonDocument rhsDoc = QJsonDocument::fromJson(rhs.toUtf8(), &parseError);
-                if (parseError.error == QJsonParseError::NoError) {
-                    QJsonValue rhsValue = rhsDoc.isArray() ? QJsonValue(rhsDoc.array()) : 
-                                         rhsDoc.isObject() ? QJsonValue(rhsDoc.object()) : 
-                                         QJsonValue(rhs); // fallback to string
-                    
-                    // Deep equality comparison for arrays and objects
-                    if (op == "==") return v == rhsValue;
-                    if (op == "!=") return v != rhsValue;
-                    // Arrays and objects don't support ordering comparisons
-                    if (v.isArray() || v.isObject() || rhsValue.isArray() || rhsValue.isObject()) {
-                        return false;
-                    }
-                }
-            }
-            
-            // String comparisons (for quoted strings or fallback)
-            const QString vs = v.toString();
-            if (op=="==") return vs == rhs;
-            if (op=="!=") return vs != rhs;
-            if (op=="<")  return vs < rhs;
-            if (op==">")  return vs > rhs;
-            if (op=="<=") return vs <= rhs;
-            if (op==">=") return vs >= rhs;
-            return false;
+            return ctx.compare(v);
         }, prop);
     }
     return std::nullopt;
@@ -429,32 +484,43 @@ std::optional<Token> parseCompareIndex(QString s, QVector<FilterFn>& out)
         if (!isNum && !isBool && !isNull)
             (void)unquote(rhs);
 
+        ComparisonContext ctx;
+        ctx.op = op;
+        ctx.rhs = rhs;
+        ctx.type = isNum ? ComparisonType::Numeric : 
+                    isBool ? ComparisonType::Boolean : 
+                    isNull ? ComparisonType::Null : 
+                    rhsQuoted ? ComparisonType::DeepEquality : ComparisonType::String;
+        ctx.numVal = numVal;
+        ctx.boolVal = boolVal;
+        ctx.rhsQuoted = rhsQuoted;
+
         Builder b{out};
-        return b.add([idx, op, isNum, numVal, isBool, boolVal, rhs, rhsQuoted, isNull](const QJsonValue& j) -> bool
+        return b.add([idx, ctx](const QJsonValue& j) -> bool
         {
             const auto arr = j.toArray();
             if (idx < 0 || idx >= arr.size()) return false;
             const auto v = arr[idx];
-            qCDebug(jsonPathLog).nospace() << "[flt-cmp-idx] idx=" << idx << " op='" << op
-                                          << "' rhs=" << (isNum ? QString::number(numVal) : rhs)
+            qCDebug(jsonPathLog).nospace() << "[flt-cmp-idx] idx=" << idx << " op='" << ctx.op
+                                          << "' rhs=" << (ctx.type == ComparisonType::Numeric ? QString::number(ctx.numVal) : ctx.rhs)
                                           << " | v=" << v << " (type=" << v.type() << ")";
             
             // Handle missing array elements per RFC 9535: out-of-bounds access is treated as null
             if (v.type() == QJsonValue::Undefined) {
                 // For != operator, missing element != any value is true (except null)
-                if (op == "!=") {
-                    if (isNum) return true;  // missing != number is true
-                    if (isBool) return true; // missing != boolean is true
-                    if (rhsQuoted) {
-                        return rhs != "null"; // missing != null is false, missing != anything else is true
+                if (ctx.op == "!=") {
+                    if (ctx.type == ComparisonType::Numeric) return true;  // missing != number is true
+                    if (ctx.type == ComparisonType::Boolean) return true; // missing != boolean is true
+                    if (ctx.rhsQuoted) {
+                        return ctx.rhs != "null"; // missing != null is false, missing != anything else is true
                     }
                     return true; // missing != unquoted non-null is true
                 }
                 // For == operator, missing element == any value is false (except null)
-                if (op == "==") {
-                    if (isNum || isBool) return false; // missing == number/boolean is false
-                    if (rhsQuoted) {
-                        return rhs == "null"; // missing == null is true, missing == anything else is false
+                if (ctx.op == "==") {
+                    if (ctx.type == ComparisonType::Numeric || ctx.type == ComparisonType::Boolean) return false; // missing == number/boolean is false
+                    if (ctx.rhsQuoted) {
+                        return ctx.rhs == "null"; // missing == null is true, missing == anything else is false
                     }
                     return false; // missing == unquoted non-null is false
                 }
@@ -462,81 +528,7 @@ std::optional<Token> parseCompareIndex(QString s, QVector<FilterFn>& out)
                 return false;
             }
             
-            if (isNum) {
-                // RFC 9535: strict type checking - no coercion between strings and numbers
-                if (!v.isDouble()) {
-                    // Non-numeric values are not equal to numbers, but can be != 
-                    if (op == "==") return false;
-                    if (op == "!=") return true;
-                    return false; // ordering comparisons require same type
-                }
-                const double d = v.toDouble();
-                if (op=="==") return d == numVal;
-                if (op=="!=") return d != numVal;
-                if (op=="<")  return d < numVal;
-                if (op==">")  return d > numVal;
-                if (op=="<=") return d <= numVal;
-                if (op==">=") return d >= numVal;
-                return false;
-            }
-            
-            if (isBool) {
-                // RFC 9535: strict type checking - no coercion between booleans and other types
-                if (!v.isBool()) {
-                    // Non-boolean values are not equal to booleans, but can be != 
-                    if (op == "==") return false;
-                    if (op == "!=") return true;
-                    return false; // ordering comparisons require same type
-                }
-                const bool b = v.toBool();
-                // RFC 9535: boolean ordering comparisons use false < true ordering
-                if (op=="==") return b == boolVal;
-                if (op=="!=") return b != boolVal;
-                if (op=="<")  return !b && boolVal;  // false < true
-                if (op==">")  return b && !boolVal;  // true > false
-                if (op=="<=") return !b || boolVal;  // false <= anything, true <= true
-                if (op==">=") return b || !boolVal;  // true >= anything, false >= false
-                return false;
-            }
-            
-            if (isNull) {
-                // RFC 9535: null comparisons
-                if (op=="==") return v.isNull();
-                if (op=="!=") return !v.isNull();
-                if (op=="<=") return v.isNull(); // null <= null is true
-                if (op==">=") return v.isNull(); // null >= null is true
-                return false; // null < null and null > null are false
-            }
-            
-            // Handle array/object deep equality comparisons
-            if (rhsQuoted) {
-                // Parse RHS as JSON for potential array/object comparison
-                QJsonParseError parseError;
-                QJsonDocument rhsDoc = QJsonDocument::fromJson(rhs.toUtf8(), &parseError);
-                if (parseError.error == QJsonParseError::NoError) {
-                    QJsonValue rhsValue = rhsDoc.isArray() ? QJsonValue(rhsDoc.array()) : 
-                                         rhsDoc.isObject() ? QJsonValue(rhsDoc.object()) : 
-                                         QJsonValue(rhs); // fallback to string
-                    
-                    // Deep equality comparison for arrays and objects
-                    if (op == "==") return v == rhsValue;
-                    if (op == "!=") return v != rhsValue;
-                    // Arrays and objects don't support ordering comparisons
-                    if (v.isArray() || v.isObject() || rhsValue.isArray() || rhsValue.isObject()) {
-                        return false;
-                    }
-                }
-            }
-            
-            // String comparisons (for quoted strings or fallback)
-            const QString vs = v.toString();
-            if (op=="==") return vs == rhs;
-            if (op=="!=") return vs != rhs;
-            if (op=="<")  return vs < rhs;
-            if (op==">")  return vs > rhs;
-            if (op=="<=") return vs <= rhs;
-            if (op==">=") return vs >= rhs;
-            return false;
+            return ctx.compare(v);
         });
     }
     return std::nullopt;
@@ -981,39 +973,19 @@ std::optional<Token> parseSelfCmp(QString s, QVector<FilterFn>& out)
         if (!isNum && !isBool && !isNull)
             (void)unquote(rhs);
 
-        auto cmpScalar=[op,isNum,num,isBool,boolVal,rhs,isNull](const QJsonValue& v)->bool{
-            if (isNum) {
-                if (!v.isDouble()) return false;
-                const double x=v.toDouble();
-                if (op=="==") return x==num;
-                if (op=="!=") return x!=num;
-                if (op==">") return x>num;
-                if (op=="<") return x<num;
-                if (op==">=") return x>=num;
-                if (op=="<=") return x<=num;
-                return false;
-            }
-            if (isBool){
-                if(!v.isBool()) return false;
-                bool b=v.toBool();
-                if (op=="==") return b == boolVal;
-                if (op=="!=") return b != boolVal;
-                if (op=="<")  return !b && boolVal;  // false < true
-                if (op==">")  return b && !boolVal;  // true > false
-                if (op=="<=") return !b || boolVal;  // false <= anything, true <= true
-                if (op==">=") return b || !boolVal;  // true >= anything, false >= false
-                return false;
-            }
-            if (isNull) {
-                // RFC 9535: null comparisons
-                if (op=="==") return v.isNull();
-                if (op=="!=") return !v.isNull();
-                if (op=="<=") return v.isNull(); // null <= null is true
-                if (op==">=") return v.isNull(); // null >= null is true
-                return false; // null < null and null > null are false
-            }
-            QString s=v.toString();
-            return op=="=="?s==rhs: op=="!="?s!=rhs:false;
+        ComparisonContext ctx;
+        ctx.op = op;
+        ctx.rhs = rhs;
+        ctx.type = isNum ? ComparisonType::Numeric : 
+                    isBool ? ComparisonType::Boolean : 
+                    isNull ? ComparisonType::Null : 
+                    rhsQuoted ? ComparisonType::DeepEquality : ComparisonType::String;
+        ctx.numVal = num;
+        ctx.boolVal = boolVal;
+        ctx.rhsQuoted = rhsQuoted;
+
+        auto cmpScalar=[ctx](const QJsonValue& v)->bool{
+            return ctx.compare(v);
         };
 
         Builder b{out};
