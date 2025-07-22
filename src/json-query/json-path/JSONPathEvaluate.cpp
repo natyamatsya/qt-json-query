@@ -461,9 +461,18 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
         }
     }
 
+    // Special case: for root selector ($), we should return the working array directly
+    // instead of squashing it, because the root selector should return the complete document
+    // as a single result, not unwrap array contents
+    bool isRootSelectorOnly = (ctx.tokens.size() == 1);
+    if (isRootSelectorOnly) {
+        return working;
+    }
+
     QJsonValue collapsed = squash(std::move(working), multi);
     if (collapsed.isUndefined())
-        return QJsonArray{}; // RFC 9535: no matches ⇒ empty result list
+        return QJsonArray{}; // RFC 9535: no matches 
+
     return applyTrailing(ctx.trailingFn, collapsed);
 }
 
