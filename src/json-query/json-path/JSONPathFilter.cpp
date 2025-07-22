@@ -258,7 +258,7 @@ std::optional<Token> parseCompare1(QString s, QVector<FilterFn>& out)
             (void)unquote(rhs);
 
         Builder b{out};
-        return b.add([prop, op, isNum, num, isBool, boolVal, rhs](const QJsonValue& j) -> bool
+        return b.add([prop, op, isNum, num, isBool, boolVal, rhs, rhsQuoted](const QJsonValue& j) -> bool
         {
             const auto obj = j.toObject();
             const auto v = obj.value(prop);
@@ -284,10 +284,36 @@ std::optional<Token> parseCompare1(QString s, QVector<FilterFn>& out)
                                  : op=="!=" ? b != boolVal
                                  : false;
             }
+            
+            // Handle array/object deep equality comparisons
+            if (rhsQuoted) {
+                // Parse RHS as JSON for potential array/object comparison
+                QJsonParseError parseError;
+                QJsonDocument rhsDoc = QJsonDocument::fromJson(rhs.toUtf8(), &parseError);
+                if (parseError.error == QJsonParseError::NoError) {
+                    QJsonValue rhsValue = rhsDoc.isArray() ? QJsonValue(rhsDoc.array()) : 
+                                         rhsDoc.isObject() ? QJsonValue(rhsDoc.object()) : 
+                                         QJsonValue(rhs); // fallback to string
+                    
+                    // Deep equality comparison for arrays and objects
+                    if (op == "==") return v == rhsValue;
+                    if (op == "!=") return v != rhsValue;
+                    // Arrays and objects don't support ordering comparisons
+                    if (v.isArray() || v.isObject() || rhsValue.isArray() || rhsValue.isObject()) {
+                        return false;
+                    }
+                }
+            }
+            
+            // String comparisons (for quoted strings or fallback)
             const QString vs = v.toString();
-            return op=="==" ? vs == rhs
-                 : op=="!=" ? vs != rhs
-                 : false;
+            if (op=="==") return vs == rhs;
+            if (op=="!=") return vs != rhs;
+            if (op=="<")  return vs < rhs;
+            if (op==">")  return vs > rhs;
+            if (op=="<=") return vs <= rhs;
+            if (op==">=") return vs >= rhs;
+            return false;
         }, prop);
     }
     return std::nullopt;
@@ -349,7 +375,7 @@ std::optional<Token> parseCompareIndex(QString s, QVector<FilterFn>& out)
             (void)unquote(rhs);
 
         Builder b{out};
-        return b.add([idx, op, isNum, num, isBool, boolVal, rhs](const QJsonValue& j) -> bool
+        return b.add([idx, op, isNum, num, isBool, boolVal, rhs, rhsQuoted](const QJsonValue& j) -> bool
         {
             const auto arr = j.toArray();
             if (idx < 0 || idx >= arr.size()) return false;
@@ -376,10 +402,36 @@ std::optional<Token> parseCompareIndex(QString s, QVector<FilterFn>& out)
                                  : op=="!=" ? b != boolVal
                                  : false;
             }
+            
+            // Handle array/object deep equality comparisons
+            if (rhsQuoted) {
+                // Parse RHS as JSON for potential array/object comparison
+                QJsonParseError parseError;
+                QJsonDocument rhsDoc = QJsonDocument::fromJson(rhs.toUtf8(), &parseError);
+                if (parseError.error == QJsonParseError::NoError) {
+                    QJsonValue rhsValue = rhsDoc.isArray() ? QJsonValue(rhsDoc.array()) : 
+                                         rhsDoc.isObject() ? QJsonValue(rhsDoc.object()) : 
+                                         QJsonValue(rhs); // fallback to string
+                    
+                    // Deep equality comparison for arrays and objects
+                    if (op == "==") return v == rhsValue;
+                    if (op == "!=") return v != rhsValue;
+                    // Arrays and objects don't support ordering comparisons
+                    if (v.isArray() || v.isObject() || rhsValue.isArray() || rhsValue.isObject()) {
+                        return false;
+                    }
+                }
+            }
+            
+            // String comparisons (for quoted strings or fallback)
             const QString vs = v.toString();
-            return op=="==" ? vs == rhs
-                 : op=="!=" ? vs != rhs
-                 : false;
+            if (op=="==") return vs == rhs;
+            if (op=="!=") return vs != rhs;
+            if (op=="<")  return vs < rhs;
+            if (op==">")  return vs > rhs;
+            if (op=="<=") return vs <= rhs;
+            if (op==">=") return vs >= rhs;
+            return false;
         });
     }
     return std::nullopt;
@@ -660,7 +712,7 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
             for (int i = actualStart; i < actualEnd; ++i) {
                 const auto& v = arr[i];
                 switch (v.type()) {
-                case QJsonValue::Null:   continue;
+                case QJsonValue::Null:   continue; // null is falsy, doesn't affect result
                 case QJsonValue::Bool:   if (v.toBool()) return false; break; // found truthy, so negated is false
                 case QJsonValue::Double: if (v.toDouble() != 0.0) return false; break;
                 case QJsonValue::String: if (!v.toString().isEmpty()) return false; break;
