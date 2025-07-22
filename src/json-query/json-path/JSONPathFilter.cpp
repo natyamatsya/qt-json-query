@@ -145,14 +145,19 @@ struct ComparisonContext {
 [[nodiscard]] inline bool unquote(QString& s)
 {
     if (s.size() < 2) return false;
-    const QChar quote = s.front();
-    if (quote != u'"' && quote != u'\'') return false;
+    const QChar openQuote = s.front();
+    const QChar closeQuote = s.back();
+    
+    // RFC 9535: Support mixed quote styles - opening can be ' or ", closing can be ' or "
+    if ((openQuote != u'"' && openQuote != u'\'') || (closeQuote != u'"' && closeQuote != u'\'')) 
+        return false;
 
+    // For mixed quotes, we need to find the actual closing quote
     // Scan forward to find the closing quote that is NOT preceded by an odd
     // number of backslashes (i.e. it is truly terminating the literal).
     int idx = -1;
     for (int i = 1; i < s.size(); ++i) {
-        if (s[i] != quote) continue;
+        if (s[i] != closeQuote) continue;
         // count preceding backslashes
         int backslashes = 0;
         int k = i - 1;
@@ -161,7 +166,7 @@ struct ComparisonContext {
     }
     if (idx == -1) {
         // Fallback: assume last char is quote even if escaped; drop first and last
-        if (s.back() != quote) return false;
+        if (s.back() != closeQuote) return false;
         s = s.mid(1, s.size()-2);
     } else {
         // Extract up to found idx
@@ -247,6 +252,7 @@ template<auto PAT> [[nodiscard]] std::optional<Token> parseNullCompareIndex(QStr
 template<auto PAT> [[nodiscard]] std::optional<Token> parseSelfCompare  (QString, QVector<FilterFn>&);
 template<auto PAT> [[nodiscard]] std::optional<Token> parseSelfCompareIndex(QString, QVector<FilterFn>&);
 template<auto PAT> [[nodiscard]] std::optional<Token> parseRegex1      (QString, QVector<FilterFn>&);
+template<auto PAT> [[nodiscard]] std::optional<Token> parseSelfValue   (QString, QVector<FilterFn>&);
 
 // Table‑driven dispatch  ----------------------------------------
 using RuleFn = std::optional<Token>(*)(QString, QVector<FilterFn>&);
@@ -362,7 +368,9 @@ std::optional<Token> parseCompare1(QString s, QVector<FilterFn>& out)
             return i==v.size();
         };
 
-        const bool rhsQuoted = (rhs.size() >= 2) && ((rhs.front()==u'\'' && rhs.back()==u'\'') || (rhs.front()==u'\"' && rhs.back()==u'\"'));
+        const bool rhsQuoted = (rhs.size() >= 2) && 
+                                ((rhs.front()==u'\'' || rhs.front()==u'\"') && 
+                                 (rhs.back()==u'\'' || rhs.back()==u'\"'));
 
         bool isNum = isValidNumberLiteral(rhs);
         double numVal = isNum ? rhs.toDouble() : 0.0;
@@ -469,7 +477,9 @@ std::optional<Token> parseCompareIndex(QString s, QVector<FilterFn>& out)
             return i==v.size();
         };
 
-        const bool rhsQuoted = (rhs.size() >= 2) && ((rhs.front()==u'\'' && rhs.back()==u'\'') || (rhs.front()==u'\"' && rhs.back()==u'\"'));
+        const bool rhsQuoted = (rhs.size() >= 2) && 
+                                ((rhs.front()==u'\'' || rhs.front()==u'\"') && 
+                                 (rhs.back()==u'\'' || rhs.back()==u'\"'));
 
         bool isNum = isValidNumberLiteral(rhs);
         double numVal = isNum ? rhs.toDouble() : 0.0;
@@ -585,6 +595,9 @@ std::optional<Token> parseCompare(QString s, QVector<FilterFn>& out)
     
     // Direct self-comparison pattern: @==@ or @!=@
     constexpr auto directSelfPat = ctll::fixed_string{R"(^@\s*(==|!=)\s*@$)"};
+    
+    // Direct self-comparison with value pattern: @ == value
+    constexpr auto selfValuePat = ctll::fixed_string{R"(^@\s*(==|!=|>=|<=|>|<)\s*(.+)$)"};
 
     // Try null comparisons first (more specific)
     if (auto t = parseNullCompare<dotNullPat>(s, out)) return t;
@@ -662,6 +675,9 @@ std::optional<Token> parseCompare(QString s, QVector<FilterFn>& out)
     if (auto t = parseSelfCompare<dotSelfPat>(s, out)) return t;
     if (auto t = parseSelfCompare<brkSelfPat>(s, out)) return t;
     if (auto t = parseSelfCompareIndex<idxSelfPat>(s, out)) return t;
+
+    // Try direct self-comparison with value
+    if (auto t = parseSelfValue<selfValuePat>(s, out)) return t;
 
     // Try regular comparisons
     if (auto t = parseCompare1<dotPat>(s, out)) return t;
@@ -741,6 +757,84 @@ std::optional<Token> parseSelfCompareIndex(QString s, QVector<FilterFn>& out)
             const auto self = j;
             return op=="==" ? v == self : v != self;
         });
+    }
+    return std::nullopt;
+}
+
+template<auto PAT>
+std::optional<Token> parseSelfValue(QString s, QVector<FilterFn>& out)
+{
+    if (auto m = ctre::match<PAT>(to_sv(s)))
+    {
+        const QString op   = to_qstr(m.template get<1>().to_view());
+        QString rhs        = to_qstr(m.template get<2>().to_view()).trimmed();
+
+        // Runtime numeric literal validator (RFC 8259 style)
+        auto isValidNumberLiteral = [](QStringView v)->bool {
+            if (v.isEmpty()) return false;
+            int i = 0;
+            if (v[i] == u'-') {
+                ++i;
+                if (i==v.size()) return false; // just '-'
+            }
+            // int part
+            if (!v[i].isDigit()) return false;
+            if (v[i]==u'0' && i+1< v.size() && v[i+1].isDigit()) return false; // leading zero
+            while (i < v.size() && v[i].isDigit()) ++i;
+            // frac part
+            if (i < v.size() && v[i]==u'.') {
+                ++i;
+                int fracStart=i;
+                while (i< v.size() && v[i].isDigit()) ++i;
+                if (i==fracStart) return false; // no digits after '.'
+            }
+            // exponent part
+            if (i < v.size() && (v[i]==u'e' || v[i]==u'E')) {
+                ++i;
+                if (i==v.size()) return false;
+                if (v[i]==u'+' || v[i]==u'-') ++i;
+                int expStart=i;
+                while (i< v.size() && v[i].isDigit()) ++i;
+                if (i==expStart) return false; // no digits in exponent
+            }
+            return i==v.size();
+        };
+
+        const bool rhsQuoted = (rhs.size() >= 2) && 
+                                ((rhs.front()==u'\'' || rhs.front()==u'\"') && 
+                                 (rhs.back()==u'\'' || rhs.back()==u'\"'));
+
+        bool isNum = isValidNumberLiteral(rhs);
+        double numVal = isNum ? rhs.toDouble() : 0.0;
+
+        const bool isBool = (!isNum && (rhs.compare("true", Qt::CaseSensitive)==0 || rhs.compare("false", Qt::CaseSensitive)==0));
+        const bool boolVal = isBool ? (rhs.compare("true", Qt::CaseSensitive)==0) : false;
+
+        const bool isNull = (!isNum && !isBool && (rhs.compare("null", Qt::CaseSensitive)==0));
+
+        // Reject unquoted RHS that is neither valid number, boolean, nor null
+        if (!isNum && !isBool && !isNull && !rhsQuoted)
+            return std::nullopt;
+
+        if (!isNum && !isBool && !isNull)
+            (void)unquote(rhs);
+
+        ComparisonContext ctx;
+        ctx.op = op;
+        ctx.rhs = rhs;
+        ctx.type = isNum ? ComparisonType::Numeric : 
+                    isBool ? ComparisonType::Boolean : 
+                    isNull ? ComparisonType::Null : 
+                    rhsQuoted ? ComparisonType::DeepEquality : ComparisonType::String;
+        ctx.numVal = numVal;
+        ctx.boolVal = boolVal;
+        ctx.rhsQuoted = rhsQuoted;
+
+        Builder b{out};
+        return b.add([ctx](const QJsonValue& j){
+            // Direct self-comparison: compare the current value with the RHS
+            return ctx.compare(j);
+        }, QString("@"));
     }
     return std::nullopt;
 }
