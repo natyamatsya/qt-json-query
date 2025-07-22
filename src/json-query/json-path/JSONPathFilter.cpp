@@ -305,9 +305,14 @@ std::optional<Token> parseCompare1(QString s, QVector<FilterFn>& out)
             if (isBool) {
                 if (!v.isBool()) return false;
                 const bool b = v.toBool();
-                return op=="==" ? b == boolVal
-                                 : op=="!=" ? b != boolVal
-                                 : false;
+                // RFC 9535: boolean ordering comparisons use false < true ordering
+                if (op=="==") return b == boolVal;
+                if (op=="!=") return b != boolVal;
+                if (op=="<")  return !b && boolVal;  // false < true
+                if (op==">")  return b && !boolVal;  // true > false
+                if (op=="<=") return !b || boolVal;  // false <= anything, true <= true
+                if (op==">=") return b || !boolVal;  // true >= anything, false >= false
+                return false;
             }
             
             // Handle array/object deep equality comparisons
@@ -447,9 +452,14 @@ std::optional<Token> parseCompareIndex(QString s, QVector<FilterFn>& out)
             if (isBool) {
                 if (!v.isBool()) return false;
                 const bool b = v.toBool();
-                return op=="==" ? b == boolVal
-                                 : op=="!=" ? b != boolVal
-                                 : false;
+                // RFC 9535: boolean ordering comparisons use false < true ordering
+                if (op=="==") return b == boolVal;
+                if (op=="!=") return b != boolVal;
+                if (op=="<")  return !b && boolVal;  // false < true
+                if (op==">")  return b && !boolVal;  // true > false
+                if (op=="<=") return !b || boolVal;  // false <= anything, true <= true
+                if (op==">=") return b || !boolVal;  // true >= anything, false >= false
+                return false;
             }
             
             // Handle array/object deep equality comparisons
@@ -861,7 +871,14 @@ std::optional<Token> parseSelfCmp(QString s, QVector<FilterFn>& out)
             if (isBool){
                 if(!v.isBool()) return false;
                 bool b=v.toBool();
-                return op=="=="?b==boolVal: op=="!="?b!=boolVal:false;
+                // RFC 9535: boolean ordering comparisons use false < true ordering
+                if (op=="==") return b == boolVal;
+                if (op=="!=") return b != boolVal;
+                if (op=="<")  return !b && boolVal;  // false < true
+                if (op==">")  return b && !boolVal;  // true > false
+                if (op=="<=") return !b || boolVal;  // false <= anything, true <= true
+                if (op==">=") return b || !boolVal;  // true >= anything, false >= false
+                return false;
             }
             QString s=v.toString();
             return op=="=="?s==rhs: op=="!="?s!=rhs:false;
