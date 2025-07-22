@@ -563,6 +563,9 @@ std::optional<Token> parseCompare(QString s, QVector<FilterFn>& out)
     constexpr auto dotSelfPat = ctll::fixed_string{R"(@\.([\w$]+)\s*(==|!=)\s*@)"};
     constexpr auto brkSelfPat = ctll::fixed_string{R"(@\[['\"]([^'\"]+)['\"]\]\s*(==|!=)\s*@)"};
     constexpr auto idxSelfPat = ctll::fixed_string{R"(@\[(-?\d+)\]\s*(==|!=)\s*@)"};
+    
+    // Direct self-comparison pattern: @==@ or @!=@
+    constexpr auto directSelfPat = ctll::fixed_string{R"(^@\s*(==|!=)\s*@$)"};
 
     // Try null comparisons first (more specific)
     if (auto t = parseNullCompare<dotNullPat>(s, out)) return t;
@@ -570,6 +573,18 @@ std::optional<Token> parseCompare(QString s, QVector<FilterFn>& out)
     if (auto t = parseNullCompareIndex<idxNullPat>(s, out)) return t;
     
     // Try self comparisons
+    // Direct self-comparison first (most specific)
+    if (ctre::match<directSelfPat>(to_sv(s))) {
+        auto m = ctre::match<directSelfPat>(to_sv(s));
+        const QString op = to_qstr(m.template get<1>().to_view());
+        
+        Builder b{out};
+        return b.add([op](const QJsonValue& j){
+            // Direct self-comparison: @ == @ is always true, @ != @ is always false
+            return op == "==" ? true : false;
+        }, QString("@"));
+    }
+    
     if (auto t = parseSelfCompare<dotSelfPat>(s, out)) return t;
     if (auto t = parseSelfCompare<brkSelfPat>(s, out)) return t;
     if (auto t = parseSelfCompareIndex<idxSelfPat>(s, out)) return t;
@@ -667,10 +682,10 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
     constexpr auto rootRefPat = ctll::fixed_string{R"(^\$$)"};
     
     // Negated patterns
-    constexpr auto negDotPat = ctll::fixed_string{R"(^!@\.([\w$]+)$)"};
-    constexpr auto negBrkPat = ctll::fixed_string{R"(^!@\[['\"]([^'"]+)['\"]\]$)"};
     constexpr auto negRootPat = ctll::fixed_string{R"(^!@$)"};
     constexpr auto negWildcardPat = ctll::fixed_string{R"(^!@\.\*$)"};
+    constexpr auto negDotPat = ctll::fixed_string{R"(^!@\.([\w$]+)$)"};
+    constexpr auto negBrkPat = ctll::fixed_string{R"(^!@\[['\"]([^'"]+)['\"]\]$)"};
     
     // Complex access patterns
     constexpr auto arrayIndexPat = ctll::fixed_string{R"(^@\[(\d+)\]$)"};
@@ -742,7 +757,7 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
             if (!j.isArray()) return true; // non-arrays don't have indices
             const auto arr = j.toArray();
             if (index < 0 || index >= arr.size()) return true; // out of bounds is absent
-            const auto& v = arr[index];
+            const auto v = arr[index];
             // RFC 9535: negated existence filters check for element absence
             return v.type() == QJsonValue::Undefined;
         }, QString("!@[%1]").arg(index));
@@ -812,6 +827,28 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
     if (auto m = ctre::match<negBrkPat>(to_sv(s)))
         return makeNegatedToken(to_qstr(m.template get<1>().to_view()));
 
+    // Root self-comparison pattern for $[?$==$] - compares root to itself
+    constexpr auto rootSelfPat = ctll::fixed_string{R"(^\$\s*(==|!=)\s*\$$)"};
+    if (ctre::match<rootSelfPat>(to_sv(s))) {
+        auto m = ctre::match<rootSelfPat>(to_sv(s));
+        const QString op = to_qstr(m.template get<1>().to_view());
+        
+        Builder b{out};
+        return b.add([op](const QJsonValue& j){
+            // Root self-comparison: $ == $ is always true, $ != $ is always false
+            return op == "==" ? true : false;
+        }, QString("$"));
+    }
+
+    // Root reference existence filter: $[?$] - always true (root document always exists)
+    if (ctre::match<rootRefPat>(to_sv(s))) {
+        Builder b{out};
+        return b.add([](const QJsonValue& j){
+            // Root document always exists
+            return true;
+        }, QString("$"));
+    }
+    
     // Check for root existence filter
     if (auto m = ctre::match<rootPat>(to_sv(s)))
         return makeRootToken();
@@ -838,15 +875,6 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
     if (auto m = ctre::match<brkPat>(to_sv(s)))
         return makeToken(to_qstr(m.template get<1>().to_view()));
     
-    // Root reference existence filter: $[?$] - always true (root document always exists)
-    if (ctre::match<rootRefPat>(to_sv(s))) {
-        Builder b{out};
-        return b.add([](const QJsonValue& j){
-            // Root document always exists
-            return true;
-        }, QString("$"));
-    }
-
     return std::nullopt;
 }
 
