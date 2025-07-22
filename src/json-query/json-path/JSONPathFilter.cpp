@@ -121,7 +121,13 @@ struct Builder {
 [[nodiscard]] std::optional<Token> parseSelfCmp  (QString, QVector<FilterFn>&);
 
 // Template function forward declarations
-template<auto PAT> [[nodiscard]] std::optional<Token> parseCompareIndex(QString, QVector<FilterFn>&);
+template<auto PAT> [[nodiscard]] std::optional<Token> parseCompare1     (QString, QVector<FilterFn>&);
+template<auto PAT> [[nodiscard]] std::optional<Token> parseCompareIndex (QString, QVector<FilterFn>&);
+template<auto PAT> [[nodiscard]] std::optional<Token> parseNullCompare  (QString, QVector<FilterFn>&);
+template<auto PAT> [[nodiscard]] std::optional<Token> parseNullCompareIndex(QString, QVector<FilterFn>&);
+template<auto PAT> [[nodiscard]] std::optional<Token> parseSelfCompare  (QString, QVector<FilterFn>&);
+template<auto PAT> [[nodiscard]] std::optional<Token> parseSelfCompareIndex(QString, QVector<FilterFn>&);
+template<auto PAT> [[nodiscard]] std::optional<Token> parseRegex1      (QString, QVector<FilterFn>&);
 
 // Table‑driven dispatch  ----------------------------------------
 using RuleFn = std::optional<Token>(*)(QString, QVector<FilterFn>&);
@@ -412,13 +418,109 @@ std::optional<Token> parseCompare(QString s, QVector<FilterFn>& out)
     constexpr auto dotPat = ctll::fixed_string{R"(@\.([\w$]+)\s*(==|!=|>=|<=|>|<)\s*(.+))"};
     constexpr auto brkPat = ctll::fixed_string{R"(@\[['\"]([^'\"]+)['\"]\]\s*(==|!=|>=|<=|>|<)\s*(.+))"};
     constexpr auto idxPat = ctll::fixed_string{R"(@\[(-?\d+)\]\s*(==|!=|>=|<=|>|<)\s*(.+))"};
+    
+    // Null comparison patterns
+    constexpr auto dotNullPat = ctll::fixed_string{R"(@\.([\w$]+)\s*(==|!=)\s*null)"};
+    constexpr auto brkNullPat = ctll::fixed_string{R"(@\[['\"]([^'\"]+)['\"]\]\s*(==|!=)\s*null)"};
+    constexpr auto idxNullPat = ctll::fixed_string{R"(@\[(-?\d+)\]\s*(==|!=)\s*null)"};
+    
+    // Self comparison patterns
+    constexpr auto dotSelfPat = ctll::fixed_string{R"(@\.([\w$]+)\s*(==|!=)\s*@)"};
+    constexpr auto brkSelfPat = ctll::fixed_string{R"(@\[['\"]([^'\"]+)['\"]\]\s*(==|!=)\s*@)"};
+    constexpr auto idxSelfPat = ctll::fixed_string{R"(@\[(-?\d+)\]\s*(==|!=)\s*@)"};
 
+    // Try null comparisons first (more specific)
+    if (auto t = parseNullCompare<dotNullPat>(s, out)) return t;
+    if (auto t = parseNullCompare<brkNullPat>(s, out)) return t;
+    if (auto t = parseNullCompareIndex<idxNullPat>(s, out)) return t;
+    
+    // Try self comparisons
+    if (auto t = parseSelfCompare<dotSelfPat>(s, out)) return t;
+    if (auto t = parseSelfCompare<brkSelfPat>(s, out)) return t;
+    if (auto t = parseSelfCompareIndex<idxSelfPat>(s, out)) return t;
+
+    // Try regular comparisons
     if (auto t = parseCompare1<dotPat>(s, out)) return t;
     if (auto t = parseCompare1<brkPat>(s, out)) return t;
     return        parseCompareIndex<idxPat>(s, out);
 }
 
-// Existence / truthiness: "@.prop" or "@['prop']" (no operator)
+template<auto PAT>
+std::optional<Token> parseNullCompare(QString s, QVector<FilterFn>& out)
+{
+    if (auto m = ctre::match<PAT>(to_sv(s)))
+    {
+        const QString prop = to_qstr(m.template get<1>().to_view());
+        const QString op   = to_qstr(m.template get<2>().to_view());
+
+        Builder b{out};
+        return b.add([prop, op](const QJsonValue& j){
+            const auto obj = j.toObject();
+            const auto v = obj.value(prop);
+            return op=="==" ? v.isNull() : v.type() != QJsonValue::Null;
+        }, prop);
+    }
+    return std::nullopt;
+}
+
+template<auto PAT>
+std::optional<Token> parseNullCompareIndex(QString s, QVector<FilterFn>& out)
+{
+    if (auto m = ctre::match<PAT>(to_sv(s)))
+    {
+        const int idx = to_qstr(m.template get<1>().to_view()).toInt();
+        const QString op   = to_qstr(m.template get<2>().to_view());
+
+        Builder b{out};
+        return b.add([idx, op](const QJsonValue& j){
+            const auto arr = j.toArray();
+            if (idx < 0 || idx >= arr.size()) return false;
+            const auto v = arr[idx];
+            return op=="==" ? v.isNull() : v.type() != QJsonValue::Null;
+        });
+    }
+    return std::nullopt;
+}
+
+template<auto PAT>
+std::optional<Token> parseSelfCompare(QString s, QVector<FilterFn>& out)
+{
+    if (auto m = ctre::match<PAT>(to_sv(s)))
+    {
+        const QString prop = to_qstr(m.template get<1>().to_view());
+        const QString op   = to_qstr(m.template get<2>().to_view());
+
+        Builder b{out};
+        return b.add([prop, op](const QJsonValue& j){
+            const auto obj = j.toObject();
+            const auto v = obj.value(prop);
+            const auto self = j;
+            return op=="==" ? v == self : v != self;
+        }, prop);
+    }
+    return std::nullopt;
+}
+
+template<auto PAT>
+std::optional<Token> parseSelfCompareIndex(QString s, QVector<FilterFn>& out)
+{
+    if (auto m = ctre::match<PAT>(to_sv(s)))
+    {
+        const int idx = to_qstr(m.template get<1>().to_view()).toInt();
+        const QString op   = to_qstr(m.template get<2>().to_view());
+
+        Builder b{out};
+        return b.add([idx, op](const QJsonValue& j){
+            const auto arr = j.toArray();
+            if (idx < 0 || idx >= arr.size()) return false;
+            const auto v = arr[idx];
+            const auto self = j;
+            return op=="==" ? v == self : v != self;
+        });
+    }
+    return std::nullopt;
+}
+
 std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
 {
     constexpr auto dotPat = ctll::fixed_string{R"(^@\.([\w$]+)$)"};
@@ -497,6 +599,21 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
         }, QString("@[%1:%2]").arg(start).arg(end));
     };
 
+    auto makeRootToken = [&]()->Token {
+        Builder b{out};
+        return b.add([](const QJsonValue& j){
+            switch (j.type()) {
+            case QJsonValue::Null:   return false;
+            case QJsonValue::Bool:   return j.toBool();
+            case QJsonValue::Double: return j.toDouble() != 0.0;
+            case QJsonValue::String: return !j.toString().isEmpty();
+            case QJsonValue::Array:  return !j.toArray().isEmpty();
+            case QJsonValue::Object: return !j.toObject().isEmpty();
+            default: return false;
+            }
+        }, "@");
+    };
+
     auto makeNegatedToken = [&](QString prop)->Token {
         Builder b{out};
         return b.add([prop](const QJsonValue& j){
@@ -554,21 +671,6 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
             }
             return true; // No truthy elements found, so negated is true
         }, QString("!@[%1:%2]").arg(start).arg(end));
-    };
-
-    auto makeRootToken = [&]()->Token {
-        Builder b{out};
-        return b.add([](const QJsonValue& j){
-            switch (j.type()) {
-            case QJsonValue::Null:   return false;
-            case QJsonValue::Bool:   return j.toBool();
-            case QJsonValue::Double: return j.toDouble() != 0.0;
-            case QJsonValue::String: return !j.toString().isEmpty();
-            case QJsonValue::Array:  return !j.toArray().isEmpty();
-            case QJsonValue::Object: return !j.toObject().isEmpty();
-            default: return false;
-            }
-        }, "@");
     };
 
     auto makeNegatedRootToken = [&]()->Token {
