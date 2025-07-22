@@ -245,7 +245,7 @@ std::optional<Token> parseCompare1(QString s, QVector<FilterFn>& out)
         const bool rhsQuoted = (rhs.size() >= 2) && ((rhs.front()==u'\'' && rhs.back()==u'\'') || (rhs.front()==u'\"' && rhs.back()==u'\"'));
 
         bool isNum = isValidNumberLiteral(rhs);
-        double num = isNum ? rhs.toDouble() : 0.0;
+        double numVal = isNum ? rhs.toDouble() : 0.0;
 
         const bool isBool = (!isNum && (rhs.compare("true", Qt::CaseSensitive)==0 || rhs.compare("false", Qt::CaseSensitive)==0));
         const bool boolVal = isBool ? (rhs.compare("true", Qt::CaseSensitive)==0) : false;
@@ -258,12 +258,12 @@ std::optional<Token> parseCompare1(QString s, QVector<FilterFn>& out)
             (void)unquote(rhs);
 
         Builder b{out};
-        return b.add([prop, op, isNum, num, isBool, boolVal, rhs, rhsQuoted](const QJsonValue& j) -> bool
+        return b.add([prop, op, isNum, numVal, isBool, boolVal, rhs, rhsQuoted](const QJsonValue& j) -> bool
         {
             const auto obj = j.toObject();
             const auto v = obj.value(prop);
             qCDebug(jsonPathLog).nospace() << "[flt-cmp] prop='" << prop << "' op='" << op
-                                          << "' rhs=" << (isNum ? QString::number(num) : rhs)
+                                          << "' rhs=" << (isNum ? QString::number(numVal) : rhs)
                                           << " | v=" << v << " (type=" << v.type() << ")";
             
             // Handle missing properties per RFC 9535: missing properties are treated as null
@@ -291,15 +291,20 @@ std::optional<Token> parseCompare1(QString s, QVector<FilterFn>& out)
             }
             
             if (isNum) {
-                if (!v.isDouble()) return false;
-                const double x = v.toDouble();
-                qCDebug(jsonPathLog).nospace() << "  -> numeric compare lhs=" << x;
-                if (op=="==") return x == num;
-                if (op=="!=") return x != num;
-                if (op==">")  return x >  num;
-                if (op=="<")  return x <  num;
-                if (op==">=") return x >= num;
-                if (op=="<=") return x <= num;
+                // RFC 9535: strict type checking - no coercion between strings and numbers
+                if (!v.isDouble()) {
+                    // Non-numeric values are not equal to numbers, but can be != 
+                    if (op == "==") return false;
+                    if (op == "!=") return true;
+                    return false; // ordering comparisons require same type
+                }
+                const double d = v.toDouble();
+                if (op=="==") return d == numVal;
+                if (op=="!=") return d != numVal;
+                if (op=="<")  return d < numVal;
+                if (op==">")  return d > numVal;
+                if (op=="<=") return d <= numVal;
+                if (op==">=") return d >= numVal;
                 return false;
             }
             if (isBool) {
@@ -392,7 +397,7 @@ std::optional<Token> parseCompareIndex(QString s, QVector<FilterFn>& out)
         const bool rhsQuoted = (rhs.size() >= 2) && ((rhs.front()==u'\'' && rhs.back()==u'\'') || (rhs.front()==u'\"' && rhs.back()==u'\"'));
 
         bool isNum = isValidNumberLiteral(rhs);
-        double num = isNum ? rhs.toDouble() : 0.0;
+        double numVal = isNum ? rhs.toDouble() : 0.0;
 
         const bool isBool = (!isNum && (rhs.compare("true", Qt::CaseSensitive)==0 || rhs.compare("false", Qt::CaseSensitive)==0));
         const bool boolVal = isBool ? (rhs.compare("true", Qt::CaseSensitive)==0) : false;
@@ -405,13 +410,13 @@ std::optional<Token> parseCompareIndex(QString s, QVector<FilterFn>& out)
             (void)unquote(rhs);
 
         Builder b{out};
-        return b.add([idx, op, isNum, num, isBool, boolVal, rhs, rhsQuoted](const QJsonValue& j) -> bool
+        return b.add([idx, op, isNum, numVal, isBool, boolVal, rhs, rhsQuoted](const QJsonValue& j) -> bool
         {
             const auto arr = j.toArray();
             if (idx < 0 || idx >= arr.size()) return false;
             const auto v = arr[idx];
             qCDebug(jsonPathLog).nospace() << "[flt-cmp-idx] idx=" << idx << " op='" << op
-                                          << "' rhs=" << (isNum ? QString::number(num) : rhs)
+                                          << "' rhs=" << (isNum ? QString::number(numVal) : rhs)
                                           << " | v=" << v << " (type=" << v.type() << ")";
             
             // Handle missing array elements per RFC 9535: out-of-bounds access is treated as null
@@ -438,15 +443,20 @@ std::optional<Token> parseCompareIndex(QString s, QVector<FilterFn>& out)
             }
             
             if (isNum) {
-                if (!v.isDouble()) return false;
-                const double x = v.toDouble();
-                qCDebug(jsonPathLog).nospace() << "  -> numeric compare lhs=" << x;
-                if (op=="==") return x == num;
-                if (op=="!=") return x != num;
-                if (op==">")  return x >  num;
-                if (op=="<")  return x <  num;
-                if (op==">=") return x >= num;
-                if (op=="<=") return x <= num;
+                // RFC 9535: strict type checking - no coercion between strings and numbers
+                if (!v.isDouble()) {
+                    // Non-numeric values are not equal to numbers, but can be != 
+                    if (op == "==") return false;
+                    if (op == "!=") return true;
+                    return false; // ordering comparisons require same type
+                }
+                const double d = v.toDouble();
+                if (op=="==") return d == numVal;
+                if (op=="!=") return d != numVal;
+                if (op=="<")  return d < numVal;
+                if (op==">")  return d > numVal;
+                if (op=="<=") return d <= numVal;
+                if (op==">=") return d >= numVal;
                 return false;
             }
             if (isBool) {
