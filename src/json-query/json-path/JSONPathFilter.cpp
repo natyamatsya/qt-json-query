@@ -126,7 +126,7 @@ struct ComparisonContext {
     }
 };
 
-    using FilterFn = json_path::FilterFn;
+    using FilterFn = json_query::json_path::FilterFn;
     using Kind  = Token::Kind;
     using json_query::utils::to_sv;
     using json_query::utils::to_qstr;
@@ -243,6 +243,7 @@ struct Builder {
 [[nodiscard]] std::optional<Token> parseExists  (QString, QVector<FilterFn>&);
 [[nodiscard]] std::optional<Token> parseSelfCmp (QString, QVector<FilterFn>&);
 [[nodiscard]] std::optional<Token> parseNot     (QString, QVector<FilterFn>&);
+[[nodiscard]] std::optional<Token> parseAbsolutePath(QString, QVector<FilterFn>&);
 
 // Template function forward declarations
 template<auto PAT> [[nodiscard]] std::optional<Token> parseCompare1     (QString, QVector<FilterFn>&);
@@ -261,6 +262,7 @@ constexpr std::array rules = {
     &parseOr,      // lowest precedence first
     &parseAnd,
     &parseNot,     // Add negation parser with high precedence
+    &parseAbsolutePath, // Add absolute path parser
     &parseIn,
     &parseExists,
     &parseSelfCmp,
@@ -880,9 +882,9 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
     auto makeArrayIndexToken = [&](int index)->Token {
         Builder b{out};
         return b.add([index](const QJsonValue& j){
-            if (!j.isArray()) return false;
+            if (!j.isArray()) return false; // non-arrays don't have indices
             const auto arr = j.toArray();
-            if (index < 0 || index >= arr.size()) return false;
+            if (index < 0 || index >= arr.size()) return false; // out of bounds is absent
             const auto& v = arr[index];
             // RFC 9535: existence filters check for element presence, not truthiness
             // An array element exists if it's within bounds, regardless of its value (including false, 0, "", [], {})
@@ -893,7 +895,7 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
     auto makeArraySliceToken = [&](int start, int end)->Token {
         Builder b{out};
         return b.add([start, end](const QJsonValue& j){
-            if (!j.isArray()) return false;
+            if (!j.isArray()) return false; // non-arrays don't have slices
             const auto arr = j.toArray();
             int actualStart = start < 0 ? 0 : start;
             int actualEnd = end < 0 ? arr.size() : qMin(end, arr.size());
@@ -919,11 +921,11 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
             if (j.isObject()) {
                 const auto obj = j.toObject();
                 // Any property that exists (is not undefined) should match
-                return !obj.isEmpty(); // If object has any properties, wildcard existence is true
+                return !obj.empty(); // If object has any properties, wildcard existence is true
             } else if (j.isArray()) {
                 const auto arr = j.toArray();
                 // Any array element that exists should match
-                return !arr.isEmpty(); // If array has any elements, wildcard existence is true
+                return !arr.empty(); // If array has any elements, wildcard existence is true
             }
             return false; // Primitives have no properties or elements
         }, "@.*");
@@ -980,11 +982,11 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
             if (j.isObject()) {
                 const auto obj = j.toObject();
                 // If object has no properties, then !@.* is true
-                return obj.isEmpty();
+                return obj.empty();
             } else if (j.isArray()) {
                 const auto arr = j.toArray();
                 // If array has no elements, then !@.* is true
-                return arr.isEmpty();
+                return arr.empty();
             }
             return true; // Primitives have no properties or elements, so !@.* is true
         }, "!@.*");
@@ -1184,7 +1186,7 @@ std::optional<Token> parseNot(QString s, QVector<FilterFn>& out)
         
         // Recursively parse the inner expression
         QVector<FilterFn> innerFilters;
-        if (auto innerToken = compileFilter(innerExpr, innerFilters))
+        if (auto innerToken = json_query::json_path::compileFilter(innerExpr, innerFilters))
         {
             // Create a negated version of the inner filter
             Builder b{out};
@@ -1205,7 +1207,7 @@ std::optional<Token> parseNot(QString s, QVector<FilterFn>& out)
         
         // Recursively parse the inner expression
         QVector<FilterFn> innerFilters;
-        if (auto innerToken = compileFilter(innerExpr, innerFilters))
+        if (auto innerToken = json_query::json_path::compileFilter(innerExpr, innerFilters))
         {
             // Create a negated version of the inner filter
             Builder b{out};
@@ -1220,6 +1222,31 @@ std::optional<Token> parseNot(QString s, QVector<FilterFn>& out)
     }
     
     return std::nullopt;
+}
+
+// Parse absolute path references like $.*.a in filter expressions
+std::optional<Token> parseAbsolutePath(QString s, QVector<FilterFn>& out)
+{
+    // Check if expression starts with $ (absolute path reference)
+    if (!s.startsWith('$')) {
+        return std::nullopt;
+    }
+    
+    // For now, implement basic existence test for absolute paths
+    // This handles patterns like $.*.a, $.foo.bar, etc.
+    using json_query::JSONPath;
+    
+    Builder b{out};
+    return b.add([s](const QJsonValue& rootValue) -> bool {
+        // Create a temporary JSONPath to evaluate the absolute path
+        // against the root document
+        if (auto path = JSONPath::create(s)) {
+            auto results = path->evaluateAll(rootValue);
+            // Return true if the absolute path exists (has any results)
+            return !results.isEmpty();
+        }
+        return false;
+    }, s);
 }
 
 } // namespace json_query::json_path::detail

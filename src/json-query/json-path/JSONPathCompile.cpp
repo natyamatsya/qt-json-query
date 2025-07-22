@@ -519,7 +519,9 @@ static const std::array<BrRule,10> BR_RULES = {{
                 out.slice(*maybe);
                 return Error::Ok;
             }
-            return Error::InvalidSlice;
+            // Return nullopt instead of Error::InvalidSlice to allow other rules to try
+            // This fixes slice existence tests like $[?@[0:2]] which should be handled by filter rules
+            return std::nullopt;
         }
     },
 
