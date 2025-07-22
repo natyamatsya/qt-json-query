@@ -564,6 +564,9 @@ std::optional<Token> parseCompare(QString s, QVector<FilterFn>& out)
     constexpr auto brkSelfPat = ctll::fixed_string{R"(@\[['\"]([^'\"]+)['\"]\]\s*(==|!=)\s*@)"};
     constexpr auto idxSelfPat = ctll::fixed_string{R"(@\[(-?\d+)\]\s*(==|!=)\s*@)"};
     
+    // Property-to-property comparison patterns: @.a == @.b
+    constexpr auto propToPropPat = ctll::fixed_string{R"(@\.([\w$]+)\s*(==|!=|<|>|<=|>=)\s*@\.([\w$]+))"};
+    
     // Direct self-comparison pattern: @==@ or @!=@
     constexpr auto directSelfPat = ctll::fixed_string{R"(^@\s*(==|!=)\s*@$)"};
 
@@ -571,6 +574,61 @@ std::optional<Token> parseCompare(QString s, QVector<FilterFn>& out)
     if (auto t = parseNullCompare<dotNullPat>(s, out)) return t;
     if (auto t = parseNullCompare<brkNullPat>(s, out)) return t;
     if (auto t = parseNullCompareIndex<idxNullPat>(s, out)) return t;
+    
+    // Try property-to-property comparisons
+    if (ctre::match<propToPropPat>(to_sv(s))) {
+        auto m = ctre::match<propToPropPat>(to_sv(s));
+        const QString leftProp = to_qstr(m.template get<1>().to_view());
+        const QString op = to_qstr(m.template get<2>().to_view());
+        const QString rightProp = to_qstr(m.template get<3>().to_view());
+        
+        Builder b{out};
+        return b.add([leftProp, op, rightProp](const QJsonValue& j){
+            const auto obj = j.toObject();
+            const auto leftVal = obj.value(leftProp);
+            const auto rightVal = obj.value(rightProp);
+            
+            // Handle missing properties as null for comparison
+            if (leftVal.type() == QJsonValue::Undefined || rightVal.type() == QJsonValue::Undefined) {
+                if (op == "==") return leftVal.type() == rightVal.type(); // both undefined
+                if (op == "!=") return leftVal.type() != rightVal.type(); // one undefined, one not
+                return false; // ordering comparisons with undefined are false
+            }
+            
+            // Use deep equality for == and !=
+            if (op == "==") return leftVal == rightVal;
+            if (op == "!=") return leftVal != rightVal;
+            
+            // For ordering comparisons, ensure same type
+            if (leftVal.type() != rightVal.type()) return false;
+            
+            // Handle ordering comparisons by type
+            if (leftVal.isDouble() && rightVal.isDouble()) {
+                double left = leftVal.toDouble();
+                double right = rightVal.toDouble();
+                if (op == "<") return left < right;
+                if (op == ">") return left > right;
+                if (op == "<=") return left <= right;
+                if (op == ">=") return left >= right;
+            } else if (leftVal.isBool() && rightVal.isBool()) {
+                bool left = leftVal.toBool();
+                bool right = rightVal.toBool();
+                if (op == "<") return !left && right;  // false < true
+                if (op == ">") return left && !right;  // true > false
+                if (op == "<=") return !left || right; // false <= anything, true <= true
+                if (op == ">=") return left || !right; // true >= anything, false >= false
+            } else if (leftVal.isString() && rightVal.isString()) {
+                QString left = leftVal.toString();
+                QString right = rightVal.toString();
+                if (op == "<") return left < right;
+                if (op == ">") return left > right;
+                if (op == "<=") return left <= right;
+                if (op == ">=") return left >= right;
+            }
+            
+            return false; // unsupported comparison
+        }, QString("%1%2%3").arg(leftProp, op, rightProp));
+    }
     
     // Try self comparisons
     // Direct self-comparison first (most specific)
@@ -685,7 +743,7 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
     constexpr auto negRootPat = ctll::fixed_string{R"(^!@$)"};
     constexpr auto negWildcardPat = ctll::fixed_string{R"(^!@\.\*$)"};
     constexpr auto negDotPat = ctll::fixed_string{R"(^!@\.([\w$]+)$)"};
-    constexpr auto negBrkPat = ctll::fixed_string{R"(^!@\[['\"]([^'"]+)['\"]\]$)"};
+    constexpr auto negBrkPat = ctll::fixed_string{R"(^!@\[['\"]([^'\"]+)['\"]\]$)"};
     
     // Complex access patterns
     constexpr auto arrayIndexPat = ctll::fixed_string{R"(^@\[(\d+)\]$)"};
