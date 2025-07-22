@@ -327,9 +327,6 @@ parseDot(qsizetype pos, QStringView sv,
     // name-first = ALPHA / "_" / Unicode, not DIGIT
     // name-char = name-first / DIGIT
     QStringView identifier = sv.sliced(start, pos - start);
-    if (identifier.isEmpty()) {
-        return std::unexpected(Error::EmptySegment);
-    }
     
     // Check first character: must be ALPHA, underscore, or Unicode (not digit)
     QChar first = identifier[0];
@@ -362,14 +359,24 @@ struct BracketSink {
     QVector<Token>&   tk;
     KeyBuilder&       kb;
     QVector<FilterFn>& filters;
+    int               currentBracketGroupId; // Track current bracket group ID
 
-    std::expected<void,Error> key(QString key, bool allow=false) { return kb.push(key, allow); }
+    std::expected<void,Error> key(QString key, bool allow=false) { 
+        // Create token with bracket group ID
+        if (!allow && key.contains(u' '))
+            return std::unexpected(Error::BlankInKey);
+        Token t{Token::Kind::Key, 0, {}, qt_hash(key), key};
+        t.bracketGroupId = currentBracketGroupId;
+        tk.append(std::move(t));
+        return {};
+    }
     void keyList(const QVector<QString>& keys)
     {
         if (keys.isEmpty()) return;
 
         Token t;
         t.kind = Token::Kind::KeyList;
+        t.bracketGroupId = currentBracketGroupId; // Set bracket group ID
 
         // Pack the keys into a single QString separated by '\n' so that the
         // evaluator can split them later without ambiguity.
@@ -381,13 +388,27 @@ struct BracketSink {
         t.key = list.join(u"\n");
         tk.append(std::move(t));
     }
-    void wild()                 { tk.append(Token{Token::Kind::Wildcard}); }
-    void slice(const Slice& s)   { tk.append(Token{Token::Kind::Slice,0,s,0u}); }
+    void wild()                 { 
+        Token t{Token::Kind::Wildcard};
+        t.bracketGroupId = currentBracketGroupId;
+        tk.append(t); 
+    }
+    void slice(const Slice& s)   { 
+        Token t{Token::Kind::Slice,0,s,0u};
+        t.bracketGroupId = currentBracketGroupId;
+        tk.append(t); 
+    }
     void index(int i)            { 
         qCDebug(jsonPathLog) << "BracketSink::index emit" << i;
-        tk.append(Token{Token::Kind::Index,i}); 
+        Token t{Token::Kind::Index,i};
+        t.bracketGroupId = currentBracketGroupId;
+        tk.append(t); 
     }
-    void pushFilter(const Token& t){ tk.append(t); }
+    void pushFilter(const Token& t){ 
+        Token copy = t;
+        copy.bracketGroupId = currentBracketGroupId;
+        tk.append(copy); 
+    }
 };
 
 // A helper to iterate over the content and run rules.
@@ -643,6 +664,7 @@ parseBracket(qsizetype pos, QStringView sv,
     qCDebug(jsonPathLog) << "parseBracket content=" << content.toString();
 
     BracketSink sink{tokens, kb, filters};
+    sink.currentBracketGroupId = tokens.size(); // Set unique bracket group ID
 
     int ruleIndex = 0;
     for (auto& rule : BR_RULES) {

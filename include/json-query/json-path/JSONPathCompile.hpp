@@ -36,6 +36,13 @@ namespace json_query::json_path
         quint32       hash{};           // cached object-key hash
         QString       key{};            // for Kind::Key / KeyList (joined by '\n') / Filter
         std::size_t   filterId{};       // index into filter table
+        
+        // Bracket group metadata for union vs sequential evaluation
+        int           bracketGroupId{-1}; // -1 = not from bracket, >0 = bracket group ID
+        
+        bool isFromSameBracket(const Token& other) const {
+            return bracketGroupId > 0 && bracketGroupId == other.bracketGroupId;
+        }
     };   
 
 // ------------------------------------------------------------------

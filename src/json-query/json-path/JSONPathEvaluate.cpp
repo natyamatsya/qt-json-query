@@ -330,47 +330,44 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
                 }
             }
             
-            // Apply union semantics only if we have multiple consecutive selector tokens
-            // AND we're not in a sequential context (after Recursive)
-            // AND it's not sequential property access (consecutive Key tokens from dot notation)
-            bool isSequentialPropertyAccess = (unionTokens.size() > 1 && 
-                                               std::all_of(unionTokens.begin(), unionTokens.end(), 
-                                                          [&ctx](qsizetype idx) { 
-                                                              return ctx.tokens[idx].kind == Token::Kind::Key; 
-                                                          }));
-            
-            // For wildcard + key patterns, we need to distinguish between:
-            // 1. Dot notation: $.*.a (sequential - key applied to wildcard results)
-            // 2. Bracket union: $[*,'a'] (union - both applied to same input)
+            // Updated union condition: Use bracket group metadata for accurate union vs sequential distinction
             // 
-            // Strategy: Try sequential evaluation first. If the key produces no results when
-            // applied to wildcard results, but would produce results when applied to the original
-            // input, then it's likely a bracket union pattern.
-            bool isWildcardSequentialAccess = false;
-            if (unionTokens.size() == 2 && 
-                ctx.tokens[unionTokens[0]].kind == Token::Kind::Wildcard &&
-                ctx.tokens[unionTokens[1]].kind == Token::Kind::Key) {
+            // Key insight: Tokens from the same bracket expression should be unioned,
+            // tokens from separate bracket expressions should be processed sequentially.
+            // This is the compiler design approach using semantic annotations.
+            
+            bool shouldUseUnion = false;
+            
+            if (unionTokens.size() > 1) {
+                // Check if all tokens are from the same bracket expression
+                bool allFromSameBracket = true;
+                int firstBracketGroupId = ctx.tokens[unionTokens[0]].bracketGroupId;
                 
-                // Test sequential evaluation: apply key to wildcard results
-                QJsonArray wildcardResults = fanOut(ctx, ctx.tokens[unionTokens[0]], working);
-                QJsonArray keyOnWildcardResults = fanOut(ctx, ctx.tokens[unionTokens[1]], wildcardResults);
-                
-                // Test union evaluation: apply key to original input
-                QJsonArray keyOnOriginalInput = fanOut(ctx, ctx.tokens[unionTokens[1]], working);
-                
-                // If key produces results on wildcard results, it's likely sequential (dot notation)
-                // If key produces no results on wildcard results but results on original input, it's likely union (bracket)
-                if (!keyOnWildcardResults.isEmpty()) {
-                    isWildcardSequentialAccess = true; // Dot notation like $.*.a
-                } else if (!keyOnOriginalInput.isEmpty()) {
-                    isWildcardSequentialAccess = false; // Bracket union like $[*,'a']
+                // If first token is not from a bracket, this can't be a bracket union
+                if (firstBracketGroupId <= 0) {
+                    allFromSameBracket = false;
                 } else {
-                    // Both produce no results - default to sequential for consistency
-                    isWildcardSequentialAccess = true;
+                    // Check if all subsequent tokens have the same bracket group ID
+                    for (qsizetype i = 1; i < unionTokens.size(); ++i) {
+                        if (ctx.tokens[unionTokens[i]].bracketGroupId != firstBracketGroupId) {
+                            allFromSameBracket = false;
+                            break;
+                        }
+                    }
+                }
+                
+                if (allFromSameBracket) {
+                    // All tokens from same bracket expression → union evaluation
+                    // Examples: $[0,2], $['a','d'], $..['a','d']
+                    shouldUseUnion = true;
+                } else {
+                    // Tokens from different sources → sequential evaluation
+                    // Examples: $.a.b (dot notation), $..[2][3] (separate brackets)
+                    shouldUseUnion = false;
                 }
             }
             
-            if (unionTokens.size() > 1 && !prevRecursive && !isSequentialPropertyAccess && !isWildcardSequentialAccess) {
+            if (shouldUseUnion) {
                 qDebug() << "[union] processing" << unionTokens.size() << "consecutive selector tokens";
                 
                 QJsonArray unionResult;
