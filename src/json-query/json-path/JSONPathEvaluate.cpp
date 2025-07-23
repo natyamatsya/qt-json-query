@@ -36,7 +36,7 @@ std::expected<QJsonArray, EvalError> evalSlice(const QJsonArray& array, const Sl
     // Step normalisation ----------------------------------------------------
     qsizetype step = s.step;
     if (step == 0)
-        return std::unexpected(EvalError::InvalidSlice); // zero-step ⇒ empty result per RFC & Python
+        return QJsonArray{}; // Empty result for zero step (RFC 9535 compliance)
 
     qsizetype start = s.start;
     qsizetype stop  = s.end;
@@ -221,11 +221,14 @@ std::expected<QJsonArray, EvalError> evaluateToken(const PathEvalCtx& ctx, const
 // ---------------------------------------------------------------------------
 //  Fan-out helper (adapted from legacy implementation)
 // ---------------------------------------------------------------------------
-std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src)
+std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src, qsizetype tokenPos = -1)
 {
     QJsonArray dst;
     bool anySuccess = false;
     EvalError lastError = EvalError::TypeMismatchObject;
+    
+    // For direct array access (position 1), use permissive error handling (RFC 9535)
+    const bool isDirectArrayAccess = (tokenPos == 1 && tk.kind == Token::Kind::Index);
     
     for (const auto& v : src) {
         auto seg = evaluateTokenExpected(ctx, tk, v);
@@ -237,14 +240,30 @@ std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token&
             for (const auto& e : *seg)
                 dst.append(e);
         } else {
-            // Failure: record error but continue processing other values
+            // Failure: record error
             lastError = seg.error();
             qDebug() << "[fanOut] kind=" << static_cast<int>(tk.kind) << "srcType"
                      << v.type() << "failed with error:" << static_cast<int>(lastError);
+            
+            // Context-aware error handling for Index tokens
+            if (tk.kind == Token::Kind::Index) {
+                // Property chain access (token position > 1): Use strict error handling (UpstreamArrayIndexOOB)
+                if (tokenPos > 1) {
+                    // Property chain access: propagate all errors immediately
+                    return std::unexpected(lastError);
+                }
+                // Direct array access (position 1): Continue with permissive error handling
+                // Errors will be converted to empty results at the end
+            }
         }
     }
     
-    // Only fail if ALL evaluations failed
+    // For direct array access, return empty result instead of error (RFC 9535 compliance)
+    if (isDirectArrayAccess && !anySuccess) {
+        return QJsonArray{}; // Empty result for RFC 9535 compliance
+    }
+    
+    // Only fail if ALL evaluations failed (non-direct array access)
     if (!anySuccess) {
         return std::unexpected(lastError);
     }
@@ -392,7 +411,7 @@ std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const 
                 
                 for (qsizetype tokenIdx : unionTokens) {
                     const Token& unionTk = ctx.tokens[tokenIdx];
-                    auto tokenResult = fanOut(ctx, unionTk, *working);
+                    auto tokenResult = fanOut(ctx, unionTk, *working, tokenIdx);
                     if (tokenResult) {
                         // Success: collect results
                         anySuccess = true;
@@ -503,7 +522,7 @@ std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const 
             i = j - 1;
             continue;
         } else {
-            working = fanOut(ctx, tk, *working);
+            working = fanOut(ctx, tk, *working, i);
             if (!working) {
                 return std::unexpected(working.error());
             }

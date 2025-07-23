@@ -40,7 +40,7 @@ std::expected<QJsonArray, EvalError> evalExpected<Token::Kind::Index>(const Path
         return std::unexpected(EvalError::TypeMismatchArray);
     }
     
-    const auto arr = v.toArray();
+    const QJsonArray arr = v.toArray(); // Create copy to avoid iterator invalidation
     const int idx = normalizeIndex(tk.index, arr.size());
     if (idx < 0 || idx >= arr.size()) {
         return std::unexpected(EvalError::IndexOutOfRange);
