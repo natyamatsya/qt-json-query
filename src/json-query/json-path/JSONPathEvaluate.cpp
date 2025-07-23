@@ -227,8 +227,38 @@ std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token&
     bool anySuccess = false;
     EvalError lastError = EvalError::TypeMismatchObject;
     
-    // For direct array access (position 1), use permissive error handling (RFC 9535)
-    const bool isDirectArrayAccess = (tokenPos == 1 && tk.kind == Token::Kind::Index);
+    // Determine if we should use permissive or strict error handling
+    bool usePermissiveErrorHandling = false;
+    
+    if (tk.kind == Token::Kind::Index) {
+        if (tokenPos == 1) {
+            // Direct array access: always use permissive error handling (RFC 9535)
+            usePermissiveErrorHandling = true;
+        } else if (tokenPos > 1) {
+            // Check if we're in a recursive descent context by looking back through tokens
+            bool inRecursiveContext = false;
+            for (qsizetype i = tokenPos - 1; i >= 1; --i) {
+                const Token& prevToken = ctx.tokens[i];
+                if (prevToken.kind == Token::Kind::Recursive) {
+                    // Found recursive descent in the token chain
+                    inRecursiveContext = true;
+                    break;
+                } else if (prevToken.kind == Token::Kind::Key) {
+                    // Property access breaks the recursive context
+                    break;
+                }
+                // Index tokens continue the recursive context
+            }
+            
+            if (inRecursiveContext) {
+                // After recursive descent: use permissive error handling (RFC 9535)
+                usePermissiveErrorHandling = true;
+            } else {
+                // After property chain: use strict error handling (UpstreamArrayIndexOOB)
+                usePermissiveErrorHandling = false;
+            }
+        }
+    }
     
     for (const auto& v : src) {
         auto seg = evaluateTokenExpected(ctx, tk, v);
@@ -246,24 +276,20 @@ std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token&
                      << v.type() << "failed with error:" << static_cast<int>(lastError);
             
             // Context-aware error handling for Index tokens
-            if (tk.kind == Token::Kind::Index) {
-                // Property chain access (token position > 1): Use strict error handling (UpstreamArrayIndexOOB)
-                if (tokenPos > 1) {
-                    // Property chain access: propagate all errors immediately
-                    return std::unexpected(lastError);
-                }
-                // Direct array access (position 1): Continue with permissive error handling
-                // Errors will be converted to empty results at the end
+            if (tk.kind == Token::Kind::Index && !usePermissiveErrorHandling) {
+                // Strict error handling: propagate errors immediately (property chain access)
+                return std::unexpected(lastError);
             }
+            // Permissive error handling: continue processing (direct access or after recursive descent)
         }
     }
     
-    // For direct array access, return empty result instead of error (RFC 9535 compliance)
-    if (isDirectArrayAccess && !anySuccess) {
+    // For permissive error handling, return empty result instead of error (RFC 9535 compliance)
+    if (tk.kind == Token::Kind::Index && usePermissiveErrorHandling && !anySuccess) {
         return QJsonArray{}; // Empty result for RFC 9535 compliance
     }
     
-    // Only fail if ALL evaluations failed (non-direct array access)
+    // Only fail if ALL evaluations failed (non-permissive contexts)
     if (!anySuccess) {
         return std::unexpected(lastError);
     }
