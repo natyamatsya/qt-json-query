@@ -680,15 +680,19 @@ std::optional<Token> parseCompare(QString s, QVector<FilterFn>& out)
     constexpr auto idxNullPat = ctll::fixed_string{R"(@\[(-?\d+)\]\s*(==|!=)\s*null)"};
     
     // Self comparison patterns
-    constexpr auto dotSelfPat = ctll::fixed_string{R"(@\.([\w$]+)\s*(==|!=)\s*@)"};
-    constexpr auto brkSelfPat = ctll::fixed_string{R"(@\[['\"]([^'\"]+)['\"]\]\s*(==|!=)\s*@)"};
-    constexpr auto idxSelfPat = ctll::fixed_string{R"(@\[(-?\d+)\]\s*(==|!=)\s*@)"};
+    constexpr auto dotSelfPat = ctll::fixed_string{R"(@\.([\w$]+)\s*(==|!=|>=|<=|>|<)\s*@)"};
+    constexpr auto brkSelfPat = ctll::fixed_string{R"(@\[['\"]([^'\"]+)['\"]\]\s*(==|!=|>=|<=|>|<)\s*@)"};
+    constexpr auto idxSelfPat = ctll::fixed_string{R"(@\[(-?\d+)\]\s*(==|!=|>=|<=|>|<)\s*@)"};
     
     // Property-to-property comparison patterns: @.a == @.b
     constexpr auto propToPropPat = ctll::fixed_string{R"(@\.([\w$]+)\s*(==|!=|<|>|<=|>=)\s*@\.([\w$]+))"};
     
+    // Property-to-property with array indexing: @.a == @.list[9] or @.list[9] == @.a
+    constexpr auto propToArrayPat = ctll::fixed_string{R"(@\.([\w$]+)\s*(==|!=|<|>|<=|>=)\s*@\.([\w$]+)\[(-?\d+)\])"};
+    constexpr auto arrayToPropPat = ctll::fixed_string{R"(@\.([\w$]+)\[(-?\d+)\]\s*(==|!=|<|>|<=|>=)\s*@\.([\w$]+))"};
+    
     // Direct self-comparison pattern: @==@ or @!=@
-    constexpr auto directSelfPat = ctll::fixed_string{R"(^@\s*(==|!=)\s*@$)"};
+    constexpr auto directSelfPat = ctll::fixed_string{R"(^@\s*(==|!=|>=|<=|>|<)\s*@$)"};
     
     // Direct self-comparison with value pattern: @ == value
     constexpr auto selfValuePat = ctll::fixed_string{R"(^@\s*(==|!=|>=|<=|>|<)\s*(.+)$)"};
@@ -707,8 +711,11 @@ std::optional<Token> parseCompare(QString s, QVector<FilterFn>& out)
         Builder b{out};
         return b.add([op](const QJsonValue& j){
             // Direct self-comparison: @ == @ is always true, @ != @ is always false
-            return op == "==" ? true : false;
-        }, QString("@"));
+            // For ordering operators, self-comparison is always false
+            if (op == "==") return true;
+            if (op == "!=") return false;
+            return false;
+        }, QString("@%1@").arg(op));
     }
 
     if (auto t = parseSelfCompare<dotSelfPat>(s, out)) return t;
@@ -735,7 +742,7 @@ std::optional<Token> parseCompare(QString s, QVector<FilterFn>& out)
             if (leftVal.type() == QJsonValue::Undefined || rightVal.type() == QJsonValue::Undefined) {
                 if (op == "==") return leftVal.type() == rightVal.type(); // both undefined
                 if (op == "!=") return leftVal.type() != rightVal.type(); // one undefined, one not
-                return false; // ordering comparisons with undefined are false
+                return false; // ordering comparisons require same type
             }
             
             // Use deep equality for == and !=
@@ -771,6 +778,81 @@ std::optional<Token> parseCompare(QString s, QVector<FilterFn>& out)
             
             return false; // unsupported comparison
         }, QString("%1%2%3").arg(leftProp, op, rightProp));
+    }
+
+    if (ctre::match<propToArrayPat>(to_sv(s))) {
+        auto m = ctre::match<propToArrayPat>(to_sv(s));
+        const QString leftProp = to_qstr(m.template get<1>().to_view());
+        const QString op = to_qstr(m.template get<2>().to_view());
+        const QString rightProp = to_qstr(m.template get<3>().to_view());
+        const QString rightIndex = to_qstr(m.template get<4>().to_view());
+        
+        Builder b{out};
+        return b.add([leftProp, op, rightProp, rightIndex](const QJsonValue& j){
+            const auto obj = j.toObject();
+            const auto leftVal = obj.value(leftProp);
+            const auto rightArr = obj.value(rightProp).toArray();
+            
+            // Handle missing properties as null for comparison
+            if (leftVal.type() == QJsonValue::Undefined || rightArr.isEmpty()) {
+                if (op == "==") return leftVal.type() == QJsonValue::Undefined; // both undefined
+                if (op == "!=") return leftVal.type() != QJsonValue::Undefined; // one undefined, one not
+                return false; // ordering comparisons require same type
+            }
+            
+            // Convert rightIndex to integer for array index access
+            bool ok;
+            int rightIndexInt = rightIndex.toInt(&ok);
+            if (!ok) return false; // Invalid index
+            
+            // Array index access: only works on arrays, not objects
+            if (rightIndexInt < 0 || rightIndexInt >= rightArr.size()) {
+                // Out of bounds: compare with undefined/null
+                QJsonValue undefined; // QJsonValue::Undefined
+                return leftVal == undefined;
+            } else {
+                const auto rightVal = rightArr[rightIndexInt];
+                return leftVal == rightVal;
+            }
+        }, QString("%1%2%3[%4]").arg(leftProp, op, rightProp, rightIndex));
+    }
+
+    if (ctre::match<arrayToPropPat>(to_sv(s))) {
+        auto m = ctre::match<arrayToPropPat>(to_sv(s));
+        const QString leftProp = to_qstr(m.template get<1>().to_view());
+        const QString leftIndex = to_qstr(m.template get<2>().to_view());
+        const QString op = to_qstr(m.template get<3>().to_view());
+        const QString rightProp = to_qstr(m.template get<4>().to_view());
+        
+        Builder b{out};
+        return b.add([leftProp, leftIndex, op, rightProp](const QJsonValue& j){
+            const auto obj = j.toObject();
+            const auto leftArr = obj.value(leftProp).toArray();
+            
+            // Handle missing properties as null for comparison
+            if (leftArr.isEmpty() || obj.value(rightProp).type() == QJsonValue::Undefined) {
+                if (op == "==") return leftArr.isEmpty() && obj.value(rightProp).type() == QJsonValue::Undefined; // both undefined
+                if (op == "!=") return leftArr.isEmpty() != (obj.value(rightProp).type() == QJsonValue::Undefined); // one undefined, one not
+                return false; // ordering comparisons require same type
+            }
+            
+            // Convert leftIndex to integer for array index access
+            bool ok;
+            int leftIndexInt = leftIndex.toInt(&ok);
+            if (!ok) return false; // Invalid index
+            
+            // Array index access: only works on arrays, not objects
+            if (leftIndexInt < 0 || leftIndexInt >= leftArr.size()) {
+                // Out of bounds: compare with undefined/null
+                QJsonValue leftVal; // QJsonValue::Undefined
+                const auto rightVal = obj.value(rightProp);
+                return leftVal == rightVal;
+            } else {
+                const auto leftVal = leftArr[leftIndexInt];
+                const auto rightVal = obj.value(rightProp);
+                return leftVal == rightVal;
+            }
+        }, QString("%1[%2]%3%4").arg(leftProp, leftIndex, op, rightProp));
     }
 
     // Try regular comparisons
@@ -1121,7 +1203,7 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
         return makeNegatedRootToken();
 
     // Root self-comparison pattern for $[?$] - compares root to itself
-    constexpr auto rootSelfPat = ctll::fixed_string{R"(^\$\s*(==|!=)\s*\$$)"};
+    constexpr auto rootSelfPat = ctll::fixed_string{R"(^\$\s*(==|!=|>=|<=|>|<)\s*\$$)"};
     
     // Root reference existence filter: $[?$] - always true (root document always exists)
     if (ctre::match<rootRefPat>(to_sv(s))) {
