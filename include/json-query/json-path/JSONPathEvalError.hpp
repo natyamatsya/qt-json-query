@@ -26,12 +26,12 @@ enum class EvalError : std::uint8_t {
 {
     using enum EvalError;
     switch (e) {
-    case TypeMismatchObject: return "type mismatch: expected object";
-    case TypeMismatchArray : return "type mismatch: expected array";
-    case KeyNotFound       : return "key not found";
-    case IndexOutOfRange   : return "index out of range";
-    case InvalidSlice      : return "invalid slice parameters";
-    default                : return "unknown eval error";
+    case TypeMismatchObject: return "name-selector applied to non-object";
+    case TypeMismatchArray : return "index-selector or slice-selector applied to non-array";
+    case KeyNotFound       : return "member name not found";
+    case IndexOutOfRange   : return "array index outside range";
+    case InvalidSlice      : return "invalid slice-selector parameters";
+    default                : return "unknown evaluation error";
     }
 }
 
