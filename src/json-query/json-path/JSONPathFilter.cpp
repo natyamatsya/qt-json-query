@@ -602,13 +602,192 @@ template<auto PAT>
 }
 
 // ───────────────────────────────────────────────────────────────
-//  compileFilter  — turns [? …] into Token{Filter,…} + lambda
-//      Supports three forms:
-//        1.  @.prop  <op>  value          (numeric or string, == != > < >= <=)
-//        2.  @['prop'] <op> value         (same operators)
-//        3.  'foo' in @['arrayProp']
-//      Extend with more patterns as needed.
-// ────────────────── parser implementations ───────────────────────────
+//  Helper functions and structures for filter compilation
+// ───────────────────────────────────────────────────────────────
+
+// Helper function to evaluate function calls like length(@.a) or value($..c)
+QJsonValue evaluateFunction(const QString& funcExpr, const QJsonValue& context) {
+    int openParen = funcExpr.indexOf('(');
+    int closeParen = funcExpr.lastIndexOf(')');
+    if (openParen == -1 || closeParen == -1) {
+        return QJsonValue(); // Invalid function syntax
+    }
+    
+    QString funcName = funcExpr.mid(0, openParen).trimmed();
+    QString args = funcExpr.mid(openParen + 1, closeParen - openParen - 1).trimmed();
+    
+    if (funcName == "length") {
+        // Evaluate the argument (usually @.property)
+        QJsonValue argValue;
+        if (args.startsWith("@.")) {
+            QString prop = args.mid(2);
+            argValue = context.toObject().value(prop);
+        } else if (args == "@") {
+            argValue = context;
+        } else {
+            argValue = context; // Default to context
+        }
+        
+        // Return length as QJsonValue - RFC 9535 "nothing" semantics
+        if (argValue.isUndefined() || argValue.isNull()) return QJsonValue(0); // Nothing has length 0
+        if (argValue.isString()) return QJsonValue(argValue.toString().length());
+        if (argValue.isArray()) return QJsonValue(argValue.toArray().size());
+        if (argValue.isObject()) return QJsonValue(argValue.toObject().size());
+        return QJsonValue(0); // Other types have no length
+    }
+    
+    if (funcName == "value") {
+        // Implement proper JSONPath evaluation for complex paths like $..c
+        if (args.startsWith("$")) {
+            // This is a JSONPath expression that needs to be evaluated against root
+            using json_query::JSONPath;
+            auto path = JSONPath::create(args);
+            if (path) {
+                auto results = path->evaluateAll(context);
+                if (results.isEmpty()) {
+                    return QJsonValue(); // Return null for empty results
+                } else {
+                    return results.first(); // Return the first result
+                }
+            }
+            return QJsonValue(); // Invalid JSONPath expression
+        } else if (args.startsWith("@.")) {
+            QString prop = args.mid(2);
+            QJsonValue val = context.toObject().value(prop);
+            return val.isUndefined() ? QJsonValue() : val; // Return null for undefined
+        } else if (args == "@") {
+            return context;
+        }
+        return QJsonValue(); // Undefined for complex paths
+    }
+    
+    return QJsonValue(); // Unknown function
+}
+
+// Helper function to parse JSON literals from strings
+QJsonValue parseJsonLiteral(const QString& literal) {
+    QString trimmed = literal.trimmed();
+    
+    // Check for null
+    if (trimmed == "null") return QJsonValue();
+    
+    // Check for boolean
+    if (trimmed == "true") return QJsonValue(true);
+    if (trimmed == "false") return QJsonValue(false);
+    
+    // Check for number
+    bool ok;
+    double num = trimmed.toDouble(&ok);
+    if (ok) return QJsonValue(num);
+    
+    // Check for string (remove quotes)
+    if ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+        (trimmed.startsWith('\'') && trimmed.endsWith('\''))) {
+        return QJsonValue(trimmed.mid(1, trimmed.length() - 2));
+    }
+    
+    // Default to string
+    return QJsonValue(trimmed);
+}
+
+// Helper function to compare QJsonValues for ordering
+int compareValues(const QJsonValue& left, const QJsonValue& right) {
+    // Handle null values
+    if (left.isNull() && right.isNull()) return 0;
+    if (left.isNull()) return -1;
+    if (right.isNull()) return 1;
+    
+    // Handle numbers
+    if (left.isDouble() && right.isDouble()) {
+        double l = left.toDouble();
+        double r = right.toDouble();
+        if (l < r) return -1;
+        if (l > r) return 1;
+        return 0;
+    }
+    
+    // Handle strings
+    if (left.isString() && right.isString()) {
+        QString l = left.toString();
+        QString r = right.toString();
+        return l.compare(r);
+    }
+    
+    // Handle booleans (false < true)
+    if (left.isBool() && right.isBool()) {
+        bool l = left.toBool();
+        bool r = right.toBool();
+        if (l == r) return 0;
+        return l ? 1 : -1; // false < true
+    }
+    
+    // Different types - use string comparison as fallback
+    return left.toString().compare(right.toString());
+}
+
+// Parse function calls like length() and value() in filter expressions
+std::optional<Token> parseFunction(QString s, QVector<FilterFn>& out)
+{
+    // Pattern for function call comparisons: func(...) op value or value op func(...)
+    constexpr auto funcCompPat = ctll::fixed_string{R"(^(.*?)\s*(==|!=|<|>|<=|>=)\s*(.*?)$)"};
+    
+    if (auto m = ctre::match<funcCompPat>(to_sv(s))) {
+        QString left = to_qstr(m.template get<1>().to_view()).trimmed();
+        QString op = to_qstr(m.template get<2>().to_view());
+        QString right = to_qstr(m.template get<3>().to_view()).trimmed();
+        
+        // Check if either side contains a function call
+        bool leftHasFunc = left.contains("(") && left.contains(")");
+        bool rightHasFunc = right.contains("(") && right.contains(")");
+        
+        if (!leftHasFunc && !rightHasFunc) {
+            return std::nullopt; // No function calls found
+        }
+        
+        Builder b{out};
+        return b.add([left, op, right, leftHasFunc, rightHasFunc](const QJsonValue& j) -> bool {
+            QJsonValue leftVal, rightVal;
+            
+            // Evaluate left side
+            if (leftHasFunc) {
+                leftVal = evaluateFunction(left, j);
+            } else if (left.startsWith("@.")) {
+                // Property access - RFC 9535 "nothing" semantics
+                QString prop = left.mid(2);
+                QJsonValue val = j.toObject().value(prop);
+                leftVal = val.isUndefined() ? QJsonValue(0) : val; // Undefined becomes 0
+            } else {
+                // Literal value
+                leftVal = parseJsonLiteral(left);
+            }
+            
+            // Evaluate right side  
+            if (rightHasFunc) {
+                rightVal = evaluateFunction(right, j);
+            } else if (right.startsWith("@.")) {
+                // Property access - RFC 9535 "nothing" semantics
+                QString prop = right.mid(2);
+                QJsonValue val = j.toObject().value(prop);
+                rightVal = val.isUndefined() ? QJsonValue(0) : val; // Undefined becomes 0
+            } else {
+                // Literal value
+                rightVal = parseJsonLiteral(right);
+            }
+            
+            // Perform comparison
+            if (op == "==") return leftVal == rightVal;
+            if (op == "!=") return leftVal != rightVal;
+            if (op == "<") return compareValues(leftVal, rightVal) < 0;
+            if (op == ">") return compareValues(leftVal, rightVal) > 0;
+            if (op == "<=") return compareValues(leftVal, rightVal) <= 0;
+            if (op == ">=") return compareValues(leftVal, rightVal) >= 0;
+            return false;
+        }, s);
+    }
+    
+    return std::nullopt;
+}
+
 std::optional<Token> parseOr(QString s, QVector<FilterFn>& out)
 {
     if (auto split = splitTopLevel(s, "||"_L1); split)
@@ -1394,6 +1573,7 @@ constexpr std::array rules = {
     &parseIn,
     &parseExists,
     &parseSelfCmp,
+    &parseFunction, // Add function call parser
     &parseCompare,
     &parseRegex
 };
