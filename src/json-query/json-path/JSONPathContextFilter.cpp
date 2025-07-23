@@ -44,7 +44,7 @@ QJsonValue evaluateContextFunction(const QString& funcExpr, const QJsonValue& co
             auto path = JSONPath::create(args);
             if (path) {
                 // For RFC 9535 "nothing" semantics, evaluate against current context, not root
-                auto results = path->evaluateAllExpected(context);
+                auto results = path->evaluateAll(context);
                 if (results) {
                     if (results->isEmpty()) {
                         return QJsonValue(0); // Return 0 for empty results (RFC 9535 "nothing" semantics)
@@ -121,7 +121,7 @@ std::optional<Token> parseAbsolutePathContext(QString s, QVector<ContextFilterFn
                 try {
                     auto absolutePath = json_query::JSONPath::create(QString::fromStdString(leftPath));
                     if (absolutePath) {
-                        auto results = absolutePath->evaluateAllExpected(root);
+                        auto results = absolutePath->evaluateAll(root);
                         if (results && !results->isEmpty()) {
                             leftValue = results->first();
                         }
@@ -288,7 +288,7 @@ std::optional<Token> parseAbsolutePathContext(QString s, QVector<ContextFilterFn
                             QString pathStr = right.mid(6, right.length() - 7); // Extract path
                             auto path = JSONPath::create(pathStr);
                             if (path) {
-                                auto results = path->evaluateAllExpected(node);
+                                auto results = path->evaluateAll(node);
                                 if (results && results->isEmpty()) {
                                     rightIsNothing = true;
                                 }
@@ -374,7 +374,7 @@ std::optional<Token> parseAbsolutePathContext(QString s, QVector<ContextFilterFn
                     // Create a temporary JSONPath to evaluate the absolute path
                     auto absolutePath = json_query::JSONPath::create(s);
                     if (absolutePath) {
-                        auto results = absolutePath->evaluateAllExpected(root);
+                        auto results = absolutePath->evaluateAll(root);
                         if (results && !results->isEmpty()) {
                             return true;
                         }

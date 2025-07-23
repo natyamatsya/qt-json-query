@@ -36,7 +36,7 @@ TEST(JSONPathLogicalOr, IdOneOrThree)
 {
     auto path = JSONPath::create(u"$[?(@.id == 1 || @.id == 3)]");
     ASSERT_TRUE(path);
-    auto resResult = path->evaluateAllExpected(bondDoc);
+    auto resResult = path->evaluateAll(bondDoc);
     ASSERT_TRUE(resResult.has_value()) << "Failed to evaluate path";
     QJsonArray res = *resResult;
     ASSERT_EQ(res.size(), 2);
@@ -53,7 +53,7 @@ TEST(JSONPathLogicalOr, DirectorIsMendesOrStarringEva)
     auto path = JSONPath::create(
         u"$[?(@['director']=='Sam Mendes' || 'Eva Green' in @['starring'])]");
     ASSERT_TRUE(path);
-    auto resResult = path->evaluateAllExpected(bondDoc);
+    auto resResult = path->evaluateAll(bondDoc);
     ASSERT_TRUE(resResult.has_value()) << "Failed to evaluate path";
     QJsonArray res = *resResult;
 
@@ -74,7 +74,7 @@ TEST(JSONPathLogicalOr, AndHasHigherPrecedenceThanOr)
     auto path = JSONPath::create(
         u"$[?(@.id == 1 || @.director == 'Sam Mendes' && @.id == 3)]");
     ASSERT_TRUE(path);
-    auto resResult = path->evaluateAllExpected(bondDoc);
+    auto resResult = path->evaluateAll(bondDoc);
     ASSERT_TRUE(resResult.has_value()) << "Failed to evaluate path";
     QJsonArray res = *resResult;
 
@@ -95,7 +95,7 @@ TEST(JSONPathLogicalOr, ParenChangePrecedence)
     auto path = JSONPath::create(
         u"$[?(@['director']=='Sam Mendes' && (@.id == 3 || @.id == 4))]");
     ASSERT_TRUE(path);
-    auto resResult = path->evaluateAllExpected(bondDoc);
+    auto resResult = path->evaluateAll(bondDoc);
     ASSERT_TRUE(resResult.has_value()) << "Failed to evaluate path";
     QJsonArray res = *resResult;
 

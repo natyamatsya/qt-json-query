@@ -49,7 +49,7 @@ TEST(JSONPathBaeldung, CreatorNameAndLocation)
 
     EXPECT_THAT( eval(*namePath, doc), IsJsonString(u"Jayway Inc.") );
 
-    EXPECT_THAT( locationPath->evaluateAllExpected(doc).value_or(QJsonArray{}),
+    EXPECT_THAT( locationPath->evaluateAll(doc).value_or(QJsonArray{}),
                  ElementsAre(IsJsonString(u"Malmo"),
                              IsJsonString(u"San Francisco"),
                              IsJsonString(u"Helsingborg")) );
@@ -75,7 +75,7 @@ TEST(JSONPathBaeldung, PredicatePriceGreaterThan20)
     // Inline predicate variant equivalent to article but comparing with constant
     auto expensive{ JSONPath::create(u"$['book'][?(@.price > 20.00)]") };
     ASSERT_TRUE(expensive);
-    auto result = expensive->evaluateAllExpected(doc);
+    auto result = expensive->evaluateAll(doc);
     ASSERT_TRUE(result.has_value()) << "Failed to evaluate expensive books";
     QJsonArray expensiveBooks = *result;
     QStringList titles;
@@ -104,7 +104,7 @@ TEST(JSONPathBaeldung, MovieWithId2)
 
     auto path{ JSONPath::create(u"$[?(@.id == 2)]") };
     ASSERT_TRUE(path);
-    auto resResult = path->evaluateAllExpected(doc);
+    auto resResult = path->evaluateAll(doc);
     ASSERT_TRUE(resResult.has_value()) << "Failed to evaluate path";
     QJsonArray resArr = *resResult;
     ASSERT_EQ(resArr.size(), 1);
@@ -131,7 +131,7 @@ TEST(JSONPathBaeldung, TitleByStarringEvaGreen)
 
     auto path{ JSONPath::create(u"$[?('Eva Green' in @['starring'])]") };
     ASSERT_TRUE(path);
-    auto resResult = path->evaluateAllExpected(doc);
+    auto resResult = path->evaluateAll(doc);
     ASSERT_TRUE(resResult.has_value()) << "Failed to evaluate path";
     QJsonArray res = *resResult;
     ASSERT_EQ(res.size(), 1);
@@ -155,7 +155,7 @@ TEST(JSONPathBaeldung, TotalRevenue)
 
     // Equivalent to Java example: iterate through array and sum revenues
     auto root{ JSONPath::create(u"$") };
-    auto moviesResult = root->evaluateAllExpected(doc);
+    auto moviesResult = root->evaluateAll(doc);
     ASSERT_TRUE(moviesResult.has_value()) << "Failed to evaluate root";
     QJsonArray movies = *moviesResult;
     long long revenue = 0;
@@ -181,7 +181,7 @@ TEST(JSONPathBaeldung, HighestRevenueMovie)
 
     // 1. Get list of revenues
     auto revenuePath{ JSONPath::create(u"$[*]['box office']") };
-    auto revenuesResult = revenuePath->evaluateAllExpected(doc);
+    auto revenuesResult = revenuePath->evaluateAll(doc);
     ASSERT_TRUE(revenuesResult.has_value()) << "Failed to evaluate revenues";
     QJsonArray revenues = *revenuesResult;
     long long highest = 0;
@@ -191,7 +191,7 @@ TEST(JSONPathBaeldung, HighestRevenueMovie)
     // 2. Find movie with that revenue
     auto moviePath{ JSONPath::create(QString(u"$[?(@['box office'] == %1)]").arg(highest)) };
     ASSERT_TRUE(moviePath);
-    auto resResult = moviePath->evaluateAllExpected(doc);
+    auto resResult = moviePath->evaluateAll(doc);
     ASSERT_TRUE(resResult.has_value()) << "Failed to evaluate movie path";
     QJsonArray res = *resResult;
     ASSERT_EQ(res.size(), 1);
@@ -214,7 +214,7 @@ TEST(JSONPathBaeldung, LatestMovieOfSamMendes)
 
     auto path{ JSONPath::create(u"$[?(@['director'] == 'Sam Mendes' && @['release date'] == 1445821200000)]") };
     ASSERT_TRUE(path);
-    auto resResult = path->evaluateAllExpected(doc);
+    auto resResult = path->evaluateAll(doc);
     ASSERT_TRUE(resResult.has_value()) << "Failed to evaluate path";
     QJsonArray res = *resResult;
     ASSERT_EQ(res.size(), 1);

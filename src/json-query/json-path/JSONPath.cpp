@@ -18,17 +18,17 @@ using json_path::FilterFn;
 // ─────────────────────────────────────────────────────────────────────
 
 // ─────────────────────────────────────────────────────────────────────
-//  evaluateExpected – with error handling
+//  evaluate – with error handling
 // ─────────────────────────────────────────────────────────────────────
 
-JSONPath::EvalResult JSONPath::evaluateExpected(const QJsonDocument& doc) const
+JSONPath::EvalResult JSONPath::evaluate(const QJsonDocument& doc) const
 {
     const QJsonValue root = doc.isArray() ? QJsonValue(doc.array())
                                           : QJsonValue(doc.object());
-    return evaluateExpected(root);
+    return evaluate(root);
 }
 
-JSONPath::EvalResult JSONPath::evaluateExpected(const QJsonValue& value) const
+JSONPath::EvalResult JSONPath::evaluate(const QJsonValue& value) const
 {
     try {
         json_path::detail::PathEvalCtx ctx{m_tokens, m_filters, m_contextFilters, value, m_option, m_func};
@@ -42,17 +42,17 @@ JSONPath::EvalResult JSONPath::evaluateExpected(const QJsonValue& value) const
 }
 
 // ─────────────────────────────────────────────────────────────────────
-//  evaluateAllExpected – array results with error handling
+//  evaluateAll – array results with error handling
 // ─────────────────────────────────────────────────────────────────────
 
-JSONPath::EvalArrayResult JSONPath::evaluateAllExpected(const QJsonDocument& doc) const
+JSONPath::EvalArrayResult JSONPath::evaluateAll(const QJsonDocument& doc) const
 {
     const QJsonValue root = doc.isArray() ? QJsonValue(doc.array())
                                           : QJsonValue(doc.object());
-    return evaluateAllExpected(root);
+    return evaluateAll(root);
 }
 
-JSONPath::EvalArrayResult JSONPath::evaluateAllExpected(const QJsonValue& value) const
+JSONPath::EvalArrayResult JSONPath::evaluateAll(const QJsonValue& value) const
 {
     try {
         json_path::detail::PathEvalCtx ctx{m_tokens, m_filters, m_contextFilters, value, m_option, m_func};

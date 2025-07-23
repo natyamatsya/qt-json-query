@@ -643,7 +643,7 @@ QJsonValue evaluateFunction(const QString& funcExpr, const QJsonValue& context) 
             using json_query::JSONPath;
             auto path = JSONPath::create(args);
             if (path) {
-                auto results = path->evaluateAllExpected(context);
+                auto results = path->evaluateAll(context);
                 if (results) {
                     return results->size();
                 }
@@ -1562,7 +1562,7 @@ std::optional<Token> parseAbsolutePath(QString s, QVector<FilterFn>& out)
         // Create a temporary JSONPath to evaluate the absolute path
         // against the root document
         if (auto path = JSONPath::create(s)) {
-            auto results = path->evaluateAllExpected(rootValue);
+            auto results = path->evaluateAll(rootValue);
             if (results) {
                 return !results->isEmpty();
             }

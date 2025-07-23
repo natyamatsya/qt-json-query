@@ -71,17 +71,17 @@ TEST(RFC9535_JSONPath, UpstreamArrayIndexOOB)
     ASSERT_TRUE(path);
 
     {
-        auto res = path->evaluateExpected(parseJson(R"({"foo":{"bar":null}})"));
+        auto res = path->evaluate(parseJson(R"({"foo":{"bar":null}})"));
         ASSERT_FALSE(res);
         EXPECT_EQ(res.error(), json_query::json_path::EvalError::TypeMismatchArray);
     }
     {
-        auto res = path->evaluateExpected(parseJson(R"({"foo":{"bar":4}})"));
+        auto res = path->evaluate(parseJson(R"({"foo":{"bar":4}})"));
         ASSERT_FALSE(res);
         EXPECT_EQ(res.error(), json_query::json_path::EvalError::TypeMismatchArray);
     }
     {
-        auto res = path->evaluateExpected(parseJson(R"({"foo":{"bar":[]}})"));
+        auto res = path->evaluate(parseJson(R"({"foo":{"bar":[]}})"));
         ASSERT_FALSE(res);
         EXPECT_EQ(res.error(), json_query::json_path::EvalError::IndexOutOfRange);
     }

@@ -36,7 +36,7 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
     
-    auto evalResult = pathResult->evaluateExpected(doc);
+    auto evalResult = pathResult->evaluate(doc);
     if (!evalResult) {
         qDebug() << "Failed to evaluate JSONPath";
         return EXIT_FAILURE;

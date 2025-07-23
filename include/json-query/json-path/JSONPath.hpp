@@ -47,11 +47,11 @@ public:
     using EvalResult = std::expected<QJsonValue, json_path::EvalError>;
     using EvalArrayResult = std::expected<QJsonArray, json_path::EvalError>;
 
-    [[nodiscard]] EvalResult evaluateExpected(const QJsonDocument& doc) const;
-    [[nodiscard]] EvalResult evaluateExpected(const QJsonValue&    value) const;
+    [[nodiscard]] EvalResult evaluate(const QJsonDocument& doc) const;
+    [[nodiscard]] EvalResult evaluate(const QJsonValue&    value) const;
     
-    [[nodiscard]] EvalArrayResult evaluateAllExpected(const QJsonDocument& doc) const;
-    [[nodiscard]] EvalArrayResult evaluateAllExpected(const QJsonValue&    value) const;
+    [[nodiscard]] EvalArrayResult evaluateAll(const QJsonDocument& doc) const;
+    [[nodiscard]] EvalArrayResult evaluateAll(const QJsonValue&    value) const;
 
     // -----------------------------------------------------------------
     //  Other

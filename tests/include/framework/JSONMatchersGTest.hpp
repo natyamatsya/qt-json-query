@@ -49,7 +49,7 @@ inline QJsonDocument parseJson(const char* src)
 // Evaluate a compiled JSONPath against a document and return the raw value.
 inline QJsonValue eval(const JSONPath& path, const QJsonDocument& doc)
 {
-    auto result = path.evaluateExpected(doc);
+    auto result = path.evaluate(doc);
     if (!result) {
         std::string error_msg = "JSONPath evaluation failed: ";
         error_msg += json_query::json_path::to_string(result.error());
@@ -69,7 +69,7 @@ inline QJsonValue eval(QStringView path, const QJsonDocument& doc,
         throw std::runtime_error(error_msg);
     }
     
-    auto result = p->evaluateExpected(doc);
+    auto result = p->evaluate(doc);
     if (!result) {
         std::string error_msg = "JSONPath evaluation failed: ";
         error_msg += json_query::json_path::to_string(result.error());
@@ -83,7 +83,7 @@ inline QJsonValue eval(QStringView path, const QJsonDocument& doc,
 // so caller can treat uniformly.
 inline QJsonArray evalArray(const JSONPath& path, const QJsonDocument& doc)
 {
-    auto result = path.evaluateExpected(doc);
+    auto result = path.evaluate(doc);
     if (!result) {
         std::string error_msg = "JSONPath evaluation failed: ";
         error_msg += json_query::json_path::to_string(result.error());
@@ -103,7 +103,7 @@ inline QJsonArray evalArray(QStringView path, const QJsonDocument& doc,
         throw std::runtime_error(error_msg);
     }
     
-    auto result = p->evaluateAllExpected(doc);
+    auto result = p->evaluateAll(doc);
     if (!result) {
         std::string error_msg = "JSONPath evaluation failed: ";
         error_msg += json_query::json_path::to_string(result.error());
@@ -131,7 +131,7 @@ inline std::expected<QJsonValue, json_query::json_path::Error> evalExp(QStringVi
     if (!compiled)
         return std::unexpected(compiled.error());
     
-    auto result = compiled->evaluateExpected(doc);
+    auto result = compiled->evaluate(doc);
     if (!result) {
         // For now, we need to convert EvalError to Error since the return type expects Error
         // In the future, we might want to have a unified error type or return std::variant

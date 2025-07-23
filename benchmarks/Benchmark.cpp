@@ -180,7 +180,7 @@ static void BM_JSONPath_Simple(benchmark::State &state)
         auto pathRes = JSONPath::create(u"$.name");
         if (!pathRes.has_value())
             state.SkipWithError("Failed to compile path");
-        auto result = pathRes->evaluateAllExpected(doc);
+        auto result = pathRes->evaluateAll(doc);
         if (result) {
             benchmark::DoNotOptimize(*result);
         }
@@ -195,7 +195,7 @@ static void BM_JSONPath_Nested(benchmark::State &state)
     {
         auto p = JSONPath::create(u"$.location.city");
         if (!p) state.SkipWithError("compile fail");
-        auto result = p->evaluateAllExpected(doc);
+        auto result = p->evaluateAll(doc);
         if (result) {
             benchmark::DoNotOptimize(*result);
         }
@@ -210,7 +210,7 @@ static void BM_JSONPath_Array(benchmark::State &state)
     {
         auto p = JSONPath::create(u"$.inventory[5].title");
         if (!p) state.SkipWithError("compile fail");
-        auto result = p->evaluateAllExpected(doc);
+        auto result = p->evaluateAll(doc);
         if (result) {
             benchmark::DoNotOptimize(*result);
         }
@@ -225,7 +225,7 @@ static void BM_JSONPath_Filter(benchmark::State &state)
     {
         auto p = JSONPath::create(u"$.inventory[?(@.price > 20)].title");
         if (!p) state.SkipWithError("compile fail");
-        auto result = p->evaluateAllExpected(doc);
+        auto result = p->evaluateAll(doc);
         if (result) {
             benchmark::DoNotOptimize(*result);
         }
@@ -240,7 +240,7 @@ static void BM_JSONPath_Recursive(benchmark::State &state)
     {
         auto p = JSONPath::create(u"$..title");
         if (!p) state.SkipWithError("compile fail");
-        auto result = p->evaluateAllExpected(doc);
+        auto result = p->evaluateAll(doc);
         if (result) {
             benchmark::DoNotOptimize(*result);
         }

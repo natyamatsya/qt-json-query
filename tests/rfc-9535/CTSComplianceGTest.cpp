@@ -164,7 +164,7 @@ TEST_P(CtsJsonPathTest, EvaluatesPerSpec)
     ASSERT_TRUE(maybePath.has_value()) << "Failed to compile: " << tc.selector.toStdString();
 
     const JSONPath& path = *maybePath;
-    auto result = path.evaluateExpected(doc);
+    auto result = path.evaluate(doc);
     ASSERT_TRUE(result.has_value()) << "Failed to evaluate: " << tc.selector.toStdString();
     
     QJsonValue resVal = *result;
