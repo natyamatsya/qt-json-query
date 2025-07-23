@@ -31,7 +31,7 @@ JSONPath::EvalResult JSONPath::evaluate(const QJsonDocument& doc) const
 JSONPath::EvalResult JSONPath::evaluate(const QJsonValue& value) const
 {
     try {
-        json_path::detail::PathEvalCtx ctx{m_tokens, m_filters, m_contextFilters, value, m_option, m_func};
+        json_path::detail::PathEvalCtx ctx{m_tokens, m_filters, m_contextFilters, value, m_func};
         QJsonValue result = json_path::detail::evaluate(ctx, value);
         return result;
     } catch (...) {
@@ -55,7 +55,7 @@ JSONPath::EvalArrayResult JSONPath::evaluateAll(const QJsonDocument& doc) const
 JSONPath::EvalArrayResult JSONPath::evaluateAll(const QJsonValue& value) const
 {
     try {
-        json_path::detail::PathEvalCtx ctx{m_tokens, m_filters, m_contextFilters, value, m_option, m_func};
+        json_path::detail::PathEvalCtx ctx{m_tokens, m_filters, m_contextFilters, value, m_func};
         QJsonArray result = json_path::detail::evaluateAll(ctx, value);
         return result;
     } catch (...) {

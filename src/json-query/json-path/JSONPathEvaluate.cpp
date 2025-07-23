@@ -514,28 +514,10 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
 }
 
 // ---------------------------------------------------------------------------
-//  evalAsPathList – pure variant
-// ---------------------------------------------------------------------------
-QJsonValue evalAsPathList(const PathEvalCtx& ctx, const QJsonValue& root)
-{
-    Q_UNUSED(root)
-    if (ctx.option != PathEvalCtx::Option::AsPathList)
-        return QJsonValue(QJsonValue::Undefined);
-
-    QStringList segs;
-    const QString ptr = tokensToPointer(segs, ctx.tokens);
-    if (ptr.isEmpty())
-        return QJsonValue(QJsonValue::Undefined);
-    return ptr;
-}
-
-// ---------------------------------------------------------------------------
 //  Convenience entry points (pure)
 // ---------------------------------------------------------------------------
 QJsonValue evaluate(const PathEvalCtx& ctx, const QJsonValue& root)
 {
-    if (ctx.option == PathEvalCtx::Option::AsPathList)
-        return evalAsPathList(ctx, root);
     return evalStandard(ctx, root);
 }
 

@@ -8,7 +8,7 @@ namespace json_query {
     using json_path::compile;
     using json_path::jsonPathLog;
 
-    JSONPath::Result JSONPath::create(QStringView rawPath, Option opt)
+    JSONPath::Result JSONPath::create(QStringView rawPath)
     {
         qCDebug(jsonPathLog) << "JSONPath::create() called with rawPath=" << rawPath;
         auto result = compile(rawPath);
@@ -19,7 +19,6 @@ namespace json_query {
         qCDebug(jsonPathLog) << "JSONPath::create() compile succeeded, creating JSONPath object";
 
         return JSONPath(result.value().function,
-                        opt,
                         rawPath.toString(),
                         std::move(result.value().compiled.tokens),
                         std::move(result.value().compiled.filters),

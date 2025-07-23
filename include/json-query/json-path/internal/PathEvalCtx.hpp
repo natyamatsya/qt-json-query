@@ -23,22 +23,19 @@ public:
     using FilterFn           = json_path::FilterFn;
     using ContextFilterFn    = json_path::ContextFilterFn;
     using Function           = json_path::FunctionType;
-    using Option             = json_query::json_path::Option;
 
     PathEvalCtx(const QVector<Token>&   t,
                 const QVector<FilterFn>& f,
                 const QVector<ContextFilterFn>& cf,
                 const QJsonValue& root,
-                Option                   opt,
                 Function                 fn) noexcept
-        : tokens{t}, filters{f}, contextFilters{cf}, rootDocument{root}, option{opt}, trailingFn{fn} {}
+        : tokens{t}, filters{f}, contextFilters{cf}, rootDocument{root}, trailingFn{fn} {}
 
     // Data members are intentionally const refs – PathEvalCtx is just a view.
     const QVector<Token>&   tokens;
     const QVector<FilterFn>& filters;
     const QVector<ContextFilterFn>& contextFilters;
     const QJsonValue& rootDocument;
-    Option                   option {Option::None};
     Function                 trailingFn {Function::None};
 };
 

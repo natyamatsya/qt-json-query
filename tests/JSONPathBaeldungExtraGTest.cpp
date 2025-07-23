@@ -73,18 +73,5 @@ TEST(JSONPathBaeldungExtra, RegexAuthorFilter)
                  ElementsAre(JsonObjContains(kvlist(kv("title","Beginning JSON"), kv("author","Ben Smith")))) );
 }
 
-//---------------------------------------------
-// 7.4 Option.AS_PATH_LIST behaviour
-//---------------------------------------------
-TEST(JSONPathBaeldungExtra, AsPathListOption)
-{
-    static const char jsonSrc[] = R"JSON({
-        "book": [{"title": "Beginning JSON"}]
-    })JSON";
-
-    const QJsonDocument doc = QJsonDocument::fromJson(QByteArray(jsonSrc));
-
-    auto path{ JSONPath::create(u"$['book'][0]['title']", JSONPath::Option::AsPathList) };
-    ASSERT_TRUE(path);
-    EXPECT_THAT( eval(*path, doc), IsJsonString(u"/book/0/title") );
-}
+// Test removed: AsPathListOption is not part of RFC 9535 specification
+// RFC 9535 defines JSONPath as returning JSON values, not path strings

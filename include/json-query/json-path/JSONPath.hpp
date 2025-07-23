@@ -19,7 +19,6 @@
 #include "JSONPathCompile.hpp"
 #include "json-query/utils/JSONQueryUtils.hpp"
 #include "json-query/json-pointer/JSONPointer.hpp"
-#include "json-query/json-path/JSONPathOption.hpp"
 #include "json-query/json-path/JSONPathEvalError.hpp"
 
 using namespace Qt::StringLiterals;
@@ -31,15 +30,12 @@ namespace json_query {
 class JSONPath
 {
 public:
-    using Option = json_query::json_path::Option;
-
     // -----------------------------------------------------------------
     //  Factory (replaces throwing constructor)                    ★
     // -----------------------------------------------------------------
     using Result = std::expected<JSONPath, json_path::Error>;
     // ★
-    static Result create(QStringView path,                       // ★
-                             Option opt = Option::None);
+    static Result create(QStringView path);                      // ★
     // ★
     // -----------------------------------------------------------------
     //  Evaluation API with error reporting (std::expected)
@@ -77,13 +73,11 @@ private:
     //  Private "data" ctor – used only by factory                     ★
     // -----------------------------------------------------------------
     JSONPath( FunctionType                func,
-                  Option                        opt,
                   QString                     original,
                   QVector<Token>              tokens,
                   QVector<FilterFn> filters,
                   QVector<ContextFilterFn> contextFilters ) noexcept
             : m_func(func)
-            , m_option(opt)
             , m_originalPath(std::move(original))
             , m_tokens(std::move(tokens))
             , m_filters(std::move(filters))
@@ -94,7 +88,6 @@ private:
     //  Data members
     // -----------------------------------------------------------------
     FunctionType               m_func    {FunctionType::None};
-    Option                     m_option  {Option::None};
     QString                    m_originalPath;
     QVector<Token>             m_tokens;
     QVector<FilterFn> m_filters;

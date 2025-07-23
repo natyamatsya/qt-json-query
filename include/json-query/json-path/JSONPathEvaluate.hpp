@@ -21,14 +21,12 @@ QJsonArray evaluateToken(const PathEvalCtx& ctx, const Token& tk, const QJsonVal
 // Fan-out one token over an array of input values
 QJsonArray fanOut       (const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src);
 
-// Complete evaluation pipelines (migrated former evalStandard / evalAsPathList)
+// Complete evaluation pipelines (migrated former evalStandard)
 QJsonValue evalStandard   (const PathEvalCtx& ctx, const QJsonValue& root);
-QJsonValue evalAsPathList (const PathEvalCtx& ctx, const QJsonValue& root);
+QJsonArray evaluateAll    (const PathEvalCtx& ctx, const QJsonValue& root);
 
 // Convenience top-level entry that selects strategy based on ctx.option
 QJsonValue evaluate       (const PathEvalCtx& ctx, const QJsonValue& root);
-
-QJsonArray evaluateAll    (const PathEvalCtx& ctx, const QJsonValue& root);
 
 // Wildcard and recursive helpers
 QJsonArray wildcardObject(const QJsonObject& obj);

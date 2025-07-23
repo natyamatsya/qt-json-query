@@ -59,8 +59,7 @@ inline QJsonValue eval(const JSONPath& path, const QJsonDocument& doc)
 }
 
 // Convenience overload that compiles the path each call (avoid in hot code).
-inline QJsonValue eval(QStringView path, const QJsonDocument& doc,
-                       JSONPath::Option opt = JSONPath::Option::None)
+inline QJsonValue eval(QStringView path, const QJsonDocument& doc)
 {
     auto p = JSONPath::create(path);
     if (!p) {
@@ -93,8 +92,7 @@ inline QJsonArray evalArray(const JSONPath& path, const QJsonDocument& doc)
     return v.isArray() ? v.toArray() : QJsonArray{v};
 }
 
-inline QJsonArray evalArray(QStringView path, const QJsonDocument& doc,
-                           JSONPath::Option opt = JSONPath::Option::None)
+inline QJsonArray evalArray(QStringView path, const QJsonDocument& doc)
 {
     auto p = JSONPath::create(path);
     if (!p) {
@@ -124,10 +122,9 @@ using EvalResult = std::expected<QJsonValue, Error>;
 // Evaluate path and propagate compile-time errors via std::expected.  Runtime
 // evaluation errors are also propagated via std::expected.
 inline std::expected<QJsonValue, json_query::json_path::Error> evalExp(QStringView path,
-                          const QJsonDocument& doc,
-                          JSONPath::Option opt = JSONPath::Option::None)
+                          const QJsonDocument& doc)
 {
-    auto compiled = JSONPath::create(path, opt);
+    auto compiled = JSONPath::create(path);
     if (!compiled)
         return std::unexpected(compiled.error());
     
