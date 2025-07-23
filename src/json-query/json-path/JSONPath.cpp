@@ -32,11 +32,13 @@ JSONPath::EvalResult JSONPath::evaluate(const QJsonValue& value) const
 {
     try {
         json_path::detail::PathEvalCtx ctx{m_tokens, m_filters, m_contextFilters, value, m_func};
-        QJsonValue result = json_path::detail::evaluate(ctx, value);
-        return result;
+        auto result = json_path::detail::evaluate(ctx, value);
+        if (result) {
+            return *result;
+        } else {
+            return std::unexpected(result.error());
+        }
     } catch (...) {
-        // For now, return a generic error if evaluation fails
-        // In the future, we could extend the evaluation functions to return std::expected
         return std::unexpected(json_path::EvalError::TypeMismatchObject);
     }
 }
@@ -56,11 +58,13 @@ JSONPath::EvalArrayResult JSONPath::evaluateAll(const QJsonValue& value) const
 {
     try {
         json_path::detail::PathEvalCtx ctx{m_tokens, m_filters, m_contextFilters, value, m_func};
-        QJsonArray result = json_path::detail::evaluateAll(ctx, value);
-        return result;
+        auto result = json_path::detail::evaluateAll(ctx, value);
+        if (result) {
+            return *result;
+        } else {
+            return std::unexpected(result.error());
+        }
     } catch (...) {
-        // For now, return a generic error if evaluation fails
-        // In the future, we could extend the evaluation functions to return std::expected
         return std::unexpected(json_path::EvalError::TypeMismatchObject);
     }
 }

@@ -11,6 +11,7 @@
 
 #include <limits>
 #include <QRegularExpression>
+#include <ctre.hpp>
 
 namespace json_query::json_path
 {
@@ -30,7 +31,7 @@ namespace
 
         // integer literal per RFC 9535: optional *minus* sign followed by digits.
         // Plus sign is NOT allowed. Leading zeros forbidden unless the value is exactly 0.
-        static const QRegularExpression re(R"(^(?:0|-[1-9][0-9]*|[1-9][0-9]*)$)");
+        static constexpr auto integer_literal_pattern = ctre::match<"^(?:0|-[1-9][0-9]*|[1-9][0-9]*)$">;
 
         qCDebug(jsonPathLog).noquote() << "makeSlice(" << v << ")";
 
@@ -38,16 +39,13 @@ namespace
             part = part.trimmed();
             if (part.isEmpty()) {
                 out.reset();
-                return true; // omitted component
+                return true;
             }
 
             // Manual integer-literal validation per RFC 9535 ----------
-            qsizetype idx = 0;
-            if (part[idx] == u'-') ++idx; // optional minus
-            if (idx >= part.size() || !part[idx].isDigit()) return false;
-            if (part[idx] == u'0' && (part.size() - idx) > 1) return false; // leading zero forbidden
-            for (qsizetype j = idx; j < part.size(); ++j) {
-                if (!part[j].isDigit()) return false;
+            if (!integer_literal_pattern(part.toString().toStdString())) {
+                qCDebug(jsonPathLog) << "strictParse(" << part << ") invalid integer literal";
+                return false;
             }
 
             // Fast path 64-bit conversion first.
@@ -260,12 +258,13 @@ namespace
     // Helper to validate integer literals per RFC 9535 §4.2.3
     [[nodiscard]] static bool isValidIndexLiteral(QStringView content)
     {
-        static const QRegularExpression re(R"(^(?:0|-[1-9][0-9]*|[1-9][0-9]*)$)");
-        auto m = re.match(content.toString());
-        if (!m.hasMatch()) {
-            qCDebug(jsonPathLog) << "isValidIndexLiteral(" << content << ") match=false";
+        static constexpr auto integer_literal_pattern = ctre::match<"^(?:0|-[1-9][0-9]*|[1-9][0-9]*)$">;
+        
+        if (!integer_literal_pattern(content.toString().toStdString())) {
+            qCDebug(jsonPathLog) << "isValidIndexLiteral(" << content << ") invalid integer literal";
             return false;
         }
+        
         bool ok=false; qlonglong val = content.toLongLong(&ok);
         qCDebug(jsonPathLog) << "isValidIndexLiteral(" << content << ") match=true ok=" << ok << " val=" << (ok?QString::number(val):QStringLiteral("n/a"));
         constexpr qlonglong SAFE_INT = 9007199254740992LL; // 2^53 per RFC 9535 test expectations

@@ -26,7 +26,7 @@ int normalizeIndex(int idx, int size)
     return idx < 0 ? size + idx : idx;
 }
 
-QJsonArray evalSlice(const QJsonArray& array, const Slice& s)
+std::expected<QJsonArray, EvalError> evalSlice(const QJsonArray& array, const Slice& s)
 {
     QJsonArray out;
 
@@ -36,7 +36,7 @@ QJsonArray evalSlice(const QJsonArray& array, const Slice& s)
     // Step normalisation ----------------------------------------------------
     qsizetype step = s.step;
     if (step == 0)
-        return out; // zero-step ⇒ empty result per RFC & Python
+        return std::unexpected(EvalError::InvalidSlice); // zero-step ⇒ empty result per RFC & Python
 
     qsizetype start = s.start;
     qsizetype stop  = s.end;
@@ -124,78 +124,66 @@ QJsonArray evalSlice(const QJsonArray& array, const Slice& s)
 //  Wildcard and recursive helpers (moved from JSONPathEvaluate.cpp)
 // ---------------------------------------------------------------------------
 namespace {
-QJsonArray __wildcardObjectImpl(const QJsonObject& obj)
+
+std::expected<QJsonArray, EvalError> __wildcardObjectImpl(const QJsonObject& obj)
 {
     QJsonArray out;
-    for (auto it = obj.begin(); it != obj.end(); ++it)
+    for (auto it = obj.constBegin(); it != obj.constEnd(); ++it)
         out.append(it.value());
     return out;
 }
 
-QJsonArray __evaluateRecursiveImpl(const QJsonValue& value)
+std::expected<QJsonArray, EvalError> __evaluateRecursiveImpl(const QJsonValue& value)
 {
     QJsonArray out;
-    if (!value.isArray() && !value.isObject())
-        return out;
-
-    // Use depth-first traversal with stack for RFC 9535 compliance
-    std::vector<QJsonValue> stack;
-    stack.push_back(value);
     
-    while (!stack.empty())
-    {
-        QJsonValue cur = stack.back();
-        stack.pop_back();
-        out.append(cur);
-
-        if (cur.isObject()) {
-            const QJsonObject obj = cur.toObject();
-            // Add children in reverse order for correct depth-first traversal
-            QVector<QJsonValue> children;
-            for (auto it = obj.begin(); it != obj.end(); ++it) {
-                children.append(it.value());
+    // Add the current value itself
+    out.append(value);
+    
+    // Recursively add all descendants
+    if (value.isObject()) {
+        const QJsonObject obj = value.toObject();
+        for (auto it = obj.constBegin(); it != obj.constEnd(); ++it) {
+            auto subResult = __evaluateRecursiveImpl(it.value());
+            if (!subResult) {
+                return std::unexpected(subResult.error());
             }
-            // Add in reverse order so they're processed in correct order
-            for (int i = children.size() - 1; i >= 0; --i) {
-                const QJsonValue& child = children[i];
-                // Add ALL values to the result, but only traverse containers
-                if (child.isArray() || child.isObject()) {
-                    stack.push_back(child);
-                } else {
-                    // Add primitive values directly to output for completeness
-                    out.append(child);
-                }
+            for (const auto& item : *subResult) {
+                out.append(item);
             }
-        } else if (cur.isArray()) {
-            const QJsonArray arr = cur.toArray();
-            // Add children in reverse order for correct depth-first traversal
-            for (int i = arr.size() - 1; i >= 0; --i) {
-                const QJsonValue& child = arr[i];
-                // Add ALL values to the result, but only traverse containers
-                if (child.isArray() || child.isObject()) {
-                    stack.push_back(child);
-                } else {
-                    // Add primitive values directly to output for completeness
-                    out.append(child);
-                }
+        }
+    } else if (value.isArray()) {
+        const QJsonArray arr = value.toArray();
+        for (const auto& item : arr) {
+            auto subResult = __evaluateRecursiveImpl(item);
+            if (!subResult) {
+                return std::unexpected(subResult.error());
+            }
+            for (const auto& subItem : *subResult) {
+                out.append(subItem);
             }
         }
     }
+    
     return out;
 }
+
 } // anonymous
 
-QJsonArray wildcardObject(const QJsonObject& obj)
+std::expected<QJsonArray, EvalError> wildcardObject(const QJsonObject& obj)
 {
     return __wildcardObjectImpl(obj);
 }
 
-QJsonArray wildcardArray(const QJsonArray& arr)
+std::expected<QJsonArray, EvalError> wildcardArray(const QJsonArray& arr)
 {
-    return arr; // shallow copy
+    QJsonArray out;
+    for (const auto& item : arr)
+        out.append(item);
+    return out;
 }
 
-QJsonArray evaluateRecursive(const QJsonValue& value, int /*unused*/)
+std::expected<QJsonArray, EvalError> evaluateRecursive(const QJsonValue& value, int /*unused*/)
 {
     return __evaluateRecursiveImpl(value);
 }
@@ -205,32 +193,45 @@ QJsonArray evaluateRecursive(const QJsonValue& value, int /*unused*/)
 namespace json_query::json_path::detail {
 
 // ---------------------------------------------------------------------------
-//  Token dispatcher (ex-JSONPath::evaluateToken)
+//  Token dispatcher with std::expected error handling
 // ---------------------------------------------------------------------------
-QJsonArray evaluateToken(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
+std::expected<QJsonArray, EvalError> evaluateTokenExpected(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
 {
     using enum Token::Kind;
-    constexpr std::array<QJsonArray (*)(const PathEvalCtx&, const Token&, const QJsonValue&), 7> lut = {
-        eval<Key>, eval<KeyList>, eval<Index>, eval<Slice>, eval<Wildcard>, eval<Recursive>, eval<Filter>
-    };
+    switch (tk.kind) {
+        case Key:       return evalExpected<Key>(ctx, tk, v);
+        case Index:     return evalExpected<Index>(ctx, tk, v);
+        case Slice:     return evalExpected<Slice>(ctx, tk, v);
+        case Wildcard:  return evalExpected<Wildcard>(ctx, tk, v);
+        case Recursive: return evalExpected<Recursive>(ctx, tk, v);
+        case Filter:    return evalExpected<Filter>(ctx, tk, v);
+        case KeyList:   return evalExpected<KeyList>(ctx, tk, v);
+        default:        return std::unexpected(EvalError::TypeMismatchObject);
+    }
+}
 
-    if (static_cast<size_t>(tk.kind) >= lut.size())
-        return {};
-
-    return lut[static_cast<size_t>(tk.kind)](ctx, tk, v);
+// ---------------------------------------------------------------------------
+//  Token dispatcher (ex-JSONPath::evaluateToken)
+// ---------------------------------------------------------------------------
+std::expected<QJsonArray, EvalError> evaluateToken(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
+{
+    return evaluateTokenExpected(ctx, tk, v);
 }
 
 // ---------------------------------------------------------------------------
 //  Fan-out helper (adapted from legacy implementation)
 // ---------------------------------------------------------------------------
-QJsonArray fanOut(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src)
+std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src)
 {
     QJsonArray dst;
     for (const auto& v : src) {
-        const QJsonArray seg = evaluateToken(ctx, tk, v);
+        auto seg = evaluateTokenExpected(ctx, tk, v);
+        if (!seg) {
+            return std::unexpected(seg.error());
+        }
         qDebug() << "[fanOut] kind=" << static_cast<int>(tk.kind) << "srcType"
-                 << v.type() << "seg size=" << seg.size();
-        for (const auto& e : seg)
+                 << v.type() << "seg size=" << seg->size();
+        for (const auto& e : *seg)
             dst.append(e);
     }
     return dst;
@@ -287,21 +288,21 @@ static QJsonValue applyTrailing(json_path::FunctionType fn, const QJsonValue& v)
 // ---------------------------------------------------------------------------
 //  evalStandard – pure variant
 // ---------------------------------------------------------------------------
-QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
+std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
 {
     if (ctx.tokens.isEmpty())
         return QJsonValue(QJsonValue::Undefined);
 
-    QJsonArray working{root};
+    std::expected<QJsonArray, EvalError> working = QJsonArray{root};
     bool multi = false;
 
     using json_query::json_path::internal::qt_hash;
 
-    for (qsizetype i = 1; i < ctx.tokens.size() && !working.isEmpty(); ++i)
+    for (qsizetype i = 1; i < ctx.tokens.size() && working; ++i)
     {
         const Token& tk = ctx.tokens[i];
         qDebug() << "[stage] token" << i << ": kind=" << static_cast<int>(tk.kind)
-                 << "working size=" << working.size();
+                 << "working size=" << working->size();
 
         bool prevRecursive = (i>0 && ctx.tokens[i-1].kind == Token::Kind::Recursive);
 
@@ -370,27 +371,30 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
             if (shouldUseUnion) {
                 qDebug() << "[union] processing" << unionTokens.size() << "consecutive selector tokens";
                 
-                QJsonArray unionResult;
+                std::expected<QJsonArray, EvalError> unionResult;
                 for (qsizetype tokenIdx : unionTokens) {
                     const Token& unionTk = ctx.tokens[tokenIdx];
-                    QJsonArray tokenResult = fanOut(ctx, unionTk, working);
+                    auto tokenResult = fanOut(ctx, unionTk, *working);
+                    if (!tokenResult) {
+                        return std::unexpected(tokenResult.error());
+                    }
                     qDebug() << "[union] token" << tokenIdx << "kind" << static_cast<int>(unionTk.kind) 
-                             << "produced" << tokenResult.size() << "results";
+                             << "produced" << tokenResult->size() << "results";
                     
                     // Combine results (union semantics)
-                    for (const auto& result : tokenResult) {
-                        unionResult.append(result);
+                    for (const auto& result : *tokenResult) {
+                        unionResult->append(result);
                     }
                 }
                 
                 working = unionResult;
-                qDebug() << "[union] combined result size:" << working.size();
+                qDebug() << "[union] combined result size:" << working->size();
                 
                 // Skip the tokens we just processed
                 i = j - 1;
                 
                 bool multiAfter = multi || addsMultiplicity(tk);
-                if (working.isEmpty())
+                if (working->isEmpty())
                     return QJsonArray{}; // RFC 9535: empty result list when no matches
 
                 multi = multiAfter;
@@ -414,8 +418,8 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
 
             bool isLeaf = (j == ctx.tokens.size());
 
-            QJsonArray next;
-            for (const auto& v : working) {
+            std::expected<QJsonArray, EvalError> next;
+            for (const auto& v : *working) {
                 if (!v.isObject()) continue;
                 const QJsonObject obj = v.toObject();
 
@@ -427,31 +431,31 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
                 if (isLeaf) {
                     if (keys.size() > 1) {
                         // Multi-property leaf union ⇒ return parent only (Jayway)
-                        next.append(v);
+                        next->append(v);
                     } else {
                         // Single-property leaf: return only the value, not the parent
-                        next.append(obj.value(keys.first()));
+                        next->append(obj.value(keys.first()));
                         // RFC 9535: Don't include parent containers for single-key descendant selectors
-                        // Removed: if (obj.size() == 1) next.append(v);
+                        // Removed: if (obj.size() == 1) next->append(v);
                     }
                 } else {
                     // Non-leaf: parent first, then properties for traversal
-                    next.append(v);
+                    next->append(v);
                     for (const QString& k : keys)
-                        next.append(obj.value(k));
+                        next->append(obj.value(k));
                 }
             }
 
-            if (next.isEmpty())
+            if (next->isEmpty())
                 return QJsonArray{}; // RFC 9535: empty result list when no matches
 
-            working.swap(next);
+            working = next;
 
             // Deduplicate container nodes at leaf to avoid duplicates
             if (isLeaf) {
                 QSet<uint> seen;
                 QJsonArray dedup;
-                for (const auto& v2 : working) {
+                for (const auto& v2 : *working) {
                     if (v2.isObject()) {
                         uint h = qt_hash(QJsonDocument(v2.toObject()).toJson());
                         if (seen.contains(h)) continue;
@@ -463,23 +467,26 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
                     }
                     dedup.append(v2);
                 }
-                working.swap(dedup);
+                working = dedup;
             }
 
             // Skip over tokens we have just processed
             i = j - 1;
             continue;
         } else {
-            working = fanOut(ctx, tk, working);
+            working = fanOut(ctx, tk, *working);
+            if (!working) {
+                return std::unexpected(working.error());
+            }
             bool multiAfter = multi || addsMultiplicity(tk);
-            if (working.isEmpty())
+            if (working->isEmpty())
                 return QJsonArray{}; // RFC 9535: empty result list when no matches
 
             // Deduplicate containers after normal fan-out when preceded by Recursive
             if (prevRecursive) {
                 QSet<uint> seen;
                 QJsonArray dedup;
-                for (const auto& v : working) {
+                for (const auto& v : *working) {
                     if (v.isObject()) {
                         uint h = qt_hash(QJsonDocument(v.toObject()).toJson());
                         if (seen.contains(h)) continue;
@@ -491,7 +498,7 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
                     }
                     dedup.append(v);
                 }
-                working.swap(dedup);
+                working = dedup;
             }
 
             multi = multiAfter;
@@ -503,10 +510,10 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
     // as a single result, not unwrap array contents
     bool isRootSelectorOnly = (ctx.tokens.size() == 1);
     if (isRootSelectorOnly) {
-        return working;
+        return *working;
     }
 
-    QJsonValue collapsed = squash(std::move(working), multi);
+    QJsonValue collapsed = squash(*std::move(working), multi);
     if (collapsed.isUndefined())
         return QJsonArray{}; // RFC 9535: no matches 
 
@@ -514,19 +521,75 @@ QJsonValue evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
 }
 
 // ---------------------------------------------------------------------------
+//  Enhanced evaluation with std::expected error handling
+// ---------------------------------------------------------------------------
+std::expected<QJsonValue, EvalError> evaluateWithErrorHandling(const PathEvalCtx& ctx, const QJsonValue& root)
+{
+    if (ctx.tokens.isEmpty())
+        return QJsonValue(QJsonValue::Undefined);
+
+    std::expected<QJsonValue, EvalError> current = root;
+    
+    // Skip leading root token ('$' or '@') if present
+    int startIdx = 0;
+    if (!ctx.tokens.isEmpty() && ctx.tokens.front().kind == Token::Kind::Key) {
+        const QString& k = ctx.tokens.front().key;
+        if (k == u"$" || k == u"@") {
+            startIdx = 1;
+        }
+    }
+
+    // Process tokens sequentially with error handling
+    for (int i = startIdx; i < ctx.tokens.size(); ++i) {
+        const Token& tk = ctx.tokens[i];
+        
+        // Use error-handling evaluation for Index tokens
+        if (tk.kind == Token::Kind::Index) {
+            auto result = evalExpected<Token::Kind::Index>(ctx, tk, *current);
+            if (!result) {
+                return std::unexpected(result.error());
+            }
+            
+            // Convert QJsonArray result back to single value
+            QJsonArray arr = *result;
+            if (arr.isEmpty()) {
+                return QJsonValue(QJsonValue::Undefined);
+            }
+            current = arr.first();
+        }
+        // Use legacy evaluation for other token types
+        else {
+            auto results = evaluateTokenExpected(ctx, tk, *current);
+            if (!results) {
+                return std::unexpected(results.error());
+            }
+            if (results->isEmpty()) {
+                return QJsonValue(QJsonValue::Undefined);
+            }
+            current = results->first();
+        }
+    }
+    
+    return *current;
+}
+
+// ---------------------------------------------------------------------------
 //  Convenience entry points (pure)
 // ---------------------------------------------------------------------------
-QJsonValue evaluate(const PathEvalCtx& ctx, const QJsonValue& root)
+std::expected<QJsonValue, EvalError> evaluate(const PathEvalCtx& ctx, const QJsonValue& root)
 {
     return evalStandard(ctx, root);
 }
 
-QJsonArray evaluateAll(const PathEvalCtx& ctx, const QJsonValue& root)
+std::expected<QJsonArray, EvalError> evaluateAll(const PathEvalCtx& ctx, const QJsonValue& root)
 {
-    QJsonValue res = evaluate(ctx, root);
-    if (res.isArray()) return res.toArray();
-    if (res.isUndefined() || res.isNull()) return {};
-    return QJsonArray{res};
+    auto res = evaluate(ctx, root);
+    if (!res) {
+        return std::unexpected(res.error());
+    }
+    if (res->isArray()) return res->toArray();
+    if (res->isUndefined() || res->isNull()) return {};
+    return QJsonArray{*res};
 }
 
 } // namespace json_query::json_path::detail

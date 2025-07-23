@@ -3,9 +3,11 @@
 #include <QJsonValue>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <expected>
 
 #include "internal/PathEvalCtx.hpp"
 #include "json-query/json-path/JSONPathCompile.hpp"
+#include "JSONPathEvalError.hpp"
 
 // (legacy JSONPath bridge removed)
 
@@ -13,24 +15,28 @@ namespace json_query::json_path::detail {
 
 // Basic helpers (exposed for tests)
 int        normalizeIndex(int idx, int size);
-QJsonArray evalSlice      (const QJsonArray& arr, const Slice& s);
+std::expected<QJsonArray, EvalError> evalSlice(const QJsonArray& arr, const Slice& s);
 
-// Core evaluation API (fully decoupled, pure helpers)
-QJsonArray evaluateToken(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v);
+// Core evaluation API with std::expected error handling
+std::expected<QJsonArray, EvalError> evaluateTokenExpected(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v);
+std::expected<QJsonArray, EvalError> evaluateToken(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v);
 
 // Fan-out one token over an array of input values
-QJsonArray fanOut       (const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src);
+std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src);
 
-// Complete evaluation pipelines (migrated former evalStandard)
-QJsonValue evalStandard   (const PathEvalCtx& ctx, const QJsonValue& root);
-QJsonArray evaluateAll    (const PathEvalCtx& ctx, const QJsonValue& root);
+// Complete evaluation pipelines with std::expected error handling
+std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const QJsonValue& root);
+std::expected<QJsonArray, EvalError> evaluateAll(const PathEvalCtx& ctx, const QJsonValue& root);
 
-// Convenience top-level entry that selects strategy based on ctx.option
-QJsonValue evaluate       (const PathEvalCtx& ctx, const QJsonValue& root);
+// Enhanced evaluation with std::expected error handling
+std::expected<QJsonValue, EvalError> evaluateWithErrorHandling(const PathEvalCtx& ctx, const QJsonValue& root);
+
+// Convenience top-level entry that uses std::expected
+std::expected<QJsonValue, EvalError> evaluate(const PathEvalCtx& ctx, const QJsonValue& root);
 
 // Wildcard and recursive helpers
-QJsonArray wildcardObject(const QJsonObject& obj);
-QJsonArray wildcardArray (const QJsonArray& arr);
-QJsonArray evaluateRecursive(const QJsonValue& value, int unused = 0);
+std::expected<QJsonArray, EvalError> wildcardObject(const QJsonObject& obj);
+std::expected<QJsonArray, EvalError> wildcardArray(const QJsonArray& arr);
+std::expected<QJsonArray, EvalError> evaluateRecursive(const QJsonValue& value, int unused = 0);
 
 } // namespace json_query::json_path::detail

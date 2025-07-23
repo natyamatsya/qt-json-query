@@ -18,7 +18,8 @@ enum class EvalError : std::uint8_t {
     TypeMismatchObject = 0, // expected object but found other when key access
     TypeMismatchArray  = 1, // expected array but found other when index/slice
     KeyNotFound        = 2, // object key missing (for definite access)
-    IndexOutOfRange    = 3  // array index OOB
+    IndexOutOfRange    = 3, // array index OOB
+    InvalidSlice       = 4  // invalid slice parameters (e.g., zero step)
 };
 
 [[nodiscard]] inline constexpr std::string_view to_string(EvalError e) noexcept
@@ -29,6 +30,7 @@ enum class EvalError : std::uint8_t {
     case TypeMismatchArray : return "type mismatch: expected array";
     case KeyNotFound       : return "key not found";
     case IndexOutOfRange   : return "index out of range";
+    case InvalidSlice      : return "invalid slice parameters";
     default                : return "unknown eval error";
     }
 }
