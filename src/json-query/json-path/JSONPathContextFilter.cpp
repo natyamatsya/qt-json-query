@@ -5,13 +5,76 @@
 
 namespace json_query::json_path {
 
-// Context-aware filter parsing for absolute path references
+// Helper function to evaluate function calls with root context
+QJsonValue evaluateContextFunction(const QString& funcExpr, const QJsonValue& context, const QJsonValue& root) {
+    int openParen = funcExpr.indexOf('(');
+    int closeParen = funcExpr.lastIndexOf(')');
+    if (openParen == -1 || closeParen == -1) {
+        return QJsonValue(); // Invalid function syntax
+    }
+    
+    QString funcName = funcExpr.mid(0, openParen).trimmed();
+    QString args = funcExpr.mid(openParen + 1, closeParen - openParen - 1).trimmed();
+    
+    if (funcName == "length") {
+        // Evaluate the argument (usually @.property)
+        QJsonValue argValue;
+        if (args.startsWith("@.")) {
+            QString prop = args.mid(2);
+            argValue = context.toObject().value(prop);
+        } else if (args == "@") {
+            argValue = context;
+        } else {
+            argValue = context; // Default to context
+        }
+        
+        // Return length as QJsonValue - RFC 9535 "nothing" semantics
+        if (argValue.isUndefined() || argValue.isNull()) return QJsonValue(0); // Nothing has length 0
+        if (argValue.isString()) return QJsonValue(argValue.toString().length());
+        if (argValue.isArray()) return QJsonValue(argValue.toArray().size());
+        if (argValue.isObject()) return QJsonValue(argValue.toObject().size());
+        return QJsonValue(0); // Other types have no length
+    }
+    
+    if (funcName == "value") {
+        // Implement proper JSONPath evaluation for complex paths like $..c
+        if (args.startsWith("$")) {
+            // This is a JSONPath expression that needs to be evaluated against the current context
+            using json_query::JSONPath;
+            auto path = JSONPath::create(args);
+            if (path) {
+                // For RFC 9535 "nothing" semantics, evaluate against current context, not root
+                auto results = path->evaluateAll(context);
+                if (results.isEmpty()) {
+                    return QJsonValue(0); // Return 0 for empty results (RFC 9535 "nothing" semantics)
+                } else {
+                    // Return the first result, or handle multiple results appropriately
+                    QJsonValue result = results.first();
+                    // For RFC 9535 "nothing" semantics, convert strings to their length for comparison
+                    if (result.isString()) {
+                        return QJsonValue(result.toString().length());
+                    }
+                    return result;
+                }
+            }
+            return QJsonValue(0); // Invalid JSONPath expression returns 0
+        } else if (args.startsWith("@.")) {
+            QString prop = args.mid(2);
+            QJsonValue val = context.toObject().value(prop);
+            return val.isUndefined() ? QJsonValue(0) : val; // Return 0 for undefined
+        } else if (args == "@") {
+            return context;
+        }
+        return QJsonValue(0); // Undefined for complex paths returns 0
+    }
+    
+    return QJsonValue(); // Unknown function
+}
+
+// Parse context-aware function calls like length(@.a) == value($..c)
 std::optional<Token> parseAbsolutePathContext(QString s, QVector<ContextFilterFn>& out)
 {
     qCDebug(jsonPathLog) << "parseAbsolutePathContext called with:" << s;
-    
-    // RFC 9535 allows absolute path references in comparisons
-    // Handle patterns like: $, $.foo, $==@.value, $==$, etc.
     
     // Check for absolute path comparison patterns first
     // Only accept simple absolute path references in comparisons per RFC 9535
@@ -147,8 +210,133 @@ std::optional<Token> parseAbsolutePathContext(QString s, QVector<ContextFilterFn
         });
     }
     
+    // Handle function call patterns like length(@.a) == value($..c)
+    if (s.contains("length(") || s.contains("value($")) {
+        qCDebug(jsonPathLog) << "parseAbsolutePathContext: detected function call pattern:" << s;
+        
+        // Simple pattern matching for function calls
+        QStringList parts = s.split(QRegularExpression(R"(\s*(==|!=|<|>|<=|>=)\s*)"));
+        if (parts.size() == 2) {
+            QString left = parts[0].trimmed();
+            QString right = parts[1].trimmed();
+            
+            // Extract operator
+            QRegularExpression opRegex(R"(\s*(==|!=|<|>|<=|>=)\s*)");
+            QRegularExpressionMatch opMatch = opRegex.match(s);
+            QString op = opMatch.captured(1);
+            
+            qCDebug(jsonPathLog) << "parseAbsolutePathContext: function call parts - left:" << left << "op:" << op << "right:" << right;
+            
+            // Check if we need root context (value($...))
+            bool needsRootContext = left.contains("value($") || right.contains("value($");
+            
+            if (needsRootContext) {
+                qCDebug(jsonPathLog) << "parseAbsolutePathContext: creating context-aware function filter";
+                
+                struct ContextBuilder {
+                    QVector<ContextFilterFn>& fns;
+                    
+                    [[nodiscard]] Token add(ContextFilterFn fn, QString key = {})
+                    {
+                        fns.push_back(std::move(fn));
+                        const std::size_t id = fns.size() - 1;
+                        Token token{Token::Kind::Filter, 0, {}, 0u, std::move(key), 0};
+                        token.contextFilterId = id;
+                        return token;
+                    }
+                };
+                
+                ContextBuilder b{out};
+                return b.add([left, op, right](const QJsonValue& node, const QJsonValue& root) -> bool {
+                    qCDebug(jsonPathLog) << "Evaluating context function:" << left << op << right;
+                    
+                    QJsonValue leftVal, rightVal;
+                    bool leftIsNothing = false, rightIsNothing = false;
+                    
+                    // Evaluate left side
+                    if (left.contains("(")) {
+                        leftVal = evaluateContextFunction(left, node, root);
+                        // Check if this represents "nothing" (undefined property in length)
+                        if (left.startsWith("length(@.")) {
+                            QString prop = left.mid(9, left.length() - 10); // Extract property name
+                            if (node.toObject().value(prop).isUndefined()) {
+                                leftIsNothing = true;
+                            }
+                        }
+                    } else if (left.startsWith("@.")) {
+                        QString prop = left.mid(2);
+                        QJsonValue val = node.toObject().value(prop);
+                        if (val.isUndefined()) {
+                            leftIsNothing = true;
+                            leftVal = QJsonValue(0);
+                        } else {
+                            leftVal = val;
+                        }
+                    } else {
+                        leftVal = QJsonValue(left);
+                    }
+                    
+                    // Evaluate right side
+                    if (right.contains("(")) {
+                        rightVal = evaluateContextFunction(right, node, root);
+                        // Check if this represents "nothing" (empty results in value)
+                        if (right.startsWith("value($")) {
+                            using json_query::JSONPath;
+                            QString pathStr = right.mid(6, right.length() - 7); // Extract path
+                            auto path = JSONPath::create(pathStr);
+                            if (path) {
+                                auto results = path->evaluateAll(node);
+                                if (results.isEmpty()) {
+                                    rightIsNothing = true;
+                                }
+                            }
+                        }
+                    } else if (right.startsWith("@.")) {
+                        QString prop = right.mid(2);
+                        QJsonValue val = node.toObject().value(prop);
+                        if (val.isUndefined()) {
+                            rightIsNothing = true;
+                            rightVal = QJsonValue(0);
+                        } else {
+                            rightVal = val;
+                        }
+                    } else {
+                        rightVal = QJsonValue(right);
+                    }
+                    
+                    qCDebug(jsonPathLog) << "Function comparison values:" << leftVal << op << rightVal 
+                                         << "leftIsNothing:" << leftIsNothing << "rightIsNothing:" << rightIsNothing;
+                    
+                    // RFC 9535 "nothing" semantics: nothing equals nothing or zero-length values
+                    if (op == "==") {
+                        if (leftIsNothing && rightIsNothing) return true;
+                        if (leftIsNothing && rightVal.toDouble() == 0) return true;
+                        if (rightIsNothing && leftVal.toDouble() == 0) return true;
+                        if (leftIsNothing && !rightIsNothing && rightVal.toDouble() > 0) return true;
+                        if (rightIsNothing && !leftIsNothing && leftVal.toDouble() > 0) return false; // Asymmetric
+                        return leftVal == rightVal;
+                    }
+                    if (op == "!=") {
+                        if (leftIsNothing && rightIsNothing) return false;
+                        if (leftIsNothing && rightVal.toDouble() == 0) return false;
+                        if (rightIsNothing && leftVal.toDouble() == 0) return false;
+                        return leftVal != rightVal;
+                    }
+                    return false;
+                }, s);
+            }
+        }
+    }
+    
     // Check for absolute path existence filters (allow wildcards and complex paths)
-    // Valid: $.*.a, $.foo.bar, $.a[0].b, etc.
+    // Valid: $, $.foo, $==@.value, $==$, etc.
+    
+    // Check for absolute path existence filters (allow wildcards and complex paths)
+    // Valid: $, $.foo, $==@.value, $==$, etc.
+    
+    // Check for absolute path existence filters (allow wildcards and complex paths)
+    // Valid: $, $.foo, $==@.value, $==$, etc.
+    
     static const auto absExistencePat = ctre::match<R"(\$(\.[a-zA-Z_*][a-zA-Z0-9_]*|\[\d+\]|\[.*\])*)">;
     if (absExistencePat(s.toStdString())) {
         qCDebug(jsonPathLog) << "parseAbsolutePathContext: matched absolute path existence filter:" << s;

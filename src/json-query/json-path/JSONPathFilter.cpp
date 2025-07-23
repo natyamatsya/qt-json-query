@@ -744,6 +744,17 @@ std::optional<Token> parseFunction(QString s, QVector<FilterFn>& out)
             return std::nullopt; // No function calls found
         }
         
+        // Check if any function call needs root context (value($...))
+        bool needsRootContext = false;
+        if (leftHasFunc && left.contains("value($")) needsRootContext = true;
+        if (rightHasFunc && right.contains("value($")) needsRootContext = true;
+        
+        if (needsRootContext) {
+            // This needs to be handled by context-aware filter infrastructure
+            // Return nullopt to let context-aware compilation handle it
+            return std::nullopt;
+        }
+        
         Builder b{out};
         return b.add([left, op, right, leftHasFunc, rightHasFunc](const QJsonValue& j) -> bool {
             QJsonValue leftVal, rightVal;
@@ -1228,7 +1239,7 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
                 }
                 // Check if it's a numeric index selector
                 else {
-                    bool ok = false;
+                    bool ok;
                     int index = selector.toInt(&ok);
                     if (ok && j.isArray()) {
                         const auto arr = j.toArray();
@@ -1263,7 +1274,7 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
                 }
                 // Check if it's a numeric index selector
                 else {
-                    bool ok = false;
+                    bool ok;
                     int index = selector.toInt(&ok);
                     if (ok && j.isArray()) {
                         const auto arr = j.toArray();
