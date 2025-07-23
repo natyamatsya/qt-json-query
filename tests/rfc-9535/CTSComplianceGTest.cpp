@@ -165,6 +165,11 @@ TEST_P(CtsJsonPathTest, EvaluatesPerSpec)
 
     const JSONPath& path = *maybePath;
     auto result = path.evaluate(doc);
+    if (!result.has_value()) {
+        std::cout << "Evaluation error for " << tc.selector.toStdString() << ": " 
+                  << static_cast<int>(result.error()) << " (" 
+                  << to_string(result.error()) << ")" << std::endl;
+    }
     ASSERT_TRUE(result.has_value()) << "Failed to evaluate: " << tc.selector.toStdString();
     
     QJsonValue resVal = *result;

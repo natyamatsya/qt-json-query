@@ -224,16 +224,31 @@ std::expected<QJsonArray, EvalError> evaluateToken(const PathEvalCtx& ctx, const
 std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src)
 {
     QJsonArray dst;
+    bool anySuccess = false;
+    EvalError lastError = EvalError::TypeMismatchObject;
+    
     for (const auto& v : src) {
         auto seg = evaluateTokenExpected(ctx, tk, v);
-        if (!seg) {
-            return std::unexpected(seg.error());
+        if (seg) {
+            // Success: collect results
+            anySuccess = true;
+            qDebug() << "[fanOut] kind=" << static_cast<int>(tk.kind) << "srcType"
+                     << v.type() << "seg size=" << seg->size();
+            for (const auto& e : *seg)
+                dst.append(e);
+        } else {
+            // Failure: record error but continue processing other values
+            lastError = seg.error();
+            qDebug() << "[fanOut] kind=" << static_cast<int>(tk.kind) << "srcType"
+                     << v.type() << "failed with error:" << static_cast<int>(lastError);
         }
-        qDebug() << "[fanOut] kind=" << static_cast<int>(tk.kind) << "srcType"
-                 << v.type() << "seg size=" << seg->size();
-        for (const auto& e : *seg)
-            dst.append(e);
     }
+    
+    // Only fail if ALL evaluations failed
+    if (!anySuccess) {
+        return std::unexpected(lastError);
+    }
+    
     return dst;
 }
 
@@ -371,20 +386,34 @@ std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const 
             if (shouldUseUnion) {
                 qDebug() << "[union] processing" << unionTokens.size() << "consecutive selector tokens";
                 
-                std::expected<QJsonArray, EvalError> unionResult;
+                std::expected<QJsonArray, EvalError> unionResult = QJsonArray{};
+                bool anySuccess = false;
+                EvalError lastError = EvalError::TypeMismatchObject;
+                
                 for (qsizetype tokenIdx : unionTokens) {
                     const Token& unionTk = ctx.tokens[tokenIdx];
                     auto tokenResult = fanOut(ctx, unionTk, *working);
-                    if (!tokenResult) {
-                        return std::unexpected(tokenResult.error());
+                    if (tokenResult) {
+                        // Success: collect results
+                        anySuccess = true;
+                        qDebug() << "[union] token" << tokenIdx << "kind" << static_cast<int>(unionTk.kind) 
+                                 << "produced" << tokenResult->size() << "results";
+                        
+                        // Combine results (union semantics)
+                        for (const auto& result : *tokenResult) {
+                            unionResult->append(result);
+                        }
+                    } else {
+                        // Failure: record error but continue processing other selectors
+                        lastError = tokenResult.error();
+                        qDebug() << "[union] token" << tokenIdx << "kind" << static_cast<int>(unionTk.kind) 
+                                 << "failed with error:" << static_cast<int>(lastError);
                     }
-                    qDebug() << "[union] token" << tokenIdx << "kind" << static_cast<int>(unionTk.kind) 
-                             << "produced" << tokenResult->size() << "results";
-                    
-                    // Combine results (union semantics)
-                    for (const auto& result : *tokenResult) {
-                        unionResult->append(result);
-                    }
+                }
+                
+                // Only fail if ALL selectors failed
+                if (!anySuccess) {
+                    return std::unexpected(lastError);
                 }
                 
                 working = unionResult;

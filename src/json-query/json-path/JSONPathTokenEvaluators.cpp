@@ -138,7 +138,8 @@ std::expected<QJsonArray, EvalError> evalExpected<Token::Kind::Filter>(const Pat
     bool useContextFilter = (tk.contextFilterId != SIZE_MAX && tk.contextFilterId < ctx.contextFilters.size());
     
     if (v.isArray()) {
-        for (const auto& item : v.toArray()) {
+        const QJsonArray arr = v.toArray(); // Create proper copy to avoid iterator invalidation
+        for (const auto& item : arr) {
             bool pass = false;
             if (useContextFilter) {
                 const auto& contextFilterFn = ctx.contextFilters[tk.contextFilterId];
@@ -152,8 +153,9 @@ std::expected<QJsonArray, EvalError> evalExpected<Token::Kind::Filter>(const Pat
                 out.append(item);
         }
     } else if (v.isObject()) {
-        for (auto it = v.toObject().begin(); it != v.toObject().end(); ++it) {
-            const auto& val = it.value();
+        const QJsonObject obj = v.toObject(); // Create proper copy to avoid iterator invalidation
+        for (auto it = obj.begin(); it != obj.end(); ++it) {
+            const QJsonValue val = it.value(); // Create proper copy instead of reference
             bool pass = false;
             if (useContextFilter) {
                 const auto& contextFilterFn = ctx.contextFilters[tk.contextFilterId];

@@ -51,9 +51,8 @@ inline QJsonValue eval(const JSONPath& path, const QJsonDocument& doc)
 {
     auto result = path.evaluate(doc);
     if (!result) {
-        std::string error_msg = "JSONPath evaluation failed: ";
-        error_msg += json_query::json_path::to_string(result.error());
-        throw std::runtime_error(error_msg);
+        // Return null value on evaluation error instead of throwing
+        return QJsonValue{};
     }
     return *result;
 }
@@ -63,16 +62,14 @@ inline QJsonValue eval(QStringView path, const QJsonDocument& doc)
 {
     auto p = JSONPath::create(path);
     if (!p) {
-        std::string error_msg = "JSONPath compilation failed: ";
-        error_msg += json_query::json_path::toString(p.error());
-        throw std::runtime_error(error_msg);
+        // Return null value on compilation error instead of throwing
+        return QJsonValue{};
     }
     
     auto result = p->evaluate(doc);
     if (!result) {
-        std::string error_msg = "JSONPath evaluation failed: ";
-        error_msg += json_query::json_path::to_string(result.error());
-        throw std::runtime_error(error_msg);
+        // Return null value on evaluation error instead of throwing
+        return QJsonValue{};
     }
     
     return *result;
@@ -82,30 +79,26 @@ inline QJsonValue eval(QStringView path, const QJsonDocument& doc)
 // so caller can treat uniformly.
 inline QJsonArray evalArray(const JSONPath& path, const QJsonDocument& doc)
 {
-    auto result = path.evaluate(doc);
+    auto result = path.evaluateAll(doc);
     if (!result) {
-        std::string error_msg = "JSONPath evaluation failed: ";
-        error_msg += json_query::json_path::to_string(result.error());
-        throw std::runtime_error(error_msg);
+        // Return empty array on evaluation error instead of throwing
+        return QJsonArray{};
     }
-    QJsonValue v = *result;
-    return v.isArray() ? v.toArray() : QJsonArray{v};
+    return *result;
 }
 
 inline QJsonArray evalArray(QStringView path, const QJsonDocument& doc)
 {
     auto p = JSONPath::create(path);
     if (!p) {
-        std::string error_msg = "JSONPath compilation failed: ";
-        error_msg += json_query::json_path::toString(p.error());
-        throw std::runtime_error(error_msg);
+        // Return empty array on compilation error instead of throwing
+        return QJsonArray{};
     }
     
     auto result = p->evaluateAll(doc);
     if (!result) {
-        std::string error_msg = "JSONPath evaluation failed: ";
-        error_msg += json_query::json_path::to_string(result.error());
-        throw std::runtime_error(error_msg);
+        // Return empty array on evaluation error instead of throwing
+        return QJsonArray{};
     }
     
     return *result;
