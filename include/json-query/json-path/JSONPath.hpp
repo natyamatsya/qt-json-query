@@ -42,21 +42,20 @@ public:
                              Option opt = Option::None);
     // ★
     // -----------------------------------------------------------------
-    //  Evaluation API (unchanged)
-    // -----------------------------------------------------------------
-    [[nodiscard]] QJsonValue evaluate    (const QJsonDocument& doc  ) const;
-    [[nodiscard]] QJsonValue evaluate    (const QJsonValue&    value) const;
-    [[nodiscard]] QJsonArray evaluateAll (const QJsonDocument& doc  ) const;
-    [[nodiscard]] QJsonArray evaluateAll (const QJsonValue&    value) const;
-
-    // -----------------------------------------------------------------
-    //  Evaluation with error reporting (std::expected)
+    //  Evaluation API with error reporting (std::expected)
     // -----------------------------------------------------------------
     using EvalResult = std::expected<QJsonValue, json_path::EvalError>;
+    using EvalArrayResult = std::expected<QJsonArray, json_path::EvalError>;
 
     [[nodiscard]] EvalResult evaluateExpected(const QJsonDocument& doc) const;
     [[nodiscard]] EvalResult evaluateExpected(const QJsonValue&    value) const;
+    
+    [[nodiscard]] EvalArrayResult evaluateAllExpected(const QJsonDocument& doc) const;
+    [[nodiscard]] EvalArrayResult evaluateAllExpected(const QJsonValue&    value) const;
 
+    // -----------------------------------------------------------------
+    //  Other
+    // -----------------------------------------------------------------
     [[nodiscard]] QString toString() const { return m_originalPath; }
 
     //  Move / copy remain defaulted

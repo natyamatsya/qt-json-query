@@ -30,22 +30,23 @@ int main(int argc, char **argv)
         return {};
     };
 
-    // ─── one monadic pipeline ─────────────────────────────────────────────────
-    JSONPath::create(u"$.books[?(@.price > 20)].author")          // Result<JSONPath>
-        .transform([&](const JSONPath& jp) {                      // -> QJsonValue
-            return jp.evaluate(doc);
-        })
-        .transform(toArray)                                       // -> QJsonArray
-        .and_then([](const QJsonArray& authors) {                 // happy path
-            qInfo() << "Authors of expensive books:" << authors;
-            return std::expected<void, Error>{};      // propagate Ok
-        })
-        .or_else([](Error e) -> std::expected<void, Error>
-        {
-            // error path
-            qWarning() << "Invalid JSONPath:" << toString(e).data();
-            return {};
-        });
+    auto pathResult = JSONPath::create(u"$.books[?(@.price > 20)].author");
+    if (!pathResult) {
+        qDebug() << "Failed to compile JSONPath";
+        return EXIT_FAILURE;
+    }
+    
+    auto evalResult = pathResult->evaluateExpected(doc);
+    if (!evalResult) {
+        qDebug() << "Failed to evaluate JSONPath";
+        return EXIT_FAILURE;
+    }
+    
+    QJsonArray authors = toArray(*evalResult);
+    qDebug() << "Authors of expensive books:";
+    for (const auto& author : authors) {
+        qDebug() << "  -" << author.toString();
+    }
 
     return EXIT_SUCCESS;
 }

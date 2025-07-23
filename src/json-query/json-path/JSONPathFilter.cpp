@@ -643,12 +643,11 @@ QJsonValue evaluateFunction(const QString& funcExpr, const QJsonValue& context) 
             using json_query::JSONPath;
             auto path = JSONPath::create(args);
             if (path) {
-                auto results = path->evaluateAll(context);
-                if (results.isEmpty()) {
-                    return QJsonValue(); // Return null for empty results
-                } else {
-                    return results.first(); // Return the first result
+                auto results = path->evaluateAllExpected(context);
+                if (results) {
+                    return results->size();
                 }
+                return 0;
             }
             return QJsonValue(); // Invalid JSONPath expression
         } else if (args.startsWith("@.")) {
@@ -1563,9 +1562,11 @@ std::optional<Token> parseAbsolutePath(QString s, QVector<FilterFn>& out)
         // Create a temporary JSONPath to evaluate the absolute path
         // against the root document
         if (auto path = JSONPath::create(s)) {
-            auto results = path->evaluateAll(rootValue);
-            // Return true if the absolute path exists (has any results)
-            return !results.isEmpty();
+            auto results = path->evaluateAllExpected(rootValue);
+            if (results) {
+                return !results->isEmpty();
+            }
+            return false;
         }
         return false;
     }, s);

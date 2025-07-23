@@ -49,30 +49,68 @@ inline QJsonDocument parseJson(const char* src)
 // Evaluate a compiled JSONPath against a document and return the raw value.
 inline QJsonValue eval(const JSONPath& path, const QJsonDocument& doc)
 {
-    return path.evaluate(doc);
+    auto result = path.evaluateExpected(doc);
+    if (!result) {
+        std::string error_msg = "JSONPath evaluation failed: ";
+        error_msg += json_query::json_path::to_string(result.error());
+        throw std::runtime_error(error_msg);
+    }
+    return *result;
 }
 
 // Convenience overload that compiles the path each call (avoid in hot code).
-inline QJsonValue eval(QStringView path, const QJsonDocument& doc)
+inline QJsonValue eval(QStringView path, const QJsonDocument& doc,
+                       JSONPath::Option opt = JSONPath::Option::None)
 {
     auto p = JSONPath::create(path);
-    if (!p) return {};
-    return p->evaluate(doc);
+    if (!p) {
+        std::string error_msg = "JSONPath compilation failed: ";
+        error_msg += json_query::json_path::toString(p.error());
+        throw std::runtime_error(error_msg);
+    }
+    
+    auto result = p->evaluateExpected(doc);
+    if (!result) {
+        std::string error_msg = "JSONPath evaluation failed: ";
+        error_msg += json_query::json_path::to_string(result.error());
+        throw std::runtime_error(error_msg);
+    }
+    
+    return *result;
 }
 
 // Return result as array – scalar values are wrapped into single-element array
 // so caller can treat uniformly.
 inline QJsonArray evalArray(const JSONPath& path, const QJsonDocument& doc)
 {
-    QJsonValue v = path.evaluate(doc);
+    auto result = path.evaluateExpected(doc);
+    if (!result) {
+        std::string error_msg = "JSONPath evaluation failed: ";
+        error_msg += json_query::json_path::to_string(result.error());
+        throw std::runtime_error(error_msg);
+    }
+    QJsonValue v = *result;
     return v.isArray() ? v.toArray() : QJsonArray{v};
 }
 
-inline QJsonArray evalArray(QStringView path, const QJsonDocument& doc)
+inline QJsonArray evalArray(QStringView path, const QJsonDocument& doc,
+                           JSONPath::Option opt = JSONPath::Option::None)
 {
     auto p = JSONPath::create(path);
-    if (!p) return {};
-    return evalArray(*p, doc);
+    if (!p) {
+        std::string error_msg = "JSONPath compilation failed: ";
+        error_msg += json_query::json_path::toString(p.error());
+        throw std::runtime_error(error_msg);
+    }
+    
+    auto result = p->evaluateAllExpected(doc);
+    if (!result) {
+        std::string error_msg = "JSONPath evaluation failed: ";
+        error_msg += json_query::json_path::to_string(result.error());
+        throw std::runtime_error(error_msg);
+    }
+    
+    return *result;
 }
 
 // ---------------------------------------------------------------------------
@@ -84,17 +122,31 @@ inline QJsonArray evalArray(QStringView path, const QJsonDocument& doc)
 using EvalResult = std::expected<QJsonValue, Error>;
 
 // Evaluate path and propagate compile-time errors via std::expected.  Runtime
-// evaluation currently cannot fail (always returns a value), so we wrap it in
-// a successful result for now.  When evaluation gains error handling this
-// wrapper will forward those as well.
-inline EvalResult evalExp(QStringView path,
+// evaluation errors are also propagated via std::expected.
+inline std::expected<QJsonValue, json_query::json_path::Error> evalExp(QStringView path,
                           const QJsonDocument& doc,
                           JSONPath::Option opt = JSONPath::Option::None)
 {
     auto compiled = JSONPath::create(path, opt);
     if (!compiled)
         return std::unexpected(compiled.error());
-    return compiled->evaluate(doc);
+    
+    auto result = compiled->evaluateExpected(doc);
+    if (!result) {
+        // For now, we need to convert EvalError to Error since the return type expects Error
+        // In the future, we might want to have a unified error type or return std::variant
+        // For now, map evaluation errors to the closest compilation error equivalent
+        switch (result.error()) {
+            case json_query::json_path::EvalError::TypeMismatchObject:
+            case json_query::json_path::EvalError::TypeMismatchArray:
+            case json_query::json_path::EvalError::KeyNotFound:
+            case json_query::json_path::EvalError::IndexOutOfRange:
+                return std::unexpected(json_query::json_path::Error::UnsupportedFilter);
+            default:
+                return std::unexpected(json_query::json_path::Error::UnsupportedFilter);
+        }
+    }
+    return *result;
 }
 
 // Macro to assert that a statement of type std::expected<> fails with a

@@ -49,7 +49,7 @@ TEST(JSONPathBaeldung, CreatorNameAndLocation)
 
     EXPECT_THAT( eval(*namePath, doc), IsJsonString(u"Jayway Inc.") );
 
-    EXPECT_THAT( locationPath->evaluateAll(doc),
+    EXPECT_THAT( locationPath->evaluateAllExpected(doc).value_or(QJsonArray{}),
                  ElementsAre(IsJsonString(u"Malmo"),
                              IsJsonString(u"San Francisco"),
                              IsJsonString(u"Helsingborg")) );
@@ -75,9 +75,11 @@ TEST(JSONPathBaeldung, PredicatePriceGreaterThan20)
     // Inline predicate variant equivalent to article but comparing with constant
     auto expensive{ JSONPath::create(u"$['book'][?(@.price > 20.00)]") };
     ASSERT_TRUE(expensive);
-    QJsonArray result = expensive->evaluateAll(doc);
+    auto result = expensive->evaluateAllExpected(doc);
+    ASSERT_TRUE(result.has_value()) << "Failed to evaluate expensive books";
+    QJsonArray expensiveBooks = *result;
     QStringList titles;
-    for (const auto &v : result)
+    for (const auto &v : expensiveBooks)
         titles << v.toObject().value("title").toString();
 
     EXPECT_TRUE(titles.contains(u"Beginning JSON"_s));
@@ -102,7 +104,9 @@ TEST(JSONPathBaeldung, MovieWithId2)
 
     auto path{ JSONPath::create(u"$[?(@.id == 2)]") };
     ASSERT_TRUE(path);
-    QJsonArray resArr = path->evaluateAll(doc);
+    auto resResult = path->evaluateAllExpected(doc);
+    ASSERT_TRUE(resResult.has_value()) << "Failed to evaluate path";
+    QJsonArray resArr = *resResult;
     ASSERT_EQ(resArr.size(), 1);
     const QJsonObject obj = resArr[0].toObject();
 
@@ -127,7 +131,9 @@ TEST(JSONPathBaeldung, TitleByStarringEvaGreen)
 
     auto path{ JSONPath::create(u"$[?('Eva Green' in @['starring'])]") };
     ASSERT_TRUE(path);
-    QJsonArray res = path->evaluateAll(doc);
+    auto resResult = path->evaluateAllExpected(doc);
+    ASSERT_TRUE(resResult.has_value()) << "Failed to evaluate path";
+    QJsonArray res = *resResult;
     ASSERT_EQ(res.size(), 1);
     QJsonObject obj = res[0].toObject();
     EXPECT_EQ(obj.value("title").toString(), u"Casino Royale"_s);
@@ -149,7 +155,9 @@ TEST(JSONPathBaeldung, TotalRevenue)
 
     // Equivalent to Java example: iterate through array and sum revenues
     auto root{ JSONPath::create(u"$") };
-    QJsonArray movies = root->evaluateAll(doc);
+    auto moviesResult = root->evaluateAllExpected(doc);
+    ASSERT_TRUE(moviesResult.has_value()) << "Failed to evaluate root";
+    QJsonArray movies = *moviesResult;
     long long revenue = 0;
     for (const auto &v : movies)
         revenue += v.toObject().value("box office").toVariant().toLongLong();
@@ -173,7 +181,9 @@ TEST(JSONPathBaeldung, HighestRevenueMovie)
 
     // 1. Get list of revenues
     auto revenuePath{ JSONPath::create(u"$[*]['box office']") };
-    QJsonArray revenues = revenuePath->evaluateAll(doc);
+    auto revenuesResult = revenuePath->evaluateAllExpected(doc);
+    ASSERT_TRUE(revenuesResult.has_value()) << "Failed to evaluate revenues";
+    QJsonArray revenues = *revenuesResult;
     long long highest = 0;
     for (const auto &v : revenues)
         highest = std::max(highest, v.toVariant().toLongLong());
@@ -181,7 +191,9 @@ TEST(JSONPathBaeldung, HighestRevenueMovie)
     // 2. Find movie with that revenue
     auto moviePath{ JSONPath::create(QString(u"$[?(@['box office'] == %1)]").arg(highest)) };
     ASSERT_TRUE(moviePath);
-    QJsonArray res = moviePath->evaluateAll(doc);
+    auto resResult = moviePath->evaluateAllExpected(doc);
+    ASSERT_TRUE(resResult.has_value()) << "Failed to evaluate movie path";
+    QJsonArray res = *resResult;
     ASSERT_EQ(res.size(), 1);
     EXPECT_EQ(res[0].toObject().value("title").toString(), u"Skyfall"_s);
 }
@@ -202,7 +214,9 @@ TEST(JSONPathBaeldung, LatestMovieOfSamMendes)
 
     auto path{ JSONPath::create(u"$[?(@['director'] == 'Sam Mendes' && @['release date'] == 1445821200000)]") };
     ASSERT_TRUE(path);
-    QJsonArray res = path->evaluateAll(doc);
+    auto resResult = path->evaluateAllExpected(doc);
+    ASSERT_TRUE(resResult.has_value()) << "Failed to evaluate path";
+    QJsonArray res = *resResult;
     ASSERT_EQ(res.size(), 1);
     QJsonObject obj = res[0].toObject();
     EXPECT_EQ(obj.value("title").toString(), u"Spectre"_s);

@@ -44,18 +44,21 @@ QJsonValue evaluateContextFunction(const QString& funcExpr, const QJsonValue& co
             auto path = JSONPath::create(args);
             if (path) {
                 // For RFC 9535 "nothing" semantics, evaluate against current context, not root
-                auto results = path->evaluateAll(context);
-                if (results.isEmpty()) {
-                    return QJsonValue(0); // Return 0 for empty results (RFC 9535 "nothing" semantics)
-                } else {
-                    // Return the first result, or handle multiple results appropriately
-                    QJsonValue result = results.first();
-                    // For RFC 9535 "nothing" semantics, convert strings to their length for comparison
-                    if (result.isString()) {
-                        return QJsonValue(result.toString().length());
+                auto results = path->evaluateAllExpected(context);
+                if (results) {
+                    if (results->isEmpty()) {
+                        return QJsonValue(0); // Return 0 for empty results (RFC 9535 "nothing" semantics)
+                    } else {
+                        // Return the first result, or handle multiple results appropriately
+                        QJsonValue result = results->first();
+                        // For RFC 9535 "nothing" semantics, convert strings to their length for comparison
+                        if (result.isString()) {
+                            return QJsonValue(result.toString().length());
+                        }
+                        return result;
                     }
-                    return result;
                 }
+                return QJsonValue(0); // Invalid JSONPath expression returns 0
             }
             return QJsonValue(0); // Invalid JSONPath expression returns 0
         } else if (args.startsWith("@.")) {
@@ -118,9 +121,9 @@ std::optional<Token> parseAbsolutePathContext(QString s, QVector<ContextFilterFn
                 try {
                     auto absolutePath = json_query::JSONPath::create(QString::fromStdString(leftPath));
                     if (absolutePath) {
-                        auto results = absolutePath->evaluateAll(root);
-                        if (!results.isEmpty()) {
-                            leftValue = results.first();
+                        auto results = absolutePath->evaluateAllExpected(root);
+                        if (results && !results->isEmpty()) {
+                            leftValue = results->first();
                         }
                     }
                 } catch (...) {
@@ -285,8 +288,8 @@ std::optional<Token> parseAbsolutePathContext(QString s, QVector<ContextFilterFn
                             QString pathStr = right.mid(6, right.length() - 7); // Extract path
                             auto path = JSONPath::create(pathStr);
                             if (path) {
-                                auto results = path->evaluateAll(node);
-                                if (results.isEmpty()) {
+                                auto results = path->evaluateAllExpected(node);
+                                if (results && results->isEmpty()) {
                                     rightIsNothing = true;
                                 }
                             }
@@ -371,11 +374,10 @@ std::optional<Token> parseAbsolutePathContext(QString s, QVector<ContextFilterFn
                     // Create a temporary JSONPath to evaluate the absolute path
                     auto absolutePath = json_query::JSONPath::create(s);
                     if (absolutePath) {
-                        auto results = absolutePath->evaluateAll(root);
-                        // Return true if the absolute path yields any results
-                        bool hasResults = !results.isEmpty();
-                        qCDebug(jsonPathLog) << "Absolute path" << s << "evaluation result:" << hasResults << "(" << results.size() << "results)";
-                        return hasResults;
+                        auto results = absolutePath->evaluateAllExpected(root);
+                        if (results && !results->isEmpty()) {
+                            return true;
+                        }
                     }
                 } catch (...) {
                     qCDebug(jsonPathLog) << "Failed to evaluate absolute path:" << s;

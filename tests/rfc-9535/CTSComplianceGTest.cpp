@@ -149,11 +149,6 @@ TEST_P(CtsJsonPathTest, EvaluatesPerSpec)
         return;
     }
 
-    // Compile selector
-    auto maybePath = JSONPath::create(tc.selector);
-    ASSERT_TRUE(maybePath.has_value()) << "Compilation failed for selector: " << tc.selector.toStdString();
-    const JSONPath &path = maybePath.value();
-
     // Convert document to QJsonDocument (must be array/object)
     QJsonDocument doc;
     if (tc.document.isArray())
@@ -164,8 +159,17 @@ TEST_P(CtsJsonPathTest, EvaluatesPerSpec)
         FAIL() << "CTS document for test '" << tc.name.toStdString() << "' is not object/array";
     }
 
+    // Compile selector
+    auto maybePath = JSONPath::create(tc.selector);
+    ASSERT_TRUE(maybePath.has_value()) << "Failed to compile: " << tc.selector.toStdString();
+
+    const JSONPath& path = *maybePath;
+    auto result = path.evaluateExpected(doc);
+    ASSERT_TRUE(result.has_value()) << "Failed to evaluate: " << tc.selector.toStdString();
+    
+    QJsonValue resVal = *result;
+
     // Evaluate
-    QJsonValue resVal = path.evaluate(doc);
     QJsonArray actual;
     if (resVal.isArray())
         actual = resVal.toArray();

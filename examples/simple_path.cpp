@@ -29,20 +29,23 @@ int main(int argc, char **argv)
         return {};
     };
 
-    JSONPath::create(u"$.books[*].title")                 // expected<JSONPath,Error>
-        .transform([&](const JSONPath& jp) {              // → QJsonValue
-            return jp.evaluate(doc);
-        })
-        .transform(toArray)                               // → QJsonArray
-        .and_then([](const QJsonArray& titles) {          // success branch
-            qInfo() << "Book titles:" << titles;          // ["Book 1", "Book 2", "Book 3"]
-            return std::expected<void, Error>{};
-        })
-        .or_else([](Error e) -> std::expected<void, Error>
-        {                // error branch
-            qWarning() << "Invalid JSONPath:" << toString(e).data();
-            return {};
-        });
+    auto pathResult = JSONPath::create(u"$.books[*].title");
+    if (!pathResult) {
+        qDebug() << "Failed to compile JSONPath";
+        return EXIT_FAILURE;
+    }
+    
+    auto evalResult = pathResult->evaluateExpected(doc);
+    if (!evalResult) {
+        qDebug() << "Failed to evaluate JSONPath";
+        return EXIT_FAILURE;
+    }
+    
+    QJsonArray titles = toArray(*evalResult);
+    qDebug() << "Book titles:";
+    for (const auto& title : titles) {
+        qDebug() << "  -" << title.toString();
+    }
 
     return EXIT_SUCCESS;
 }

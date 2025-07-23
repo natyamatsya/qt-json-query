@@ -13,38 +13,12 @@ using json_path::Token;
 using json_path::Error;
 using json_path::FilterFn;
 
-QJsonValue JSONPath::evaluate(const QJsonDocument &document) const
-{
-    const QJsonValue root = document.isArray() ? QJsonValue(document.array())
-                                               : QJsonValue(document.object());
-    return evaluate(root);
-}
+// ─────────────────────────────────────────────────────────────────────
+//  JSONPath implementation
+// ─────────────────────────────────────────────────────────────────────
 
 // ─────────────────────────────────────────────────────────────────────
-//  evaluate (token pipeline)
-// ─────────────────────────────────────────────────────────────────────
-QJsonValue JSONPath::evaluate(const QJsonValue& root) const
-{
-    json_path::detail::PathEvalCtx ctx{m_tokens, m_filters, m_contextFilters, root, m_option, m_func};
-    return json_path::detail::evaluate(ctx, root);
-}
-
-QJsonArray JSONPath::evaluateAll(const QJsonDocument &document) const
-{
-    const QJsonValue root = document.isArray() ? QJsonValue(document.array())
-                                               : QJsonValue(document.object());
-    json_path::detail::PathEvalCtx ctx{m_tokens, m_filters, m_contextFilters, root, m_option, m_func};
-    return json_path::detail::evaluateAll(ctx, root);
-}
-
-QJsonArray JSONPath::evaluateAll(const QJsonValue &value) const
-{
-    json_path::detail::PathEvalCtx ctx{m_tokens, m_filters, m_contextFilters, value, m_option, m_func};
-    return json_path::detail::evaluateAll(ctx, value);
-}
-
-// ─────────────────────────────────────────────────────────────────────
-//  evaluateExpected – sequential, definite-path only for now
+//  evaluateExpected – with error handling
 // ─────────────────────────────────────────────────────────────────────
 
 JSONPath::EvalResult JSONPath::evaluateExpected(const QJsonDocument& doc) const
@@ -56,8 +30,39 @@ JSONPath::EvalResult JSONPath::evaluateExpected(const QJsonDocument& doc) const
 
 JSONPath::EvalResult JSONPath::evaluateExpected(const QJsonValue& value) const
 {
-    // Currently handles definite paths only (no wildcard/filter/recursive)
-    return json_path::detail::evaluateDefinite(m_tokens, value);
+    try {
+        json_path::detail::PathEvalCtx ctx{m_tokens, m_filters, m_contextFilters, value, m_option, m_func};
+        QJsonValue result = json_path::detail::evaluate(ctx, value);
+        return result;
+    } catch (...) {
+        // For now, return a generic error if evaluation fails
+        // In the future, we could extend the evaluation functions to return std::expected
+        return std::unexpected(json_path::EvalError::TypeMismatchObject);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+//  evaluateAllExpected – array results with error handling
+// ─────────────────────────────────────────────────────────────────────
+
+JSONPath::EvalArrayResult JSONPath::evaluateAllExpected(const QJsonDocument& doc) const
+{
+    const QJsonValue root = doc.isArray() ? QJsonValue(doc.array())
+                                          : QJsonValue(doc.object());
+    return evaluateAllExpected(root);
+}
+
+JSONPath::EvalArrayResult JSONPath::evaluateAllExpected(const QJsonValue& value) const
+{
+    try {
+        json_path::detail::PathEvalCtx ctx{m_tokens, m_filters, m_contextFilters, value, m_option, m_func};
+        QJsonArray result = json_path::detail::evaluateAll(ctx, value);
+        return result;
+    } catch (...) {
+        // For now, return a generic error if evaluation fails
+        // In the future, we could extend the evaluation functions to return std::expected
+        return std::unexpected(json_path::EvalError::TypeMismatchObject);
+    }
 }
 
 } // namespace json_query

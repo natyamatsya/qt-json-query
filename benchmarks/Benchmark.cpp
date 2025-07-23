@@ -45,7 +45,11 @@ static void BM_JSONPointer_Simple(benchmark::State &state)
     {
         auto ptr = JSONPointer::create(QStringLiteral("/name"));
         auto res = ptr->evaluate(doc);
-        benchmark::DoNotOptimize(res);
+        if (!res) {
+            benchmark::DoNotOptimize(QJsonValue{});
+        } else {
+            benchmark::DoNotOptimize(*res);
+        }
     }
 }
 BENCHMARK(BM_JSONPointer_Simple);
@@ -56,7 +60,10 @@ static void BM_JSONPointer_Nested(benchmark::State &state)
     for (auto _ : state)
     {
         auto ptr = JSONPointer::create(QStringLiteral("/location/city"));
-        benchmark::DoNotOptimize(ptr->evaluate(doc));
+        auto result = ptr->evaluate(doc);
+        if (result) {
+            benchmark::DoNotOptimize(*result);
+        }
     }
 }
 BENCHMARK(BM_JSONPointer_Nested);
@@ -67,7 +74,10 @@ static void BM_JSONPointer_Array(benchmark::State &state)
     for (auto _ : state)
     {
         auto ptr = JSONPointer::create(QStringLiteral("/inventory/5/title"));
-        benchmark::DoNotOptimize(ptr->evaluate(doc));
+        auto result = ptr->evaluate(doc);
+        if (result) {
+            benchmark::DoNotOptimize(*result);
+        }
     }
 }
 BENCHMARK(BM_JSONPointer_Array);
@@ -78,7 +88,10 @@ static void BM_JSONPointer_Complex(benchmark::State &state)
     for (auto _ : state)
     {
         auto ptr = JSONPointer::create(QStringLiteral("/inventory/15/author/name"));
-        benchmark::DoNotOptimize(ptr->evaluate(doc));
+        auto result = ptr->evaluate(doc);
+        if (result) {
+            benchmark::DoNotOptimize(*result);
+        }
     }
 }
 BENCHMARK(BM_JSONPointer_Complex);
@@ -167,7 +180,10 @@ static void BM_JSONPath_Simple(benchmark::State &state)
         auto pathRes = JSONPath::create(u"$.name");
         if (!pathRes.has_value())
             state.SkipWithError("Failed to compile path");
-        benchmark::DoNotOptimize(pathRes->evaluate(doc));
+        auto result = pathRes->evaluateAllExpected(doc);
+        if (result) {
+            benchmark::DoNotOptimize(*result);
+        }
     }
 }
 BENCHMARK(BM_JSONPath_Simple);
@@ -179,7 +195,10 @@ static void BM_JSONPath_Nested(benchmark::State &state)
     {
         auto p = JSONPath::create(u"$.location.city");
         if (!p) state.SkipWithError("compile fail");
-        benchmark::DoNotOptimize(p->evaluate(doc));
+        auto result = p->evaluateAllExpected(doc);
+        if (result) {
+            benchmark::DoNotOptimize(*result);
+        }
     }
 }
 BENCHMARK(BM_JSONPath_Nested);
@@ -191,7 +210,10 @@ static void BM_JSONPath_Array(benchmark::State &state)
     {
         auto p = JSONPath::create(u"$.inventory[5].title");
         if (!p) state.SkipWithError("compile fail");
-        benchmark::DoNotOptimize(p->evaluate(doc));
+        auto result = p->evaluateAllExpected(doc);
+        if (result) {
+            benchmark::DoNotOptimize(*result);
+        }
     }
 }
 BENCHMARK(BM_JSONPath_Array);
@@ -203,7 +225,10 @@ static void BM_JSONPath_Filter(benchmark::State &state)
     {
         auto p = JSONPath::create(u"$.inventory[?(@.price > 20)].title");
         if (!p) state.SkipWithError("compile fail");
-        benchmark::DoNotOptimize(p->evaluate(doc));
+        auto result = p->evaluateAllExpected(doc);
+        if (result) {
+            benchmark::DoNotOptimize(*result);
+        }
     }
 }
 BENCHMARK(BM_JSONPath_Filter);
@@ -215,7 +240,10 @@ static void BM_JSONPath_Recursive(benchmark::State &state)
     {
         auto p = JSONPath::create(u"$..title");
         if (!p) state.SkipWithError("compile fail");
-        benchmark::DoNotOptimize(p->evaluate(doc));
+        auto result = p->evaluateAllExpected(doc);
+        if (result) {
+            benchmark::DoNotOptimize(*result);
+        }
     }
 }
 BENCHMARK(BM_JSONPath_Recursive);
