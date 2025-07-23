@@ -698,6 +698,26 @@ std::optional<Token> parseCompare(QString s, QVector<FilterFn>& out)
     if (auto t = parseNullCompare<brkNullPat>(s, out)) return t;
     if (auto t = parseNullCompareIndex<idxNullPat>(s, out)) return t;
     
+    // Try self comparisons
+    // Direct self-comparison first (most specific)
+    if (ctre::match<directSelfPat>(to_sv(s))) {
+        auto m = ctre::match<directSelfPat>(to_sv(s));
+        const QString op = to_qstr(m.template get<1>().to_view());
+        
+        Builder b{out};
+        return b.add([op](const QJsonValue& j){
+            // Direct self-comparison: @ == @ is always true, @ != @ is always false
+            return op == "==" ? true : false;
+        }, QString("@"));
+    }
+
+    if (auto t = parseSelfCompare<dotSelfPat>(s, out)) return t;
+    if (auto t = parseSelfCompare<brkSelfPat>(s, out)) return t;
+    if (auto t = parseSelfCompareIndex<idxSelfPat>(s, out)) return t;
+
+    // Try direct self-comparison with value
+    if (auto t = parseSelfValue<selfValuePat>(s, out)) return t;
+
     // Try property-to-property comparisons
     if (ctre::match<propToPropPat>(to_sv(s))) {
         auto m = ctre::match<propToPropPat>(to_sv(s));
@@ -752,26 +772,6 @@ std::optional<Token> parseCompare(QString s, QVector<FilterFn>& out)
             return false; // unsupported comparison
         }, QString("%1%2%3").arg(leftProp, op, rightProp));
     }
-    
-    // Try self comparisons
-    // Direct self-comparison first (most specific)
-    if (ctre::match<directSelfPat>(to_sv(s))) {
-        auto m = ctre::match<directSelfPat>(to_sv(s));
-        const QString op = to_qstr(m.template get<1>().to_view());
-        
-        Builder b{out};
-        return b.add([op](const QJsonValue& j){
-            // Direct self-comparison: @ == @ is always true, @ != @ is always false
-            return op == "==" ? true : false;
-        }, QString("@"));
-    }
-    
-    if (auto t = parseSelfCompare<dotSelfPat>(s, out)) return t;
-    if (auto t = parseSelfCompare<brkSelfPat>(s, out)) return t;
-    if (auto t = parseSelfCompareIndex<idxSelfPat>(s, out)) return t;
-
-    // Try direct self-comparison with value
-    if (auto t = parseSelfValue<selfValuePat>(s, out)) return t;
 
     // Try regular comparisons
     if (auto t = parseCompare1<dotPat>(s, out)) return t;
@@ -790,6 +790,8 @@ std::optional<Token> parseRegex(QString s, QVector<FilterFn>& out)
 
 std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
 {
+    qCDebug(jsonPathLog) << "parseExists: ENTRY with input:" << s;
+    
     constexpr auto dotPat = ctll::fixed_string{R"(^@\.([\w$]+)$)"};
     constexpr auto brkPat = ctll::fixed_string{R"(^@\[['\"]([^'"]+)['\"]\]$)"};
     constexpr auto rootPat = ctll::fixed_string{R"(^@$)"};
@@ -810,8 +812,9 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
     constexpr auto negArraySlicePat = ctll::fixed_string{R"(^!@\[(-?\d+):(-?\d+)\]$)"};
     
     // Multi-selector existence patterns for tests like @[0, 0, 'a'] or @[1, 'key']
-    constexpr auto multiSelectorPat = ctll::fixed_string{R"(^@\[([^:]+)\]$)"};
-    constexpr auto negMultiSelectorPat = ctll::fixed_string{R"(^!@\[([^:]+)\]$)"};
+    // Exclude nested filter patterns that start with ? (those should be handled by nested filter patterns)
+    constexpr auto multiSelectorPat = ctll::fixed_string{R"(^@\[([^?:][^:]*)\]$)"};
+    constexpr auto negMultiSelectorPat = ctll::fixed_string{R"(^!@\[([^?:][^:]*)\]$)"};
     
     // Nested filter pattern for tests like @[?@>1] - apply filter to current array/object
     constexpr auto nestedFilterPat = ctll::fixed_string{R"(^@\[\?(.+)\]$)"};
@@ -1017,33 +1020,77 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
     auto makeNestedFilterToken = [&](const QString& filterExpr)->Token {
         Builder b{out};
         return b.add([filterExpr](const QJsonValue& j){
-            // Nested filter existence test: apply the filter as a JSONPath to the current value
-            // For pattern like @[?@>1], we need to create a JSONPath like $[?@>1] and apply it to j
-            QString jsonPathExpr = QString("$[?%1]").arg(filterExpr);
+            qCDebug(jsonPathLog) << "Nested filter evaluating:" << filterExpr << "on" << j;
             
-            // Create a temporary JSONPath to evaluate the nested filter
-            if (auto path = json_query::JSONPath::create(jsonPathExpr)) {
-                auto results = path->evaluateAll(j);
-                // If the nested filter returns any results, the existence test passes
-                return !results.empty();
+            if (!j.isArray()) {
+                qCDebug(jsonPathLog) << "Not an array, returning false";
+                return false; // Nested filters only work on arrays
             }
-            return false; // Invalid filter expression or no matches
+            
+            const auto arr = j.toArray();
+            qCDebug(jsonPathLog) << "Array has" << arr.size() << "elements";
+            
+            // Compile the inner filter expression
+            QVector<FilterFn> innerFilterFns;
+            auto innerToken = json_query::json_path::compileFilter(filterExpr, innerFilterFns);
+            if (!innerToken || innerFilterFns.isEmpty()) {
+                qCDebug(jsonPathLog) << "Failed to compile inner filter:" << filterExpr;
+                return false; // Failed to compile inner filter
+            }
+            
+            FilterFn innerFilterFn = innerFilterFns.last();
+            
+            // Apply the inner filter to each array element
+            for (int i = 0; i < arr.size(); ++i) {
+                const auto& element = arr[i];
+                bool matches = innerFilterFn(element);
+                qCDebug(jsonPathLog) << "Element" << i << ":" << element << "matches:" << matches;
+                if (matches) {
+                    qCDebug(jsonPathLog) << "Found matching element, returning true";
+                    return true; // Found at least one matching element
+                }
+            }
+            qCDebug(jsonPathLog) << "No elements matched, returning false";
+            return false; // No elements matched the inner filter
         }, QString("@[?%1]").arg(filterExpr));
     };
 
     auto makeNegatedNestedFilterToken = [&](const QString& filterExpr)->Token {
         Builder b{out};
         return b.add([filterExpr](const QJsonValue& j){
-            // Negated nested filter existence test: apply the filter as a JSONPath and negate the result
-            QString jsonPathExpr = QString("$[?%1]").arg(filterExpr);
+            // Negated nested filter existence test: compile and apply the inner filter to array elements
+            qCDebug(jsonPathLog) << "Negated nested filter evaluating:" << filterExpr << "on" << j;
             
-            // Create a temporary JSONPath to evaluate the nested filter
-            if (auto path = json_query::JSONPath::create(jsonPathExpr)) {
-                auto results = path->evaluateAll(j);
-                // If the nested filter returns any results, negate it (return false)
-                return results.empty();
+            if (!j.isArray()) {
+                qCDebug(jsonPathLog) << "Not an array, returning true";
+                return true; // Non-arrays don't match nested filters, so negation is true
             }
-            return false;
+            
+            const auto arr = j.toArray();
+            qCDebug(jsonPathLog) << "Array has" << arr.size() << "elements";
+            
+            // Compile the inner filter expression
+            QVector<FilterFn> innerFilterFns;
+            auto innerToken = json_query::json_path::compileFilter(filterExpr, innerFilterFns);
+            if (!innerToken || innerFilterFns.isEmpty()) {
+                qCDebug(jsonPathLog) << "Failed to compile inner filter:" << filterExpr;
+                return true; // Failed to compile inner filter, so negation is true
+            }
+            
+            FilterFn innerFilterFn = innerFilterFns.last();
+            
+            // Apply the inner filter to each array element
+            for (int i = 0; i < arr.size(); ++i) {
+                const auto& element = arr[i];
+                bool matches = innerFilterFn(element);
+                qCDebug(jsonPathLog) << "Element" << i << ":" << element << "matches:" << matches;
+                if (matches) {
+                    qCDebug(jsonPathLog) << "Found matching element, returning false";
+                    return false; // Found a matching element, so negation is false
+                }
+            }
+            qCDebug(jsonPathLog) << "No elements matched, returning true";
+            return true; // No elements matched the inner filter, so negation is true
         }, QString("!@[?%1]").arg(filterExpr));
     };
 
@@ -1073,19 +1120,9 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
     if (auto m = ctre::match<negRootRefPat>(to_sv(s)))
         return makeNegatedRootToken();
 
-    // Root self-comparison pattern for $[?$==$] - compares root to itself
+    // Root self-comparison pattern for $[?$] - compares root to itself
     constexpr auto rootSelfPat = ctll::fixed_string{R"(^\$\s*(==|!=)\s*\$$)"};
-    if (ctre::match<rootSelfPat>(to_sv(s))) {
-        auto m = ctre::match<rootSelfPat>(to_sv(s));
-        const QString op = to_qstr(m.template get<1>().to_view());
-        
-        Builder b{out};
-        return b.add([op](const QJsonValue& j){
-            // Root self-comparison: $ == $ is always true, $ != $ is always false
-            return op == "==" ? true : false;
-        }, QString("$"));
-    }
-
+    
     // Root reference existence filter: $[?$] - always true (root document always exists)
     if (ctre::match<rootRefPat>(to_sv(s))) {
         Builder b{out};
@@ -1094,7 +1131,7 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
             return true;
         }, QString("$"));
     }
-    
+
     // Check for root existence filter
     if (auto m = ctre::match<rootPat>(to_sv(s)))
         return makeRootToken();
@@ -1130,22 +1167,28 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
         return makeNegatedMultiSelectorToken(selectorsStr);
     }
 
-    // Nested filter patterns
+    qCDebug(jsonPathLog) << "parseExists: testing nested filter pattern against:" << s;
+    qCDebug(jsonPathLog) << "parseExists: nestedFilterPat attempting to match:" << s;
     if (auto m = ctre::match<nestedFilterPat>(to_sv(s))) {
         QString filterExpr = to_qstr(m.template get<1>().to_view());
+        qCDebug(jsonPathLog) << "parseExists: nested filter matched! filterExpr:" << filterExpr;
         return makeNestedFilterToken(filterExpr);
     }
+    qCDebug(jsonPathLog) << "parseExists: nestedFilterPat did not match:" << s;
+    qCDebug(jsonPathLog) << "parseExists: negNestedFilterPat attempting to match:" << s;
     if (auto m = ctre::match<negNestedFilterPat>(to_sv(s))) {
         QString filterExpr = to_qstr(m.template get<1>().to_view());
+        qCDebug(jsonPathLog) << "parseExists: negated nested filter matched! filterExpr:" << filterExpr;
         return makeNegatedNestedFilterToken(filterExpr);
     }
-
+    qCDebug(jsonPathLog) << "parseExists: negNestedFilterPat did not match:" << s;
     return std::nullopt;
 }
 
 std::optional<Token> parseSelfCmp(QString s, QVector<FilterFn>& out)
 {
-    static constexpr auto pat = ctll::fixed_string{R"(^@\s*(==|!=|>=|<=|>|<)\s*@$)"};
+    static constexpr auto pat = ctll::fixed_string{
+        R"(^@\s*(==|!=|>=|<=|>|<)\s*@$)"};
     
     if (auto m = ctre::match<pat>(to_sv(s)))
     {
@@ -1284,9 +1327,11 @@ std::optional<Token> compileFilter(const QString& expr, QVector<FilterFn>& out)
 {
     QString s = json_query::json_path::detail::stripOuterParens(expr);
     qCDebug(jsonPathLog) << "compileFilter expr=" << expr << "stripped=" << s;
-    for (const auto rule : detail::rules) {
+    for (int i = 0; i < detail::rules.size(); ++i) {
+        const auto rule = detail::rules[i];
+        qCDebug(jsonPathLog) << "Trying rule" << i;
         if (auto result = rule(s, out)) {
-            qCDebug(jsonPathLog) << "compileFilter accepted token kind=" << (result ? static_cast<int>(result->kind) : -1);
+            qCDebug(jsonPathLog) << "compileFilter accepted token kind=" << (result ? static_cast<int>(result->kind) : -1) << "from rule" << i;
             return result;
         }
     }

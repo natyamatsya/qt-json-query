@@ -10,27 +10,25 @@ std::optional<Token> parseAbsolutePathContext(QString s, QVector<ContextFilterFn
 {
     qCDebug(jsonPathLog) << "parseAbsolutePathContext called with:" << s;
     
-    // RFC 9535 compliant patterns for absolute path references in filters
-    // According to RFC 9535, absolute path references should be simple path expressions,
-    // NOT comparison expressions or complex operations
+    // RFC 9535 allows absolute path references in comparisons
+    // Handle patterns like: $, $.foo, $==@.value, $==$, etc.
     
-    // Reject expressions that contain comparison operators - these should be handled by regular filters
-    if (s.contains("==") || s.contains("!=") || s.contains("<=") || s.contains(">=") || 
-        s.contains("<") || s.contains(">") || s.contains("&&") || s.contains("||")) {
-        qCDebug(jsonPathLog) << "parseAbsolutePathContext: rejecting comparison expression:" << s;
-        return std::nullopt;
-    }
-    
-    // Only accept simple absolute path references
-    static const auto rootOnlyPat = ctre::match<R"(\$)">;  // Just "$"
-    static const auto simpleAbsPathPat = ctre::match<R"(\$(\.[a-zA-Z_][a-zA-Z0-9_]*|\.\*|\[.*\])*)">;  // Simple absolute paths like $.foo, $.*, etc.
-    
-    // Check for root-only reference first
-    if (rootOnlyPat(s.toStdString())) {
-        qCDebug(jsonPathLog) << "parseAbsolutePathContext: matched root-only pattern for:" << s;
+    // Check for absolute path comparison patterns first
+    // Only accept simple absolute path references in comparisons per RFC 9535
+    // Valid: $==@, $.foo==@.bar, $.a.b==42
+    // Invalid: $.*==42, $[*]==42, $..foo==42 (non-singular queries)
+    static const auto absComparisonPat = ctre::match<R"(\$(\.[a-zA-Z_][a-zA-Z0-9_]*)*\s*(==|!=|<=|>=|<|>)\s*(.+))">;
+    if (auto match = absComparisonPat(s.toStdString())) {
+        qCDebug(jsonPathLog) << "parseAbsolutePathContext: matched simple absolute path comparison:" << s;
         
-        // Create a context-aware filter that uses the root document
-        // For now, implement basic absolute path evaluation
+        std::string leftPath = "$" + std::string(match.get<1>().to_view());
+        std::string op = std::string(match.get<2>().to_view());
+        std::string rightExpr = std::string(match.get<3>().to_view());
+        
+        qCDebug(jsonPathLog) << "parseAbsolutePathContext: leftPath=" << QString::fromStdString(leftPath) 
+                             << "op=" << QString::fromStdString(op) 
+                             << "rightExpr=" << QString::fromStdString(rightExpr);
+        
         struct ContextBuilder {
             QVector<ContextFilterFn>& fns;
             
@@ -45,42 +43,116 @@ std::optional<Token> parseAbsolutePathContext(QString s, QVector<ContextFilterFn
         };
         
         ContextBuilder b{out};
-        return b.add([s](const QJsonValue& node, const QJsonValue& root) -> bool {
-            qCDebug(jsonPathLog) << "Evaluating absolute path filter:" << s << "on root:" << root;
+        return b.add([leftPath, op, rightExpr](const QJsonValue& node, const QJsonValue& root) -> bool {
+            qCDebug(jsonPathLog) << "Evaluating absolute path comparison:" << QString::fromStdString(leftPath) 
+                                 << QString::fromStdString(op) << QString::fromStdString(rightExpr);
             
-            // Basic implementation for simple absolute path references
-            if (s == "$") {
-                // Root existence filter: always true if root exists
-                return !root.isUndefined();
-            }
-            
-            // Handle simple absolute path patterns
-            if (s.startsWith("$.")) {
-                // For patterns like "$.a", "$.*.a", etc., try to evaluate against root
+            // Evaluate left side (absolute path)
+            QJsonValue leftValue;
+            if (leftPath == "$") {
+                leftValue = root;
+            } else {
                 try {
-                    // Create a temporary JSONPath to evaluate the absolute path
-                    auto absolutePath = json_query::JSONPath::create(s);
+                    auto absolutePath = json_query::JSONPath::create(QString::fromStdString(leftPath));
                     if (absolutePath) {
                         auto results = absolutePath->evaluateAll(root);
-                        // Return true if the absolute path yields any results
-                        bool hasResults = !results.isEmpty();
-                        qCDebug(jsonPathLog) << "Absolute path" << s << "evaluation result:" << hasResults << "(" << results.size() << "results)";
-                        return hasResults;
+                        if (!results.isEmpty()) {
+                            leftValue = results.first();
+                        }
                     }
                 } catch (...) {
-                    qCDebug(jsonPathLog) << "Failed to evaluate absolute path:" << s;
+                    qCDebug(jsonPathLog) << "Failed to evaluate absolute path:" << QString::fromStdString(leftPath);
+                    return false;
                 }
             }
             
-            // Fallback for unimplemented patterns
-            qCDebug(jsonPathLog) << "Absolute path pattern not yet fully implemented:" << s;
+            // Evaluate right side
+            QJsonValue rightValue;
+            QString rightExprStr = QString::fromStdString(rightExpr);
+            if (rightExprStr == "$") {
+                rightValue = root;
+            } else if (rightExprStr.startsWith("@")) {
+                // Right side is a relative path - evaluate against current node
+                if (rightExprStr == "@") {
+                    rightValue = node;
+                } else {
+                    // Handle @.property, @[index], etc.
+                    QString relativePath = rightExprStr.mid(1); // Remove @
+                    if (relativePath.startsWith(".")) {
+                        // Property access like @.value
+                        QString propName = relativePath.mid(1);
+                        if (node.isObject()) {
+                            rightValue = node.toObject().value(propName);
+                        }
+                    }
+                    // Add more relative path handling as needed
+                }
+            } else {
+                // Right side might be a literal value
+                // Try to parse as JSON literal
+                if (rightExprStr == "null") {
+                    rightValue = QJsonValue::Null;
+                } else if (rightExprStr == "true") {
+                    rightValue = QJsonValue(true);
+                } else if (rightExprStr == "false") {
+                    rightValue = QJsonValue(false);
+                } else {
+                    // Try as number or string
+                    bool ok;
+                    double num = rightExprStr.toDouble(&ok);
+                    if (ok) {
+                        rightValue = QJsonValue(num);
+                    } else {
+                        // Treat as string (remove quotes if present)
+                        if ((rightExprStr.startsWith('"') && rightExprStr.endsWith('"')) ||
+                            (rightExprStr.startsWith('\'') && rightExprStr.endsWith('\''))) {
+                            rightValue = QJsonValue(rightExprStr.mid(1, rightExprStr.length() - 2));
+                        } else {
+                            rightValue = QJsonValue(rightExprStr);
+                        }
+                    }
+                }
+            }
+            
+            // Perform comparison
+            QString opStr = QString::fromStdString(op);
+            if (opStr == "==") {
+                return leftValue == rightValue;
+            } else if (opStr == "!=") {
+                return leftValue != rightValue;
+            } else if (opStr == "<") {
+                // Implement ordering comparison logic as needed
+                if (leftValue.isDouble() && rightValue.isDouble()) {
+                    return leftValue.toDouble() < rightValue.toDouble();
+                }
+                return false;
+            } else if (opStr == ">") {
+                if (leftValue.isDouble() && rightValue.isDouble()) {
+                    return leftValue.toDouble() > rightValue.toDouble();
+                }
+                return false;
+            } else if (opStr == "<=") {
+                if (leftValue.isDouble() && rightValue.isDouble()) {
+                    return leftValue.toDouble() <= rightValue.toDouble();
+                }
+                return false;
+            } else if (opStr == ">=") {
+                if (leftValue.isDouble() && rightValue.isDouble()) {
+                    return leftValue.toDouble() >= rightValue.toDouble();
+                }
+                return false;
+            }
+            
             return false;
         });
-    } else if (simpleAbsPathPat(s.toStdString())) {
-        qCDebug(jsonPathLog) << "parseAbsolutePathContext: matched simple absolute path pattern for:" << s;
+    }
+    
+    // Check for absolute path existence filters (allow wildcards and complex paths)
+    // Valid: $.*.a, $.foo.bar, $.a[0].b, etc.
+    static const auto absExistencePat = ctre::match<R"(\$(\.[a-zA-Z_*][a-zA-Z0-9_]*|\[\d+\]|\[.*\])*)">;
+    if (absExistencePat(s.toStdString())) {
+        qCDebug(jsonPathLog) << "parseAbsolutePathContext: matched absolute path existence filter:" << s;
         
-        // Create a context-aware filter that uses the root document
-        // For now, implement basic absolute path evaluation
         struct ContextBuilder {
             QVector<ContextFilterFn>& fns;
             
@@ -96,15 +168,15 @@ std::optional<Token> parseAbsolutePathContext(QString s, QVector<ContextFilterFn
         
         ContextBuilder b{out};
         return b.add([s](const QJsonValue& node, const QJsonValue& root) -> bool {
-            qCDebug(jsonPathLog) << "Evaluating absolute path filter:" << s << "on root:" << root;
+            qCDebug(jsonPathLog) << "Evaluating absolute path existence filter:" << s << "on root:" << root;
             
-            // Basic implementation for simple absolute path references
+            // Basic implementation for absolute path existence filters
             if (s == "$") {
                 // Root existence filter: always true if root exists
                 return !root.isUndefined();
             }
             
-            // Handle simple absolute path patterns
+            // Handle absolute path patterns
             if (s.startsWith("$.")) {
                 // For patterns like "$.a", "$.*.a", etc., try to evaluate against root
                 try {
