@@ -321,10 +321,28 @@ template<auto PAT>
         
         Builder b{out};
         return b.add([prop, ctx](const QJsonValue& j){
-            const auto obj = j.toObject();
-            const auto v = obj.value(prop);
-            return ctx.compare(v);
-        }, prop);
+            // Convert prop to integer for array index access
+            bool ok;
+            int index = prop.toInt(&ok);
+            if (!ok) return false; // Invalid index
+            
+            // Array index access: only works on arrays, not objects
+            if (j.isArray()) {
+                const auto arr = j.toArray();
+                if (index < 0 || index >= arr.size()) {
+                    // Out of bounds: compare with undefined/null
+                    QJsonValue undefined; // QJsonValue::Undefined
+                    return ctx.compare(undefined);
+                } else {
+                    const auto v = arr[index];
+                    return ctx.compare(v);
+                }
+            } else {
+                // Non-arrays don't have array indices: compare with undefined/null
+                QJsonValue undefined; // QJsonValue::Undefined
+                return ctx.compare(undefined);
+            }
+        }, QString("@[%1]").arg(prop));
     }
     return std::nullopt;
 }
@@ -365,10 +383,28 @@ template<auto PAT>
         
         Builder b{out};
         return b.add([prop, ctx](const QJsonValue& j){
-            const auto obj = j.toObject();
-            const auto v = obj.value(prop);
-            return ctx.compare(v);
-        }, prop);
+            // Convert prop to integer for array index access
+            bool ok;
+            int index = prop.toInt(&ok);
+            if (!ok) return false; // Invalid index
+            
+            // Array index access: only works on arrays, not objects
+            if (j.isArray()) {
+                const auto arr = j.toArray();
+                if (index < 0 || index >= arr.size()) {
+                    // Out of bounds: compare with undefined/null
+                    QJsonValue undefined; // QJsonValue::Undefined
+                    return ctx.compare(undefined);
+                } else {
+                    const auto v = arr[index];
+                    return ctx.compare(v);
+                }
+            } else {
+                // Non-arrays don't have array indices: compare with undefined/null
+                QJsonValue undefined; // QJsonValue::Undefined
+                return ctx.compare(undefined);
+            }
+        }, QString("@[%1]").arg(prop));
     }
     return std::nullopt;
 }
