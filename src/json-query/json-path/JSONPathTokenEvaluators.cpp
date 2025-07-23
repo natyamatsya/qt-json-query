@@ -12,22 +12,12 @@ std::expected<QJsonArray, EvalError> evalExpected<Token::Kind::Key>(const PathEv
                                                                      const QJsonValue& v)
 {
     QJsonArray out;
-    if (!v.isObject()) {
-        return out; // Empty result for non-objects (not an error in JSONPath)
-    }
-    const auto obj = v.toObject();
+    if (!v.isObject())
+        return out; // Empty result for non-objects
+    const QJsonObject obj = v.toObject();
     if (obj.contains(tk.key))
         out.append(obj[tk.key]);
     return out;
-}
-
-template<>
-QJsonArray eval<Token::Kind::Key>(const PathEvalCtx& ctx,
-                                  const Token& tk,
-                                  const QJsonValue& v)
-{
-    auto result = evalExpected<Token::Kind::Key>(ctx, tk, v);
-    return result.value_or(QJsonArray{});
 }
 
 // --- Index -----------------------------------------------------------------
@@ -51,16 +41,6 @@ std::expected<QJsonArray, EvalError> evalExpected<Token::Kind::Index>(const Path
     return out;
 }
 
-// Legacy wrapper for backward compatibility
-template<>
-QJsonArray eval<Token::Kind::Index>(const PathEvalCtx& ctx,
-                                    const Token& tk,
-                                    const QJsonValue& v)
-{
-    auto result = evalExpected<Token::Kind::Index>(ctx, tk, v);
-    return result.value_or(QJsonArray{});
-}
-
 // --- Slice -----------------------------------------------------------------
 template<>
 std::expected<QJsonArray, EvalError> evalExpected<Token::Kind::Slice>(const PathEvalCtx& /*ctx*/,
@@ -71,15 +51,6 @@ std::expected<QJsonArray, EvalError> evalExpected<Token::Kind::Slice>(const Path
         return QJsonArray{}; // Empty result for non-arrays (not an error in JSONPath)
     }
     return evalSlice(v.toArray(), tk.slice);
-}
-
-template<>
-QJsonArray eval<Token::Kind::Slice>(const PathEvalCtx& ctx,
-                                    const Token& tk,
-                                    const QJsonValue& v)
-{
-    auto result = evalExpected<Token::Kind::Slice>(ctx, tk, v);
-    return result.value_or(QJsonArray{});
 }
 
 // --- Wildcard --------------------------------------------------------------
@@ -96,15 +67,6 @@ std::expected<QJsonArray, EvalError> evalExpected<Token::Kind::Wildcard>(const P
     return QJsonArray{}; // Empty result for primitives
 }
 
-template<>
-QJsonArray eval<Token::Kind::Wildcard>(const PathEvalCtx& ctx,
-                                       const Token& tk,
-                                       const QJsonValue& v)
-{
-    auto result = evalExpected<Token::Kind::Wildcard>(ctx, tk, v);
-    return result.value_or(QJsonArray{});
-}
-
 // --- Recursive -------------------------------------------------------------
 template<>
 std::expected<QJsonArray, EvalError> evalExpected<Token::Kind::Recursive>(const PathEvalCtx& /*ctx*/,
@@ -112,15 +74,6 @@ std::expected<QJsonArray, EvalError> evalExpected<Token::Kind::Recursive>(const 
                                                                            const QJsonValue& v)
 {
     return evaluateRecursive(v);
-}
-
-template<>
-QJsonArray eval<Token::Kind::Recursive>(const PathEvalCtx& ctx,
-                                        const Token& tk,
-                                        const QJsonValue& v)
-{
-    auto result = evalExpected<Token::Kind::Recursive>(ctx, tk, v);
-    return result.value_or(QJsonArray{});
 }
 
 // --- Filter ----------------------------------------------------------------
@@ -172,15 +125,6 @@ std::expected<QJsonArray, EvalError> evalExpected<Token::Kind::Filter>(const Pat
     return out;
 }
 
-template<>
-QJsonArray eval<Token::Kind::Filter>(const PathEvalCtx& ctx,
-                                     const Token& tk,
-                                     const QJsonValue& v)
-{
-    auto result = evalExpected<Token::Kind::Filter>(ctx, tk, v);
-    return result.value_or(QJsonArray{});
-}
-
 // --- KeyList ---------------------------------------------------------------
 template<>
 std::expected<QJsonArray, EvalError> evalExpected<Token::Kind::KeyList>(const PathEvalCtx& /*ctx*/,
@@ -202,15 +146,6 @@ std::expected<QJsonArray, EvalError> evalExpected<Token::Kind::KeyList>(const Pa
     if (!sel.isEmpty())
         out.append(sel);
     return out;
-}
-
-template<>
-QJsonArray eval<Token::Kind::KeyList>(const PathEvalCtx& ctx,
-                                      const Token& tk,
-                                      const QJsonValue& v)
-{
-    auto result = evalExpected<Token::Kind::KeyList>(ctx, tk, v);
-    return result.value_or(QJsonArray{});
 }
 
 } // namespace json_query::json_path::detail

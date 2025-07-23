@@ -28,9 +28,6 @@ std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token&
 std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const QJsonValue& root);
 std::expected<QJsonArray, EvalError> evaluateAll(const PathEvalCtx& ctx, const QJsonValue& root);
 
-// Enhanced evaluation with std::expected error handling
-std::expected<QJsonValue, EvalError> evaluateWithErrorHandling(const PathEvalCtx& ctx, const QJsonValue& root);
-
 // Convenience top-level entry that uses std::expected
 std::expected<QJsonValue, EvalError> evaluate(const PathEvalCtx& ctx, const QJsonValue& root);
 

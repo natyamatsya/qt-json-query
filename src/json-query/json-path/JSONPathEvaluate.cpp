@@ -595,59 +595,6 @@ std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const 
 }
 
 // ---------------------------------------------------------------------------
-//  Enhanced evaluation with std::expected error handling
-// ---------------------------------------------------------------------------
-std::expected<QJsonValue, EvalError> evaluateWithErrorHandling(const PathEvalCtx& ctx, const QJsonValue& root)
-{
-    if (ctx.tokens.isEmpty())
-        return QJsonValue(QJsonValue::Undefined);
-
-    std::expected<QJsonValue, EvalError> current = root;
-    
-    // Skip leading root token ('$' or '@') if present
-    int startIdx = 0;
-    if (!ctx.tokens.isEmpty() && ctx.tokens.front().kind == Token::Kind::Key) {
-        const QString& k = ctx.tokens.front().key;
-        if (k == u"$" || k == u"@") {
-            startIdx = 1;
-        }
-    }
-
-    // Process tokens sequentially with error handling
-    for (int i = startIdx; i < ctx.tokens.size(); ++i) {
-        const Token& tk = ctx.tokens[i];
-        
-        // Use error-handling evaluation for Index tokens
-        if (tk.kind == Token::Kind::Index) {
-            auto result = evalExpected<Token::Kind::Index>(ctx, tk, *current);
-            if (!result) {
-                return std::unexpected(result.error());
-            }
-            
-            // Convert QJsonArray result back to single value
-            QJsonArray arr = *result;
-            if (arr.isEmpty()) {
-                return QJsonValue(QJsonValue::Undefined);
-            }
-            current = arr.first();
-        }
-        // Use legacy evaluation for other token types
-        else {
-            auto results = evaluateTokenExpected(ctx, tk, *current);
-            if (!results) {
-                return std::unexpected(results.error());
-            }
-            if (results->isEmpty()) {
-                return QJsonValue(QJsonValue::Undefined);
-            }
-            current = results->first();
-        }
-    }
-    
-    return *current;
-}
-
-// ---------------------------------------------------------------------------
 //  Convenience entry points (pure)
 // ---------------------------------------------------------------------------
 std::expected<QJsonValue, EvalError> evaluate(const PathEvalCtx& ctx, const QJsonValue& root)

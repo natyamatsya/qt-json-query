@@ -14,23 +14,6 @@ namespace json_query {
 namespace json_query::json_path::detail {
 
 /**
- * @brief Template function for evaluating tokens of different kinds
- * 
- * This template is specialized for each Token::Kind to provide
- * specific evaluation logic for different JSONPath token types.
- * 
- * @tparam K The Token::Kind to evaluate
- * @param ctx The PathEvalCtx instance (for context and options)
- * @param tk The token to evaluate
- * @param v The JSON value to evaluate against
- * @return QJsonArray containing all matching results
- */
-template<Token::Kind K>
-QJsonArray eval(const json_query::json_path::detail::PathEvalCtx& ctx,
-                const Token& tk,
-                const QJsonValue& v);
-
-/**
  * @brief Template function for evaluating tokens with std::expected error handling
  * 
  * This template is specialized for each Token::Kind to provide
@@ -46,42 +29,6 @@ template<Token::Kind K>
 std::expected<QJsonArray, EvalError> evalExpected(const json_query::json_path::detail::PathEvalCtx& ctx,
                                                    const Token& tk,
                                                    const QJsonValue& v);
-
-// Explicit template specialization declarations for legacy eval
-template<>
-QJsonArray eval<Token::Kind::Key>(const json_query::json_path::detail::PathEvalCtx& ctx,
-                                  const Token& tk,
-                                  const QJsonValue& v);
-
-template<>
-QJsonArray eval<Token::Kind::Index>(const json_query::json_path::detail::PathEvalCtx& ctx,
-                                    const Token& tk,
-                                    const QJsonValue& v);
-
-template<>
-QJsonArray eval<Token::Kind::Slice>(const json_query::json_path::detail::PathEvalCtx& ctx,
-                                    const Token& tk,
-                                    const QJsonValue& v);
-
-template<>
-QJsonArray eval<Token::Kind::Wildcard>(const json_query::json_path::detail::PathEvalCtx& ctx,
-                                       const Token& tk,
-                                       const QJsonValue& v);
-
-template<>
-QJsonArray eval<Token::Kind::Recursive>(const json_query::json_path::detail::PathEvalCtx& ctx,
-                                        const Token& tk,
-                                        const QJsonValue& v);
-
-template<>
-QJsonArray eval<Token::Kind::Filter>(const json_query::json_path::detail::PathEvalCtx& ctx,
-                                     const Token& tk,
-                                     const QJsonValue& v);
-
-template<>
-QJsonArray eval<Token::Kind::KeyList>(const json_query::json_path::detail::PathEvalCtx& ctx,
-                                      const Token& tk,
-                                      const QJsonValue& v);
 
 // Explicit template specialization declarations for evalExpected
 template<>
