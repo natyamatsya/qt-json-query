@@ -146,11 +146,14 @@ std::expected<QJsonArray, json_query::json_path::EvalError> __evaluateRecursiveI
     // Add the current value itself
     out.append(value);
     
-    // Recursively add all descendants
+    // Recursively add all descendants using ContainerCursor optimization
     if (value.isObject()) {
         const QJsonObject obj = value.toObject();
-        for (auto it = obj.constBegin(); it != obj.constEnd(); ++it) {
-            auto subResult = __evaluateRecursiveImpl(it.value());
+        
+        // Use ContainerCursor for optimized, zero-copy object iteration
+        auto cursor = ContainerCursor::object(obj);
+        for (const auto& childValue : cursor) {
+            auto subResult = __evaluateRecursiveImpl(childValue);
             if (!subResult) {
                 return std::unexpected(subResult.error());
             }
@@ -160,8 +163,11 @@ std::expected<QJsonArray, json_query::json_path::EvalError> __evaluateRecursiveI
         }
     } else if (value.isArray()) {
         const QJsonArray arr = value.toArray();
-        for (const auto& item : arr) {
-            auto subResult = __evaluateRecursiveImpl(item);
+        
+        // Use ContainerCursor for optimized, zero-copy array iteration
+        auto cursor = ContainerCursor::array(arr);
+        for (const auto& childValue : cursor) {
+            auto subResult = __evaluateRecursiveImpl(childValue);
             if (!subResult) {
                 return std::unexpected(subResult.error());
             }
