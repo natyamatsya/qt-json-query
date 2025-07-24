@@ -614,12 +614,16 @@ std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const 
         }
     }
 
-    // Special case: for root selector ($), we should return the working array directly
-    // instead of squashing it, because the root selector should return the complete document
-    // as a single result, not unwrap array contents
+    // Special case: for root selector ($), we should return the root document itself
+    // not wrapped in an array, because the root selector should return the complete document
+    // as a single result
     bool isRootSelectorOnly = (ctx.tokens.size() == 1);
     if (isRootSelectorOnly) {
-        return *working;
+        // Return the first (and only) element from the working array, which is the root document
+        if (!working->isEmpty()) {
+            return working->first();
+        }
+        return QJsonValue(QJsonValue::Undefined);
     }
 
     QJsonValue collapsed = squash(*std::move(working), multi);
@@ -643,6 +647,17 @@ std::expected<QJsonArray, EvalError> evaluateAll(const PathEvalCtx& ctx, const Q
     if (!res) {
         return std::unexpected(res.error());
     }
+    
+    // Special handling for root-only selectors: preserve the result as a single item
+    // even if it's an array, to match RFC 9535 CTS expectations
+    bool isRootSelectorOnly = (ctx.tokens.size() == 1);
+    if (isRootSelectorOnly) {
+        // Root selector should return the document itself as a single result
+        if (res->isUndefined() || res->isNull()) return {};
+        return QJsonArray{*res};
+    }
+    
+    // For non-root selectors, expand arrays into individual results
     if (res->isArray()) return res->toArray();
     if (res->isUndefined() || res->isNull()) return {};
     return QJsonArray{*res};

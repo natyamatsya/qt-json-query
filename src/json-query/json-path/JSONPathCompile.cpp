@@ -522,10 +522,7 @@ static const std::array<BrRule,10> BR_RULES = {{
         if (!content.startsWith(u"?(") || !content.endsWith(u')'))
             return std::nullopt;
 
-        std::cout << "[bracket ?(] raw content=" << content.toString().toStdString() << std::endl;
-
         QString expr = content.sliced(2, content.size() - 3).toString();
-        std::cout << "[bracket ?(] extracted expr=" << expr.toStdString() << std::endl;
 
         if (auto tok = json_query::json_path::compileContextFilter(expr, out.contextFilters, out.filters)) {
             out.pushFilter(*tok);
