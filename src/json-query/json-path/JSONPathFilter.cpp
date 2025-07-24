@@ -5,8 +5,73 @@
 #include <QDebug>
 #include "json-query/json-path/JSONPathLog.hpp"
 #include <iostream>
+#include <ctre.hpp>
 
 namespace json_query::json_path::detail {
+
+// Helper function for JSON number validation with strict JSON compliance
+[[nodiscard]] static bool isValidJsonNumber(const QString& value) noexcept
+{
+    if (value.isEmpty()) return false;
+    
+    int pos = 0;
+    const int len = value.length();
+    
+    // Handle optional minus sign
+    if (pos < len && value[pos] == '-') {
+        pos++;
+    }
+    
+    // Must have at least one digit after optional minus
+    if (pos >= len || !value[pos].isDigit()) {
+        return false;
+    }
+    
+    // Handle integer part - either '0' or non-zero digit followed by digits
+    if (value[pos] == '0') {
+        pos++; // Single zero
+        // Leading zeros not allowed (e.g., "00", "01" are invalid)
+        if (pos < len && value[pos].isDigit()) {
+            return false;
+        }
+    } else {
+        // Non-zero digit followed by optional digits
+        while (pos < len && value[pos].isDigit()) {
+            pos++;
+        }
+    }
+    
+    // Handle optional fractional part
+    if (pos < len && value[pos] == '.') {
+        pos++;
+        // Must have at least one digit after decimal point
+        if (pos >= len || !value[pos].isDigit()) {
+            return false;
+        }
+        while (pos < len && value[pos].isDigit()) {
+            pos++;
+        }
+    }
+    
+    // Handle optional exponent part
+    if (pos < len && (value[pos] == 'e' || value[pos] == 'E')) {
+        pos++;
+        // Optional sign after e/E
+        if (pos < len && (value[pos] == '+' || value[pos] == '-')) {
+            pos++;
+        }
+        // Must have at least one digit after e/E (and optional sign)
+        if (pos >= len || !value[pos].isDigit()) {
+            return false;
+        }
+        while (pos < len && value[pos].isDigit()) {
+            pos++;
+        }
+    }
+    
+    // Should have consumed entire string
+    return pos == len;
+}
 
 // Enum to characterize comparison types for template specialization
 enum class ComparisonType {
@@ -239,7 +304,7 @@ template<auto PAT>
         const QString op = to_qstr(match.template get<2>().to_view());
         QString rhs = to_qstr(match.template get<3>().to_view());
         
-        const bool isNum = rhs.contains(QRegularExpression(R"(^-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?$)"));
+        const bool isNum = isValidJsonNumber(rhs);
         const bool isBool = (rhs == "true" || rhs == "false");
         const bool isNull = (rhs == "null");
         const bool rhsQuoted = (rhs.startsWith('"') && rhs.endsWith('"')) || 
@@ -288,7 +353,7 @@ template<auto PAT>
         const QString op = to_qstr(match.template get<2>().to_view());
         QString rhs = to_qstr(match.template get<3>().to_view());
         
-        const bool isNum = rhs.contains(QRegularExpression(R"(^-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?$)"));
+        const bool isNum = isValidJsonNumber(rhs);
         const bool isBool = (rhs == "true" || rhs == "false");
         const bool isNull = (rhs == "null");
         const bool rhsQuoted = (rhs.startsWith('"') && rhs.endsWith('"')) || 
@@ -416,7 +481,7 @@ template<auto PAT>
         const QString op = to_qstr(match.template get<1>().to_view());
         QString rhs = to_qstr(match.template get<2>().to_view());
         
-        const bool isNum = rhs.contains(QRegularExpression(R"(^-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?$)"));
+        const bool isNum = isValidJsonNumber(rhs);
         const bool isBool = (rhs == "true" || rhs == "false");
         const bool isNull = (rhs == "null");
         const bool rhsQuoted = (rhs.startsWith('"') && rhs.endsWith('"')) || 
@@ -462,7 +527,7 @@ template<auto PAT>
         const QString op = to_qstr(match.template get<1>().to_view());
         QString rhs = to_qstr(match.template get<2>().to_view());
         
-        const bool isNum = rhs.contains(QRegularExpression(R"(^-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?$)"));
+        const bool isNum = isValidJsonNumber(rhs);
         const bool isBool = (rhs == "true" || rhs == "false");
         const bool isNull = (rhs == "null");
         const bool rhsQuoted = (rhs.startsWith('"') && rhs.endsWith('"')) || 
@@ -510,6 +575,17 @@ template<auto PAT>
         
         if (!unquote(pattern)) return std::nullopt;
         
+        // REQUIRED: QRegularExpression for user-provided runtime regex patterns
+        // Cannot use CTRE here as patterns are dynamic/user-provided at runtime
+        // REGEX USAGE ANNOTATION:
+        // QRegularExpression is REQUIRED here and CANNOT be migrated to CTRE because:
+        // 1. User-provided patterns: The regex pattern comes from user input at runtime
+        // 2. Dynamic compilation: Patterns cannot be known at compile-time for CTRE
+        // 3. RFC 9535 compliance: Must support arbitrary user regex patterns in filters
+        // 4. Runtime validation: Need to validate user patterns and handle invalid regex gracefully
+        //
+        // This is the ONLY remaining QRegularExpression usage in the codebase after CTRE migration.
+        // All internal/static regex patterns have been successfully migrated to CTRE for performance.
         const QRegularExpression regex(pattern);
         if (!regex.isValid()) return std::nullopt;
         
@@ -531,7 +607,7 @@ template<auto PAT>
         const QString op = to_qstr(match.template get<1>().to_view());
         QString value = to_qstr(match.template get<2>().to_view());
         
-        const bool isNum = value.contains(QRegularExpression(R"(^-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?$)"));
+        const bool isNum = isValidJsonNumber(value);
         const bool isBool = (value == "true" || value == "false");
         const bool isNull = (value == "null");
         const bool isQuoted = (value.startsWith('"') && value.endsWith('"')) || 
@@ -1050,6 +1126,15 @@ std::optional<Token> parseCompare(QString s, QVector<FilterFn>& out)
     return        parseCompareIndex<idxPat>(s, out);
 }
 
+// Parse regex filter expressions with different property access patterns:
+// - @.property =~ /pattern/     (dot notation)
+// - @['property'] =~ /pattern/  (bracket notation)
+// - @["property"] =~ /pattern/  (bracket notation with double quotes)
+//
+// REGEX USAGE ANNOTATION:
+// This function uses CTRE for parsing the filter expression structure (compile-time),
+// but delegates to parseRegex1 which uses QRegularExpression for user-provided patterns (runtime).
+// This hybrid approach optimizes static pattern matching while supporting dynamic user regex.
 std::optional<Token> parseRegex(QString s, QVector<FilterFn>& out)
 {
     constexpr auto dotPat = ctll::fixed_string{R"(@\.([\w$]+)\s*=~\s*/(.+)/)"};

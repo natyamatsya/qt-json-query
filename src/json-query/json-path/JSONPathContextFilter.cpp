@@ -1,6 +1,8 @@
 #include "json-query/json-path/JSONPathCompile.hpp"
 #include "json-query/json-path/JSONPathLog.hpp"
 #include "json-query/json-path/JSONPath.hpp"
+#include <QDebug>
+#include <iostream>
 #include <ctre.hpp>
 
 namespace json_query::json_path {
@@ -217,16 +219,24 @@ std::optional<Token> parseAbsolutePathContext(QString s, QVector<ContextFilterFn
     if (s.contains("length(") || s.contains("value($")) {
         qCDebug(jsonPathLog) << "parseAbsolutePathContext: detected function call pattern:" << s;
         
-        // Simple pattern matching for function calls
-        QStringList parts = s.split(QRegularExpression(R"(\s*(==|!=|<|>|<=|>=)\s*)"));
-        if (parts.size() == 2) {
-            QString left = parts[0].trimmed();
-            QString right = parts[1].trimmed();
-            
-            // Extract operator
-            QRegularExpression opRegex(R"(\s*(==|!=|<|>|<=|>=)\s*)");
-            QRegularExpressionMatch opMatch = opRegex.match(s);
-            QString op = opMatch.captured(1);
+        // Simple pattern matching for function calls using string operations
+        // Look for comparison operators in order of precedence (longest first)
+        const QStringList operators = {"<=", ">=", "==", "!=", "<", ">"};
+        QString op;
+        int opPos = -1;
+        
+        for (const QString& testOp : operators) {
+            int pos = s.indexOf(testOp);
+            if (pos != -1) {
+                op = testOp;
+                opPos = pos;
+                break;
+            }
+        }
+        
+        if (opPos != -1) {
+            QString left = s.left(opPos).trimmed();
+            QString right = s.mid(opPos + op.length()).trimmed();
             
             qCDebug(jsonPathLog) << "parseAbsolutePathContext: function call parts - left:" << left << "op:" << op << "right:" << right;
             

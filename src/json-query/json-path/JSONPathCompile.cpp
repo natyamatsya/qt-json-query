@@ -10,7 +10,6 @@
 #include "json-query/json-path/JSONPathFilter.hpp"  // For compileFilter implementation
 
 #include <limits>
-#include <QRegularExpression>
 #include <ctre.hpp>
 
 namespace json_query::json_path
@@ -82,12 +81,11 @@ namespace
             return true;
         };
 
-        static const QRegularExpression sliceFull(
-            R"(^\s*(?:(?:0|-[1-9][0-9]*|[1-9][0-9]*))?\s*(?::\s*(?:(?:0|-[1-9][0-9]*|[1-9][0-9]*))?\s*(?::\s*(?:(?:0|-[1-9][0-9]*|[1-9][0-9]*))?\s*)?)?\s*$)");
-        if (!sliceFull.matchView(v).hasMatch()) {
+        static constexpr auto sliceFull = ctre::match<"^\\s*(?:(?:0|-[1-9][0-9]*|[1-9][0-9]*))?\\s*(?::\\s*(?:(?:0|-[1-9][0-9]*|[1-9][0-9]*))?\\s*(?:\\s*:\\s*(?:(?:0|-[1-9][0-9]*|[1-9][0-9]*))?\\s*)?)?\\s*$">;
+        if (!sliceFull(v.toString().toStdString())) {
             qCDebug(jsonPathLog) << "sliceFull regex failed";
         }
-        if (!sliceFull.matchView(v).hasMatch())
+        if (!sliceFull(v.toString().toStdString()))
             return std::nullopt;
         const auto parts = v.split(u':');
         if (parts.size() > 3)
