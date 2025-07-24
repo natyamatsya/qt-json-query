@@ -6,6 +6,7 @@
 #include "json-query/json-path/JSONPathEvalError.hpp"
 #include "json-query/json-path/JSONPathTokenEvaluators.hpp"
 #include "json-query/json-path/JSONPathPointerConversion.hpp"
+#include "json-query/json-path/internal/TokenDispatchTable.hpp"
 
 #include <array>
 #include <deque>
@@ -30,8 +31,8 @@ using json_query::json_path::internal::ResultCollector;
 using internal::acquirePooledArray;
 using internal::IterativeRecursiveDescent;
 
-// --------------------------------------------------------------
-// Basic helpers (free versions copied from legacy JSONPath.cpp)
+// ---------------------------------------------------------------------------
+//  Basic helpers (free versions copied from legacy JSONPath.cpp)
 // --------------------------------------------------------------
 int normalizeIndex(int idx, int size)
 {
@@ -202,20 +203,12 @@ std::expected<QJsonArray, EvalError> evaluateRecursive(const QJsonValue& value, 
 
 // ---------------------------------------------------------------------------
 //  Token dispatcher with std::expected error handling
+//  Now using TableGen-inspired declarative dispatch system
 // ---------------------------------------------------------------------------
 std::expected<QJsonArray, EvalError> evaluateTokenExpected(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
 {
-    using enum Token::Kind;
-    switch (tk.kind) {
-        case Key:       return evalExpected<Key>(ctx, tk, v);
-        case Index:     return evalExpected<Index>(ctx, tk, v);
-        case Slice:     return evalExpected<Slice>(ctx, tk, v);
-        case Wildcard:  return evalExpected<Wildcard>(ctx, tk, v);
-        case Recursive: return evalExpected<Recursive>(ctx, tk, v);
-        case Filter:    return evalExpected<Filter>(ctx, tk, v);
-        case KeyList:   return evalExpected<KeyList>(ctx, tk, v);
-        default:        return std::unexpected(EvalError::TypeMismatchObject);
-    }
+    // Use TableGen-inspired dispatch table instead of manual switch
+    return json_query::json_path::internal::TokenDispatcher::dispatch(ctx, tk, v);
 }
 
 // ---------------------------------------------------------------------------
@@ -459,7 +452,7 @@ std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const 
                 EvalError lastError;
                 
                 // Use context-aware cursor for efficient union result collection
-                auto workingCursor = internal::makeSimpleContextCursor(*working, root, root);
+                auto workingCursor = json_query::json_path::internal::makeSimpleContextCursor(*working, root, root);
                 QJsonArray collectedResults;
                 
                 for (qsizetype tokenIdx : unionTokens) {
@@ -473,7 +466,7 @@ std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const 
                         
                         // Use context-aware cursor for efficient result merging
                         if (!tokenResult->isEmpty()) {
-                            auto resultCursor = internal::makeSimpleContextCursor(*tokenResult, root, root);
+                            auto resultCursor = json_query::json_path::internal::makeSimpleContextCursor(*tokenResult, root, root);
                             for (const auto& [result, context] : resultCursor) {
                                 collectedResults.append(result);
                             }
@@ -531,7 +524,7 @@ std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const 
             std::expected<QJsonArray, EvalError> next;
             
             // Use context-aware cursor for efficient working array processing
-            auto workingCursor = internal::makeSimpleContextCursor(*working, root, root);
+            auto workingCursor = json_query::json_path::internal::makeSimpleContextCursor(*working, root, root);
             for (const auto& [v, context] : workingCursor) {
                 if (!v.isObject()) continue;
                 const QJsonObject obj = v.toObject();
@@ -574,7 +567,7 @@ std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const 
                 QJsonArray dedup;
                 
                 // Use context-aware cursor for efficient deduplication processing
-                auto workingDedupCursor = internal::makeSimpleContextCursor(*working, root, root);
+                auto workingDedupCursor = json_query::json_path::internal::makeSimpleContextCursor(*working, root, root);
                 for (const auto& [v2, context] : workingDedupCursor) {
                     if (v2.isObject()) {
                         uint h = qt_hash(QJsonDocument(v2.toObject()).toJson());
@@ -675,3 +668,41 @@ std::expected<QJsonArray, EvalError> evaluateAll(const PathEvalCtx& ctx, const Q
 }
 
 } // namespace json_query::json_path::detail
+
+// ---------------------------------------------------------------------------
+//  TableGen-inspired token dispatch function implementations
+//  These must be in the json_query::json_path::internal namespace
+// ---------------------------------------------------------------------------
+
+namespace json_query::json_path::internal {
+
+// Simple dispatch functions that call the actual evalExpected functions
+std::expected<QJsonArray, EvalError> dispatchKey(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v) {
+    return json_query::json_path::detail::evalExpected<Token::Kind::Key>(ctx, tk, v);
+}
+
+std::expected<QJsonArray, EvalError> dispatchIndex(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v) {
+    return json_query::json_path::detail::evalExpected<Token::Kind::Index>(ctx, tk, v);
+}
+
+std::expected<QJsonArray, EvalError> dispatchSlice(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v) {
+    return json_query::json_path::detail::evalExpected<Token::Kind::Slice>(ctx, tk, v);
+}
+
+std::expected<QJsonArray, EvalError> dispatchWildcard(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v) {
+    return json_query::json_path::detail::evalExpected<Token::Kind::Wildcard>(ctx, tk, v);
+}
+
+std::expected<QJsonArray, EvalError> dispatchRecursive(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v) {
+    return json_query::json_path::detail::evalExpected<Token::Kind::Recursive>(ctx, tk, v);
+}
+
+std::expected<QJsonArray, EvalError> dispatchFilter(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v) {
+    return json_query::json_path::detail::evalExpected<Token::Kind::Filter>(ctx, tk, v);
+}
+
+std::expected<QJsonArray, EvalError> dispatchKeyList(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v) {
+    return json_query::json_path::detail::evalExpected<Token::Kind::KeyList>(ctx, tk, v);
+}
+
+} // namespace json_query::json_path::internal
