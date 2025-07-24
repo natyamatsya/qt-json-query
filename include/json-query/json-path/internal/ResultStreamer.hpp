@@ -90,9 +90,15 @@ private:
 class ResultCollector {
 public:
     /**
-     * @brief Construct a ResultCollector
+     * @brief Construct a ResultCollector with internal array
      */
     ResultCollector() = default;
+    
+    /**
+     * @brief Construct a ResultCollector that writes to an external array
+     * @param externalArray Reference to external QJsonArray to collect results
+     */
+    explicit ResultCollector(QJsonArray& externalArray) : externalResults_(&externalArray) {}
 
     /**
      * @brief Get a ResultStreamer that collects results into this collector
@@ -100,9 +106,37 @@ public:
      */
     [[nodiscard]] ResultStreamer getStreamer() noexcept {
         return ResultStreamer(
-            [this](const QJsonValue& value) { results_.append(value); },
+            [this](const QJsonValue& value) { 
+                if (externalResults_) {
+                    externalResults_->append(value);
+                } else {
+                    results_.append(value);
+                }
+            },
             [this](EvalError error) { lastError_ = error; hasError_ = true; }
         );
+    }
+    
+    /**
+     * @brief Emit a single value (for compatibility with streaming interface)
+     * @param value Value to emit
+     */
+    void emitValue(const QJsonValue& value) {
+        if (externalResults_) {
+            externalResults_->append(value);
+        } else {
+            results_.append(value);
+        }
+    }
+    
+    /**
+     * @brief Emit an array of values (for compatibility with streaming interface)
+     * @param array Array of values to emit
+     */
+    void emitArray(const QJsonArray& array) {
+        for (const auto& value : array) {
+            emitValue(value);
+        }
     }
 
     /**
@@ -110,6 +144,9 @@ public:
      * @return QJsonArray containing all emitted results
      */
     [[nodiscard]] const QJsonArray& getResults() const noexcept {
+        if (externalResults_) {
+            return *externalResults_;
+        }
         return results_;
     }
 
@@ -118,6 +155,9 @@ public:
      * @return QJsonArray containing all emitted results
      */
     [[nodiscard]] QJsonArray moveResults() noexcept {
+        if (externalResults_) {
+            return std::move(*externalResults_);
+        }
         return std::move(results_);
     }
 
@@ -145,6 +185,9 @@ public:
         if (hasError_) {
             return std::unexpected(lastError_);
         }
+        if (externalResults_) {
+            return *externalResults_;
+        }
         return std::move(results_);
     }
 
@@ -152,9 +195,13 @@ public:
      * @brief Clear the collector for reuse
      */
     void clear() noexcept {
-        results_ = QJsonArray{};
+        if (externalResults_) {
+            *externalResults_ = QJsonArray{}; // QJsonArray doesn't have clear()
+        } else {
+            results_ = QJsonArray{};
+        }
         hasError_ = false;
-        lastError_ = EvalError::TypeMismatchObject; // Default error
+        lastError_ = EvalError::TypeMismatchObject; // Use valid enum value
     }
 
     /**
@@ -162,6 +209,9 @@ public:
      * @return Number of results in the collector
      */
     [[nodiscard]] qsizetype size() const noexcept {
+        if (externalResults_) {
+            return externalResults_->size();
+        }
         return results_.size();
     }
 
@@ -170,12 +220,16 @@ public:
      * @return true if no results have been collected
      */
     [[nodiscard]] bool empty() const noexcept {
+        if (externalResults_) {
+            return externalResults_->isEmpty();
+        }
         return results_.isEmpty();
     }
 
 private:
     QJsonArray results_;
-    EvalError lastError_ = EvalError::TypeMismatchObject;
+    QJsonArray* externalResults_ = nullptr; // Optional external array
+    EvalError lastError_ = EvalError::TypeMismatchObject; // Use valid enum value
     bool hasError_ = false;
 };
 

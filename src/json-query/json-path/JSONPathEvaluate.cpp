@@ -18,12 +18,17 @@
 #include <QDebug>
 #include <algorithm>
 #include "json-query/json-path/JSONPathLog.hpp"
+#include "json-query/json-path/internal/ArrayPool.hpp"
+#include "json-query/json-path/internal/IterativeRecursiveDescent.hpp"
+#include "json-query/json-path/internal/ArenaAllocator.hpp"
 
 namespace json_query::json_path::detail {
 
 using json_query::json_path::internal::ContainerCursor;
 using json_query::json_path::internal::ResultStreamer;
 using json_query::json_path::internal::ResultCollector;
+using internal::acquirePooledArray;
+using internal::IterativeRecursiveDescent;
 
 // --------------------------------------------------------------
 // Basic helpers (free versions copied from legacy JSONPath.cpp)
@@ -35,7 +40,9 @@ int normalizeIndex(int idx, int size)
 
 std::expected<QJsonArray, EvalError> evalSlice(const QJsonArray& array, const Slice& s)
 {
-    QJsonArray out;
+    // Use pooled array to reduce allocations
+    auto pooledArray = acquirePooledArray();
+    QJsonArray& out = *pooledArray;
 
     const int len = array.size();
     constexpr qsizetype SENTINEL = std::numeric_limits<qsizetype>::max();
@@ -124,7 +131,9 @@ std::expected<QJsonArray, EvalError> evalSlice(const QJsonArray& array, const Sl
 
     qCDebug(jsonPathLog) << "evalSlice result size="<<out.size();
 
-    return out;
+    // Move result to avoid copying
+    QJsonArray finalResult = std::move(out);
+    return finalResult;
 }
 
 // ---------------------------------------------------------------------------
@@ -132,7 +141,9 @@ std::expected<QJsonArray, EvalError> evalSlice(const QJsonArray& array, const Sl
 // ---------------------------------------------------------------------------
 std::expected<QJsonArray, EvalError> __wildcardObjectImpl(const QJsonObject& obj)
 {
-    QJsonArray out;
+    // Use pooled array to reduce allocations
+    auto pooledArray = acquirePooledArray();
+    QJsonArray& out = *pooledArray;
     
     // Use ContainerCursor for optimized, zero-copy iteration
     auto cursor = ContainerCursor::object(obj);
@@ -140,40 +151,26 @@ std::expected<QJsonArray, EvalError> __wildcardObjectImpl(const QJsonObject& obj
         out.append(value);
     }
     
-    return out;
+    // Move result to avoid copying
+    QJsonArray finalResult = std::move(out);
+    return finalResult;
 }
 
 void __evaluateRecursiveImplStreaming(const QJsonValue& value, const ResultStreamer& streamer)
 {
-    // Emit the current value itself
-    streamer.emitValue(value);
-    
-    // Recursively emit all descendants using ContainerCursor optimization
-    if (value.isObject()) {
-        const QJsonObject obj = value.toObject();
-        
-        // Use ContainerCursor for optimized, zero-copy object iteration
-        auto cursor = ContainerCursor::object(obj);
-        for (const auto& childValue : cursor) {
-            __evaluateRecursiveImplStreaming(childValue, streamer);
-        }
-    } else if (value.isArray()) {
-        const QJsonArray arr = value.toArray();
-        
-        // Use ContainerCursor for optimized, zero-copy array iteration
-        auto cursor = ContainerCursor::array(arr);
-        for (const auto& childValue : cursor) {
-            __evaluateRecursiveImplStreaming(childValue, streamer);
-        }
+    // Use iterative implementation to reduce call stack memory overhead
+    auto result = IterativeRecursiveDescent::evaluateIterative(value, streamer);
+    if (!result) {
+        // Handle error - for streaming, we can't propagate errors easily
+        // This maintains backward compatibility with the original streaming interface
+        qWarning() << "Iterative recursive descent failed with error:" << static_cast<int>(result.error());
     }
 }
 
 std::expected<QJsonArray, EvalError> __evaluateRecursiveImpl(const QJsonValue& value)
 {
-    // Use streaming implementation with result collector for backward compatibility
-    ResultCollector collector;
-    __evaluateRecursiveImplStreaming(value, collector.getStreamer());
-    return collector.getExpected();
+    // Use iterative implementation with array pooling for better memory efficiency
+    return IterativeRecursiveDescent::evaluateIterativeArray(value);
 }
 
 std::expected<QJsonArray, EvalError> wildcardObject(const QJsonObject& obj)
@@ -183,7 +180,9 @@ std::expected<QJsonArray, EvalError> wildcardObject(const QJsonObject& obj)
 
 std::expected<QJsonArray, EvalError> wildcardArray(const QJsonArray& arr)
 {
-    QJsonArray out;
+    // Use pooled array to reduce allocations
+    auto pooledArray = acquirePooledArray();
+    QJsonArray& out = *pooledArray;
     
     // Use ContainerCursor for optimized, zero-copy iteration
     auto cursor = ContainerCursor::array(arr);
@@ -191,7 +190,9 @@ std::expected<QJsonArray, EvalError> wildcardArray(const QJsonArray& arr)
         out.append(item);
     }
     
-    return out;
+    // Move result to avoid copying
+    QJsonArray finalResult = std::move(out);
+    return finalResult;
 }
 
 std::expected<QJsonArray, EvalError> evaluateRecursive(const QJsonValue& value, int /*unused*/)
@@ -305,13 +306,18 @@ void fanOutStreaming(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& 
     }
 }
 
-// Legacy array-based fanOut (for backward compatibility)
-std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src, qsizetype tokenPos = -1)
+// Legacy array-based fan-out (for backward compatibility)
+std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src, qsizetype tokenPos)
 {
-    // Use streaming implementation with result collector for backward compatibility
-    ResultCollector collector;
+    // Use pooled array for better memory efficiency
+    auto pooledResult = acquirePooledArray();
+    ResultCollector collector(*pooledResult);
+    
     fanOutStreaming(ctx, tk, src, collector.getStreamer(), tokenPos);
-    return collector.getExpected();
+    
+    // Move result to avoid copying
+    QJsonArray finalResult = std::move(*pooledResult);
+    return finalResult;
 }
 
 // ---------------------------------------------------------------------------

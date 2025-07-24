@@ -1,0 +1,180 @@
+#pragma once
+
+#include <QJsonArray>
+#include <vector>
+#include <memory>
+#include <mutex>
+
+namespace json_query::json_path::internal {
+
+/**
+ * @brief Thread-safe object pool for QJsonArray instances to reduce allocations
+ * 
+ * This pool maintains a collection of pre-allocated QJsonArray objects that can be
+ * reused across JSONPath evaluations, significantly reducing memory allocation overhead
+ * in hot paths like recursive descent and fanOut operations.
+ */
+class ArrayPool {
+public:
+    /**
+     * @brief RAII wrapper for pooled QJsonArray instances
+     * 
+     * Automatically returns the array to the pool when destroyed, ensuring
+     * proper resource management and preventing memory leaks.
+     */
+    class PooledArray {
+    public:
+        explicit PooledArray(ArrayPool& pool, std::unique_ptr<QJsonArray> array)
+            : pool_(pool), array_(std::move(array)) {
+            if (array_) {
+                *array_ = QJsonArray{}; // Ensure clean state - QJsonArray doesn't have clear()
+            }
+        }
+        
+        ~PooledArray() {
+            if (array_) {
+                pool_.returnArray(std::move(array_));
+            }
+        }
+        
+        // Move-only semantics
+        PooledArray(const PooledArray&) = delete;
+        PooledArray& operator=(const PooledArray&) = delete;
+        
+        PooledArray(PooledArray&& other) noexcept
+            : pool_(other.pool_), array_(std::move(other.array_)) {}
+        
+        PooledArray& operator=(PooledArray&& other) noexcept {
+            if (this != &other) {
+                if (array_) {
+                    pool_.returnArray(std::move(array_));
+                }
+                array_ = std::move(other.array_);
+            }
+            return *this;
+        }
+        
+        QJsonArray& operator*() { return *array_; }
+        const QJsonArray& operator*() const { return *array_; }
+        
+        QJsonArray* operator->() { return array_.get(); }
+        const QJsonArray* operator->() const { return array_.get(); }
+        
+        QJsonArray* get() { return array_.get(); }
+        const QJsonArray* get() const { return array_.get(); }
+        
+        bool isValid() const { return array_ != nullptr; }
+        
+    private:
+        ArrayPool& pool_;
+        std::unique_ptr<QJsonArray> array_;
+    };
+    
+    /**
+     * @brief Get the singleton instance of the array pool
+     */
+    static ArrayPool& instance() {
+        static ArrayPool pool;
+        return pool;
+    }
+    
+    /**
+     * @brief Acquire a pooled QJsonArray instance
+     * 
+     * Returns a clean, empty QJsonArray wrapped in a RAII container.
+     * If no pooled arrays are available, creates a new one.
+     */
+    PooledArray acquire() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        
+        std::unique_ptr<QJsonArray> array;
+        if (!pool_.empty()) {
+            array = std::move(pool_.back());
+            pool_.pop_back();
+            *array = QJsonArray{}; // Ensure clean state - QJsonArray doesn't have clear()
+        } else {
+            array = std::make_unique<QJsonArray>();
+            ++totalCreated_;
+        }
+        
+        ++acquisitions_;
+        return PooledArray(*this, std::move(array));
+    }
+    
+    /**
+     * @brief Get pool statistics for monitoring and optimization
+     */
+    struct Stats {
+        size_t poolSize;
+        size_t totalCreated;
+        size_t acquisitions;
+        size_t returns;
+        double hitRate; // Percentage of acquisitions served from pool
+    };
+    
+    Stats getStats() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return {
+            pool_.size(),
+            totalCreated_,
+            acquisitions_,
+            returns_,
+            acquisitions_ > 0 ? (static_cast<double>(returns_) / acquisitions_ * 100.0) : 0.0
+        };
+    }
+    
+    /**
+     * @brief Clear the pool and reset statistics (for testing)
+     */
+    void clear() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        pool_.clear();
+        totalCreated_ = 0;
+        acquisitions_ = 0;
+        returns_ = 0;
+    }
+    
+private:
+    ArrayPool() = default;
+    ~ArrayPool() = default;
+    
+    // Non-copyable, non-movable singleton
+    ArrayPool(const ArrayPool&) = delete;
+    ArrayPool& operator=(const ArrayPool&) = delete;
+    ArrayPool(ArrayPool&&) = delete;
+    ArrayPool& operator=(ArrayPool&&) = delete;
+    
+    void returnArray(std::unique_ptr<QJsonArray> array) {
+        if (!array) return;
+        
+        std::lock_guard<std::mutex> lock(mutex_);
+        
+        // Limit pool size to prevent unbounded growth
+        constexpr size_t MAX_POOL_SIZE = 32;
+        if (pool_.size() < MAX_POOL_SIZE) {
+            *array = QJsonArray{}; // Ensure clean state - QJsonArray doesn't have clear()
+            pool_.push_back(std::move(array));
+            ++returns_;
+        }
+        // If pool is full, let the array be destroyed naturally
+    }
+    
+    friend class PooledArray;
+    
+    mutable std::mutex mutex_;
+    std::vector<std::unique_ptr<QJsonArray>> pool_;
+    
+    // Statistics
+    size_t totalCreated_ = 0;
+    size_t acquisitions_ = 0;
+    size_t returns_ = 0;
+};
+
+/**
+ * @brief Convenience function to acquire a pooled array
+ */
+inline ArrayPool::PooledArray acquirePooledArray() {
+    return ArrayPool::instance().acquire();
+}
+
+} // namespace json_query::json_path::internal
