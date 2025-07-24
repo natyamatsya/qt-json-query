@@ -1,6 +1,7 @@
 #include "json-query/json-path/JSONPathFilter.hpp"
 #include "json-query/json-path/JSONPath.hpp"
 #include "json-query/json-path/JSONPathHelpers.hpp"
+#include "json-query/json-path/internal/ContainerCursor.hpp"  // ContainerCursor for optimized iteration
 
 #include <QDebug>
 #include "json-query/json-path/JSONPathLog.hpp"
@@ -8,6 +9,8 @@
 #include <ctre.hpp>
 
 namespace json_query::json_path::detail {
+
+using json_query::json_path::internal::ContainerCursor;
 
 // Helper function for JSON number validation with strict JSON compliance
 [[nodiscard]] static bool isValidJsonNumber(const QString& value) noexcept
@@ -925,8 +928,13 @@ std::optional<Token> parseIn(QString s, QVector<FilterFn>& out)
         return b.add([want, array](const QJsonValue& j){
             auto a = j[array];
             if (!a.isArray()) return false;
-            for (const auto& v : a.toArray())
+            
+            // Use ContainerCursor for optimized, zero-copy array iteration during 'in' evaluation
+            const QJsonArray arr = a.toArray();
+            auto cursor = ContainerCursor::array(arr);
+            for (const auto& v : cursor) {
                 if (v.isString() && v.toString() == want) return true;
+            }
             return false;
         }, array);
     }
@@ -936,17 +944,17 @@ std::optional<Token> parseIn(QString s, QVector<FilterFn>& out)
 std::optional<Token> parseCompare(QString s, QVector<FilterFn>& out)
 {
     constexpr auto dotPat = ctll::fixed_string{R"(@\.([\w$]+)\s*(==|!=|>=|<=|>|<)\s*(.+))"};
-    constexpr auto brkPat = ctll::fixed_string{R"(@\[['\"]([^'\"]+)['\"]\]\s*(==|!=|>=|<=|>|<)\s*(.+))"};
+    constexpr auto brkPat = ctll::fixed_string{R"(@\[['\"]([^'"]+)['\"]\]\s*(==|!=|>=|<=|>|<)\s*(.+))"};
     constexpr auto idxPat = ctll::fixed_string{R"(@\[(-?\d+)\]\s*(==|!=|>=|<=|>|<)\s*(.+))"};
     
     // Null comparison patterns
     constexpr auto dotNullPat = ctll::fixed_string{R"(@\.([\w$]+)\s*(==|!=)\s*null)"};
-    constexpr auto brkNullPat = ctll::fixed_string{R"(@\[['\"]([^'\"]+)['\"]\]\s*(==|!=)\s*null)"};
+    constexpr auto brkNullPat = ctll::fixed_string{R"(@\[['\"]([^'"]+)['\"]\]\s*(==|!=)\s*null)"};
     constexpr auto idxNullPat = ctll::fixed_string{R"(@\[(-?\d+)\]\s*(==|!=)\s*null)"};
     
     // Self comparison patterns
     constexpr auto dotSelfPat = ctll::fixed_string{R"(@\.([\w$]+)\s*(==|!=|>=|<=|>|<)\s*@)"};
-    constexpr auto brkSelfPat = ctll::fixed_string{R"(@\[['\"]([^'\"]+)['\"]\]\s*(==|!=|>=|<=|>|<)\s*@)"};
+    constexpr auto brkSelfPat = ctll::fixed_string{R"(@\[['\"]([^'"]+)['\"]\]\s*(==|!=|>=|<=|>|<)\s*@)"};
     constexpr auto idxSelfPat = ctll::fixed_string{R"(@\[(-?\d+)\]\s*(==|!=|>=|<=|>|<)\s*@)"};
     
     // Property-to-property comparison patterns: @.a == @.b
