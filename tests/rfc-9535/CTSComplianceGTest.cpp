@@ -174,12 +174,23 @@ TEST_P(CtsJsonPathTest, EvaluatesPerSpec)
     
     QJsonValue resVal = *result;
 
-    // Evaluate
+    // Evaluate - handle root selectors correctly
     QJsonArray actual;
-    if (resVal.isArray())
-        actual = resVal.toArray();
-    else
+    
+    // Special case: root selector should preserve array results as single items
+    // The root selector "$" returns the document itself, even if it's an array
+    bool isRootSelector = (tc.selector == "$");
+    
+    if (isRootSelector) {
+        // Root selector: preserve the result as a single item, even if it's an array
         actual = QJsonArray{resVal};
+    } else {
+        // Non-root selectors: expand arrays into individual results
+        if (resVal.isArray())
+            actual = resVal.toArray();
+        else
+            actual = QJsonArray{resVal};
+    }
 
     // Compare against each allowed result set
     bool matched = false;
