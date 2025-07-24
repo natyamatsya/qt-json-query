@@ -2,6 +2,7 @@
 #include "json-query/json-path/JSONPathEvaluate.hpp"  // normalizeIndex, evalSlice
 #include "json-query/json-path/JSONPathEvalError.hpp"  // EvalError
 #include "json-query/json-path/internal/ContainerCursor.hpp"  // ContainerCursor for optimized iteration
+#include "json-query/json-path/internal/ContextAwareContainerCursor.hpp"  // ContextAwareContainerCursor for context-aware iteration
 #include <expected>
 
 namespace json_query::json_path::detail {
@@ -96,38 +97,54 @@ std::expected<QJsonArray, EvalError> evalExpected<Token::Kind::Filter>(const Pat
     if (v.isArray()) {
         const QJsonArray arr = v.toArray(); // Create proper copy to avoid iterator invalidation
         
-        // Use ContainerCursor for optimized, zero-copy array iteration during filter evaluation
-        auto cursor = ContainerCursor::array(arr);
-        for (const auto& item : cursor) {
-            bool pass = false;
-            if (useContextFilter) {
-                const auto& contextFilterFn = ctx.contextFilters[tk.contextFilterId];
-                pass = contextFilterFn(item, ctx.rootDocument);
-            } else {
+        if (useContextFilter) {
+            // Use ContextAwareContainerCursor for context-aware filter evaluation with zero-copy iteration
+            auto cursor = internal::makeSimpleContextCursor(arr, ctx.rootDocument, v);
+            const auto& contextFilterFn = ctx.contextFilters[tk.contextFilterId];
+            
+            for (const auto& [item, context] : cursor) {
+                bool pass = contextFilterFn(item, context.rootDocument());
+                if (pass) {
+                    out.append(item);
+                }
+            }
+        } else {
+            // Use ContainerCursor for optimized, zero-copy array iteration during regular filter evaluation
+            auto cursor = ContainerCursor::array(arr);
+            for (const auto& item : cursor) {
+                bool pass = false;
                 if (tk.filterId >= ctx.filters.size()) continue;
                 const auto& filterFn = ctx.filters[tk.filterId];
                 pass = filterFn(item);
+                if (pass)
+                    out.append(item);
             }
-            if (pass)
-                out.append(item);
         }
     } else if (v.isObject()) {
         const QJsonObject obj = v.toObject(); // Create proper copy to avoid iterator invalidation
         
-        // Use ContainerCursor for optimized, zero-copy object iteration during filter evaluation
-        auto cursor = ContainerCursor::object(obj);
-        for (const auto& val : cursor) {
-            bool pass = false;
-            if (useContextFilter) {
-                const auto& contextFilterFn = ctx.contextFilters[tk.contextFilterId];
-                pass = contextFilterFn(val, ctx.rootDocument);
-            } else {
+        if (useContextFilter) {
+            // Use ContextAwareContainerCursor for context-aware filter evaluation with zero-copy iteration
+            auto cursor = internal::makeSimpleContextCursor(obj, ctx.rootDocument, v);
+            const auto& contextFilterFn = ctx.contextFilters[tk.contextFilterId];
+            
+            for (const auto& [val, context] : cursor) {
+                bool pass = contextFilterFn(val, context.rootDocument());
+                if (pass) {
+                    out.append(val);
+                }
+            }
+        } else {
+            // Use ContainerCursor for optimized, zero-copy object iteration during regular filter evaluation
+            auto cursor = ContainerCursor::object(obj);
+            for (const auto& val : cursor) {
+                bool pass = false;
                 if (tk.filterId >= ctx.filters.size()) continue;
                 const auto& filterFn = ctx.filters[tk.filterId];
                 pass = filterFn(val);
+                if (pass)
+                    out.append(val);
             }
-            if (pass)
-                out.append(val);
         }
     }
     return out;

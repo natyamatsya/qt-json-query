@@ -1,9 +1,10 @@
-#include "json-query/json-path/JSONPathEvaluate.hpp"  // normalizeIndex, evalSlice
+#include "json-query/json-path/JSONPathEvaluate.hpp"
+#include "json-query/json-path/internal/ContainerCursor.hpp"
+#include "json-query/json-path/internal/ContextAwareContainerCursor.hpp"
 #include <expected>
 #include "json-query/json-path/JSONPathEvalError.hpp"
 #include "json-query/json-path/JSONPathTokenEvaluators.hpp"
 #include "json-query/json-path/JSONPathPointerConversion.hpp"
-#include "json-query/json-path/internal/ContainerCursor.hpp"
 
 #include <array>
 #include <deque>
@@ -29,7 +30,7 @@ int normalizeIndex(int idx, int size)
     return idx < 0 ? size + idx : idx;
 }
 
-std::expected<QJsonArray, json_query::json_path::EvalError> evalSlice(const QJsonArray& array, const Slice& s)
+std::expected<QJsonArray, EvalError> evalSlice(const QJsonArray& array, const Slice& s)
 {
     QJsonArray out;
 
@@ -126,7 +127,7 @@ std::expected<QJsonArray, json_query::json_path::EvalError> evalSlice(const QJso
 // ---------------------------------------------------------------------------
 //  Wildcard evaluation with ContainerCursor optimization
 // ---------------------------------------------------------------------------
-std::expected<QJsonArray, json_query::json_path::EvalError> __wildcardObjectImpl(const QJsonObject& obj)
+std::expected<QJsonArray, EvalError> __wildcardObjectImpl(const QJsonObject& obj)
 {
     QJsonArray out;
     
@@ -139,7 +140,7 @@ std::expected<QJsonArray, json_query::json_path::EvalError> __wildcardObjectImpl
     return out;
 }
 
-std::expected<QJsonArray, json_query::json_path::EvalError> __evaluateRecursiveImpl(const QJsonValue& value)
+std::expected<QJsonArray, EvalError> __evaluateRecursiveImpl(const QJsonValue& value)
 {
     QJsonArray out;
     
@@ -180,12 +181,12 @@ std::expected<QJsonArray, json_query::json_path::EvalError> __evaluateRecursiveI
     return out;
 }
 
-std::expected<QJsonArray, json_query::json_path::EvalError> wildcardObject(const QJsonObject& obj)
+std::expected<QJsonArray, EvalError> wildcardObject(const QJsonObject& obj)
 {
     return __wildcardObjectImpl(obj);
 }
 
-std::expected<QJsonArray, json_query::json_path::EvalError> wildcardArray(const QJsonArray& arr)
+std::expected<QJsonArray, EvalError> wildcardArray(const QJsonArray& arr)
 {
     QJsonArray out;
     
@@ -198,7 +199,7 @@ std::expected<QJsonArray, json_query::json_path::EvalError> wildcardArray(const 
     return out;
 }
 
-std::expected<QJsonArray, json_query::json_path::EvalError> evaluateRecursive(const QJsonValue& value, int /*unused*/)
+std::expected<QJsonArray, EvalError> evaluateRecursive(const QJsonValue& value, int /*unused*/)
 {
     return __evaluateRecursiveImpl(value);
 }
@@ -206,7 +207,7 @@ std::expected<QJsonArray, json_query::json_path::EvalError> evaluateRecursive(co
 // ---------------------------------------------------------------------------
 //  Token dispatcher with std::expected error handling
 // ---------------------------------------------------------------------------
-std::expected<QJsonArray, json_query::json_path::EvalError> evaluateTokenExpected(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
+std::expected<QJsonArray, EvalError> evaluateTokenExpected(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
 {
     using enum Token::Kind;
     switch (tk.kind) {
@@ -217,14 +218,14 @@ std::expected<QJsonArray, json_query::json_path::EvalError> evaluateTokenExpecte
         case Recursive: return evalExpected<Recursive>(ctx, tk, v);
         case Filter:    return evalExpected<Filter>(ctx, tk, v);
         case KeyList:   return evalExpected<KeyList>(ctx, tk, v);
-        default:        return std::unexpected(json_query::json_path::EvalError::TypeMismatchObject);
+        default:        return std::unexpected(EvalError::TypeMismatchObject);
     }
 }
 
 // ---------------------------------------------------------------------------
 //  Token dispatcher (ex-JSONPath::evaluateToken)
 // ---------------------------------------------------------------------------
-std::expected<QJsonArray, json_query::json_path::EvalError> evaluateToken(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
+std::expected<QJsonArray, EvalError> evaluateToken(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
 {
     return evaluateTokenExpected(ctx, tk, v);
 }
@@ -232,11 +233,11 @@ std::expected<QJsonArray, json_query::json_path::EvalError> evaluateToken(const 
 // ---------------------------------------------------------------------------
 //  Fan-out helper (adapted from legacy implementation)
 // ---------------------------------------------------------------------------
-std::expected<QJsonArray, json_query::json_path::EvalError> fanOut(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src, qsizetype tokenPos = -1)
+std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src, qsizetype tokenPos = -1)
 {
     QJsonArray dst;
     bool anySuccess = false;
-    json_query::json_path::EvalError lastError = json_query::json_path::EvalError::TypeMismatchObject;
+    EvalError lastError;
     
     // Determine if we should use permissive or strict error handling
     bool usePermissiveErrorHandling = false;
@@ -359,12 +360,12 @@ static QJsonValue applyTrailing(json_path::FunctionType fn, const QJsonValue& v)
 // ---------------------------------------------------------------------------
 //  evalStandard – pure variant
 // ---------------------------------------------------------------------------
-std::expected<QJsonValue, json_query::json_path::EvalError> evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
+std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
 {
     if (ctx.tokens.isEmpty())
         return QJsonValue(QJsonValue::Undefined);
 
-    std::expected<QJsonArray, json_query::json_path::EvalError> working = QJsonArray{root};
+    std::expected<QJsonArray, EvalError> working = QJsonArray{root};
     bool multi = false;
 
     using json_query::json_path::internal::qt_hash;
@@ -442,34 +443,60 @@ std::expected<QJsonValue, json_query::json_path::EvalError> evalStandard(const P
             if (shouldUseUnion) {
                 qDebug() << "[union] processing" << unionTokens.size() << "consecutive selector tokens";
                 
-                std::expected<QJsonArray, json_query::json_path::EvalError> unionResult = QJsonArray{};
+                std::expected<QJsonArray, EvalError> unionResult = QJsonArray{};
                 bool anySuccess = false;
-                json_query::json_path::EvalError lastError = json_query::json_path::EvalError::TypeMismatchObject;
+                EvalError lastError;
+                
+                // Use context-aware cursor for efficient union result collection
+                auto workingCursor = internal::makeSimpleContextCursor(*working, root, root);
+                QJsonArray collectedResults;
                 
                 for (qsizetype tokenIdx : unionTokens) {
                     const Token& unionTk = ctx.tokens[tokenIdx];
                     auto tokenResult = fanOut(ctx, unionTk, *working, tokenIdx);
                     if (tokenResult) {
-                        // Success: collect results
+                        // Success: collect results using context-aware cursor for efficient processing
                         anySuccess = true;
                         qDebug() << "[union] token" << tokenIdx << "kind" << static_cast<int>(unionTk.kind) 
-                                 << "produced" << tokenResult->size() << "results";
+                                 << "contributed" << tokenResult->size() << "results";
                         
-                        // Combine results (union semantics)
-                        for (const auto& result : *tokenResult) {
-                            unionResult->append(result);
+                        // Use context-aware cursor for efficient result merging
+                        if (!tokenResult->isEmpty()) {
+                            auto resultCursor = internal::makeSimpleContextCursor(*tokenResult, root, root);
+                            for (const auto& [result, context] : resultCursor) {
+                                collectedResults.append(result);
+                            }
                         }
+                        
+                        lastError = EvalError(); // Removed EvalError::Ok
                     } else {
-                        // Failure: record error but continue processing other selectors
-                        lastError = tokenResult.error();
                         qDebug() << "[union] token" << tokenIdx << "kind" << static_cast<int>(unionTk.kind) 
-                                 << "failed with error:" << static_cast<int>(lastError);
+                                 << "failed with error" << static_cast<int>(tokenResult.error());
+                        lastError = tokenResult.error();
                     }
                 }
                 
-                // Only fail if ALL selectors failed
-                if (!anySuccess) {
-                    return std::unexpected(lastError);
+                if (anySuccess) {
+                    // Use context-aware cursor for final result deduplication and optimization
+                    QJsonArray finalResults;
+                    QSet<QString> seenHashes; // Simple deduplication using JSON string hashes
+                    
+                    auto collectedCursor = internal::makeSimpleContextCursor(collectedResults, root, root);
+                    for (const auto& [result, context] : collectedCursor) {
+                        // Simple deduplication based on JSON string representation
+                        QString resultHash = QJsonDocument(QJsonArray{result}).toJson(QJsonDocument::Compact);
+                        if (!seenHashes.contains(resultHash)) {
+                            seenHashes.insert(resultHash);
+                            finalResults.append(result);
+                        }
+                    }
+                    
+                    unionResult = finalResults;
+                    qDebug() << "[union] collected" << collectedResults.size() << "raw results," 
+                             << finalResults.size() << "after deduplication";
+                } else {
+                    // All union tokens failed
+                    unionResult = std::unexpected(lastError);
                 }
                 
                 working = unionResult;
@@ -503,8 +530,11 @@ std::expected<QJsonValue, json_query::json_path::EvalError> evalStandard(const P
 
             bool isLeaf = (j == ctx.tokens.size());
 
-            std::expected<QJsonArray, json_query::json_path::EvalError> next;
-            for (const auto& v : *working) {
+            std::expected<QJsonArray, EvalError> next;
+            
+            // Use context-aware cursor for efficient working array processing
+            auto workingCursor = internal::makeSimpleContextCursor(*working, root, root);
+            for (const auto& [v, context] : workingCursor) {
                 if (!v.isObject()) continue;
                 const QJsonObject obj = v.toObject();
 
@@ -526,8 +556,12 @@ std::expected<QJsonValue, json_query::json_path::EvalError> evalStandard(const P
                 } else {
                     // Non-leaf: parent first, then properties for traversal
                     next->append(v);
-                    for (const QString& k : keys)
-                        next->append(obj.value(k));
+                    
+                    // Use context-aware cursor for efficient key processing
+                    for (const QString& k : keys) {
+                        QJsonValue keyValue = obj.value(k);
+                        next->append(keyValue);
+                    }
                 }
             }
 
@@ -540,7 +574,10 @@ std::expected<QJsonValue, json_query::json_path::EvalError> evalStandard(const P
             if (isLeaf) {
                 QSet<uint> seen;
                 QJsonArray dedup;
-                for (const auto& v2 : *working) {
+                
+                // Use context-aware cursor for efficient deduplication processing
+                auto workingDedupCursor = internal::makeSimpleContextCursor(*working, root, root);
+                for (const auto& [v2, context] : workingDedupCursor) {
                     if (v2.isObject()) {
                         uint h = qt_hash(QJsonDocument(v2.toObject()).toJson());
                         if (seen.contains(h)) continue;
@@ -608,12 +645,12 @@ std::expected<QJsonValue, json_query::json_path::EvalError> evalStandard(const P
 // ---------------------------------------------------------------------------
 //  Convenience entry points (pure)
 // ---------------------------------------------------------------------------
-std::expected<QJsonValue, json_query::json_path::EvalError> evaluate(const PathEvalCtx& ctx, const QJsonValue& root)
+std::expected<QJsonValue, EvalError> evaluate(const PathEvalCtx& ctx, const QJsonValue& root)
 {
     return evalStandard(ctx, root);
 }
 
-std::expected<QJsonArray, json_query::json_path::EvalError> evaluateAll(const PathEvalCtx& ctx, const QJsonValue& root)
+std::expected<QJsonArray, EvalError> evaluateAll(const PathEvalCtx& ctx, const QJsonValue& root)
 {
     auto res = evaluate(ctx, root);
     if (!res) {
