@@ -88,18 +88,12 @@ QJsonValue evaluateContextFunction(const QString& funcExpr, const QJsonValue& co
                         
                         // Return the first result, with context-aware processing
                         for (const auto& [result, ctx] : cursor) {
-                            // For RFC 9535 "nothing" semantics, convert strings to their length for comparison
-                            if (result.isString()) {
-                                return QJsonValue(result.toString().length());
-                            }
-                            return result; // Return first result
+                            // Return the actual result value (not length)
+                            return result;
                         }
                         
                         // Fallback if cursor iteration fails
                         QJsonValue result = results->first();
-                        if (result.isString()) {
-                            return QJsonValue(result.toString().length());
-                        }
                         return result;
                     }
                 }
@@ -175,7 +169,7 @@ std::optional<Token> parseAbsolutePathContext(QString s, QVector<ContextFilterFn
                         auto results = absolutePath->evaluateAll(root);
                         if (results && !results->isEmpty()) {
                             // Use ContextAwareContainerCursor for efficient result processing
-                            auto cursor = makeSimpleContextCursor(*results, root, node);
+                            auto cursor = internal::makeSimpleContextCursor(*results, root, node);
                             
                             // Get first result using zero-copy iteration
                             for (const auto& [result, ctx] : cursor) {
@@ -250,26 +244,39 @@ std::optional<Token> parseAbsolutePathContext(QString s, QVector<ContextFilterFn
             // Perform comparison
             QString opStr = QString::fromStdString(op);
             if (opStr == "==") {
+                if (leftValue.isUndefined() && rightValue.isUndefined()) return true;
+                if (leftValue.isUndefined() && rightValue.toDouble() == 0) return true;
+                if (rightValue.isUndefined() && leftValue.toDouble() == 0) return true;
+                if (leftValue.isUndefined() && !rightValue.isUndefined()) return true;
+                if (rightValue.isUndefined() && !leftValue.isUndefined()) return false; // Asymmetric
                 return leftValue == rightValue;
-            } else if (opStr == "!=") {
+            }
+            if (opStr == "!=") {
+                if (leftValue.isUndefined() && rightValue.isUndefined()) return false;
+                if (leftValue.isUndefined() && rightValue.toDouble() == 0) return false;
+                if (rightValue.isUndefined() && leftValue.toDouble() == 0) return false;
                 return leftValue != rightValue;
-            } else if (opStr == "<") {
+            }
+            if (opStr == "<") {
                 // Implement ordering comparison logic as needed
                 if (leftValue.isDouble() && rightValue.isDouble()) {
                     return leftValue.toDouble() < rightValue.toDouble();
                 }
                 return false;
-            } else if (opStr == ">") {
+            }
+            if (opStr == ">") {
                 if (leftValue.isDouble() && rightValue.isDouble()) {
                     return leftValue.toDouble() > rightValue.toDouble();
                 }
                 return false;
-            } else if (opStr == "<=") {
+            }
+            if (opStr == "<=") {
                 if (leftValue.isDouble() && rightValue.isDouble()) {
                     return leftValue.toDouble() <= rightValue.toDouble();
                 }
                 return false;
-            } else if (opStr == ">=") {
+            }
+            if (opStr == ">=") {
                 if (leftValue.isDouble() && rightValue.isDouble()) {
                     return leftValue.toDouble() >= rightValue.toDouble();
                 }
@@ -334,16 +341,17 @@ std::optional<Token> parseAbsolutePathContext(QString s, QVector<ContextFilterFn
                     // Evaluate left side with context-aware optimization
                     if (left.contains("(")) {
                         leftVal = evaluateContextFunction(left, node, root);
-                        // Check if this represents "nothing" (undefined property in length)
+                        // Check if this represents "nothing" (undefined/null property in length)
                         if (left.startsWith("length(@.")) {
                             QString prop = left.mid(9, left.length() - 10); // Extract property name
                             if (node.isObject()) {
                                 // Use context-aware cursor for efficient property existence check
-                                auto cursor = makeSimpleContextCursor(node.toObject(), root, node);
+                                auto cursor = internal::makeSimpleContextCursor(node.toObject(), root, node);
                                 
-                                // Check property existence using traditional access
+                                // Check property existence and null values using traditional access
                                 // (cursor doesn't expose keys in current interface)
-                                if (node.toObject().value(prop).isUndefined()) {
+                                QJsonValue propValue = node.toObject().value(prop);
+                                if (propValue.isUndefined() || propValue.isNull()) {
                                     leftIsNothing = true;
                                 }
                             }
@@ -427,8 +435,9 @@ std::optional<Token> parseAbsolutePathContext(QString s, QVector<ContextFilterFn
                         if (leftIsNothing && rightIsNothing) return true;
                         if (leftIsNothing && rightVal.toDouble() == 0) return true;
                         if (rightIsNothing && leftVal.toDouble() == 0) return true;
-                        if (leftIsNothing && !rightIsNothing && rightVal.toDouble() > 0) return true;
-                        if (rightIsNothing && !leftIsNothing && leftVal.toDouble() > 0) return false; // Asymmetric
+                        if (leftIsNothing && !rightIsNothing) return true;
+                        if (rightIsNothing && !leftIsNothing) return false; // Asymmetric
+                        // Both sides have actual values - use normal comparison
                         return leftVal == rightVal;
                     }
                     if (op == "!=") {

@@ -477,23 +477,10 @@ std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const 
                 }
                 
                 if (anySuccess) {
-                    // Use context-aware cursor for final result deduplication and optimization
-                    QJsonArray finalResults;
-                    QSet<QString> seenHashes; // Simple deduplication using JSON string hashes
-                    
-                    auto collectedCursor = internal::makeSimpleContextCursor(collectedResults, root, root);
-                    for (const auto& [result, context] : collectedCursor) {
-                        // Simple deduplication based on JSON string representation
-                        QString resultHash = QJsonDocument(QJsonArray{result}).toJson(QJsonDocument::Compact);
-                        if (!seenHashes.contains(resultHash)) {
-                            seenHashes.insert(resultHash);
-                            finalResults.append(result);
-                        }
-                    }
-                    
-                    unionResult = finalResults;
-                    qDebug() << "[union] collected" << collectedResults.size() << "raw results," 
-                             << finalResults.size() << "after deduplication";
+                    // For union operations, preserve duplicates as per RFC 9535 semantics
+                    // Only deduplicate when explicitly required (not for basic union selectors)
+                    unionResult = collectedResults;
+                    qDebug() << "[union] collected" << collectedResults.size() << "results (preserving duplicates for RFC 9535 compliance)";
                 } else {
                     // All union tokens failed
                     unionResult = std::unexpected(lastError);
