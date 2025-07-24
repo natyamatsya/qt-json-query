@@ -1,6 +1,7 @@
 #include "json-query/json-path/JSONPathEvaluate.hpp"
 #include "json-query/json-path/internal/ContainerCursor.hpp"
 #include "json-query/json-path/internal/ContextAwareContainerCursor.hpp"
+#include "json-query/json-path/internal/ResultStreamer.hpp"
 #include <expected>
 #include "json-query/json-path/JSONPathEvalError.hpp"
 #include "json-query/json-path/JSONPathTokenEvaluators.hpp"
@@ -21,6 +22,8 @@
 namespace json_query::json_path::detail {
 
 using json_query::json_path::internal::ContainerCursor;
+using json_query::json_path::internal::ResultStreamer;
+using json_query::json_path::internal::ResultCollector;
 
 // --------------------------------------------------------------
 // Basic helpers (free versions copied from legacy JSONPath.cpp)
@@ -140,27 +143,19 @@ std::expected<QJsonArray, EvalError> __wildcardObjectImpl(const QJsonObject& obj
     return out;
 }
 
-std::expected<QJsonArray, EvalError> __evaluateRecursiveImpl(const QJsonValue& value)
+void __evaluateRecursiveImplStreaming(const QJsonValue& value, const ResultStreamer& streamer)
 {
-    QJsonArray out;
+    // Emit the current value itself
+    streamer.emitValue(value);
     
-    // Add the current value itself
-    out.append(value);
-    
-    // Recursively add all descendants using ContainerCursor optimization
+    // Recursively emit all descendants using ContainerCursor optimization
     if (value.isObject()) {
         const QJsonObject obj = value.toObject();
         
         // Use ContainerCursor for optimized, zero-copy object iteration
         auto cursor = ContainerCursor::object(obj);
         for (const auto& childValue : cursor) {
-            auto subResult = __evaluateRecursiveImpl(childValue);
-            if (!subResult) {
-                return std::unexpected(subResult.error());
-            }
-            for (const auto& item : *subResult) {
-                out.append(item);
-            }
+            __evaluateRecursiveImplStreaming(childValue, streamer);
         }
     } else if (value.isArray()) {
         const QJsonArray arr = value.toArray();
@@ -168,17 +163,17 @@ std::expected<QJsonArray, EvalError> __evaluateRecursiveImpl(const QJsonValue& v
         // Use ContainerCursor for optimized, zero-copy array iteration
         auto cursor = ContainerCursor::array(arr);
         for (const auto& childValue : cursor) {
-            auto subResult = __evaluateRecursiveImpl(childValue);
-            if (!subResult) {
-                return std::unexpected(subResult.error());
-            }
-            for (const auto& subItem : *subResult) {
-                out.append(subItem);
-            }
+            __evaluateRecursiveImplStreaming(childValue, streamer);
         }
     }
-    
-    return out;
+}
+
+std::expected<QJsonArray, EvalError> __evaluateRecursiveImpl(const QJsonValue& value)
+{
+    // Use streaming implementation with result collector for backward compatibility
+    ResultCollector collector;
+    __evaluateRecursiveImplStreaming(value, collector.getStreamer());
+    return collector.getExpected();
 }
 
 std::expected<QJsonArray, EvalError> wildcardObject(const QJsonObject& obj)
@@ -231,11 +226,11 @@ std::expected<QJsonArray, EvalError> evaluateToken(const PathEvalCtx& ctx, const
 }
 
 // ---------------------------------------------------------------------------
-//  Fan-out helper (adapted from legacy implementation)
+//  Streaming-optimized fan-out helper
 // ---------------------------------------------------------------------------
-std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src, qsizetype tokenPos = -1)
+void fanOutStreaming(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src, 
+                    const ResultStreamer& streamer, qsizetype tokenPos = -1)
 {
-    QJsonArray dst;
     bool anySuccess = false;
     EvalError lastError;
     
@@ -275,38 +270,48 @@ std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token&
     for (const auto& v : src) {
         auto seg = evaluateTokenExpected(ctx, tk, v);
         if (seg) {
-            // Success: collect results
+            // Success: stream results directly without intermediate array
             anySuccess = true;
-            qDebug() << "[fanOut] kind=" << static_cast<int>(tk.kind) << "srcType"
+            qDebug() << "[fanOutStreaming] kind=" << static_cast<int>(tk.kind) << "srcType"
                      << v.type() << "seg size=" << seg->size();
-            for (const auto& e : *seg)
-                dst.append(e);
+            
+            // Stream all results directly
+            streamer.emitArray(*seg);
         } else {
             // Failure: record error
             lastError = seg.error();
-            qDebug() << "[fanOut] kind=" << static_cast<int>(tk.kind) << "srcType"
+            qDebug() << "[fanOutStreaming] kind=" << static_cast<int>(tk.kind) << "srcType"
                      << v.type() << "failed with error:" << static_cast<int>(lastError);
             
             // Context-aware error handling for Index tokens
             if (tk.kind == Token::Kind::Index && !usePermissiveErrorHandling) {
                 // Strict error handling: propagate errors immediately (property chain access)
-                return std::unexpected(lastError);
+                streamer.handleError(lastError);
+                return;
             }
             // Permissive error handling: continue processing (direct access or after recursive descent)
         }
     }
     
-    // For permissive error handling, return empty result instead of error (RFC 9535 compliance)
+    // For permissive error handling, don't emit error if no results (RFC 9535 compliance)
     if (tk.kind == Token::Kind::Index && usePermissiveErrorHandling && !anySuccess) {
-        return QJsonArray{}; // Empty result for RFC 9535 compliance
+        // Empty result for RFC 9535 compliance - no emission needed
+        return;
     }
     
-    // Only fail if ALL evaluations failed (non-permissive contexts)
-    if (!anySuccess) {
-        return std::unexpected(lastError);
+    // Only emit error if ALL evaluations failed (non-permissive contexts)
+    if (!anySuccess && streamer.canHandleErrors()) {
+        streamer.handleError(lastError);
     }
-    
-    return dst;
+}
+
+// Legacy array-based fanOut (for backward compatibility)
+std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src, qsizetype tokenPos = -1)
+{
+    // Use streaming implementation with result collector for backward compatibility
+    ResultCollector collector;
+    fanOutStreaming(ctx, tk, src, collector.getStreamer(), tokenPos);
+    return collector.getExpected();
 }
 
 // ---------------------------------------------------------------------------
