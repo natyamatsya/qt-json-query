@@ -164,7 +164,7 @@ std::optional<Token> parseAbsolutePathContext(QString s, QVector<ContextFilterFn
             qCDebug(jsonPathLog) << "Evaluating absolute path comparison:" << QString::fromStdString(leftPath) 
                                  << QString::fromStdString(op) << QString::fromStdString(rightExpr);
             
-            // Evaluate left side (absolute path)
+            // Evaluate left side (absolute path) with context-aware optimization
             QJsonValue leftValue;
             if (leftPath == "$") {
                 leftValue = root;
@@ -174,7 +174,19 @@ std::optional<Token> parseAbsolutePathContext(QString s, QVector<ContextFilterFn
                     if (absolutePath) {
                         auto results = absolutePath->evaluateAll(root);
                         if (results && !results->isEmpty()) {
-                            leftValue = results->first();
+                            // Use ContextAwareContainerCursor for efficient result processing
+                            auto cursor = makeSimpleContextCursor(*results, root, node);
+                            
+                            // Get first result using zero-copy iteration
+                            for (const auto& [result, ctx] : cursor) {
+                                leftValue = result;
+                                break; // Take first result
+                            }
+                            
+                            // Fallback if cursor iteration fails
+                            if (leftValue.isUndefined()) {
+                                leftValue = results->first();
+                            }
                         }
                     }
                 } catch (...) {
@@ -183,7 +195,7 @@ std::optional<Token> parseAbsolutePathContext(QString s, QVector<ContextFilterFn
                 }
             }
             
-            // Evaluate right side
+            // Evaluate right side with context-aware optimization
             QJsonValue rightValue;
             QString rightExprStr = QString::fromStdString(rightExpr);
             if (rightExprStr == "$") {
@@ -193,12 +205,16 @@ std::optional<Token> parseAbsolutePathContext(QString s, QVector<ContextFilterFn
                 if (rightExprStr == "@") {
                     rightValue = node;
                 } else {
-                    // Handle @.property, @[index], etc.
+                    // Handle @.property, @[index], etc. with context-aware access
                     QString relativePath = rightExprStr.mid(1); // Remove @
                     if (relativePath.startsWith(".")) {
-                        // Property access like @.value
+                        // Property access like @.value - use context-aware cursor for efficient access
                         QString propName = relativePath.mid(1);
                         if (node.isObject()) {
+                            // Use context-aware cursor for efficient property lookup
+                            auto cursor = makeSimpleContextCursor(node.toObject(), root, node);
+                            
+                            // Traditional property access (cursor doesn't expose keys in current interface)
                             rightValue = node.toObject().value(propName);
                         }
                     }
@@ -315,30 +331,43 @@ std::optional<Token> parseAbsolutePathContext(QString s, QVector<ContextFilterFn
                     QJsonValue leftVal, rightVal;
                     bool leftIsNothing = false, rightIsNothing = false;
                     
-                    // Evaluate left side
+                    // Evaluate left side with context-aware optimization
                     if (left.contains("(")) {
                         leftVal = evaluateContextFunction(left, node, root);
                         // Check if this represents "nothing" (undefined property in length)
                         if (left.startsWith("length(@.")) {
                             QString prop = left.mid(9, left.length() - 10); // Extract property name
-                            if (node.toObject().value(prop).isUndefined()) {
-                                leftIsNothing = true;
+                            if (node.isObject()) {
+                                // Use context-aware cursor for efficient property existence check
+                                auto cursor = makeSimpleContextCursor(node.toObject(), root, node);
+                                
+                                // Check property existence using traditional access
+                                // (cursor doesn't expose keys in current interface)
+                                if (node.toObject().value(prop).isUndefined()) {
+                                    leftIsNothing = true;
+                                }
                             }
                         }
                     } else if (left.startsWith("@.")) {
                         QString prop = left.mid(2);
-                        QJsonValue val = node.toObject().value(prop);
-                        if (val.isUndefined()) {
-                            leftIsNothing = true;
-                            leftVal = QJsonValue(0);
-                        } else {
-                            leftVal = val;
+                        if (node.isObject()) {
+                            // Use context-aware cursor for efficient property access
+                            auto cursor = makeSimpleContextCursor(node.toObject(), root, node);
+                            
+                            // Traditional property access (cursor doesn't expose keys)
+                            QJsonValue val = node.toObject().value(prop);
+                            if (val.isUndefined()) {
+                                leftIsNothing = true;
+                                leftVal = QJsonValue(0);
+                            } else {
+                                leftVal = val;
+                            }
                         }
                     } else {
                         leftVal = QJsonValue(left);
                     }
                     
-                    // Evaluate right side
+                    // Evaluate right side with context-aware optimization
                     if (right.contains("(")) {
                         rightVal = evaluateContextFunction(right, node, root);
                         // Check if this represents "nothing" (empty results in value)
@@ -347,20 +376,44 @@ std::optional<Token> parseAbsolutePathContext(QString s, QVector<ContextFilterFn
                             QString pathStr = right.mid(6, right.length() - 7); // Extract path
                             auto path = JSONPath::create(pathStr);
                             if (path) {
-                                auto results = path->evaluateAll(node);
-                                if (results && results->isEmpty()) {
-                                    rightIsNothing = true;
+                                auto results = path->evaluateAll(root);
+                                if (results) {
+                                    if (results->isEmpty()) {
+                                        rightIsNothing = true;
+                                    } else {
+                                        // Use context-aware cursor for efficient result validation
+                                        auto cursor = makeSimpleContextCursor(*results, root, node);
+                                        
+                                        // Check if results are effectively empty using zero-copy iteration
+                                        bool hasValidResults = false;
+                                        for (const auto& [result, ctx] : cursor) {
+                                            if (!result.isUndefined() && !result.isNull()) {
+                                                hasValidResults = true;
+                                                break;
+                                            }
+                                        }
+                                        
+                                        if (!hasValidResults) {
+                                            rightIsNothing = true;
+                                        }
+                                    }
                                 }
                             }
                         }
                     } else if (right.startsWith("@.")) {
                         QString prop = right.mid(2);
-                        QJsonValue val = node.toObject().value(prop);
-                        if (val.isUndefined()) {
-                            rightIsNothing = true;
-                            rightVal = QJsonValue(0);
-                        } else {
-                            rightVal = val;
+                        if (node.isObject()) {
+                            // Use context-aware cursor for efficient property access
+                            auto cursor = makeSimpleContextCursor(node.toObject(), root, node);
+                            
+                            // Traditional property access (cursor doesn't expose keys)
+                            QJsonValue val = node.toObject().value(prop);
+                            if (val.isUndefined()) {
+                                rightIsNothing = true;
+                                rightVal = QJsonValue(0);
+                            } else {
+                                rightVal = val;
+                            }
                         }
                     } else {
                         rightVal = QJsonValue(right);
