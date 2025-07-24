@@ -1,0 +1,26 @@
+{
+  "version": 9,
+  "include": [
+    "Common.json"
+  ],
+  "configurePresets": [
+    {
+      "name": "relwithdebinfo",
+      "inherits": "common",
+      "displayName": "Release with Debug Info",
+      "description": "Release build with optimizations and debug symbols for profiling",
+      "binaryDir": "${sourceDir}/build-relwithdebinfo",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "relwithdebinfo",
+      "configurePreset": "relwithdebinfo",
+      "description": "Build release with debug info configuration",
+      "jobs": 8
+    }
+  ]
+}

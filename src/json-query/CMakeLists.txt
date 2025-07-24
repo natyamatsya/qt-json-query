@@ -16,6 +16,7 @@ set(JSON_QUERY_SOURCES
     json-path/JSONPathExpected.cpp
     json-path/JSONPathPointerConversion.cpp
     json-path/JSONPathLog.cpp
+    json-path/internal/IterativeRecursiveDescent.cpp
 )
 
 # ---------------------------------------------------------------------------

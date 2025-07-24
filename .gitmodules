@@ -1,3 +1,9 @@
 [submodule "tests/references/jayway-json-path"]
 	path = tests/references/jayway-json-path
 	url = https://github.com/json-path/JsonPath.git
+[submodule "compliance/rfc-9535-jsonpath-test-suite"]
+	path = compliance/rfc-9535-jsonpath-test-suite
+	url = https://github.com/jsonpath-standard/jsonpath-compliance-test-suite.git
+[submodule "tests/references/flitbit-json-ptr"]
+	path = tests/references/flitbit-json-ptr
+	url = https://github.com/flitbit/json-ptr.git

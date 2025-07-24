@@ -2,6 +2,7 @@
   "version": 9,
   "include": [
     "cmake/presets/Debug.json",
-    "cmake/presets/Release.json"
+    "cmake/presets/Release.json",
+    "cmake/presets/RelWithDebInfo.json"
   ]
 }
