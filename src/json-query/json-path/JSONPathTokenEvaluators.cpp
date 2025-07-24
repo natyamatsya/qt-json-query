@@ -1,9 +1,12 @@
 #include "json-query/json-path/JSONPathTokenEvaluators.hpp"
 #include "json-query/json-path/JSONPathEvaluate.hpp"  // normalizeIndex, evalSlice
 #include "json-query/json-path/JSONPathEvalError.hpp"  // EvalError
+#include "json-query/json-path/internal/ContainerCursor.hpp"  // ContainerCursor for optimized iteration
 #include <expected>
 
 namespace json_query::json_path::detail {
+
+using json_query::json_path::internal::ContainerCursor;
 
 // --- Key -------------------------------------------------------------------
 template<>
@@ -92,7 +95,10 @@ std::expected<QJsonArray, EvalError> evalExpected<Token::Kind::Filter>(const Pat
     
     if (v.isArray()) {
         const QJsonArray arr = v.toArray(); // Create proper copy to avoid iterator invalidation
-        for (const auto& item : arr) {
+        
+        // Use ContainerCursor for optimized, zero-copy array iteration during filter evaluation
+        auto cursor = ContainerCursor::array(arr);
+        for (const auto& item : cursor) {
             bool pass = false;
             if (useContextFilter) {
                 const auto& contextFilterFn = ctx.contextFilters[tk.contextFilterId];
@@ -107,8 +113,10 @@ std::expected<QJsonArray, EvalError> evalExpected<Token::Kind::Filter>(const Pat
         }
     } else if (v.isObject()) {
         const QJsonObject obj = v.toObject(); // Create proper copy to avoid iterator invalidation
-        for (auto it = obj.begin(); it != obj.end(); ++it) {
-            const QJsonValue val = it.value(); // Create proper copy instead of reference
+        
+        // Use ContainerCursor for optimized, zero-copy object iteration during filter evaluation
+        auto cursor = ContainerCursor::object(obj);
+        for (const auto& val : cursor) {
             bool pass = false;
             if (useContextFilter) {
                 const auto& contextFilterFn = ctx.contextFilters[tk.contextFilterId];
