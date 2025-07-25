@@ -33,12 +33,12 @@ JSONPath::EvalResult JSONPath::evaluate(const QJsonValue& value) const
 {
     try {
         json_path::detail::PathEvalCtx ctx{m_tokens, m_filters, m_contextFilters, value, m_func};
-        auto result = json_path::detail::evaluate(ctx, value);
-        if (result) {
-            return *result;
-        } else {
-            return std::unexpected(result.error());
-        }
+        
+        // C++23 Monadic Chain - Elegant error propagation without manual checks!
+        return json_path::detail::evaluate(ctx, value)
+            .or_else([](json_path::EvalError error) -> EvalResult {
+                return std::unexpected(error);
+            });
     } catch (...) {
         return std::unexpected(json_path::EvalError::TypeMismatchObject);
     }
@@ -59,12 +59,12 @@ JSONPath::EvalArrayResult JSONPath::evaluateAll(const QJsonValue& value) const
 {
     try {
         json_path::detail::PathEvalCtx ctx{m_tokens, m_filters, m_contextFilters, value, m_func};
-        auto result = json_path::detail::evaluateAll(ctx, value);
-        if (result) {
-            return *result;
-        } else {
-            return std::unexpected(result.error());
-        }
+        
+        // C++23 Monadic Chain - Elegant error propagation without manual checks!
+        return json_path::detail::evaluateAll(ctx, value)
+            .or_else([](json_path::EvalError error) -> EvalArrayResult {
+                return std::unexpected(error);
+            });
     } catch (...) {
         return std::unexpected(json_path::EvalError::TypeMismatchObject);
     }

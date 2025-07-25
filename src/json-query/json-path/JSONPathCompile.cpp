@@ -777,17 +777,19 @@ std::expected<CompilationResult, Error> compile(QStringView rawPath)
     if (path.isEmpty())
         return std::unexpected(Error::EmptySegment);
 
-    // Compile into tokens + filter list
-    auto compiled = compilePath(path);
-    if (!compiled) {
-        qCDebug(jsonPathLog) << "compile: compilePath failed with error" << static_cast<int>(compiled.error());
-        return std::unexpected(compiled.error());
-    }
-
-    return CompilationResult{
-        func,
-        std::move(*compiled)
-    };
+    // C++23 Monadic Chain - Elegant error composition without manual checks!
+    return compilePath(path)
+        .transform([func](Compiled&& compiled) -> CompilationResult {
+            qCDebug(jsonPathLog) << "compile: compilePath succeeded";
+            return CompilationResult{
+                func,
+                std::move(compiled)
+            };
+        })
+        .or_else([](Error error) -> std::expected<CompilationResult, Error> {
+            qCDebug(jsonPathLog) << "compile: compilePath failed with error" << static_cast<int>(error);
+            return std::unexpected(error);
+        });
 }
 
 } // namespace json_query::json_path

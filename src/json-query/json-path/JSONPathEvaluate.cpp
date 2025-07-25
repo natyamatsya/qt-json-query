@@ -653,24 +653,23 @@ std::expected<QJsonValue, EvalError> evaluate(const PathEvalCtx& ctx, const QJso
 
 std::expected<QJsonArray, EvalError> evaluateAll(const PathEvalCtx& ctx, const QJsonValue& root)
 {
-    auto res = evaluate(ctx, root);
-    if (!res) {
-        return std::unexpected(res.error());
-    }
-    
-    // Special handling for root-only selectors: preserve the result as a single item
-    // even if it's an array, to match RFC 9535 CTS expectations
-    bool isRootSelectorOnly = (ctx.tokens.size() == 1);
-    if (isRootSelectorOnly) {
-        // Root selector should return the document itself as a single result
-        if (res->isUndefined() || res->isNull()) return {};
-        return QJsonArray{*res};
-    }
-    
-    // For non-root selectors, expand arrays into individual results
-    if (res->isArray()) return res->toArray();
-    if (res->isUndefined() || res->isNull()) return {};
-    return QJsonArray{*res};
+    // C++23 Monadic Chain - Elegant error composition without manual checks!
+    return evaluate(ctx, root)
+        .transform([&ctx](const QJsonValue& res) -> QJsonArray {
+            // Special handling for root-only selectors: preserve the result as a single item
+            // even if it's an array, to match RFC 9535 CTS expectations
+            bool isRootSelectorOnly = (ctx.tokens.size() == 1);
+            if (isRootSelectorOnly) {
+                // Root selector should return the document itself as a single result
+                if (res.isUndefined() || res.isNull()) return {};
+                return QJsonArray{res};
+            }
+            
+            // For non-root selectors, expand arrays into individual results
+            if (res.isArray()) return res.toArray();
+            if (res.isUndefined() || res.isNull()) return {};
+            return QJsonArray{res};
+        });
 }
 
 } // namespace json_query::json_path::detail

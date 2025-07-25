@@ -22,44 +22,45 @@ namespace json_query {
     {
         qCDebug(jsonPathLog) << "JSONPath::create() called with rawPath=" << rawPath << "and optimization level" << static_cast<int>(optLevel);
         
-        // Standard compilation first
-        auto result = compile(rawPath);
-        if (!result.has_value()) {
-            qCDebug(jsonPathLog) << "JSONPath::create() compile failed, returning error" << static_cast<int>(result.error());
-            return std::unexpected(result.error());
-        }
-        
-        qCDebug(jsonPathLog) << "JSONPath::create() compile succeeded, running optimization passes";
-        
-        // Create evaluation context for pass pipeline (compilation-time analysis)
-        QJsonValue dummyRoot; // Passes analyze structure, not data
-        json_path::detail::PathEvalCtx evalCtx(
-            result.value().compiled.tokens,
-            result.value().compiled.filters, 
-            result.value().compiled.contextFilters,
-            dummyRoot,
-            result.value().function
-        );
-        
-        // Run LLVM-inspired optimization passes during compilation
-        PassContext passContext(evalCtx, dummyRoot);
-        auto passManager = PassManager::createDefaultPipeline(optLevel);
-        
-        auto startTime = std::chrono::high_resolution_clock::now();
-        bool passesModified = passManager->runPasses(passContext);
-        auto endTime = std::chrono::high_resolution_clock::now();
-        
-        auto passDuration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
-        qCDebug(jsonPathLog) << "Pass pipeline executed in" << passDuration.count() << "μs, modified:" << passesModified;
-        
-        // TODO: Apply pass optimizations to compiled tokens/filters
-        // For now, we use the original compiled result but with pass insights stored
-        
-        return JSONPath(result.value().function,
-                        rawPath.toString(),
-                        std::move(result.value().compiled.tokens),
-                        std::move(result.value().compiled.filters),
-                        std::move(result.value().compiled.contextFilters));
+        // C++23 Monadic Chain - Elegant error composition without manual checks!
+        return compile(rawPath)
+            .and_then([&rawPath, optLevel](json_path::CompilationResult&& compilationResult) -> JSONPath::Result {
+                qCDebug(jsonPathLog) << "JSONPath::create() compile succeeded, running optimization passes";
+                
+                // Create evaluation context for pass pipeline (compilation-time analysis)
+                QJsonValue dummyRoot; // Passes analyze structure, not data
+                json_path::detail::PathEvalCtx evalCtx(
+                    compilationResult.compiled.tokens,
+                    compilationResult.compiled.filters, 
+                    compilationResult.compiled.contextFilters,
+                    dummyRoot,
+                    compilationResult.function
+                );
+                
+                // Run LLVM-inspired optimization passes during compilation
+                PassContext passContext(evalCtx, dummyRoot);
+                auto passManager = PassManager::createDefaultPipeline(optLevel);
+                
+                auto startTime = std::chrono::high_resolution_clock::now();
+                bool passesModified = passManager->runPasses(passContext);
+                auto endTime = std::chrono::high_resolution_clock::now();
+                
+                auto passDuration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
+                qCDebug(jsonPathLog) << "Pass pipeline executed in" << passDuration.count() << "μs, modified:" << passesModified;
+                
+                // TODO: Apply pass optimizations to compiled tokens/filters
+                // For now, we use the original compiled result but with pass insights stored
+                
+                return JSONPath(compilationResult.function,
+                                rawPath.toString(),
+                                std::move(compilationResult.compiled.tokens),
+                                std::move(compilationResult.compiled.filters),
+                                std::move(compilationResult.compiled.contextFilters));
+            })
+            .or_else([](Error error) -> JSONPath::Result {
+                qCDebug(jsonPathLog) << "JSONPath::create() compile failed, returning error" << static_cast<int>(error);
+                return std::unexpected(error);
+            });
     }
 
 } // namespace json_query
