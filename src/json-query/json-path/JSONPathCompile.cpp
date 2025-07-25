@@ -360,7 +360,7 @@ struct BracketSink {
     QVector<FilterFn>& filters;
     int               currentBracketGroupId; // Track current bracket group ID
 
-    std::expected<void,Error> key(QString key, bool allow=false) { 
+    std::expected<void, Error> key(QString key, bool allow=false) { 
         // Create token with bracket group ID
         if (!allow && key.contains(u' '))
             return std::unexpected(Error::BlankInKey);
@@ -953,7 +953,27 @@ std::expected<json_query::json_path::Compiled, json_query::json_path::Error> com
                 
                 // Apply appropriate parser based on current character
                 auto nextPosResult = 
-                    (currentState.sv[currentState.pos] == u'.') ? 
+                    (currentState.sv[currentState.pos] == u'.' && 
+                     currentState.pos + 1 < currentState.sv.size() && 
+                     currentState.sv[currentState.pos + 1] == u'.') ? 
+                        // Handle descendant segment (..) directly
+                        [&currentState]() -> std::expected<qsizetype, json_query::json_path::Error> {
+                            qCDebug(json_query::json_path::jsonPathLog) << "compilePath: found descendant segment (..) at pos=" << currentState.pos;
+                            currentState.tokens.append(json_query::json_path::Token{json_query::json_path::Token::Kind::Recursive});
+                            qsizetype newPos = currentState.pos + 2;
+                            if (newPos >= currentState.sv.size()) {
+                                return std::unexpected(json_query::json_path::Error::TrailingRecursive);
+                            }
+                            return newPos;
+                        }()
+                  : (currentState.sv[currentState.pos] == u'*') ?
+                        // Handle wildcard directly
+                        [&currentState]() -> std::expected<qsizetype, json_query::json_path::Error> {
+                            qCDebug(json_query::json_path::jsonPathLog) << "compilePath: found wildcard (*) at pos=" << currentState.pos;
+                            currentState.tokens.append(json_query::json_path::Token{json_query::json_path::Token::Kind::Wildcard});
+                            return currentState.pos + 1;
+                        }()
+                  : (currentState.sv[currentState.pos] == u'.') ? 
                         json_query::json_path::detail::parseDot(currentState.pos, currentState.sv, currentState.kb, currentState.tokens)
                   : (currentState.sv[currentState.pos] == u'[') ? 
                         json_query::json_path::detail::parseBracket(currentState.pos, currentState.sv, currentState.kb, currentState.tokens, 
