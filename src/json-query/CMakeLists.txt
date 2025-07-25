@@ -9,6 +9,9 @@ set(JSON_QUERY_SOURCES
     json-path/JSONPath.cpp
     json-path/JSONPathCreate.cpp
     json-path/JSONPathCompile.cpp
+    json-path/JSONPathParseUtils.cpp
+    json-path/JSONPathBracketRules.cpp
+    json-path/JSONPathParsers.cpp
     json-path/JSONPathFilter.cpp
     json-path/JSONPathContextFilter.cpp
     json-path/JSONPathTokenEvaluators.cpp
