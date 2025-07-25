@@ -309,6 +309,11 @@ std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token&
     
     fanOutStreaming(ctx, tk, src, collector.getStreamer(), tokenPos);
     
+    // Check if an error occurred during streaming
+    if (collector.hasError()) {
+        return std::unexpected(collector.getLastError());
+    }
+    
     // Move result to avoid copying
     QJsonArray finalResult = std::move(*pooledResult);
     return finalResult;
