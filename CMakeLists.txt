@@ -77,13 +77,6 @@ add_subdirectory(examples)
 # Add organized subdirectories
 add_subdirectory(compliance)
 add_subdirectory(perf)
-add_subdirectory(debug)
-
-# Add debug test executable
-add_executable(debug_regression debug_test.cpp)
-target_link_libraries(debug_regression PRIVATE json-query Qt6::Core function_ref_interface)
-target_compile_features(debug_regression PRIVATE cxx_std_23)
-target_include_directories(debug_regression PRIVATE include)
 
 # Unit tests (GoogleTest)
 if (BUILD_TESTING)
