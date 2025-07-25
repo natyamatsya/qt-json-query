@@ -291,34 +291,46 @@ std::expected<QJsonArray, EvalError> processUnionTokens(
     const QJsonValue& root)
 {
     qCDebug(jsonPathLog) << "[processUnionTokens] Starting with" << unionTokens.size() << "tokens";
+    
+    // Monadic approach: Transform union tokens into results using monadic chaining
     QVector<QJsonArray> resultArrays;
     resultArrays.reserve(unionTokens.size());
-    bool anySuccess = false;
-    EvalError lastError = EvalError::TypeMismatchObject; // Default error value
     
-    // Process each union token - collect successes, ignore failures
-    for (qsizetype tokenIdx : unionTokens) {
+    // Use monadic pattern to process each token and collect successful results
+    auto processToken = [&](qsizetype tokenIdx) -> std::optional<QJsonArray> {
         qCDebug(jsonPathLog) << "[processUnionTokens] Processing token" << tokenIdx;
+        
         auto tokenResult = processSingleUnionToken(ctx, tokenIdx, working, root);
-        if (!tokenResult.success) {
-            qCDebug(jsonPathLog) << "[processUnionTokens] Token" << tokenIdx << "failed with error" << static_cast<int>(tokenResult.error) << "- continuing with other tokens";
-            lastError = tokenResult.error;
-            // Continue processing other tokens instead of failing immediately
-        } else {
+        if (tokenResult.success) {
             qCDebug(jsonPathLog) << "[processUnionTokens] Token" << tokenIdx << "succeeded with" << tokenResult.results.size() << "results";
-            resultArrays.append(tokenResult.results);
-            anySuccess = true;
+            return tokenResult.results;
+        } else {
+            qCDebug(jsonPathLog) << "[processUnionTokens] Token" << tokenIdx << "failed with error" << static_cast<int>(tokenResult.error) << "- continuing with other tokens";
+            return std::nullopt; // Convert failure to empty optional for union semantics
+        }
+    };
+    
+    // Collect successful results using monadic transformation
+    EvalError lastError = EvalError::TypeMismatchObject;
+    for (qsizetype tokenIdx : unionTokens) {
+        if (auto result = processToken(tokenIdx)) {
+            resultArrays.append(*result);
+        } else {
+            // Track last error for potential failure case
+            auto tokenResult = processSingleUnionToken(ctx, tokenIdx, working, root);
+            if (!tokenResult.success) {
+                lastError = tokenResult.error;
+            }
         }
     }
     
-    // Only fail if ALL tokens failed
-    if (!anySuccess) {
+    // Monadic error handling: Only fail if ALL tokens failed
+    if (resultArrays.isEmpty()) {
         qCDebug(jsonPathLog) << "[processUnionTokens] All tokens failed, returning last error" << static_cast<int>(lastError);
         return std::unexpected(lastError);
     }
     
     qCDebug(jsonPathLog) << "[processUnionTokens] Merging results from" << resultArrays.size() << "successful arrays";
-    // Merge all successful results
     auto mergedResults = mergeTokenResults(resultArrays, root);
     qCDebug(jsonPathLog) << "[processUnionTokens] Merged to" << mergedResults.size() << "total results";
     return mergedResults;

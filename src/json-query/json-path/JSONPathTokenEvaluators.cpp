@@ -31,14 +31,17 @@ std::expected<QJsonArray, EvalError> evalExpected<Token::Kind::Index>(const Path
                                                                        const Token& tk,
                                                                        const QJsonValue& v)
 {
+    // RFC 9535 compliance: "Nothing is selected from a value that is not an array"
     if (!v.isArray()) {
-        return std::unexpected(EvalError::TypeMismatchArray);
+        return QJsonArray{}; // Empty result for non-arrays (not an error per RFC 9535)
     }
     
     const QJsonArray arr = v.toArray(); // Create copy to avoid iterator invalidation
     const int idx = normalizeIndex(tk.index, arr.size());
+    
+    // RFC 9535 compliance: "Nothing is selected, and it is not an error, if the index lies outside the range of the array"
     if (idx < 0 || idx >= arr.size()) {
-        return std::unexpected(EvalError::IndexOutOfRange);
+        return QJsonArray{}; // Empty result for out-of-range (not an error per RFC 9535)
     }
     
     QJsonArray out;
