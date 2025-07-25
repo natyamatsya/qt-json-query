@@ -1,5 +1,6 @@
 #include "json-query/json-path/JSONPathEvalHelpers.hpp"
 #include "json-query/json-path/JSONPathTokenEvaluators.hpp"
+#include "json-query/json-path/JSONPathTokenDispatch.hpp"
 #include "json-query/json-path/internal/ContextAwareContainerCursor.hpp"
 #include "json-query/json-path/internal/ArrayPool.hpp"
 #include "json-query/json-path/JSONPathLog.hpp"
@@ -242,39 +243,41 @@ TokenProcessingResult processSingleUnionToken(
     const QJsonArray& working, 
     const QJsonValue& root)
 {
-    // Forward declare evaluateTokenExpected (will be available after token dispatch split)
-    extern std::expected<QJsonArray, EvalError> evaluateTokenExpected(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v);
-    
+    qCDebug(jsonPathLog) << "[processSingleUnionToken] Processing token" << tokenIdx << "with" << working.size() << "working values";
     TokenProcessingResult result;
     
-    for (const auto& workingValue : working) {
+    for (qsizetype i = 0; i < working.size(); ++i) {
+        const auto& workingValue = working[i];
+        qCDebug(jsonPathLog) << "[processSingleUnionToken] Processing working value" << i << "of type" << static_cast<int>(workingValue.type());
+        
         auto tokenResult = evaluateTokenExpected(ctx, ctx.tokens[tokenIdx], workingValue);
         if (!tokenResult) {
+            qCDebug(jsonPathLog) << "[processSingleUnionToken] Token evaluation failed with error" << static_cast<int>(tokenResult.error());
             result.success = false;
             result.error = tokenResult.error();
             return result;
         }
         
+        qCDebug(jsonPathLog) << "[processSingleUnionToken] Token evaluation succeeded with" << tokenResult->size() << "results";
         // Append results from this token
         for (const auto& value : *tokenResult) {
             result.results.append(value);
         }
     }
     
+    qCDebug(jsonPathLog) << "[processSingleUnionToken] Completed with" << result.results.size() << "total results";
     result.success = true;
     return result;
 }
 
-// Helper: Merge results from multiple tokens using context-aware cursor
+// Helper: Merge results from multiple tokens using simple concatenation
 QJsonArray mergeTokenResults(const QVector<QJsonArray>& resultArrays, const QJsonValue& root) {
     QJsonArray collectedResults;
     
+    // Simple concatenation approach - avoid complex cursor logic that may cause infinite loops
     for (const auto& results : resultArrays) {
-        if (!results.isEmpty()) {
-            auto resultCursor = json_query::json_path::internal::makeSimpleContextCursor(results, root, root);
-            for (const auto& [result, context] : resultCursor) {
-                collectedResults.append(result);
-            }
+        for (const auto& value : results) {
+            collectedResults.append(value);
         }
     }
     
@@ -287,20 +290,38 @@ std::expected<QJsonArray, EvalError> processUnionTokens(
     const QJsonArray& working, 
     const QJsonValue& root)
 {
+    qCDebug(jsonPathLog) << "[processUnionTokens] Starting with" << unionTokens.size() << "tokens";
     QVector<QJsonArray> resultArrays;
     resultArrays.reserve(unionTokens.size());
+    bool anySuccess = false;
+    EvalError lastError = EvalError::TypeMismatchObject; // Default error value
     
-    // Process each union token
+    // Process each union token - collect successes, ignore failures
     for (qsizetype tokenIdx : unionTokens) {
+        qCDebug(jsonPathLog) << "[processUnionTokens] Processing token" << tokenIdx;
         auto tokenResult = processSingleUnionToken(ctx, tokenIdx, working, root);
         if (!tokenResult.success) {
-            return std::unexpected(tokenResult.error);
+            qCDebug(jsonPathLog) << "[processUnionTokens] Token" << tokenIdx << "failed with error" << static_cast<int>(tokenResult.error) << "- continuing with other tokens";
+            lastError = tokenResult.error;
+            // Continue processing other tokens instead of failing immediately
+        } else {
+            qCDebug(jsonPathLog) << "[processUnionTokens] Token" << tokenIdx << "succeeded with" << tokenResult.results.size() << "results";
+            resultArrays.append(tokenResult.results);
+            anySuccess = true;
         }
-        resultArrays.append(tokenResult.results);
     }
     
-    // Merge all results
-    return mergeTokenResults(resultArrays, root);
+    // Only fail if ALL tokens failed
+    if (!anySuccess) {
+        qCDebug(jsonPathLog) << "[processUnionTokens] All tokens failed, returning last error" << static_cast<int>(lastError);
+        return std::unexpected(lastError);
+    }
+    
+    qCDebug(jsonPathLog) << "[processUnionTokens] Merging results from" << resultArrays.size() << "successful arrays";
+    // Merge all successful results
+    auto mergedResults = mergeTokenResults(resultArrays, root);
+    qCDebug(jsonPathLog) << "[processUnionTokens] Merged to" << mergedResults.size() << "total results";
+    return mergedResults;
 }
 
 // Helper: Collect keys from consecutive Key/KeyList tokens
@@ -339,8 +360,16 @@ bool objectContainsAllKeys(const QJsonObject& obj, const QStringList& keys)
 // Helper: Process object for leaf selection
 void processObjectForLeafSelection(const QJsonObject& obj, const QStringList& keys, const QJsonValue& v, QJsonArray* results)
 {
-    if (objectContainsAllKeys(obj, keys)) {
+    if (!objectContainsAllKeys(obj, keys)) {
+        return;
+    }
+    
+    if (keys.size() > 1) {
+        // Multi-property leaf union ⇒ return parent only (Jayway)
         results->append(v);
+    } else {
+        // Single-property leaf: return only the value, not the parent
+        results->append(obj.value(keys.first()));
     }
 }
 

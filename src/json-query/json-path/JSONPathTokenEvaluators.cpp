@@ -77,7 +77,7 @@ std::expected<QJsonArray, EvalError> evalExpected<Token::Kind::Recursive>(const 
                                                                            const Token&,
                                                                            const QJsonValue& v)
 {
-    return evaluateRecursive(v);
+    return evaluateRecursive(v, 0);
 }
 
 // --- Filter ----------------------------------------------------------------

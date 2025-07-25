@@ -53,6 +53,8 @@ std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const 
                  << "working size=" << working->size();
 
         bool prevRecursive = (i>0 && ctx.tokens[i-1].kind == Token::Kind::Recursive);
+        
+        qCDebug(jsonPathLog) << "[evalStandard] Token" << i << "kind=" << static_cast<int>(tk.kind) << "prevRecursive=" << prevRecursive;
 
         // Check for union semantics: consecutive tokens that should be evaluated together
         // This handles both same-kind unions (e.g., $[0,2]) and mixed-type unions (e.g., $[?@.a,1])

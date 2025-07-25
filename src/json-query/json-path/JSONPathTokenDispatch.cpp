@@ -42,15 +42,72 @@ void fanOutStreaming(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& 
                          << "srcType" << static_cast<int>(src.first().type()) 
                          << "seg size=" << src.size();
 
+    bool anySuccess = false;
+    EvalError lastError = EvalError::TypeMismatchObject; // Default error
+    
+    // Determine if we should use permissive or strict error handling
+    bool usePermissiveErrorHandling = false;
+    
+    if (tk.kind == Token::Kind::Index) {
+        if (tokenPos == 1) {
+            // Direct array access: always use permissive error handling (RFC 9535)
+            usePermissiveErrorHandling = true;
+        } else if (tokenPos > 1) {
+            // Check if we're in a recursive descent context by looking back through tokens
+            bool inRecursiveContext = false;
+            for (qsizetype i = tokenPos - 1; i >= 1; --i) {
+                const Token& prevToken = ctx.tokens[i];
+                if (prevToken.kind == Token::Kind::Recursive) {
+                    // Found recursive descent in the token chain
+                    inRecursiveContext = true;
+                    break;
+                } else if (prevToken.kind == Token::Kind::Key) {
+                    // Property access breaks the recursive context
+                    break;
+                }
+                // Index tokens continue the recursive context
+            }
+            
+            if (inRecursiveContext) {
+                // After recursive descent: use permissive error handling (RFC 9535)
+                usePermissiveErrorHandling = true;
+            } else {
+                // After property chain: use strict error handling (UpstreamArrayIndexOOB)
+                usePermissiveErrorHandling = false;
+            }
+        }
+    }
+
     for (const auto& srcValue : src) {
         auto result = evaluateTokenExpected(ctx, tk, srcValue);
         if (result) {
-            // Use emitArray to stream all results directly
+            // Success: stream results directly
+            anySuccess = true;
             streamer.emitArray(*result);
         } else {
+            // Failure: record error
+            lastError = result.error();
             qCDebug(jsonPathLog) << "[fanOutStreaming] token evaluation failed:" << static_cast<int>(result.error());
-            // Continue with other values even if one fails
+            
+            // Context-aware error handling for Index tokens
+            if (tk.kind == Token::Kind::Index && !usePermissiveErrorHandling) {
+                // Strict error handling: propagate errors immediately (property chain access)
+                streamer.handleError(lastError);
+                return;
+            }
+            // Permissive error handling: continue processing (direct access or after recursive descent)
         }
+    }
+    
+    // For permissive error handling, don't emit error if no results (RFC 9535 compliance)
+    if (tk.kind == Token::Kind::Index && usePermissiveErrorHandling && !anySuccess) {
+        // Empty result for RFC 9535 compliance - no emission needed
+        return;
+    }
+    
+    // Only emit error if ALL evaluations failed (non-permissive contexts)
+    if (!anySuccess) {
+        streamer.handleError(lastError);
     }
 }
 
