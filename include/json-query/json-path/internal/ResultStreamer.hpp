@@ -4,6 +4,7 @@
 #include <QJsonArray>
 #include <functional>
 #include <expected>
+#include <stdcompat/function_ref.hpp>
 #include "json-query/json-path/JSONPathEvalError.hpp"
 
 namespace json_query::json_path::internal {
@@ -17,25 +18,30 @@ namespace json_query::json_path::internal {
  */
 class ResultStreamer {
 public:
-    using EmitFunction = std::function<void(const QJsonValue&)>;
-    using ErrorHandler = std::function<void(EvalError)>;
+    using EmitFunction = stdcompat::function_ref<void(const QJsonValue&)>;
+    using ErrorHandler = stdcompat::function_ref<void(EvalError)>;
+
+    /**
+     * @brief Construct a ResultStreamer with emission callback only
+     * @param emitFn Function called for each result value
+     */
+    constexpr explicit ResultStreamer(EmitFunction emitFn) noexcept
+        : emitFn_(emitFn), hasErrorHandler_(false) {}
 
     /**
      * @brief Construct a ResultStreamer with emission and error handling callbacks
      * @param emitFn Function called for each result value
      * @param errorFn Function called when errors occur
      */
-    constexpr ResultStreamer(EmitFunction emitFn, ErrorHandler errorFn = nullptr) noexcept
-        : emitFn_(std::move(emitFn)), onError_(std::move(errorFn)) {}
+    constexpr ResultStreamer(EmitFunction emitFn, ErrorHandler errorFn) noexcept
+        : emitFn_(emitFn), onError_(errorFn), hasErrorHandler_(true) {}
 
     /**
      * @brief Emit a single result value
      * @param value The JSON value to emit
      */
     constexpr void emitValue(const QJsonValue& value) const noexcept {
-        if (emitFn_) {
-            emitFn_(value);
-        }
+        emitFn_(value);
     }
 
     /**
@@ -43,29 +49,27 @@ public:
      * @param array The array containing values to emit
      */
     void emitArray(const QJsonArray& array) const noexcept {
-        if (emitFn_) {
-            for (const auto& value : array) {
-                emitFn_(value);
-            }
+        for (const auto& value : array) {
+            emitFn_(value);
         }
     }
 
     /**
      * @brief Handle an error during streaming
-     * @param error The evaluation error that occurred
+     * @param error The error that occurred
      */
     constexpr void handleError(EvalError error) const noexcept {
-        if (onError_) {
+        if (hasErrorHandler_) {
             onError_(error);
         }
     }
 
     /**
-     * @brief Check if the streamer has an emit function
-     * @return true if the streamer can emit results
+     * @brief Check if the streamer can emit results
+     * @return true (always, since emitFn_ is required)
      */
     [[nodiscard]] constexpr bool canEmit() const noexcept {
-        return static_cast<bool>(emitFn_);
+        return true;
     }
 
     /**
@@ -73,92 +77,91 @@ public:
      * @return true if the streamer can handle errors
      */
     [[nodiscard]] constexpr bool canHandleErrors() const noexcept {
-        return static_cast<bool>(onError_);
+        return hasErrorHandler_;
     }
 
 private:
     EmitFunction emitFn_;
-    ErrorHandler onError_;
+    ErrorHandler onError_{[](EvalError){}};  // Default no-op handler
+    bool hasErrorHandler_;
 };
 
 /**
- * @brief Utility class for collecting streamed results into a QJsonArray
+ * @brief Result collector that accumulates values into a QJsonArray
  * 
- * This class provides a bridge between the streaming interface and the existing
- * QJsonArray-based API, allowing gradual migration to streaming.
+ * ResultCollector provides a convenient way to collect streaming results
+ * into a traditional QJsonArray for compatibility with existing APIs.
  */
 class ResultCollector {
 public:
-    /**
-     * @brief Construct a ResultCollector with internal array
-     */
-    ResultCollector() = default;
-    
-    /**
-     * @brief Construct a ResultCollector that writes to an external array
-     * @param externalArray Reference to external QJsonArray to collect results
-     */
-    explicit ResultCollector(QJsonArray& externalArray) : externalResults_(&externalArray) {}
+    using ErrorHandler = stdcompat::function_ref<void(EvalError)>;
 
     /**
-     * @brief Get a ResultStreamer that collects results into this collector
-     * @return ResultStreamer configured to collect results
+     * @brief Construct a ResultCollector that accumulates into the provided array
+     * @param results Reference to QJsonArray where results will be accumulated
+     */
+    explicit ResultCollector(QJsonArray& results) noexcept
+        : results_(results), hasErrorHandler_(false) {}
+
+    /**
+     * @brief Construct a ResultCollector with error handling
+     * @param results Reference to QJsonArray where results will be accumulated
+     * @param errorFn Function called when errors occur
+     */
+    ResultCollector(QJsonArray& results, ErrorHandler errorFn) noexcept
+        : results_(results), onError_(errorFn), hasErrorHandler_(true) {}
+
+    /**
+     * @brief Get a ResultStreamer that collects into this collector
+     * @return ResultStreamer configured to use this collector
      */
     [[nodiscard]] ResultStreamer getStreamer() noexcept {
-        return ResultStreamer(
-            [this](const QJsonValue& value) { 
-                if (externalResults_) {
-                    externalResults_->append(value);
-                } else {
-                    results_.append(value);
-                }
-            },
-            [this](EvalError error) { lastError_ = error; hasError_ = true; }
-        );
+        if (hasErrorHandler_) {
+            return ResultStreamer{
+                [this](const QJsonValue& value) { collect(value); },
+                onError_
+            };
+        } else {
+            return ResultStreamer{
+                [this](const QJsonValue& value) { collect(value); }
+            };
+        }
     }
-    
+
     /**
      * @brief Emit a single value (for compatibility with streaming interface)
      * @param value Value to emit
      */
     void emitValue(const QJsonValue& value) {
-        if (externalResults_) {
-            externalResults_->append(value);
-        } else {
-            results_.append(value);
-        }
-    }
-    
-    /**
-     * @brief Emit an array of values (for compatibility with streaming interface)
-     * @param array Array of values to emit
-     */
-    void emitArray(const QJsonArray& array) {
-        for (const auto& value : array) {
-            emitValue(value);
-        }
+        collect(value);
     }
 
     /**
-     * @brief Get the collected results
-     * @return QJsonArray containing all emitted results
+     * @brief Collect a single value into the results array
+     * @param value The value to add to the results
      */
-    [[nodiscard]] const QJsonArray& getResults() const noexcept {
-        if (externalResults_) {
-            return *externalResults_;
-        }
-        return results_;
+    void collect(const QJsonValue& value) noexcept {
+        results_.append(value);
     }
 
     /**
-     * @brief Move the collected results out of the collector
-     * @return QJsonArray containing all emitted results
+     * @brief Handle an error during collection
+     * @param error The error that occurred
      */
-    [[nodiscard]] QJsonArray moveResults() noexcept {
-        if (externalResults_) {
-            return std::move(*externalResults_);
+    void handleError(EvalError error) noexcept {
+        if (hasErrorHandler_) {
+            onError_(error);
         }
-        return std::move(results_);
+        lastError_ = error;
+        hasError_ = true;
+    }
+
+    /**
+     * @brief Check if the collector has an error handler
+     * @return true if the collector can handle errors
+     */
+    [[nodiscard]] bool canHandleErrors() const noexcept {
+        return hasErrorHandler_;
     }
 
     /**
@@ -178,58 +181,26 @@ public:
     }
 
     /**
-     * @brief Get the collected results as an expected value
-     * @return std::expected containing results or error
-     */
-    [[nodiscard]] std::expected<QJsonArray, EvalError> getExpected() noexcept {
-        if (hasError_) {
-            return std::unexpected(lastError_);
-        }
-        if (externalResults_) {
-            return *externalResults_;
-        }
-        return std::move(results_);
-    }
-
-    /**
-     * @brief Clear the collector for reuse
-     */
-    void clear() noexcept {
-        if (externalResults_) {
-            *externalResults_ = QJsonArray{}; // QJsonArray doesn't have clear()
-        } else {
-            results_ = QJsonArray{};
-        }
-        hasError_ = false;
-        lastError_ = EvalError::TypeMismatchObject; // Use valid enum value
-    }
-
-    /**
      * @brief Get the number of collected results
-     * @return Number of results in the collector
+     * @return The size of the results array
      */
     [[nodiscard]] qsizetype size() const noexcept {
-        if (externalResults_) {
-            return externalResults_->size();
-        }
         return results_.size();
     }
 
     /**
-     * @brief Check if the collector is empty
-     * @return true if no results have been collected
+     * @brief Check if any results have been collected
+     * @return true if the results array is empty
      */
     [[nodiscard]] bool empty() const noexcept {
-        if (externalResults_) {
-            return externalResults_->isEmpty();
-        }
         return results_.isEmpty();
     }
 
 private:
-    QJsonArray results_;
-    QJsonArray* externalResults_ = nullptr; // Optional external array
-    EvalError lastError_ = EvalError::TypeMismatchObject; // Use valid enum value
+    QJsonArray& results_;
+    ErrorHandler onError_{[](EvalError){}};  // Default no-op handler
+    bool hasErrorHandler_;
+    EvalError lastError_ = EvalError::TypeMismatchObject;
     bool hasError_ = false;
 };
 

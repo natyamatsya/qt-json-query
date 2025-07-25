@@ -18,6 +18,9 @@ target_include_directories(memory_optimization_test PRIVATE
     ${PROJECT_SOURCE_DIR}/include/json-query
 )
 target_compile_features(memory_optimization_test PRIVATE cxx_std_23)
+if(TARGET function_ref_interface)
+    target_link_libraries(memory_optimization_test PRIVATE function_ref_interface)
+endif()
 
 # Qt memory tracker for Qt-specific memory analysis
 add_executable(qt_memory_tracker src/qt_memory_tracker.cpp)
