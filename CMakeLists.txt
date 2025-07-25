@@ -46,6 +46,26 @@ if(NOT TARGET ctre_interface)
     target_include_directories(ctre_interface INTERFACE ${ctre_SOURCE_DIR}/single-header)
 endif()
 
+# ---------------------------------------------------------------------------
+# Header-only function_ref (lightweight non-owning function reference)
+# ---------------------------------------------------------------------------
+FetchContent_Declare(
+    function_ref
+    GIT_REPOSITORY https://github.com/TartanLlama/function_ref.git
+    GIT_TAG master
+)
+
+# Disable function_ref tests to avoid build issues
+set(FUNCTION_REF_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
+
+FetchContent_MakeAvailable(function_ref)
+
+# Create an interface target for function_ref if none provided
+if(NOT TARGET function_ref_interface)
+    add_library(function_ref_interface INTERFACE)
+    target_include_directories(function_ref_interface INTERFACE ${function_ref_SOURCE_DIR}/include)
+endif()
+
 add_subdirectory(src/json-query)
 
 # ---------------------------------------------------------------------------
@@ -77,7 +97,7 @@ endif()
 # ---------------------------------------------------------------------------
 if(JSON_QUERY_ENABLE_INSTALL)
     include(GNUInstallDirs)
-    install(TARGETS json_query ctre_interface EXPORT json_queryTargets
+    install(TARGETS json_query ctre_interface function_ref_interface EXPORT json_queryTargets
             ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
             LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
             RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}

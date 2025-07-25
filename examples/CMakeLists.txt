@@ -20,6 +20,15 @@ target_link_libraries(complex_query PRIVATE json_query)
 add_executable(refactor_potential refactor_potential.cpp)
 target_link_libraries(refactor_potential PRIVATE json_query)
 
+# function_ref demonstration and performance comparison
+add_executable(function_ref_demo function_ref_demo.cpp)
+target_link_libraries(function_ref_demo PRIVATE json_query)
+
+# Link function_ref_interface for access to tl/function_ref.hpp
+if(TARGET function_ref_interface)
+    target_link_libraries(function_ref_demo PRIVATE function_ref_interface)
+endif()
+
 install(TARGETS
     simple_pointer
     compilation_time_passes_demo
@@ -28,5 +37,6 @@ install(TARGETS
     simple_path
     complex_query
     refactor_potential
+    function_ref_demo
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}/examples
 )

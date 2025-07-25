@@ -51,6 +51,11 @@ if(TARGET ctre_interface)
     target_link_libraries(json_query PRIVATE ctre_interface)
 endif()
 
+# Link function_ref header-only interface when available
+if(TARGET function_ref_interface)
+    target_link_libraries(json_query PRIVATE function_ref_interface)
+endif()
+
 # ---------------------------------------------------------------------------
 # Installation (optional; relies on top-level JSON_QUERY_ENABLE_INSTALL option)
 # ---------------------------------------------------------------------------
