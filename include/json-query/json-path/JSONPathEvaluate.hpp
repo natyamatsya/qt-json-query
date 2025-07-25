@@ -23,7 +23,7 @@ std::expected<QJsonArray, EvalError> evaluateTokenExpected(const PathEvalCtx& ct
 std::expected<QJsonArray, EvalError> evaluateToken(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v);
 
 // Fan-out one token over an array of input values
-std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src);
+std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src, qsizetype tokenPos = -1);
 
 // Complete evaluation pipelines with std::expected error handling
 std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const QJsonValue& root);

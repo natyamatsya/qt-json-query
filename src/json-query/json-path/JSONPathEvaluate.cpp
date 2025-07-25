@@ -203,123 +203,6 @@ std::expected<QJsonArray, EvalError> evaluateRecursive(const QJsonValue& value, 
 }
 
 // ---------------------------------------------------------------------------
-//  Token dispatcher with std::expected error handling
-//  Now using TableGen-inspired declarative dispatch system
-// ---------------------------------------------------------------------------
-std::expected<QJsonArray, EvalError> evaluateTokenExpected(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
-{
-    // Use TableGen-inspired dispatch table instead of manual switch
-    return json_query::json_path::internal::TokenDispatcher::dispatch(ctx, tk, v);
-}
-
-// ---------------------------------------------------------------------------
-//  Token dispatcher (ex-JSONPath::evaluateToken)
-// ---------------------------------------------------------------------------
-std::expected<QJsonArray, EvalError> evaluateToken(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
-{
-    return evaluateTokenExpected(ctx, tk, v);
-}
-
-// ---------------------------------------------------------------------------
-//  Streaming-optimized fan-out helper
-// ---------------------------------------------------------------------------
-void fanOutStreaming(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src, 
-                    const ResultStreamer& streamer, qsizetype tokenPos = -1)
-{
-    bool anySuccess = false;
-    EvalError lastError;
-    
-    // Determine if we should use permissive or strict error handling
-    bool usePermissiveErrorHandling = false;
-    
-    if (tk.kind == Token::Kind::Index) {
-        if (tokenPos == 1) {
-            // Direct array access: always use permissive error handling (RFC 9535)
-            usePermissiveErrorHandling = true;
-        } else if (tokenPos > 1) {
-            // Check if we're in a recursive descent context by looking back through tokens
-            bool inRecursiveContext = false;
-            for (qsizetype i = tokenPos - 1; i >= 1; --i) {
-                const Token& prevToken = ctx.tokens[i];
-                if (prevToken.kind == Token::Kind::Recursive) {
-                    // Found recursive descent in the token chain
-                    inRecursiveContext = true;
-                    break;
-                } else if (prevToken.kind == Token::Kind::Key) {
-                    // Property access breaks the recursive context
-                    break;
-                }
-                // Index tokens continue the recursive context
-            }
-            
-            if (inRecursiveContext) {
-                // After recursive descent: use permissive error handling (RFC 9535)
-                usePermissiveErrorHandling = true;
-            } else {
-                // After property chain: use strict error handling (UpstreamArrayIndexOOB)
-                usePermissiveErrorHandling = false;
-            }
-        }
-    }
-    
-    for (const auto& v : src) {
-        auto seg = evaluateTokenExpected(ctx, tk, v);
-        if (seg) {
-            // Success: stream results directly without intermediate array
-            anySuccess = true;
-            qDebug() << "[fanOutStreaming] kind=" << static_cast<int>(tk.kind) << "srcType"
-                     << v.type() << "seg size=" << seg->size();
-            
-            // Stream all results directly
-            streamer.emitArray(*seg);
-        } else {
-            // Failure: record error
-            lastError = seg.error();
-            qDebug() << "[fanOutStreaming] kind=" << static_cast<int>(tk.kind) << "srcType"
-                     << v.type() << "failed with error:" << static_cast<int>(lastError);
-            
-            // Context-aware error handling for Index tokens
-            if (tk.kind == Token::Kind::Index && !usePermissiveErrorHandling) {
-                // Strict error handling: propagate errors immediately (property chain access)
-                streamer.handleError(lastError);
-                return;
-            }
-            // Permissive error handling: continue processing (direct access or after recursive descent)
-        }
-    }
-    
-    // For permissive error handling, don't emit error if no results (RFC 9535 compliance)
-    if (tk.kind == Token::Kind::Index && usePermissiveErrorHandling && !anySuccess) {
-        // Empty result for RFC 9535 compliance - no emission needed
-        return;
-    }
-    
-    // Only emit error if ALL evaluations failed (non-permissive contexts)
-    if (!anySuccess && streamer.canHandleErrors()) {
-        streamer.handleError(lastError);
-    }
-}
-
-// Legacy array-based fan-out (for backward compatibility)
-std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src, qsizetype tokenPos)
-{
-    // Use pooled array for better memory efficiency
-    auto pooledResult = acquirePooledArray();
-    ResultCollector collector(*pooledResult);
-    
-    fanOutStreaming(ctx, tk, src, collector.getStreamer(), tokenPos);
-    
-    // Check if an error occurred during streaming
-    if (collector.hasError()) {
-        return std::unexpected(collector.getLastError());
-    }
-    
-    // Move result to avoid copying
-    QJsonArray finalResult = std::move(*pooledResult);
-    return finalResult;
-}
-
-// ---------------------------------------------------------------------------
 //  Utility helpers reused by evalStandard
 // ---------------------------------------------------------------------------
 static bool addsMultiplicity(const Token& tk)
@@ -370,24 +253,28 @@ static QJsonValue applyTrailing(json_path::FunctionType fn, const QJsonValue& v)
 // ---------------------------------------------------------------------------
 //  Helper functions for evalStandard refactoring
 // ---------------------------------------------------------------------------
-
 struct UnionDetectionResult {
     QVector<qsizetype> unionTokens;
     bool shouldUseUnion;
     qsizetype nextIndex;
 };
 
-UnionDetectionResult detectUnionTokens(const PathEvalCtx& ctx, qsizetype startIndex) {
+// Helper: Check if a token is a selector token that can appear in unions
+bool isSelectorToken(const Token& token) {
+    return token.kind == Token::Kind::Index || token.kind == Token::Kind::Key ||
+           token.kind == Token::Kind::Filter || token.kind == Token::Kind::Wildcard ||
+           token.kind == Token::Kind::Slice;
+}
+
+// Helper: Collect consecutive selector tokens starting from a given index
+QVector<qsizetype> collectConsecutiveSelectorTokens(const PathEvalCtx& ctx, qsizetype startIndex) {
     QVector<qsizetype> unionTokens;
     unionTokens.append(startIndex);
     
     qsizetype j = startIndex + 1;
     while (j < ctx.tokens.size()) {
         const Token& nextTk = ctx.tokens[j];
-        // Include any selector token type that can appear in brackets
-        if (nextTk.kind == Token::Kind::Index || nextTk.kind == Token::Kind::Key ||
-            nextTk.kind == Token::Kind::Filter || nextTk.kind == Token::Kind::Wildcard ||
-            nextTk.kind == Token::Kind::Slice) {
+        if (isSelectorToken(nextTk)) {
             unionTokens.append(j);
             ++j;
         } else {
@@ -395,34 +282,79 @@ UnionDetectionResult detectUnionTokens(const PathEvalCtx& ctx, qsizetype startIn
         }
     }
     
-    // Updated union condition: Use bracket group metadata for accurate union vs sequential distinction
-    bool shouldUseUnion = false;
+    return unionTokens;
+}
+
+// Helper: Check if all tokens are from the same bracket group
+bool areTokensFromSameBracketGroup(const PathEvalCtx& ctx, const QVector<qsizetype>& tokenIndices) {
+    if (tokenIndices.size() <= 1) return false;
     
-    if (unionTokens.size() > 1) {
-        // Check if all tokens are from the same bracket expression
-        bool allFromSameBracket = true;
-        int firstBracketGroupId = ctx.tokens[unionTokens[0]].bracketGroupId;
-        
-        // If first token is not from a bracket, this can't be a bracket union
-        if (firstBracketGroupId <= 0) {
-            allFromSameBracket = false;
-        } else {
-            // Check if all subsequent tokens have the same bracket group ID
-            for (qsizetype i = 1; i < unionTokens.size(); ++i) {
-                if (ctx.tokens[unionTokens[i]].bracketGroupId != firstBracketGroupId) {
-                    allFromSameBracket = false;
-                    break;
-                }
-            }
-        }
-        
-        if (allFromSameBracket) {
-            // All tokens from same bracket expression → union evaluation
-            shouldUseUnion = true;
+    int firstBracketGroupId = ctx.tokens[tokenIndices[0]].bracketGroupId;
+    
+    // If first token is not from a bracket, this can't be a bracket union
+    if (firstBracketGroupId <= 0) {
+        return false;
+    }
+    
+    // Check if all subsequent tokens have the same bracket group ID
+    for (qsizetype i = 1; i < tokenIndices.size(); ++i) {
+        if (ctx.tokens[tokenIndices[i]].bracketGroupId != firstBracketGroupId) {
+            return false;
         }
     }
     
-    return {unionTokens, shouldUseUnion, j};
+    return true;
+}
+
+UnionDetectionResult detectUnionTokens(const PathEvalCtx& ctx, qsizetype startIndex) {
+    QVector<qsizetype> unionTokens = collectConsecutiveSelectorTokens(ctx, startIndex);
+    bool shouldUseUnion = areTokensFromSameBracketGroup(ctx, unionTokens);
+    qsizetype nextIndex = startIndex + unionTokens.size();
+    
+    return {unionTokens, shouldUseUnion, nextIndex};
+}
+
+// Helper: Process a single union token and collect its results
+struct TokenProcessingResult {
+    bool success;
+    QJsonArray results;
+    EvalError error;
+};
+
+TokenProcessingResult processSingleUnionToken(
+    const PathEvalCtx& ctx, 
+    qsizetype tokenIdx, 
+    const QJsonArray& working, 
+    const QJsonValue& root)
+{
+    const Token& unionTk = ctx.tokens[tokenIdx];
+    auto tokenResult = fanOut(ctx, unionTk, working, tokenIdx);
+    
+    if (tokenResult) {
+        qDebug() << "[union] token" << tokenIdx << "kind" << static_cast<int>(unionTk.kind) 
+                 << "contributed" << tokenResult->size() << "results";
+        return {true, *tokenResult, EvalError()};
+    } else {
+        qDebug() << "[union] token" << tokenIdx << "kind" << static_cast<int>(unionTk.kind) 
+                 << "failed with error" << static_cast<int>(tokenResult.error());
+        return {false, QJsonArray{}, tokenResult.error()};
+    }
+}
+
+// Helper: Merge results from multiple tokens using context-aware cursor
+QJsonArray mergeTokenResults(const QVector<QJsonArray>& resultArrays, const QJsonValue& root) {
+    QJsonArray collectedResults;
+    
+    for (const auto& results : resultArrays) {
+        if (!results.isEmpty()) {
+            auto resultCursor = json_query::json_path::internal::makeSimpleContextCursor(results, root, root);
+            for (const auto& [result, context] : resultCursor) {
+                collectedResults.append(result);
+            }
+        }
+    }
+    
+    return collectedResults;
 }
 
 std::expected<QJsonArray, EvalError> processUnionTokens(
@@ -433,38 +365,21 @@ std::expected<QJsonArray, EvalError> processUnionTokens(
 {
     bool anySuccess = false;
     EvalError lastError;
-    
-    // Use context-aware cursor for efficient union result collection
-    auto workingCursor = json_query::json_path::internal::makeSimpleContextCursor(working, root, root);
-    QJsonArray collectedResults;
+    QVector<QJsonArray> successfulResults;
     
     for (qsizetype tokenIdx : unionTokens) {
-        const Token& unionTk = ctx.tokens[tokenIdx];
-        auto tokenResult = fanOut(ctx, unionTk, working, tokenIdx);
-        if (tokenResult) {
-            // Success: collect results using context-aware cursor for efficient processing
+        TokenProcessingResult result = processSingleUnionToken(ctx, tokenIdx, working, root);
+        
+        if (result.success) {
             anySuccess = true;
-            qDebug() << "[union] token" << tokenIdx << "kind" << static_cast<int>(unionTk.kind) 
-                     << "contributed" << tokenResult->size() << "results";
-            
-            // Use context-aware cursor for efficient result merging
-            if (!tokenResult->isEmpty()) {
-                auto resultCursor = json_query::json_path::internal::makeSimpleContextCursor(*tokenResult, root, root);
-                for (const auto& [result, context] : resultCursor) {
-                    collectedResults.append(result);
-                }
-            }
-            
-            lastError = EvalError(); // Removed EvalError::Ok
+            successfulResults.append(result.results);
         } else {
-            qDebug() << "[union] token" << tokenIdx << "kind" << static_cast<int>(unionTk.kind) 
-                     << "failed with error" << static_cast<int>(tokenResult.error());
-            lastError = tokenResult.error();
+            lastError = result.error;
         }
     }
     
     if (anySuccess) {
-        // For union operations, preserve duplicates as per RFC 9535 semantics
+        QJsonArray collectedResults = mergeTokenResults(successfulResults, root);
         qDebug() << "[union] collected" << collectedResults.size() << "results (preserving duplicates for RFC 9535 compliance)";
         return collectedResults;
     } else {
@@ -473,17 +388,16 @@ std::expected<QJsonArray, EvalError> processUnionTokens(
     }
 }
 
-std::expected<QJsonArray, EvalError> processBranchUniqueSelection(
-    const PathEvalCtx& ctx,
-    qsizetype& i,
-    const QJsonArray& working,
-    const QJsonValue& root,
-    bool isLeaf)
-{
+// Helper: Collect keys from consecutive Key/KeyList tokens
+struct KeyCollectionResult {
     QStringList keys;
-    qsizetype j = i;
+    qsizetype nextIndex;
+};
+
+KeyCollectionResult collectKeysFromTokens(const PathEvalCtx& ctx, qsizetype startIndex) {
+    QStringList keys;
+    qsizetype j = startIndex;
     
-    // Collect all consecutive Key/KeyList tokens
     while (j < ctx.tokens.size()) {
         const Token& currentTk = ctx.tokens[j];
         if (currentTk.kind == Token::Kind::Key) {
@@ -497,6 +411,73 @@ std::expected<QJsonArray, EvalError> processBranchUniqueSelection(
         }
     }
     
+    return {keys, j};
+}
+
+// Helper: Check if an object contains all required keys
+bool objectContainsAllKeys(const QJsonObject& obj, const QStringList& keys) {
+    for (const QString& k : keys) {
+        if (!obj.contains(k)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Helper: Process object for leaf selection
+void processObjectForLeafSelection(const QJsonObject& obj, const QStringList& keys, const QJsonValue& v, QJsonArray* results) {
+    if (keys.size() > 1) {
+        // Multi-property leaf union ⇒ return parent only (Jayway)
+        results->append(v);
+    } else {
+        // Single-property leaf: return only the value, not the parent
+        results->append(obj.value(keys.first()));
+    }
+}
+
+// Helper: Process object for non-leaf selection
+void processObjectForNonLeafSelection(const QJsonObject& obj, const QStringList& keys, const QJsonValue& v, QJsonArray* results) {
+    // Non-leaf: parent first, then properties for traversal
+    results->append(v);
+    
+    for (const QString& k : keys) {
+        QJsonValue keyValue = obj.value(k);
+        results->append(keyValue);
+    }
+}
+
+// Helper: Deduplicate JSON values using hash-based approach
+QJsonArray deduplicateJsonValues(const QJsonArray& input, const QJsonValue& root) {
+    QSet<uint> seen;
+    QJsonArray dedup;
+    
+    auto workingDedupCursor = json_query::json_path::internal::makeSimpleContextCursor(input, root, root);
+    for (const auto& [v2, context] : workingDedupCursor) {
+        if (v2.isObject()) {
+            uint h = qHash(QJsonDocument(v2.toObject()).toJson());
+            if (seen.contains(h)) continue;
+            seen.insert(h);
+        } else if (v2.isArray()) {
+            uint h = qHash(QJsonDocument(v2.toArray()).toJson());
+            if (seen.contains(h)) continue;
+            seen.insert(h);
+        }
+        dedup.append(v2);
+    }
+    
+    return dedup;
+}
+
+std::expected<QJsonArray, EvalError> processBranchUniqueSelection(
+    const PathEvalCtx& ctx,
+    qsizetype& i,
+    const QJsonArray& working,
+    const QJsonValue& root,
+    bool isLeaf)
+{
+    KeyCollectionResult keyResult = collectKeysFromTokens(ctx, i);
+    const QStringList& keys = keyResult.keys;
+    
     auto next = acquirePooledArray();
     
     // Use context-aware cursor for efficient branch-unique processing
@@ -505,29 +486,12 @@ std::expected<QJsonArray, EvalError> processBranchUniqueSelection(
         if (!v.isObject()) continue;
         const QJsonObject obj = v.toObject();
         
-        // Check if object contains all required keys
-        bool all = true;
-        for (const QString& k : keys)
-            if (!obj.contains(k)) { all=false; break; }
-        if (!all) continue;
+        if (!objectContainsAllKeys(obj, keys)) continue;
 
         if (isLeaf) {
-            if (keys.size() > 1) {
-                // Multi-property leaf union ⇒ return parent only (Jayway)
-                next->append(v);
-            } else {
-                // Single-property leaf: return only the value, not the parent
-                next->append(obj.value(keys.first()));
-            }
+            processObjectForLeafSelection(obj, keys, v, next.get());
         } else {
-            // Non-leaf: parent first, then properties for traversal
-            next->append(v);
-            
-            // Use context-aware cursor for efficient key processing
-            for (const QString& k : keys) {
-                QJsonValue keyValue = obj.value(k);
-                next->append(keyValue);
-            }
+            processObjectForNonLeafSelection(obj, keys, v, next.get());
         }
     }
 
@@ -538,28 +502,11 @@ std::expected<QJsonArray, EvalError> processBranchUniqueSelection(
 
     // Deduplicate container nodes at leaf to avoid duplicates
     if (isLeaf) {
-        QSet<uint> seen;
-        QJsonArray dedup;
-        
-        // Use context-aware cursor for efficient deduplication processing
-        auto workingDedupCursor = json_query::json_path::internal::makeSimpleContextCursor(result, root, root);
-        for (const auto& [v2, context] : workingDedupCursor) {
-            if (v2.isObject()) {
-                uint h = qHash(QJsonDocument(v2.toObject()).toJson());
-                if (seen.contains(h)) continue;
-                seen.insert(h);
-            } else if (v2.isArray()) {
-                uint h = qHash(QJsonDocument(v2.toArray()).toJson());
-                if (seen.contains(h)) continue;
-                seen.insert(h);
-            }
-            dedup.append(v2);
-        }
-        result = dedup;
+        result = deduplicateJsonValues(result, root);
     }
     
     // Update loop index to skip processed tokens
-    i = j - 1;
+    i = keyResult.nextIndex - 1;
     
     return result;
 }
@@ -718,6 +665,123 @@ std::expected<QJsonArray, EvalError> evaluateAll(const PathEvalCtx& ctx, const Q
             if (res.isUndefined() || res.isNull()) return {};
             return QJsonArray{res};
         });
+}
+
+// ---------------------------------------------------------------------------
+//  Token dispatcher with std::expected error handling
+//  Now using TableGen-inspired declarative dispatch system
+// ---------------------------------------------------------------------------
+std::expected<QJsonArray, EvalError> evaluateTokenExpected(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
+{
+    // Use TableGen-inspired dispatch table instead of manual switch
+    return json_query::json_path::internal::TokenDispatcher::dispatch(ctx, tk, v);
+}
+
+// ---------------------------------------------------------------------------
+//  Token dispatcher (ex-JSONPath::evaluateToken)
+// ---------------------------------------------------------------------------
+std::expected<QJsonArray, EvalError> evaluateToken(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
+{
+    return evaluateTokenExpected(ctx, tk, v);
+}
+
+// ---------------------------------------------------------------------------
+//  Streaming-optimized fan-out helper
+// ---------------------------------------------------------------------------
+void fanOutStreaming(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src, 
+                    const ResultStreamer& streamer, qsizetype tokenPos = -1)
+{
+    bool anySuccess = false;
+    EvalError lastError;
+    
+    // Determine if we should use permissive or strict error handling
+    bool usePermissiveErrorHandling = false;
+    
+    if (tk.kind == Token::Kind::Index) {
+        if (tokenPos == 1) {
+            // Direct array access: always use permissive error handling (RFC 9535)
+            usePermissiveErrorHandling = true;
+        } else if (tokenPos > 1) {
+            // Check if we're in a recursive descent context by looking back through tokens
+            bool inRecursiveContext = false;
+            for (qsizetype i = tokenPos - 1; i >= 1; --i) {
+                const Token& prevToken = ctx.tokens[i];
+                if (prevToken.kind == Token::Kind::Recursive) {
+                    // Found recursive descent in the token chain
+                    inRecursiveContext = true;
+                    break;
+                } else if (prevToken.kind == Token::Kind::Key) {
+                    // Property access breaks the recursive context
+                    break;
+                }
+                // Index tokens continue the recursive context
+            }
+            
+            if (inRecursiveContext) {
+                // After recursive descent: use permissive error handling (RFC 9535)
+                usePermissiveErrorHandling = true;
+            } else {
+                // After property chain: use strict error handling (UpstreamArrayIndexOOB)
+                usePermissiveErrorHandling = false;
+            }
+        }
+    }
+    
+    for (const auto& v : src) {
+        auto seg = evaluateTokenExpected(ctx, tk, v);
+        if (seg) {
+            // Success: stream results directly without intermediate array
+            anySuccess = true;
+            qDebug() << "[fanOutStreaming] kind=" << static_cast<int>(tk.kind) << "srcType"
+                     << v.type() << "seg size=" << seg->size();
+            
+            // Stream all results directly
+            streamer.emitArray(*seg);
+        } else {
+            // Failure: record error
+            lastError = seg.error();
+            qDebug() << "[fanOutStreaming] kind=" << static_cast<int>(tk.kind) << "srcType"
+                     << v.type() << "failed with error:" << static_cast<int>(lastError);
+            
+            // Context-aware error handling for Index tokens
+            if (tk.kind == Token::Kind::Index && !usePermissiveErrorHandling) {
+                // Strict error handling: propagate errors immediately (property chain access)
+                streamer.handleError(lastError);
+                return;
+            }
+            // Permissive error handling: continue processing (direct access or after recursive descent)
+        }
+    }
+    
+    // For permissive error handling, don't emit error if no results (RFC 9535 compliance)
+    if (tk.kind == Token::Kind::Index && usePermissiveErrorHandling && !anySuccess) {
+        // Empty result for RFC 9535 compliance - no emission needed
+        return;
+    }
+    
+    // Only emit error if ALL evaluations failed (non-permissive contexts)
+    if (!anySuccess && streamer.canHandleErrors()) {
+        streamer.handleError(lastError);
+    }
+}
+
+// Legacy array-based fan-out (for backward compatibility)
+std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src, qsizetype tokenPos)
+{
+    // Use pooled array for better memory efficiency
+    auto pooledResult = acquirePooledArray();
+    ResultCollector collector(*pooledResult);
+    
+    fanOutStreaming(ctx, tk, src, collector.getStreamer(), tokenPos);
+    
+    // Check if an error occurred during streaming
+    if (collector.hasError()) {
+        return std::unexpected(collector.getLastError());
+    }
+    
+    // Move result to avoid copying
+    QJsonArray finalResult = std::move(*pooledResult);
+    return finalResult;
 }
 
 } // namespace json_query::json_path::detail
