@@ -21,22 +21,27 @@ set(JSON_QUERY_TEST_SOURCES
     # ${CMAKE_CURRENT_SOURCE_DIR}/ContextAwareContainerCursorGTest.cpp
 )
 
-add_executable(json_query_tests ${JSON_QUERY_TEST_SOURCES})
+# Only create json_query_tests target if there are source files
+if(JSON_QUERY_TEST_SOURCES)
+    add_executable(json_query_tests ${JSON_QUERY_TEST_SOURCES})
 
-target_include_directories(json_query_tests PRIVATE
-    ${PROJECT_SOURCE_DIR}/include
-    ${PROJECT_SOURCE_DIR}/tests/include
-)
+    target_include_directories(json_query_tests PRIVATE
+        ${PROJECT_SOURCE_DIR}/include
+        ${PROJECT_SOURCE_DIR}/tests/include
+    )
 
-target_link_libraries(json_query_tests PRIVATE
-    json_query
-    GTest::gtest
-    GTest::gmock
-    GTest::gtest_main
-    Qt6::Core
-)
+    target_link_libraries(json_query_tests PRIVATE
+        json_query
+        GTest::gtest
+        GTest::gmock
+        GTest::gtest_main
+        Qt6::Core
+    )
 
-target_compile_features(json_query_tests PRIVATE cxx_std_23)
+    target_compile_features(json_query_tests PRIVATE cxx_std_23)
+else()
+    message(STATUS "Core test suite disabled - no sources for json_query_tests")
+endif()
 
 # ---------------------------------------------------------------------------
 # Jayway JSONPath parity suite
@@ -96,10 +101,12 @@ target_compile_definitions(rfc9535_tests PRIVATE
 # ---------------------------------------------------------------------------
 include(GoogleTest)
 
-gtest_discover_tests(json_query_tests
-    DISCOVERY_MODE PRE_TEST
-    TEST_PREFIX "JsonQuery/"
-)
+if(JSON_QUERY_TEST_SOURCES)
+    gtest_discover_tests(json_query_tests
+        DISCOVERY_MODE PRE_TEST
+        TEST_PREFIX "JsonQuery/"
+    )
+endif()
 
 if(JSON_QUERY_ENABLE_JAYWAY_PARITY_TESTS)
     gtest_discover_tests(jayway_parity_tests
