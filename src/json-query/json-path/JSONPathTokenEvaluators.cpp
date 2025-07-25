@@ -64,10 +64,16 @@ std::expected<QJsonArray, EvalError> evalExpected<Token::Kind::Slice>(const Path
                                                                        const Token& tk,
                                                                        const QJsonValue& v)
 {
-    if (!v.isArray()) {
-        return QJsonArray{}; // Empty result for non-arrays (not an error in JSONPath)
-    }
-    return evalSlice(v.toArray(), tk.slice);
+    // Monadic approach: extract array and apply slice if present
+    auto asArray = [&v]() -> std::optional<QJsonArray> {
+        return v.isArray() ? std::make_optional(v.toArray()) : std::nullopt;
+    };
+
+    return asArray()
+        .and_then([&tk](const QJsonArray& arr) -> std::optional<std::expected<QJsonArray, EvalError>> {
+            return std::make_optional(evalSlice(arr, tk.slice));
+        })
+        .value_or(std::expected<QJsonArray, EvalError>{QJsonArray{}}); // Empty result for non-arrays (not an error in JSONPath)
 }
 
 // --- Wildcard --------------------------------------------------------------
@@ -76,12 +82,19 @@ std::expected<QJsonArray, EvalError> evalExpected<Token::Kind::Wildcard>(const P
                                                                           const Token&,
                                                                           const QJsonValue& v)
 {
-    if (v.isObject()) {
-        return wildcardObject(v.toObject());
-    } else if (v.isArray()) {
-        return wildcardArray(v.toArray());
-    }
-    return QJsonArray{}; // Empty result for primitives
+    // Monadic approach: transform value to appropriate wildcard result based on type
+    auto processAsObject = [&v]() -> std::optional<std::expected<QJsonArray, EvalError>> {
+        return v.isObject() ? std::make_optional(wildcardObject(v.toObject())) : std::nullopt;
+    };
+
+    auto processAsArray = [&v]() -> std::optional<std::expected<QJsonArray, EvalError>> {
+        return v.isArray() ? std::make_optional(wildcardArray(v.toArray())) : std::nullopt;
+    };
+
+    // Use monadic chaining to try object first, then array, then return empty
+    return processAsObject()
+        .or_else(processAsArray)
+        .value_or(std::expected<QJsonArray, EvalError>{QJsonArray{}}); // Empty result for primitives
 }
 
 // --- Recursive -------------------------------------------------------------
