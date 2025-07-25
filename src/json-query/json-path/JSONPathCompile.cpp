@@ -291,6 +291,65 @@ struct KeyBuilder {
     }
 };
 
+// A small façade so every rule can emit tokens consistently
+// BracketSink now carries *filters* as well
+struct BracketSink {
+    QVector<Token>&   tk;
+    KeyBuilder&       kb;
+    QVector<ContextFilterFn>& contextFilters;
+    QVector<FilterFn>& filters;
+    int               currentBracketGroupId; // Track current bracket group ID
+
+    std::expected<void, Error> key(QString key, bool allow=false) { 
+        // Create token with bracket group ID
+        if (!allow && key.contains(u' '))
+            return std::unexpected(Error::BlankInKey);
+        Token t{Token::Kind::Key, 0, {}, qt_hash(key), key};
+        t.bracketGroupId = currentBracketGroupId;
+        tk.append(std::move(t));
+        return {};
+    }
+    void keyList(const QVector<QString>& keys)
+    {
+        if (keys.isEmpty()) return;
+
+        Token t;
+        t.kind = Token::Kind::KeyList;
+        t.bracketGroupId = currentBracketGroupId; // Set bracket group ID
+
+        // Pack the keys into a single QString separated by '\n' so that the
+        // evaluator can split them later without ambiguity.
+        QStringList list;
+        list.reserve(keys.size());
+        for (const QString& k : keys)
+            list.append(k);
+
+        t.key = list.join(u"\n");
+        tk.append(std::move(t));
+    }
+    void wild()                 { 
+        Token t{Token::Kind::Wildcard};
+        t.bracketGroupId = currentBracketGroupId;
+        tk.append(t); 
+    }
+    void slice(const Slice& s)   { 
+        Token t{Token::Kind::Slice,0,s,0u};
+        t.bracketGroupId = currentBracketGroupId;
+        tk.append(t); 
+    }
+    void index(int i)            { 
+        qCDebug(jsonPathLog) << "BracketSink::index emit" << i;
+        Token t{Token::Kind::Index,i};
+        t.bracketGroupId = currentBracketGroupId;
+        tk.append(t); 
+    }
+    void pushFilter(const Token& t){ 
+        Token copy = t;
+        copy.bracketGroupId = currentBracketGroupId;
+        tk.append(copy); 
+    }
+};
+
 // ────────────────────────────────────────────────────────────────
 // 2. dot‑segment parser (no switch on QChar)
 // ────────────────────────────────────────────────────────────────
@@ -351,65 +410,6 @@ parseDot(qsizetype pos, QStringView sv,
     return pos;
 }
 
-// A small façade so every rule can emit tokens consistently
-// BracketSink now carries *filters* as well
-struct BracketSink {
-    QVector<Token>&   tk;
-    KeyBuilder&       kb;
-    QVector<ContextFilterFn>& contextFilters;
-    QVector<FilterFn>& filters;
-    int               currentBracketGroupId; // Track current bracket group ID
-
-    std::expected<void, Error> key(QString key, bool allow=false) { 
-        // Create token with bracket group ID
-        if (!allow && key.contains(u' '))
-            return std::unexpected(Error::BlankInKey);
-        Token t{Token::Kind::Key, 0, {}, qt_hash(key), key};
-        t.bracketGroupId = currentBracketGroupId;
-        tk.append(std::move(t));
-        return {};
-    }
-    void keyList(const QVector<QString>& keys)
-    {
-        if (keys.isEmpty()) return;
-
-        Token t;
-        t.kind = Token::Kind::KeyList;
-        t.bracketGroupId = currentBracketGroupId; // Set bracket group ID
-
-        // Pack the keys into a single QString separated by '\n' so that the
-        // evaluator can split them later without ambiguity.
-        QStringList list;
-        list.reserve(keys.size());
-        for (const QString& k : keys)
-            list.append(k);
-
-        t.key = list.join(u"\n");
-        tk.append(std::move(t));
-    }
-    void wild()                 { 
-        Token t{Token::Kind::Wildcard};
-        t.bracketGroupId = currentBracketGroupId;
-        tk.append(t); 
-    }
-    void slice(const Slice& s)   { 
-        Token t{Token::Kind::Slice,0,s,0u};
-        t.bracketGroupId = currentBracketGroupId;
-        tk.append(t); 
-    }
-    void index(int i)            { 
-        qCDebug(jsonPathLog) << "BracketSink::index emit" << i;
-        Token t{Token::Kind::Index,i};
-        t.bracketGroupId = currentBracketGroupId;
-        tk.append(t); 
-    }
-    void pushFilter(const Token& t){ 
-        Token copy = t;
-        copy.bracketGroupId = currentBracketGroupId;
-        tk.append(copy); 
-    }
-};
-
 // bare‑name parser: replace kb.pushKey → kb.push
 [[nodiscard]] std::expected<qsizetype,Error>
 parseBare(qsizetype pos, QStringView sv, KeyBuilder& kb)
@@ -454,7 +454,12 @@ class BracketRuleDispatcher;
 namespace matchers {
 
 static bool matchesUnionComma(QStringView content) {
-    return content.contains(u',');
+    // Must contain commas to be a union
+    if (!content.contains(u',')) return false;
+    
+    // For any content with commas, this could be a union of different selector types
+    // The union handler will determine what each part is and handle them appropriately
+    return true;
 }
 
 static bool matchesWildcard(QStringView content) {
@@ -480,15 +485,65 @@ static bool matchesIndexList(QStringView content) {
 }
 
 static bool matchesSlice(QStringView content) {
+    // Exclude filter expressions - they should be handled by filter rules
+    if (content.startsWith(u'?')) return false;
     return content.contains(u':');
 }
 
 static bool matchesFilterWithParens(QStringView content) {
-    return content.startsWith(u"?(") && content.endsWith(u')');
+    return content.startsWith(u"?(");
 }
 
 static bool matchesFilterWithoutParens(QStringView content) {
-    return content.startsWith(u'?') && !content.startsWith(u"?(");
+    // Must start with '?' but not '?('
+    if (!content.startsWith(u'?') || content.startsWith(u"?(")) {
+        return false;
+    }
+    
+    // If it contains commas, we need to check if they are top-level commas
+    // (separating selectors) or nested commas (inside brackets/quotes)
+    if (content.contains(u',')) {
+        // Check if commas are at top level (not inside brackets or quotes)
+        int bracketLevel = 0;
+        bool inSingleQuote = false;
+        bool inDoubleQuote = false;
+        
+        for (qsizetype i = 0; i < content.size(); ++i) {
+            QChar ch = content[i];
+            
+            if (!inSingleQuote && !inDoubleQuote) {
+                if (ch == u'[') {
+                    bracketLevel++;
+                } else if (ch == u']') {
+                    bracketLevel--;
+                } else if (ch == u'\'' && (i == 0 || content[i-1] != u'\\')) {
+                    inSingleQuote = true;
+                } else if (ch == u'"' && (i == 0 || content[i-1] != u'\\')) {
+                    inDoubleQuote = true;
+                } else if (ch == u',' && bracketLevel == 0) {
+                    // Found a top-level comma - this might be multiple selectors
+                    // Split by this comma and check if parts look like separate selectors
+                    const auto parts = content.split(u',');
+                    if (parts.size() > 1) {
+                        // Check if this looks like multiple filter expressions
+                        for (QStringView part : parts) {
+                            QStringView trimmed = part.trimmed();
+                            if (trimmed.startsWith(u'?')) {
+                                // Multiple filter expressions - should be handled as union
+                                return false;
+                            }
+                        }
+                    }
+                }
+            } else if (inSingleQuote && ch == u'\'' && (i == 0 || content[i-1] != u'\\')) {
+                inSingleQuote = false;
+            } else if (inDoubleQuote && ch == u'"' && (i == 0 || content[i-1] != u'\\')) {
+                inDoubleQuote = false;
+            }
+        }
+    }
+    
+    return true; // Single filter expression without parentheses
 }
 
 static bool matchesPlaceholder(QStringView content) {
@@ -571,12 +626,19 @@ static std::expected<void, Error> handleSlice(QStringView content, BracketSink& 
 }
 
 static std::expected<void, Error> handleFilterWithParens(QStringView content, BracketSink& out) {
-    QString expr = content.sliced(2, content.size() - 3).toString();
+    // For complex expressions like "?(@.a || @.b) && @.c", we need to extract the entire
+    // filter expression after the "?" character, not just what's inside the first parentheses
+    QString expr = content.sliced(1).toString(); // Remove the "?" prefix
+    
+    qCDebug(jsonPathLog) << "BR_RULE filter-with-parens: calling compileContextFilter with expr:" << expr;
     
     if (auto tok = json_query::json_path::compileContextFilter(expr, out.contextFilters, out.filters)) {
+        qCDebug(jsonPathLog) << "BR_RULE filter-with-parens: compileContextFilter succeeded";
         out.pushFilter(*tok);
         return {};
     }
+    
+    qCDebug(jsonPathLog) << "BR_RULE filter-with-parens: compileContextFilter failed";
     return std::unexpected(Error::UnsupportedFilter);
 }
 
@@ -639,11 +701,25 @@ private:
     static std::vector<BracketRuleMetadata> createRules() {
         return {
             {
+                .name = "filter_with_parens",
+                .priority = 1200,  // Highest priority for filter expressions
+                .matcher = matchers::matchesFilterWithParens,
+                .handler = handlers::handleFilterWithParens,
+                .description = "Filter expression with parentheses (e.g., '?(@.a == 1)')"
+            },
+            {
+                .name = "filter_without_parens",
+                .priority = 1100,  // Second highest priority for filter expressions
+                .matcher = matchers::matchesFilterWithoutParens,
+                .handler = handlers::handleFilterWithoutParens,
+                .description = "Filter expression without parentheses (e.g., '?@.a == 1')"
+            },
+            {
                 .name = "union_comma",
                 .priority = 1000,
                 .matcher = matchers::matchesUnionComma,
                 .handler = handlers::handleUnionComma,
-                .description = "Comma-separated union selectors (e.g., 'a,b,1,2')"
+                .description = "Union with comma-separated selectors (e.g., 'a,b,c')"
             },
             {
                 .name = "wildcard",
@@ -672,20 +748,6 @@ private:
                 .matcher = matchers::matchesSlice,
                 .handler = handlers::handleSlice,
                 .description = "Array slice (e.g., '1:3:2')"
-            },
-            {
-                .name = "filter_with_parens",
-                .priority = 600,
-                .matcher = matchers::matchesFilterWithParens,
-                .handler = handlers::handleFilterWithParens,
-                .description = "Filter expression with parentheses (e.g., '?(@.a == 1)')"
-            },
-            {
-                .name = "filter_without_parens",
-                .priority = 550,
-                .matcher = matchers::matchesFilterWithoutParens,
-                .handler = handlers::handleFilterWithoutParens,
-                .description = "Filter expression without parentheses (e.g., '?@.a == 1')"
             },
             {
                 .name = "placeholder",
