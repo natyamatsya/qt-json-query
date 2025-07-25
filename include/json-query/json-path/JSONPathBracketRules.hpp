@@ -54,6 +54,7 @@ namespace json_query::json_path
         // ──────────────────────────────────────────────────────────────────────
 
         // Function type aliases for rule system
+        // Note: These are used as function pointers in static arrays, so std::function works better
         using BracketRuleMatcher = std::function<bool(QStringView)>;
         using BracketRuleHandler = std::function<std::expected<void, Error>(QStringView, BracketSink&)>;
 

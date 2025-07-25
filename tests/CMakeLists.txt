@@ -66,6 +66,7 @@ if(JSON_QUERY_ENABLE_JAYWAY_PARITY_TESTS)
 
     target_link_libraries(jayway_parity_tests PRIVATE
         json_query
+        function_ref_interface
         GTest::gtest
         GTest::gmock
         GTest::gtest_main
@@ -87,6 +88,7 @@ target_include_directories(rfc9535_tests PRIVATE
 
 target_link_libraries(rfc9535_tests PRIVATE
     json_query
+    function_ref_interface
     GTest::gtest
     GTest::gmock
     GTest::gtest_main

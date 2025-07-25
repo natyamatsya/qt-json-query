@@ -194,20 +194,23 @@ std::expected<QJsonArray, EvalError> evaluateAll(const PathEvalCtx& ctx, const Q
 // Legacy array-based fan-out (for backward compatibility)
 std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src, qsizetype tokenPos)
 {
-    // Use pooled array for better memory efficiency
-    auto pooledResult = acquirePooledArray();
-    ResultCollector collector(*pooledResult);
+    // Use regular QJsonArray with pointer-based ResultCollector for memory safety
+    QJsonArray result;
+    ResultCollector collector(&result);
     
-    fanOutStreaming(ctx, tk, src, collector.getStreamer(), tokenPos);
+    // Use zero-overhead concept-based streaming
+    auto conceptStreamer = collector.getConceptStreamer();
+    
+    // Explicitly call the template version to ensure proper error handling
+    fanOutStreaming<decltype(conceptStreamer)>(ctx, tk, src, conceptStreamer, tokenPos);
     
     // Check if an error occurred during streaming
     if (collector.hasError()) {
         return std::unexpected(collector.getLastError());
     }
     
-    // Move result to avoid copying
-    QJsonArray finalResult = std::move(*pooledResult);
-    return finalResult;
+    // Return result
+    return result;
 }
 
 } // namespace json_query::json_path::detail

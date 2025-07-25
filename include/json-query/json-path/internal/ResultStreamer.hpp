@@ -4,17 +4,103 @@
 #include <QJsonArray>
 #include <functional>
 #include <expected>
+#include <memory>
+#include <concepts>
 #include <stdcompat/function_ref.hpp>
 #include "json-query/json-path/JSONPathEvalError.hpp"
 
 namespace json_query::json_path::internal {
 
 /**
- * @brief Result streaming interface for high-performance JSONPath evaluation
+ * @brief Concept defining the interface for result collectors
  * 
- * ResultStreamer provides a streaming interface that eliminates intermediate
- * QJsonArray allocations during recursive descent and fanOut operations.
- * Results are emitted directly to the consumer without creating temporary arrays.
+ * A ResultCollectorConcept must provide methods to collect values and handle errors.
+ * This concept ensures compile-time type safety without runtime overhead.
+ */
+template<typename T>
+concept ResultCollectorConcept = requires(T& collector, const QJsonValue& value, EvalError error) {
+    collector.collect(value);                                    // Must have collect method
+    { collector.hasError() } -> std::convertible_to<bool>;      // Must be able to check for errors
+    { collector.canHandleErrors() } -> std::convertible_to<bool>; // Must indicate error handling capability
+    collector.handleError(error);                               // Must have error handling method
+};
+
+/**
+ * @brief Zero-overhead result streaming interface using concepts
+ * 
+ * ConceptResultStreamer provides direct member function calls without any
+ * type erasure or function pointer overhead. It works with any type that
+ * satisfies the ResultCollectorConcept.
+ */
+template<ResultCollectorConcept CollectorType>
+class ConceptResultStreamer {
+public:
+    /**
+     * @brief Construct a ConceptResultStreamer with a collector reference
+     * @param collector Reference to the collector that will receive results
+     */
+    explicit constexpr ConceptResultStreamer(CollectorType& collector) noexcept
+        : collector_(collector) {}
+
+    /**
+     * @brief Emit a single result value with zero overhead
+     * @param value The JSON value to emit
+     */
+    constexpr void emitValue(const QJsonValue& value) const noexcept {
+        collector_.collect(value);  // Direct member call - zero overhead!
+    }
+
+    /**
+     * @brief Emit all values from a QJsonArray with zero overhead
+     * @param array The array containing values to emit
+     */
+    void emitArray(const QJsonArray& array) const noexcept {
+        for (const auto& value : array) {
+            collector_.collect(value);  // Direct member call for each value
+        }
+    }
+
+    /**
+     * @brief Handle an error during streaming with compile-time optimization
+     * @param error The error that occurred
+     */
+    constexpr void handleError(EvalError error) const noexcept {
+        if constexpr (requires { collector_.canHandleErrors(); }) {
+            if (collector_.canHandleErrors()) {
+                collector_.handleError(error);
+            }
+        }
+    }
+
+    /**
+     * @brief Check if the streamer can emit results (always true for concept-based design)
+     * @return true (always, since collector reference is required)
+     */
+    [[nodiscard]] constexpr bool canEmit() const noexcept {
+        return true;
+    }
+
+    /**
+     * @brief Check if the streamer has error handling capability
+     * @return true if the collector can handle errors
+     */
+    [[nodiscard]] constexpr bool canHandleErrors() const noexcept {
+        if constexpr (requires { collector_.canHandleErrors(); }) {
+            return collector_.canHandleErrors();
+        } else {
+            return false;
+        }
+    }
+
+private:
+    CollectorType& collector_;
+};
+
+/**
+ * @brief Legacy ResultStreamer for backward compatibility with function_ref
+ * 
+ * This maintains the old interface for code that hasn't been migrated to
+ * the concept-based approach yet.
  */
 class ResultStreamer {
 public:
@@ -82,49 +168,59 @@ public:
 
 private:
     EmitFunction emitFn_;
-    ErrorHandler onError_{[](EvalError){}};  // Default no-op handler
+    ErrorHandler onError_{[](EvalError){}};
     bool hasErrorHandler_;
 };
 
 /**
- * @brief Result collector that accumulates values into a QJsonArray
+ * @brief Concept-compliant result collector that accumulates values into a QJsonArray
  * 
- * ResultCollector provides a convenient way to collect streaming results
- * into a traditional QJsonArray for compatibility with existing APIs.
+ * This collector satisfies the ResultCollectorConcept and provides zero-overhead
+ * streaming through the ConceptResultStreamer interface.
  */
 class ResultCollector {
 public:
-    using ErrorHandler = stdcompat::function_ref<void(EvalError)>;
-
     /**
      * @brief Construct a ResultCollector that accumulates into the provided array
-     * @param results Reference to QJsonArray where results will be accumulated
+     * @param results Pointer to QJsonArray where results will be accumulated
      */
-    explicit ResultCollector(QJsonArray& results) noexcept
-        : results_(results), hasErrorHandler_(false) {}
+    explicit ResultCollector(QJsonArray* results) noexcept
+        : results_(results), hasErrorHandler_(true) {}  // Enable error handling by default
 
     /**
      * @brief Construct a ResultCollector with error handling
-     * @param results Reference to QJsonArray where results will be accumulated
+     * @param results Pointer to QJsonArray where results will be accumulated
      * @param errorFn Function called when errors occur
      */
-    ResultCollector(QJsonArray& results, ErrorHandler errorFn) noexcept
-        : results_(results), onError_(errorFn), hasErrorHandler_(true) {}
+    template<typename ErrorFn>
+    ResultCollector(QJsonArray* results, ErrorFn&& errorFn) noexcept
+        : results_(results), onError_(std::forward<ErrorFn>(errorFn)), hasErrorHandler_(true) {}
 
     /**
-     * @brief Get a ResultStreamer that collects into this collector
-     * @return ResultStreamer configured to use this collector
+     * @brief Get a zero-overhead ConceptResultStreamer for this collector
+     * @return ConceptResultStreamer with direct member function calls
+     */
+    [[nodiscard]] auto getConceptStreamer() noexcept {
+        return ConceptResultStreamer<ResultCollector>{*this};
+    }
+
+    /**
+     * @brief Get a legacy ResultStreamer for backward compatibility
+     * @return ResultStreamer using function_ref (with potential dangling reference issues)
      */
     [[nodiscard]] ResultStreamer getStreamer() noexcept {
+        // For backward compatibility, but this has the dangling reference issue
+        auto collectFn = [this](const QJsonValue& value) noexcept { 
+            this->collect(value); 
+        };
+        
         if (hasErrorHandler_) {
-            return ResultStreamer{
-                [this](const QJsonValue& value) { collect(value); },
-                onError_
+            auto errorFn = [this](EvalError error) noexcept { 
+                this->handleError(error); 
             };
+            return ResultStreamer{collectFn, errorFn};
         } else {
-            return ResultStreamer{
-                [this](const QJsonValue& value) { collect(value); }
-            };
+            return ResultStreamer{collectFn};
         }
     }
 
@@ -137,19 +233,21 @@ public:
     }
 
     /**
-     * @brief Collect a single value into the results array
+     * @brief Collect a single value into the results array (concept requirement)
      * @param value The value to add to the results
      */
     void collect(const QJsonValue& value) noexcept {
-        results_.append(value);
+        if (results_) {
+            results_->append(value);
+        }
     }
 
     /**
-     * @brief Handle an error during collection
+     * @brief Handle an error during collection (concept requirement)
      * @param error The error that occurred
      */
     void handleError(EvalError error) noexcept {
-        if (hasErrorHandler_) {
+        if (hasErrorHandler_ && onError_) {
             onError_(error);
         }
         lastError_ = error;
@@ -157,7 +255,7 @@ public:
     }
 
     /**
-     * @brief Check if the collector has an error handler
+     * @brief Check if the collector can handle errors (concept requirement)
      * @return true if the collector can handle errors
      */
     [[nodiscard]] bool canHandleErrors() const noexcept {
@@ -165,7 +263,7 @@ public:
     }
 
     /**
-     * @brief Check if an error occurred during collection
+     * @brief Check if an error occurred during collection (concept requirement)
      * @return true if an error was handled
      */
     [[nodiscard]] bool hasError() const noexcept {
@@ -185,7 +283,7 @@ public:
      * @return The size of the results array
      */
     [[nodiscard]] qsizetype size() const noexcept {
-        return results_.size();
+        return results_ ? results_->size() : 0;
     }
 
     /**
@@ -193,36 +291,15 @@ public:
      * @return true if the results array is empty
      */
     [[nodiscard]] bool empty() const noexcept {
-        return results_.isEmpty();
+        return results_ ? results_->isEmpty() : true;
     }
 
 private:
-    QJsonArray& results_;
-    ErrorHandler onError_{[](EvalError){}};  // Default no-op handler
+    QJsonArray* results_;
+    std::function<void(EvalError)> onError_{[](EvalError){}};  // Only used if error handling needed
     bool hasErrorHandler_;
     EvalError lastError_ = EvalError::TypeMismatchObject;
     bool hasError_ = false;
 };
-
-/**
- * @brief Create a ResultStreamer that appends to an existing QJsonArray
- * @param target The target array to append results to
- * @return ResultStreamer configured to append to the target array
- */
-[[nodiscard]] inline ResultStreamer makeAppendingStreamer(QJsonArray& target) noexcept {
-    return ResultStreamer([&target](const QJsonValue& value) {
-        target.append(value);
-    });
-}
-
-/**
- * @brief Create a ResultStreamer with custom emission logic
- * @param emitFn Function to call for each emitted result
- * @return ResultStreamer with the specified emission function
- */
-template<typename EmitFn>
-[[nodiscard]] constexpr ResultStreamer makeCustomStreamer(EmitFn&& emitFn) noexcept {
-    return ResultStreamer(std::forward<EmitFn>(emitFn));
-}
 
 } // namespace json_query::json_path::internal

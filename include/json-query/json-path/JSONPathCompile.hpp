@@ -17,10 +17,12 @@
 namespace json_query::json_path
 {
     // Filter function type - moved here for better organization
+    // Note: Must use std::function for storage in QVector containers
     using FilterFn = std::function<bool (const QJsonValue&)>;
 
     // Context-aware filter function type for absolute path references
     // Receives both current node and root document context
+    // Note: Must use std::function for storage in QVector containers
     using ContextFilterFn = std::function<bool (const QJsonValue& currentNode, const QJsonValue& rootDocument)>;
 
     enum class FunctionType { None, Length, Min, Max };

@@ -19,6 +19,7 @@ std::expected<QJsonArray, EvalError> evalExpected<Token::Kind::Key>(const PathEv
     if (!v.isObject())
         return out; // Empty result for non-objects
     const QJsonObject obj = v.toObject();
+    
     if (obj.contains(tk.key))
         out.append(obj[tk.key]);
     return out;

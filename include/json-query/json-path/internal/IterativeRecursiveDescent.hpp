@@ -92,7 +92,7 @@ public:
         const QJsonValue& rootValue) {
         
         auto pooledArray = acquirePooledArray();
-        ResultCollector collector(*pooledArray);
+        ResultCollector collector(pooledArray.get());
         
         auto result = evaluateIterative(rootValue, collector);
         if (!result) {
