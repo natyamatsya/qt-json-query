@@ -685,87 +685,120 @@ template<auto PAT>
 // ───────────────────────────────────────────────────────────────
 
 // Helper function to evaluate function calls like length(@.a) or value($..c)
+// Refactored to use explicit error handling for JSONPath evaluation
 QJsonValue evaluateFunction(const QString& funcExpr, const QJsonValue& context) {
-    int openParen = funcExpr.indexOf('(');
-    int closeParen = funcExpr.lastIndexOf(')');
-    if (openParen == -1 || closeParen == -1) {
-        return QJsonValue(); // Invalid function syntax
-    }
-    
-    QString funcName = funcExpr.mid(0, openParen).trimmed();
-    QString args = funcExpr.mid(openParen + 1, closeParen - openParen - 1).trimmed();
-    
-    if (funcName == "length") {
-        // Evaluate the argument (usually @.property)
-        QJsonValue argValue;
-        if (args.startsWith("@.")) {
-            QString prop = args.mid(2);
-            argValue = context.toObject().value(prop);
-        } else if (args == "@") {
-            argValue = context;
-        } else {
-            argValue = context; // Default to context
+    // Parse function syntax using monadic pattern
+    auto parseFunctionSyntax = [](const QString& expr) -> std::optional<std::pair<QString, QString>> {
+        int openParen = expr.indexOf('(');
+        int closeParen = expr.lastIndexOf(')');
+        if (openParen == -1 || closeParen == -1) {
+            return std::nullopt; // Invalid function syntax
         }
         
-        // Return length as QJsonValue - RFC 9535 "nothing" semantics
-        if (argValue.isUndefined() || argValue.isNull()) return QJsonValue(0); // Nothing has length 0
-        if (argValue.isString()) return QJsonValue(argValue.toString().length());
-        if (argValue.isArray()) return QJsonValue(argValue.toArray().size());
-        if (argValue.isObject()) return QJsonValue(argValue.toObject().size());
-        return QJsonValue(0); // Other types have no length
-    }
+        QString funcName = expr.mid(0, openParen).trimmed();
+        QString args = expr.mid(openParen + 1, closeParen - openParen - 1).trimmed();
+        return std::make_pair(funcName, args);
+    };
     
-    if (funcName == "value") {
-        // Implement proper JSONPath evaluation for complex paths like $..c
+    // Evaluate argument value using monadic pattern
+    auto evaluateArgument = [&context](const QString& args) -> QJsonValue {
+        if (args.startsWith("@.")) {
+            QString prop = args.mid(2);
+            return context.toObject().value(prop);
+        } else if (args == "@") {
+            return context;
+        }
+        return context; // Default to context
+    };
+    
+    // Calculate length using monadic pattern
+    auto calculateLength = [](const QJsonValue& value) -> QJsonValue {
+        // RFC 9535 "nothing" semantics with explicit error handling
+        if (value.isUndefined() || value.isNull()) return QJsonValue(0);
+        if (value.isString()) return QJsonValue(value.toString().length());
+        if (value.isArray()) return QJsonValue(value.toArray().size());
+        if (value.isObject()) return QJsonValue(value.toObject().size());
+        return QJsonValue(0); // Other types have no length
+    };
+    
+    // Evaluate JSONPath value using explicit error handling
+    auto evaluateJsonPathValue = [&context](const QString& args) -> QJsonValue {
         if (args.startsWith("$")) {
-            // This is a JSONPath expression that needs to be evaluated against root
+            // JSONPath expression evaluation with proper error handling
             using json_query::JSONPath;
-            auto path = JSONPath::create(args);
-            if (path) {
-                auto results = path->evaluateAll(context);
-                if (results) {
-                    return results->size();
-                }
-                return 0;
+            auto pathResult = JSONPath::create(args);
+            if (!pathResult) {
+                return QJsonValue(); // Return null for invalid JSONPath
             }
-            return QJsonValue(); // Invalid JSONPath expression
+            
+            auto evalResult = pathResult->evaluateAll(context);
+            if (!evalResult) {
+                return QJsonValue(); // Return null for evaluation errors
+            }
+            
+            return QJsonValue(evalResult->size());
         } else if (args.startsWith("@.")) {
             QString prop = args.mid(2);
             QJsonValue val = context.toObject().value(prop);
-            return val.isUndefined() ? QJsonValue() : val; // Return null for undefined
+            return val.isUndefined() ? QJsonValue() : val;
         } else if (args == "@") {
             return context;
         }
         return QJsonValue(); // Undefined for complex paths
+    };
+    
+    // Main function evaluation using explicit error handling
+    auto parsed = parseFunctionSyntax(funcExpr);
+    if (!parsed) {
+        return QJsonValue(); // Invalid function syntax
     }
     
+    const auto& [funcName, args] = *parsed;
+    
+    if (funcName == "length") {
+        return calculateLength(evaluateArgument(args));
+    } else if (funcName == "value") {
+        return evaluateJsonPathValue(args);
+    }
     return QJsonValue(); // Unknown function
 }
 
 // Helper function to parse JSON literals from strings
+// Refactored to use monadic error handling patterns
 QJsonValue parseJsonLiteral(const QString& literal) {
     QString trimmed = literal.trimmed();
     
-    // Check for null
-    if (trimmed == "null") return QJsonValue();
+    // Parse literal using monadic pattern with optional chaining
+    auto parseNull = [](const QString& s) -> std::optional<QJsonValue> {
+        return (s == "null") ? std::optional<QJsonValue>{QJsonValue()} : std::nullopt;
+    };
     
-    // Check for boolean
-    if (trimmed == "true") return QJsonValue(true);
-    if (trimmed == "false") return QJsonValue(false);
+    auto parseBoolean = [](const QString& s) -> std::optional<QJsonValue> {
+        if (s == "true") return QJsonValue(true);
+        if (s == "false") return QJsonValue(false);
+        return std::nullopt;
+    };
     
-    // Check for number
-    bool ok;
-    double num = trimmed.toDouble(&ok);
-    if (ok) return QJsonValue(num);
+    auto parseNumber = [](const QString& s) -> std::optional<QJsonValue> {
+        bool ok;
+        double num = s.toDouble(&ok);
+        return ok ? std::optional<QJsonValue>{QJsonValue(num)} : std::nullopt;
+    };
     
-    // Check for string (remove quotes)
-    if ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
-        (trimmed.startsWith('\'') && trimmed.endsWith('\''))) {
-        return QJsonValue(trimmed.mid(1, trimmed.length() - 2));
-    }
+    auto parseQuotedString = [](const QString& s) -> std::optional<QJsonValue> {
+        if ((s.startsWith('"') && s.endsWith('"')) ||
+            (s.startsWith('\'') && s.endsWith('\''))) {
+            return QJsonValue(s.mid(1, s.length() - 2));
+        }
+        return std::nullopt;
+    };
     
-    // Default to string
-    return QJsonValue(trimmed);
+    // Try parsing in order using monadic chaining
+    return parseNull(trimmed)
+        .or_else([&]() { return parseBoolean(trimmed); })
+        .or_else([&]() { return parseNumber(trimmed); })
+        .or_else([&]() { return parseQuotedString(trimmed); })
+        .value_or(QJsonValue(trimmed)); // Default to string
 }
 
 // Helper function to compare QJsonValues for ordering
@@ -1266,7 +1299,7 @@ std::optional<Token> parseExists(QString s, QVector<FilterFn>& out)
             if (!j.isArray()) return true; // non-arrays don't have indices
             const auto arr = j.toArray();
             if (index < 0 || index >= arr.size()) return true; // out of bounds is absent
-            const auto v = arr[index];
+            const auto& v = arr[index];
             // RFC 9535: negated existence filters check for element absence
             return v.type() == QJsonValue::Undefined;
         }, QString("!@[%1]").arg(index));
@@ -1565,7 +1598,6 @@ std::optional<Token> parseSelfCmp(QString s, QVector<FilterFn>& out)
             // For ordering operators, it depends on the value type
             if (op == "==") return true;
             if (op == "!=") return false;
-            
             // For ordering operators, self-comparison is always false
             // (a value cannot be less than, greater than itself)
             return false;

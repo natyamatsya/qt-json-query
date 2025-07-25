@@ -244,30 +244,56 @@ TokenProcessingResult processSingleUnionToken(
     const QJsonValue& root)
 {
     qCDebug(jsonPathLog) << "[processSingleUnionToken] Processing token" << tokenIdx << "with" << working.size() << "working values";
-    TokenProcessingResult result;
     
-    for (qsizetype i = 0; i < working.size(); ++i) {
-        const auto& workingValue = working[i];
-        qCDebug(jsonPathLog) << "[processSingleUnionToken] Processing working value" << i << "of type" << static_cast<int>(workingValue.type());
-        
-        auto tokenResult = evaluateTokenExpected(ctx, ctx.tokens[tokenIdx], workingValue);
-        if (!tokenResult) {
-            qCDebug(jsonPathLog) << "[processSingleUnionToken] Token evaluation failed with error" << static_cast<int>(tokenResult.error());
-            result.success = false;
-            result.error = tokenResult.error();
-            return result;
-        }
-        
-        qCDebug(jsonPathLog) << "[processSingleUnionToken] Token evaluation succeeded with" << tokenResult->size() << "results";
-        // Append results from this token
-        for (const auto& value : *tokenResult) {
-            result.results.append(value);
-        }
-    }
+    // Use pooled array for efficient result collection
+    auto pooledArray = acquirePooledArray();
+    QJsonArray& results = *pooledArray;
     
-    qCDebug(jsonPathLog) << "[processSingleUnionToken] Completed with" << result.results.size() << "total results";
-    result.success = true;
-    return result;
+    // Process each working value using monadic pattern
+    auto processWorkingValue = [&](const QJsonValue& workingValue) -> std::expected<QJsonArray, EvalError> {
+        return evaluateTokenExpected(ctx, ctx.tokens[tokenIdx], workingValue);
+    };
+    
+    // Aggregate results using monadic error handling
+    auto aggregateResults = [&]() -> std::expected<QJsonArray, EvalError> {
+        for (qsizetype i = 0; i < working.size(); ++i) {
+            const auto& workingValue = working[i];
+            qCDebug(jsonPathLog) << "[processSingleUnionToken] Processing working value" << i << "of type" << static_cast<int>(workingValue.type());
+            
+            // Use monadic chaining for token evaluation
+            auto tokenResult = processWorkingValue(workingValue);
+            if (!tokenResult) {
+                qCDebug(jsonPathLog) << "[processSingleUnionToken] Token evaluation failed with error" << static_cast<int>(tokenResult.error());
+                return std::unexpected(tokenResult.error());
+            }
+            
+            qCDebug(jsonPathLog) << "[processSingleUnionToken] Token evaluation succeeded with" << tokenResult->size() << "results";
+            // Append results from this token using range-based iteration
+            for (const auto& value : *tokenResult) {
+                results.append(value);
+            }
+        }
+        return results;
+    };
+    
+    // Convert std::expected result to TokenProcessingResult using monadic pattern
+    return aggregateResults()
+        .transform([&](const QJsonArray& successResults) -> TokenProcessingResult {
+            qCDebug(jsonPathLog) << "[processSingleUnionToken] Completed with" << successResults.size() << "total results";
+            return TokenProcessingResult{
+                .success = true,
+                .results = QJsonArray(successResults), // Copy from pooled array
+                .error = EvalError::KeyNotFound // Unused for success case
+            };
+        })
+        .or_else([](EvalError error) -> std::expected<TokenProcessingResult, EvalError> {
+            return TokenProcessingResult{
+                .success = false,
+                .results = QJsonArray{},
+                .error = error
+            };
+        })
+        .value(); // Safe to call value() since or_else always returns a value
 }
 
 // Helper: Merge results from multiple tokens using simple concatenation

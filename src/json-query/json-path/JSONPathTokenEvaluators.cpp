@@ -15,14 +15,23 @@ std::expected<QJsonArray, EvalError> evalExpected<Token::Kind::Key>(const PathEv
                                                                      const Token& tk,
                                                                      const QJsonValue& v)
 {
-    QJsonArray out;
-    if (!v.isObject())
-        return out; // Empty result for non-objects
-    const QJsonObject obj = v.toObject();
-    
-    if (obj.contains(tk.key))
-        out.append(obj[tk.key]);
-    return out;
+    // Monadic approach: check if object, then extract key if present
+    auto extractFromObject = [&tk](const QJsonObject& obj) -> std::optional<QJsonArray> {
+        if (obj.contains(tk.key)) {
+            QJsonArray result;
+            result.append(obj[tk.key]);
+            return result;
+        }
+        return std::nullopt;
+    };
+
+    auto asObject = [&v]() -> std::optional<QJsonObject> {
+        return v.isObject() ? std::make_optional(v.toObject()) : std::nullopt;
+    };
+
+    return asObject()
+        .and_then(extractFromObject)
+        .value_or(QJsonArray{});
 }
 
 // --- Index -----------------------------------------------------------------
@@ -160,21 +169,33 @@ std::expected<QJsonArray, EvalError> evalExpected<Token::Kind::KeyList>(const Pa
                                                                          const Token& tk,
                                                                          const QJsonValue& v)
 {
-    QJsonArray out;
-    if (!v.isObject()) {
-        return out; // Empty result for non-objects
-    }
+    // Monadic approach: extract keys from object if present, build result object
+    auto extractKeysFromObject = [&tk](const QJsonObject& obj) -> std::optional<QJsonArray> {
+        const QStringList keys = tk.key.split(u'\n');
+        QJsonObject selection;
+        
+        for (const QString& key : keys) {
+            if (obj.contains(key)) {
+                selection.insert(key, obj[key]);
+            }
+        }
+        
+        if (selection.isEmpty()) {
+            return std::nullopt;
+        }
+        
+        QJsonArray result;
+        result.append(selection);
+        return result;
+    };
 
-    const QJsonObject obj = v.toObject();
-    const QStringList keys = tk.key.split(u'\n');
-    QJsonObject sel;
-    for (const QString& k : keys) {
-        if (obj.contains(k))
-            sel.insert(k, obj[k]);
-    }
-    if (!sel.isEmpty())
-        out.append(sel);
-    return out;
+    auto asObject = [&v]() -> std::optional<QJsonObject> {
+        return v.isObject() ? std::make_optional(v.toObject()) : std::nullopt;
+    };
+
+    return asObject()
+        .and_then(extractKeysFromObject)
+        .value_or(QJsonArray{});
 }
 
 } // namespace json_query::json_path::detail
