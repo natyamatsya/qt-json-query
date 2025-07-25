@@ -410,188 +410,403 @@ struct BracketSink {
     }
 };
 
-// A helper to iterate over the content and run rules.
-using BrRule = std::function<std::optional<Error>(QStringView, BracketSink&)>;
+// bare‑name parser: replace kb.pushKey → kb.push
+[[nodiscard]] std::expected<qsizetype,Error>
+parseBare(qsizetype pos, QStringView sv, KeyBuilder& kb)
+{
+    qCDebug(jsonPathLog) << "parseBare pos=" << pos;
+    qsizetype start = pos;
+    const qsizetype n = sv.size();
+    while (pos < n && sv[pos] != u'.' && sv[pos] != u'[') ++pos;
+    if (pos == start) return std::unexpected(Error::EmptySegment);
+    QStringView key = sv.sliced(start, pos - start);
+    if (auto r = kb.push(key.toString()); !r)
+        return std::unexpected(r.error());
+    return pos;
+}
 
-static const std::array<BrRule,10> BR_RULES = {{
-    // 0.  union by comma (sequential selectors, e.g. ?@.a,1) --------
-    [](QStringView content, BracketSink& out)->std::optional<Error> {
-        if (!content.contains(u',')) return std::nullopt;
+// ═══════════════════════════════════════════════════════════════════════════════
+// TableGen-Inspired Declarative Bracket Rule System
+// ═══════════════════════════════════════════════════════════════════════════════
 
-        // Parse comma-separated selectors using multi-part splitting
-        using json_query::json_path::detail::splitTopLevelMultiple;
-        auto parts = splitTopLevelMultiple(content, QLatin1StringView(","));
-        if (!parts) return std::nullopt;
+// Rule handler function type with enhanced error semantics
+using BracketRuleHandler = std::function<std::expected<void, Error>(QStringView, BracketSink&)>;
 
-        // Helper lambda to route a single segment through existing rules (skip union rule to prevent recursion)
-        auto compileOne = [&](QStringView seg)->std::optional<Error> {
-            // Case A: segment starts with '?'  → standalone filter expression
-            if (seg.startsWith(u'?')) {
-                QString expr = QString(seg.mid(1)).trimmed();
-                if (expr.isEmpty()) return std::optional<Error>{};
-                if (auto tok = json_query::json_path::compileContextFilter(expr, out.contextFilters, out.filters)) {
-                    out.pushFilter(*tok);
-                    return Error::Ok;
-                }
-                return std::optional<Error>{}; // treat as non-match so other rules can try
-            }
+// Rule matcher function type for pattern detection
+using BracketRuleMatcher = std::function<bool(QStringView)>;
 
-            // Case B: delegate to other bracket rules (skip union rule itself)
-            for (size_t i = 1; i < std::size(BR_RULES); ++i) {
-                if (auto err = BR_RULES[i](seg, out)) {
-                    return err; // either Ok or specific error
-                }
-            }
-            return std::nullopt; // no rule matched
-        };
+// Declarative rule metadata structure
+struct BracketRuleMetadata {
+    const char* name;                    // Human-readable rule name
+    int priority;                        // Higher priority = checked first
+    BracketRuleMatcher matcher;          // Pattern detection function
+    BracketRuleHandler handler;          // Processing function
+    const char* description;             // Documentation string
+};
 
-        // Process all parts
-        for (const QString& part : *parts) {
-            QStringView seg = QStringView(part).trimmed();
-            if (auto maybe = compileOne(seg); !maybe) return std::nullopt;
-            else if (*maybe != Error::Ok) return maybe; // propagate
-        }
-        return Error::Ok;
-    },
+// Forward declaration for recursive calls
+class BracketRuleDispatcher;
 
-    // 1.  *      ----------------------------------------------------
-    [](QStringView content, BracketSink& out)->std::optional<Error> {
-        if (content != u"*") return std::nullopt;
-        out.wild();
-        return Error::Ok;
-    },
+// ═══════════════════════════════════════════════════════════════════════════════
+// Rule Matcher Functions (Pattern Detection)
+// ═══════════════════════════════════════════════════════════════════════════════
 
-    // 2.  123    ----------------------------------------------------
-    [](QStringView content, BracketSink& out)->std::optional<Error> {
-        qCDebug(jsonPathLog) << "BR_RULE index-single check" << content.toString();
-        if (!isValidIndexLiteral(content)) {
-            qCDebug(jsonPathLog) << "  -> invalid index literal";
-            return std::nullopt;
-        }
-        qCDebug(jsonPathLog) << "  -> valid index literal";
-        bool ok=false; qlonglong val = content.toLongLong(&ok);
+namespace matchers {
+
+static bool matchesUnionComma(QStringView content) {
+    return content.contains(u',');
+}
+
+static bool matchesWildcard(QStringView content) {
+    return content == u"*";
+}
+
+static bool matchesSingleIndex(QStringView content) {
+    return isValidIndexLiteral(content);
+}
+
+static bool matchesIndexList(QStringView content) {
+    if (!content.contains(u',')) return false;
+    // Quick check: no quotes or slice colons
+    if (content.contains(u'\'') || content.contains(u'"') || content.contains(u':'))
+        return false;
+    
+    const auto parts = content.split(u',');
+    for (QStringView p : parts) {
+        QStringView t = p.trimmed();
+        if (!isValidIndexLiteral(t)) return false;
+    }
+    return true;
+}
+
+static bool matchesSlice(QStringView content) {
+    return content.contains(u':');
+}
+
+static bool matchesFilterWithParens(QStringView content) {
+    return content.startsWith(u"?(") && content.endsWith(u')');
+}
+
+static bool matchesFilterWithoutParens(QStringView content) {
+    return content.startsWith(u'?') && !content.startsWith(u"?(");
+}
+
+static bool matchesPlaceholder(QStringView content) {
+    if (!content.contains(u'?')) return false;
+    // verify pattern consists only of '?' separated by commas/spaces
+    for (QStringView part : content.split(u',')) {
+        if (part.trimmed() != u"?") return false;
+    }
+    return true;
+}
+
+static bool matchesQuotedKey(QStringView content) {
+    if (content.size() < 2) return false;
+    QChar q = content.front();
+    return (q == u'\'' || q == u'"') && content.back() == q;
+}
+
+static bool matchesUnquotedKey(QStringView /*content*/) {
+    return false; // RFC 9535 forbids unquoted string literals inside []
+}
+
+} // namespace matchers
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Rule Handler Functions (Processing Logic)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+namespace handlers {
+
+static std::expected<void, Error> handleUnionComma(QStringView content, BracketSink& out);
+
+static std::expected<void, Error> handleWildcard(QStringView /*content*/, BracketSink& out) {
+    out.wild();
+    return {};
+}
+
+static std::expected<void, Error> handleSingleIndex(QStringView content, BracketSink& out) {
+    qCDebug(jsonPathLog) << "BR_RULE index-single check" << content.toString();
+    
+    bool ok = false;
+    qlonglong val = content.toLongLong(&ok);
+    if (!ok) return std::unexpected(Error::InvalidSlice);
+    
+    int idx = (val > std::numeric_limits<int>::max()) ? std::numeric_limits<int>::max()
+             : (val < std::numeric_limits<int>::min()) ? std::numeric_limits<int>::min()
+             : static_cast<int>(val);
+    
+    qCDebug(jsonPathLog) << "  emitting index token" << idx;
+    out.index(idx);
+    return {};
+}
+
+static std::expected<void, Error> handleIndexList(QStringView content, BracketSink& out) {
+    qCDebug(jsonPathLog) << "BR_RULE index-list raw" << content.toString();
+    
+    const auto parts = content.split(u',');
+    for (QStringView p : parts) {
+        QStringView t = p.trimmed();
+        bool ok = false;
+        qlonglong val = t.toLongLong(&ok);
+        if (!ok) return std::unexpected(Error::InvalidSlice);
+        
         int idx = (val > std::numeric_limits<int>::max()) ? std::numeric_limits<int>::max()
                  : (val < std::numeric_limits<int>::min()) ? std::numeric_limits<int>::min()
                  : static_cast<int>(val);
-        qCDebug(jsonPathLog) << "  emitting index token" << idx;
+        
+        qCDebug(jsonPathLog) << "  list element emit" << idx;
         out.index(idx);
-        return Error::Ok;
-    },
-
-    // 2b.  1,2,3  --------------------------------------------------
-    [](QStringView content, BracketSink& out)->std::optional<Error> {
-        qCDebug(jsonPathLog) << "BR_RULE index-list raw" << content.toString();
-        if (!content.contains(u',')) return std::nullopt;
-        // Quick check: no quotes or slice colons
-        if (content.contains(u'\'') || content.contains(u'"') || content.contains(u':'))
-            return std::nullopt;
-        const auto parts = content.split(u',');
-        for (QStringView p : parts)
-        {
-            QStringView t = p.trimmed();
-            if (!isValidIndexLiteral(t)) {
-                qCDebug(jsonPathLog) << "  list element invalid" << t.toString();
-                return std::nullopt; // not pure index list
-            }
-            bool ok=false; qlonglong val = t.toLongLong(&ok);
-            int idx = (val > std::numeric_limits<int>::max()) ? std::numeric_limits<int>::max()
-                     : (val < std::numeric_limits<int>::min()) ? std::numeric_limits<int>::min()
-                     : static_cast<int>(val);
-            qCDebug(jsonPathLog) << "  list element emit" << idx;
-            out.index(idx);
-        }
-        return Error::Ok;
-    },
-
-    // 3.  1:3:2  ----------------------------------------------------
-    [](QStringView content, BracketSink& out)->std::optional<Error> {
-        if (!content.contains(u':')) return std::nullopt;
-        {
-            if (auto maybe = makeSlice(content)) {
-                out.slice(*maybe);
-                return Error::Ok;
-            }
-            // Return nullopt instead of Error::InvalidSlice to allow other rules to try
-            // This fixes slice existence tests like $[?@[0:2]] which should be handled by filter rules
-            return std::nullopt;
-        }
-    },
-
-    // 4.  ?(...) ----------------------------------------------------
-    [](QStringView content, BracketSink& out)->std::optional<Error> {
-        if (!content.startsWith(u"?(") || !content.endsWith(u')'))
-            return std::nullopt;
-
-        QString expr = content.sliced(2, content.size() - 3).toString();
-
-        if (auto tok = json_query::json_path::compileContextFilter(expr, out.contextFilters, out.filters)) {
-            out.pushFilter(*tok);
-            return Error::Ok;
-        }
-        return Error::UnsupportedFilter;
-    },
-
-    // 4b.  ?expr (no outer parentheses) --------------------------------
-    [](QStringView content, BracketSink& out)->std::optional<Error> {
-        // Accept syntax like ?@.a==1  or ?$==null (no wrapping parens)
-        if (!content.startsWith(u'?'))
-            return std::nullopt; // Not a filter expression
-
-        QStringView exprView = content.sliced(1).trimmed();
-        if (exprView.isEmpty()) return std::nullopt; // Could be placeholder handled later
-
-        QString expr = exprView.toString();
-        qCDebug(jsonPathLog) << "BR_RULE 6: calling compileContextFilter with expr:" << expr;
-        if (auto tok = json_query::json_path::compileContextFilter(expr, out.contextFilters, out.filters)) {
-            qCDebug(jsonPathLog) << "BR_RULE 6: compileContextFilter succeeded";
-            out.pushFilter(*tok);
-            return Error::Ok;
-        }
-        qCDebug(jsonPathLog) << "BR_RULE 6: compileContextFilter failed, returning UnsupportedFilter";
-        return Error::UnsupportedFilter;
-    },
-
-    // 5.  placeholder '?' or list '?,?' ------------------------------
-    [](QStringView content, BracketSink& out)->std::optional<Error> {
-        if (!content.contains(u'?')) return std::nullopt;
-        // verify pattern consists only of '?' separated by commas/spaces
-        for (QStringView part : content.split(u',')) {
-            if (part.trimmed() != u"?") return std::nullopt; // not pure placeholder list
-        }
-        // For each placeholder, create a no-op filter token that will be
-        // resolved later (currently always-true).
-        for ([[maybe_unused]] QStringView _ : content.split(u',')) {
-            auto alwaysTrue = [](const QJsonValue& currentNode, const QJsonValue& /*root*/) { return true; };
-            out.contextFilters.append(alwaysTrue);
-            Token t{Token::Kind::Filter};
-            t.contextFilterId = out.contextFilters.size() - 1;
-            out.pushFilter(t);
-        }
-        return Error::Ok;
-    },
-
-    // 6.  'key'  ----------------------------------------------------
-    [](QStringView content, BracketSink& out)->std::optional<Error> {
-        if (content.size() < 2) return std::nullopt;
-        QChar q = content.front();
-        if ((q != u'\'' && q != u'"') || content.back() != q)
-            return std::nullopt;
-
-        QStringView unquoted = content.sliced(1, content.size() - 2);
-        QuoteStyle st = (q==u'\'') ? QuoteStyle::Single : QuoteStyle::Double;
-        if (!isValidQuotedKey(unquoted, st))
-            return Error::InvalidSlice; // reuse generic
-        QString unesc = unescapeQuotedKey(unquoted);
-        if (auto r = out.key(unesc, true); !r)
-            return r.error();
-        return Error::Ok;
-    },
-
-    // 7.  key (unquoted) — RFC 9535 forbids unquoted string literals inside []
-    [](QStringView /*content*/, BracketSink& /*out*/)->std::optional<Error> {
-        return std::nullopt; // disallowed per spec
     }
-}};
+    return {};
+}
+
+static std::expected<void, Error> handleSlice(QStringView content, BracketSink& out) {
+    if (auto maybe = makeSlice(content)) {
+        out.slice(*maybe);
+        return {};
+    }
+    // Return error instead of nullopt to allow other rules to try
+    return std::unexpected(Error::InvalidSlice);
+}
+
+static std::expected<void, Error> handleFilterWithParens(QStringView content, BracketSink& out) {
+    QString expr = content.sliced(2, content.size() - 3).toString();
+    
+    if (auto tok = json_query::json_path::compileContextFilter(expr, out.contextFilters, out.filters)) {
+        out.pushFilter(*tok);
+        return {};
+    }
+    return std::unexpected(Error::UnsupportedFilter);
+}
+
+static std::expected<void, Error> handleFilterWithoutParens(QStringView content, BracketSink& out) {
+    QStringView exprView = content.sliced(1).trimmed();
+    if (exprView.isEmpty()) return std::unexpected(Error::UnsupportedFilter);
+    
+    QString expr = exprView.toString();
+    qCDebug(jsonPathLog) << "BR_RULE filter-no-parens: calling compileContextFilter with expr:" << expr;
+    
+    if (auto tok = json_query::json_path::compileContextFilter(expr, out.contextFilters, out.filters)) {
+        qCDebug(jsonPathLog) << "BR_RULE filter-no-parens: compileContextFilter succeeded";
+        out.pushFilter(*tok);
+        return {};
+    }
+    
+    qCDebug(jsonPathLog) << "BR_RULE filter-no-parens: compileContextFilter failed";
+    return std::unexpected(Error::UnsupportedFilter);
+}
+
+static std::expected<void, Error> handlePlaceholder(QStringView content, BracketSink& out) {
+    // For each placeholder, create a no-op filter token that will be
+    // resolved later (currently always-true).
+    for ([[maybe_unused]] QStringView _ : content.split(u',')) {
+        auto alwaysTrue = [](const QJsonValue& /*currentNode*/, const QJsonValue& /*root*/) { return true; };
+        out.contextFilters.append(alwaysTrue);
+        Token t{Token::Kind::Filter};
+        t.contextFilterId = out.contextFilters.size() - 1;
+        out.pushFilter(t);
+    }
+    return {};
+}
+
+static std::expected<void, Error> handleQuotedKey(QStringView content, BracketSink& out) {
+    QStringView unquoted = content.sliced(1, content.size() - 2);
+    QChar q = content.front();
+    QuoteStyle st = (q == u'\'') ? QuoteStyle::Single : QuoteStyle::Double;
+    
+    if (!isValidQuotedKey(unquoted, st)) {
+        return std::unexpected(Error::InvalidSlice);
+    }
+    
+    QString unesc = unescapeQuotedKey(unquoted);
+    return out.key(unesc, true).transform_error([](Error e) { return e; });
+}
+
+static std::expected<void, Error> handleUnquotedKey(QStringView /*content*/, BracketSink& /*out*/) {
+    return std::unexpected(Error::UnsupportedFilter); // RFC 9535 forbids this
+}
+
+} // namespace handlers
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TableGen-Inspired Declarative Rule Table
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class BracketRuleDispatcher {
+private:
+    // Initialize rules at runtime to avoid constexpr issues
+    static std::vector<BracketRuleMetadata> createRules() {
+        return {
+            {
+                .name = "union_comma",
+                .priority = 1000,
+                .matcher = matchers::matchesUnionComma,
+                .handler = handlers::handleUnionComma,
+                .description = "Comma-separated union selectors (e.g., 'a,b,1,2')"
+            },
+            {
+                .name = "wildcard",
+                .priority = 900,
+                .matcher = matchers::matchesWildcard,
+                .handler = handlers::handleWildcard,
+                .description = "Wildcard selector (*)"
+            },
+            {
+                .name = "index_list",
+                .priority = 850,
+                .matcher = matchers::matchesIndexList,
+                .handler = handlers::handleIndexList,
+                .description = "Comma-separated index list (e.g., '1,2,3')"
+            },
+            {
+                .name = "single_index",
+                .priority = 800,
+                .matcher = matchers::matchesSingleIndex,
+                .handler = handlers::handleSingleIndex,
+                .description = "Single array index (e.g., '123')"
+            },
+            {
+                .name = "slice",
+                .priority = 700,
+                .matcher = matchers::matchesSlice,
+                .handler = handlers::handleSlice,
+                .description = "Array slice (e.g., '1:3:2')"
+            },
+            {
+                .name = "filter_with_parens",
+                .priority = 600,
+                .matcher = matchers::matchesFilterWithParens,
+                .handler = handlers::handleFilterWithParens,
+                .description = "Filter expression with parentheses (e.g., '?(@.a == 1)')"
+            },
+            {
+                .name = "filter_without_parens",
+                .priority = 550,
+                .matcher = matchers::matchesFilterWithoutParens,
+                .handler = handlers::handleFilterWithoutParens,
+                .description = "Filter expression without parentheses (e.g., '?@.a == 1')"
+            },
+            {
+                .name = "placeholder",
+                .priority = 500,
+                .matcher = matchers::matchesPlaceholder,
+                .handler = handlers::handlePlaceholder,
+                .description = "Placeholder filter (e.g., '?' or '?,?')"
+            },
+            {
+                .name = "quoted_key",
+                .priority = 400,
+                .matcher = matchers::matchesQuotedKey,
+                .handler = handlers::handleQuotedKey,
+                .description = "Quoted string key (e.g., \"'key'\" or '\"key\"')"
+            },
+            {
+                .name = "unquoted_key",
+                .priority = 100,
+                .matcher = matchers::matchesUnquotedKey,
+                .handler = handlers::handleUnquotedKey,
+                .description = "Unquoted key (forbidden by RFC 9535)"
+            }
+        };
+    }
+
+public:
+    // Get rules (initialized once)
+    static const std::vector<BracketRuleMetadata>& getRules() {
+        static const auto rules = createRules();
+        return rules;
+    }
+
+    // Main dispatch function using declarative rule table
+    static std::expected<void, Error> dispatch(QStringView content, BracketSink& sink) {
+        qCDebug(jsonPathLog) << "BracketRuleDispatcher::dispatch content=" << content.toString();
+        
+        // Apply rules in priority order using monadic error handling
+        for (const auto& rule : getRules()) {
+            qCDebug(jsonPathLog) << "Trying rule:" << rule.name << "(priority:" << rule.priority << ")";
+            
+            if (rule.matcher(content)) {
+                qCDebug(jsonPathLog) << "Rule" << rule.name << "matched, applying handler";
+                auto result = rule.handler(content, sink);
+                
+                if (result) {
+                    qCDebug(jsonPathLog) << "Rule" << rule.name << "succeeded";
+                    return {};
+                } else {
+                    qCDebug(jsonPathLog) << "Rule" << rule.name << "failed with error" << static_cast<int>(result.error());
+                    return result;
+                }
+            } else {
+                qCDebug(jsonPathLog) << "Rule" << rule.name << "did not match";
+            }
+        }
+        
+        qCDebug(jsonPathLog) << "No rules matched, returning UnsupportedFilter";
+        return std::unexpected(Error::UnsupportedFilter);
+    }
+
+    // Helper for union processing to avoid recursion
+    static std::expected<void, Error> processSegmentExcludingUnion(QStringView content, BracketSink& sink) {
+        // Apply all rules except union_comma to prevent recursion
+        for (const auto& rule : getRules()) {
+            if (std::string_view(rule.name) == "union_comma") continue; // Skip union rule
+            
+            if (rule.matcher(content)) {
+                return rule.handler(content, sink);
+            }
+        }
+        return std::unexpected(Error::UnsupportedFilter);
+    }
+
+    // Utility function to get rule metadata for debugging/documentation
+    static const BracketRuleMetadata* findRuleByName(const char* name) {
+        for (const auto& rule : getRules()) {
+            if (std::string_view(rule.name) == name) {
+                return &rule;
+            }
+        }
+        return nullptr;
+    }
+};
+
+// Now implement the union handler that was forward declared
+namespace handlers {
+
+static std::expected<void, Error> handleUnionComma(QStringView content, BracketSink& out) {
+    // Parse comma-separated selectors using multi-part splitting
+    using json_query::json_path::detail::splitTopLevelMultiple;
+    auto parts = splitTopLevelMultiple(content, QLatin1StringView(","));
+    if (!parts) return std::unexpected(Error::UnsupportedFilter);
+
+    // Helper lambda to route a single segment through existing rules (skip union rule to prevent recursion)
+    auto compileOne = [&](QStringView seg) -> std::expected<void, Error> {
+        // Case A: segment starts with '?'  → standalone filter expression
+        if (seg.startsWith(u'?')) {
+            QString expr = QString(seg.mid(1)).trimmed();
+            if (expr.isEmpty()) return {};
+            if (auto tok = json_query::json_path::compileContextFilter(expr, out.contextFilters, out.filters)) {
+                out.pushFilter(*tok);
+                return {};
+            }
+            return std::unexpected(Error::UnsupportedFilter);
+        }
+
+        // Case B: delegate to other bracket rules using dispatcher
+        return BracketRuleDispatcher::processSegmentExcludingUnion(seg, out);
+    };
+
+    // Process all parts with monadic error handling
+    for (const QString& part : *parts) {
+        QStringView seg = QStringView(part).trimmed();
+        if (auto result = compileOne(seg); !result) {
+            return result;
+        }
+    }
+    return {};
+}
+
+} // namespace handlers
 
 // ────────────────────────────────────────────────────────────────
 // 3. bracket parser
@@ -660,41 +875,10 @@ parseBracket(qsizetype pos, QStringView sv,
     BracketSink sink{tokens, kb, contextFilters, filters};
     sink.currentBracketGroupId = tokens.size(); // Set unique bracket group ID
 
-    int ruleIndex = 0;
-    for (auto& rule : BR_RULES) {
-        qCDebug(jsonPathLog) << "trying BR_RULE" << ruleIndex;
-        if (auto err = rule(content, sink)) {
-            qCDebug(jsonPathLog) << "BR_RULE" << ruleIndex << "returned error" << static_cast<int>(*err);
-            if (*err != Error::Ok) return std::unexpected(*err);
-            qCDebug(jsonPathLog) << "BR_RULE" << ruleIndex << "succeeded, returning pos" << (pos + 1);
-            return pos + 1;
-        }
-        qCDebug(jsonPathLog) << "BR_RULE" << ruleIndex << "returned nullopt (no match)";
-        ++ruleIndex;
-    }
-    qCDebug(jsonPathLog) << "all BR_RULES failed, returning UnsupportedFilter";
-    return std::unexpected(Error::UnsupportedFilter);
-}
-
-// bare‑name parser: replace kb.pushKey → kb.push
-std::expected<qsizetype,Error> parseBare(qsizetype pos, QStringView sv, KeyBuilder& kb)
-{
-    qsizetype start = pos;
-    while (pos < sv.size() && sv[pos] != u'.' && sv[pos] != u'[') ++pos;
-    if (pos == start) return std::unexpected(Error::EmptySegment);
-    
-    QStringView identifier = sv.sliced(start, pos - start);
-    
-    // Special case: if the identifier is exactly '*', create a Wildcard token
-    if (identifier == u"*") {
-        kb.tgt.append(Token{Token::Kind::Wildcard});
-        return pos;
-    }
-    
-    // Otherwise, create a regular Key token
-    if (auto r = kb.push(identifier.toString()); !r)
-        return std::unexpected(r.error());
-    return pos;
+    // Use TableGen dispatcher instead of manual rule loop
+    return BracketRuleDispatcher::dispatch(content, sink)
+        .transform([pos]() { return pos + 1; })
+        .transform_error([](Error e) { return e; });
 }
 
 } // namespace detail
@@ -702,11 +886,11 @@ std::expected<qsizetype,Error> parseBare(qsizetype pos, QStringView sv, KeyBuild
 // ──────────────────────────────────────────────────────────────────────
 //  detectTrailingFunction - moved from JSONPath
 // ──────────────────────────────────────────────────────────────────────
-FunctionType detectTrailingFunction(QString& path)
+json_query::json_path::FunctionType detectTrailingFunction(QString& path)
 {
-    using enum FunctionType;
+    using enum json_query::json_path::FunctionType;
 
-    static const QPair<QString, FunctionType> table[] = {
+    static const QPair<QString, json_query::json_path::FunctionType> table[] = {
         {".length()", Length},
         {".min()", Min},
         {".max()", Max},
@@ -725,46 +909,42 @@ FunctionType detectTrailingFunction(QString& path)
 // ──────────────────────────────────────────────────────────────────────
 //  compilePath - moved from JSONPath
 // ──────────────────────────────────────────────────────────────────────
-std::expected<Compiled, Error> compilePath(QStringView sv)
+std::expected<json_query::json_path::Compiled, json_query::json_path::Error> compilePath(QStringView sv)
 {
-    qCDebug(jsonPathLog) << "compilePath() sv=" << sv;
-    using K = Token::Kind;
-    QVector<Token> tokens;
-    QVector<ContextFilterFn> contextFilters;
-    QVector<FilterFn> filters;
-    tokens.reserve(sv.count('.') + sv.count('[') + 4);
+    qCDebug(json_query::json_path::jsonPathLog) << "compilePath() sv=" << sv;
+    using K = json_query::json_path::Token::Kind;
+    QVector<json_query::json_path::Token> tokens;
+    QVector<json_query::json_path::ContextFilterFn> contextFilters;
+    QVector<json_query::json_path::FilterFn> filters;
+    json_query::json_path::detail::KeyBuilder kb{tokens};
 
-    // root
-    if (sv.empty() || (sv[0] != u'$' && sv[0] != u'@'))
-        return std::unexpected(Error::MissingRoot);
-    tokens.append(Token{ K::Key, 0, {}, qt_hash(sv.first(1)),
-                         sv.first(1).toString(), 0 });
+    if (sv.isEmpty() || sv[0] != u'$')
+        return std::unexpected(json_query::json_path::Error::MissingRoot);
+    tokens.append(json_query::json_path::Token{ K::Key, 0, {}, qt_hash(sv.first(1)),
+                                                sv.first(1).toString() });
 
-    // must be followed by '.' or '[' unless path ends here
     if (sv.size() > 1 && sv[1] != u'.' && sv[1] != u'[')
-        return std::unexpected(Error::UnexpectedAfterRoot);
-
-    detail::KeyBuilder kb{tokens};
+        return std::unexpected(json_query::json_path::Error::UnexpectedAfterRoot);
 
     // C++23 Monadic Chain - Functional composition for parsing loop
     // Transform imperative loop into elegant monadic fold operation
     struct ParseState {
         qsizetype pos;
-        QVector<Token>& tokens;
-        QVector<ContextFilterFn>& contextFilters;
-        QVector<FilterFn>& filters;
-        detail::KeyBuilder& kb;
+        QVector<json_query::json_path::Token>& tokens;
+        QVector<json_query::json_path::ContextFilterFn>& contextFilters;
+        QVector<json_query::json_path::FilterFn>& filters;
+        json_query::json_path::detail::KeyBuilder& kb;
         QStringView sv;
     };
     
     ParseState state{1, tokens, contextFilters, filters, kb, sv};
     
     // Monadic fold: repeatedly apply parser until end of input or error
-    return std::expected<ParseState, Error>{std::move(state)}
-        .and_then([](ParseState&& state) -> std::expected<ParseState, Error> {
+    return std::expected<ParseState, json_query::json_path::Error>{std::move(state)}
+        .and_then([](ParseState&& state) -> std::expected<ParseState, json_query::json_path::Error> {
             // Recursive monadic parser application
-            std::function<std::expected<ParseState, Error>(ParseState&&)> parseNext = 
-                [&parseNext](ParseState&& currentState) -> std::expected<ParseState, Error> {
+            std::function<std::expected<ParseState, json_query::json_path::Error>(ParseState&&)> parseNext = 
+                [&parseNext](ParseState&& currentState) -> std::expected<ParseState, json_query::json_path::Error> {
                 
                 // Base case: reached end of input
                 if (currentState.pos >= currentState.sv.size()) {
@@ -774,29 +954,29 @@ std::expected<Compiled, Error> compilePath(QStringView sv)
                 // Apply appropriate parser based on current character
                 auto nextPosResult = 
                     (currentState.sv[currentState.pos] == u'.') ? 
-                        detail::parseDot(currentState.pos, currentState.sv, currentState.kb, currentState.tokens)
+                        json_query::json_path::detail::parseDot(currentState.pos, currentState.sv, currentState.kb, currentState.tokens)
                   : (currentState.sv[currentState.pos] == u'[') ? 
-                        detail::parseBracket(currentState.pos, currentState.sv, currentState.kb, currentState.tokens, 
+                        json_query::json_path::detail::parseBracket(currentState.pos, currentState.sv, currentState.kb, currentState.tokens, 
                                            currentState.contextFilters, currentState.filters)
-                  :     detail::parseBare(currentState.pos, currentState.sv, currentState.kb);
+                  :     json_query::json_path::detail::parseBare(currentState.pos, currentState.sv, currentState.kb);
                 
                 // Monadic composition: chain parser result with recursive call
                 return nextPosResult
-                    .and_then([&parseNext, currentState = std::move(currentState)](qsizetype nextPos) mutable -> std::expected<ParseState, Error> {
+                    .and_then([&parseNext, currentState = std::move(currentState)](qsizetype nextPos) mutable -> std::expected<ParseState, json_query::json_path::Error> {
                         currentState.pos = nextPos;
                         return parseNext(std::move(currentState));
                     })
-                    .or_else([](Error error) -> std::expected<ParseState, Error> {
-                        qCDebug(jsonPathLog) << "compilePath: parser returned error" << static_cast<int>(error);
+                    .or_else([](json_query::json_path::Error error) -> std::expected<ParseState, json_query::json_path::Error> {
+                        qCDebug(json_query::json_path::jsonPathLog) << "compilePath: parser returned error" << static_cast<int>(error);
                         return std::unexpected(error);
                     });
             };
             
             return parseNext(std::move(state));
         })
-        .transform([](ParseState&& finalState) -> Compiled {
-            qCDebug(jsonPathLog) << "compilePath: monadic parsing completed successfully";
-            return Compiled{ 
+        .transform([](ParseState&& finalState) -> json_query::json_path::Compiled {
+            qCDebug(json_query::json_path::jsonPathLog) << "compilePath: monadic parsing completed successfully";
+            return json_query::json_path::Compiled{ 
                 std::move(finalState.tokens), 
                 std::move(finalState.filters), 
                 std::move(finalState.contextFilters) 
@@ -807,28 +987,28 @@ std::expected<Compiled, Error> compilePath(QStringView sv)
 // ──────────────────────────────────────────────────────────────────────
 //  High-level compile function
 // ──────────────────────────────────────────────────────────────────────
-std::expected<CompilationResult, Error> compile(QStringView rawPath)
+std::expected<json_query::json_path::CompilationResult, json_query::json_path::Error> compile(QStringView rawPath)
 {
-    qCDebug(jsonPathLog) << "compile() rawPath=" << rawPath;
+    qCDebug(json_query::json_path::jsonPathLog) << "compile() rawPath=" << rawPath;
     QString path = rawPath.toString();
     
     // Extract any trailing function → updates `path` and yields `func`
-    FunctionType func = detectTrailingFunction(path);
+    json_query::json_path::FunctionType func = json_query::json_path::detectTrailingFunction(path);
 
     if (path.isEmpty())
-        return std::unexpected(Error::EmptySegment);
+        return std::unexpected(json_query::json_path::Error::EmptySegment);
 
     // C++23 Monadic Chain - Elegant error composition without manual checks!
-    return compilePath(path)
-        .transform([func](Compiled&& compiled) -> CompilationResult {
-            qCDebug(jsonPathLog) << "compile: compilePath succeeded";
-            return CompilationResult{
+    return json_query::json_path::compilePath(path)
+        .transform([func](json_query::json_path::Compiled&& compiled) -> json_query::json_path::CompilationResult {
+            qCDebug(json_query::json_path::jsonPathLog) << "compile: compilePath succeeded";
+            return json_query::json_path::CompilationResult{
                 func,
                 std::move(compiled)
             };
         })
-        .or_else([](Error error) -> std::expected<CompilationResult, Error> {
-            qCDebug(jsonPathLog) << "compile: compilePath failed with error" << static_cast<int>(error);
+        .or_else([](json_query::json_path::Error error) -> std::expected<json_query::json_path::CompilationResult, json_query::json_path::Error> {
+            qCDebug(json_query::json_path::jsonPathLog) << "compile: compilePath failed with error" << static_cast<int>(error);
             return std::unexpected(error);
         });
 }
