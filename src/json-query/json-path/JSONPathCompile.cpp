@@ -746,21 +746,62 @@ std::expected<Compiled, Error> compilePath(QStringView sv)
 
     detail::KeyBuilder kb{tokens};
 
-    // scan
-    for (qsizetype pos = 1, n = sv.size(); pos < n; )
-    {
-        std::expected<qsizetype,Error> next =
-            (sv[pos] == u'.') ? detail::parseDot    (pos, sv, kb, tokens)
-          : (sv[pos] == u'[') ? detail::parseBracket(pos, sv, kb, tokens, contextFilters, filters)
-          :                    detail::parseBare   (pos, sv, kb);
-
-        if (!next) {
-            qCDebug(jsonPathLog) << "compilePath: parser returned error" << static_cast<int>(next.error());
-            return std::unexpected(next.error());
-        }
-        pos = *next;
-    }
-    return Compiled{ std::move(tokens), std::move(filters), std::move(contextFilters) };
+    // C++23 Monadic Chain - Functional composition for parsing loop
+    // Transform imperative loop into elegant monadic fold operation
+    struct ParseState {
+        qsizetype pos;
+        QVector<Token>& tokens;
+        QVector<ContextFilterFn>& contextFilters;
+        QVector<FilterFn>& filters;
+        detail::KeyBuilder& kb;
+        QStringView sv;
+    };
+    
+    ParseState state{1, tokens, contextFilters, filters, kb, sv};
+    
+    // Monadic fold: repeatedly apply parser until end of input or error
+    return std::expected<ParseState, Error>{std::move(state)}
+        .and_then([](ParseState&& state) -> std::expected<ParseState, Error> {
+            // Recursive monadic parser application
+            std::function<std::expected<ParseState, Error>(ParseState&&)> parseNext = 
+                [&parseNext](ParseState&& currentState) -> std::expected<ParseState, Error> {
+                
+                // Base case: reached end of input
+                if (currentState.pos >= currentState.sv.size()) {
+                    return std::move(currentState);
+                }
+                
+                // Apply appropriate parser based on current character
+                auto nextPosResult = 
+                    (currentState.sv[currentState.pos] == u'.') ? 
+                        detail::parseDot(currentState.pos, currentState.sv, currentState.kb, currentState.tokens)
+                  : (currentState.sv[currentState.pos] == u'[') ? 
+                        detail::parseBracket(currentState.pos, currentState.sv, currentState.kb, currentState.tokens, 
+                                           currentState.contextFilters, currentState.filters)
+                  :     detail::parseBare(currentState.pos, currentState.sv, currentState.kb);
+                
+                // Monadic composition: chain parser result with recursive call
+                return nextPosResult
+                    .and_then([&parseNext, currentState = std::move(currentState)](qsizetype nextPos) mutable -> std::expected<ParseState, Error> {
+                        currentState.pos = nextPos;
+                        return parseNext(std::move(currentState));
+                    })
+                    .or_else([](Error error) -> std::expected<ParseState, Error> {
+                        qCDebug(jsonPathLog) << "compilePath: parser returned error" << static_cast<int>(error);
+                        return std::unexpected(error);
+                    });
+            };
+            
+            return parseNext(std::move(state));
+        })
+        .transform([](ParseState&& finalState) -> Compiled {
+            qCDebug(jsonPathLog) << "compilePath: monadic parsing completed successfully";
+            return Compiled{ 
+                std::move(finalState.tokens), 
+                std::move(finalState.filters), 
+                std::move(finalState.contextFilters) 
+            };
+        });
 }
 
 // ──────────────────────────────────────────────────────────────────────
