@@ -7,6 +7,7 @@
 #include "json-query/json-path/JSONPathTokenEvaluators.hpp"
 #include "json-query/json-path/JSONPathPointerConversion.hpp"
 #include "json-query/json-path/internal/TokenDispatchTable.hpp"
+#include "json-query/json-path/internal/PassPipeline.hpp"
 
 #include <array>
 #include <deque>

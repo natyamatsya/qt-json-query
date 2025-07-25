@@ -20,6 +20,7 @@
 #include "json-query/utils/JSONQueryUtils.hpp"
 #include "json-query/json-pointer/JSONPointer.hpp"
 #include "json-query/json-path/JSONPathEvalError.hpp"
+#include "json-query/json-path/internal/PassPipeline.hpp"
 
 using namespace Qt::StringLiterals;
 // ======================================================================
@@ -33,15 +34,17 @@ public:
     // -----------------------------------------------------------------
     //  Factory (replaces throwing constructor)                    ★
     // -----------------------------------------------------------------
-    using Result = std::expected<JSONPath, json_path::Error>;
+    using Result = std::expected<JSONPath, json_query::json_path::Error>;
     // ★
     static Result create(QStringView path);                      // ★
+    // LLVM-inspired compilation with optimization levels
+    static Result create(QStringView path, json_query::json_path::internal::PassManager::OptimizationLevel optLevel);
     // ★
     // -----------------------------------------------------------------
     //  Evaluation API with error reporting (std::expected)
     // -----------------------------------------------------------------
-    using EvalResult = std::expected<QJsonValue, json_path::EvalError>;
-    using EvalArrayResult = std::expected<QJsonArray, json_path::EvalError>;
+    using EvalResult = std::expected<QJsonValue, json_query::json_path::EvalError>;
+    using EvalArrayResult = std::expected<QJsonArray, json_query::json_path::EvalError>;
 
     [[nodiscard]] EvalResult evaluate(const QJsonDocument& doc) const;
     [[nodiscard]] EvalResult evaluate(const QJsonValue&    value) const;
@@ -61,22 +64,22 @@ public:
     JSONPath& operator=(const JSONPath&)     = default;
 
     //  Aliases exported for callers
-    using FunctionType = json_path::FunctionType;
-    using Slice        = json_path::Slice;
-    using Token        = json_path::Token;
-    using FilterFn     = json_path::FilterFn;
-    using ContextFilterFn = json_path::ContextFilterFn;
-    using Error = json_path::Error;
+    using FunctionType = json_query::json_path::FunctionType;
+    using Slice        = json_query::json_path::Slice;
+    using Token        = json_query::json_path::Token;
+    using FilterFn     = json_query::json_path::FilterFn;
+    using ContextFilterFn = json_query::json_path::ContextFilterFn;
+    using Error = json_query::json_path::Error;
 
 private:
     // -----------------------------------------------------------------
     //  Private "data" ctor – used only by factory                     ★
     // -----------------------------------------------------------------
-    JSONPath( FunctionType                func,
+    JSONPath( json_query::json_path::FunctionType                func,
                   QString                     original,
-                  QVector<Token>              tokens,
-                  QVector<FilterFn> filters,
-                  QVector<ContextFilterFn> contextFilters ) noexcept
+                  QVector<json_query::json_path::Token>              tokens,
+                  QVector<json_query::json_path::FilterFn> filters,
+                  QVector<json_query::json_path::ContextFilterFn> contextFilters ) noexcept
             : m_func(func)
             , m_originalPath(std::move(original))
             , m_tokens(std::move(tokens))
@@ -87,11 +90,11 @@ private:
     // -----------------------------------------------------------------
     //  Data members
     // -----------------------------------------------------------------
-    FunctionType               m_func    {FunctionType::None};
+    json_query::json_path::FunctionType               m_func    {json_query::json_path::FunctionType::None};
     QString                    m_originalPath;
-    QVector<Token>             m_tokens;
-    QVector<FilterFn> m_filters;
-    QVector<ContextFilterFn> m_contextFilters;
+    QVector<json_query::json_path::Token>             m_tokens;
+    QVector<json_query::json_path::FilterFn> m_filters;
+    QVector<json_query::json_path::ContextFilterFn> m_contextFilters;
 
 }; // end class JSONPath
 

@@ -1,13 +1,14 @@
 #pragma once
 
+#include "json-query/json-path/JSONPathEvalError.hpp"
+#include "json-query/json-path/internal/PathEvalCtx.hpp"
+#include "json-query/json-path/internal/PassPipeline.hpp"
+
 #include <QJsonValue>
 #include <QJsonArray>
-#include <QJsonObject>
 #include <expected>
 
-#include "internal/PathEvalCtx.hpp"
 #include "json-query/json-path/JSONPathCompile.hpp"
-#include "JSONPathEvalError.hpp"
 
 // (legacy JSONPath bridge removed)
 

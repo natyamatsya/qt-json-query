@@ -12,9 +12,10 @@ set(JSON_QUERY_SOURCES
     json-path/JSONPathFilter.cpp
     json-path/JSONPathContextFilter.cpp
     json-path/JSONPathTokenEvaluators.cpp
+    json-path/JSONPathPointerConversion.cpp
+    json-path/internal/PassPipeline.cpp
     json-path/JSONPathEvaluate.cpp
     json-path/JSONPathExpected.cpp
-    json-path/JSONPathPointerConversion.cpp
     json-path/JSONPathLog.cpp
     json-path/internal/IterativeRecursiveDescent.cpp
 )

@@ -1,6 +1,12 @@
 add_executable(simple_pointer simple_pointer.cpp)
 target_link_libraries(simple_pointer PRIVATE json_query)
 
+add_executable(compilation_time_passes_demo compilation_time_passes_demo.cpp)
+target_link_libraries(compilation_time_passes_demo json_query Qt6::Core)
+
+add_executable(pass_pipeline_demo pass_pipeline_demo.cpp)
+target_link_libraries(pass_pipeline_demo json_query Qt6::Core)
+
 add_executable(simple_path simple_path.cpp)
 target_link_libraries(simple_path PRIVATE json_query)
 
@@ -13,6 +19,8 @@ target_link_libraries(refactor_potential PRIVATE json_query)
 
 install(TARGETS
     simple_pointer
+    compilation_time_passes_demo
+    pass_pipeline_demo
     simple_path
     complex_query
     refactor_potential
