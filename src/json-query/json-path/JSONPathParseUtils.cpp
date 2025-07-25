@@ -88,11 +88,17 @@ std::optional<Slice> makeSlice(QStringView v)
 
     qCDebug(jsonPathLog) << "parsed slice startOpt="<<startOpt<<" endOpt="<<endOpt<<" stepOpt="<<stepOpt;
 
-    return Slice{
-        .start = startOpt.value_or(0),
-        .end   = endOpt.value_or(SENTINEL),
-        .step  = stepOpt.value_or(1)
-    };
+    // Zero-step slices are *valid* but yield an empty result (§4.2.3).
+    // We pass them through to the evaluator unchanged.
+
+    qsizetype step = stepOpt.value_or(1);
+
+    // Out-of-range literals are clamped to ±∞ above; evaluation will handle them.
+
+    qsizetype start = startOpt.has_value() ? *startOpt : SENTINEL;
+    qsizetype end   = endOpt.has_value()   ? *endOpt   : SENTINEL;
+
+    return Slice{start,end,step};
 }
 
 // ──────────────────────────────────────────────────────────────────────
@@ -258,7 +264,19 @@ bool isValidIndexLiteral(QStringView content)
         return false;
     }
     
-    return integer_literal_pattern(trimmed.toString().toStdString());
+    if (!integer_literal_pattern(trimmed.toString().toStdString())) {
+        qCDebug(jsonPathLog) << "isValidIndexLiteral(" << content << ") invalid integer literal";
+        return false;
+    }
+    
+    bool ok = false; 
+    qlonglong val = trimmed.toLongLong(&ok);
+    qCDebug(jsonPathLog) << "isValidIndexLiteral(" << content << ") match=true ok=" << ok << " val=" << (ok ? QString::number(val) : QStringLiteral("n/a"));
+    constexpr qlonglong SAFE_INT = 9007199254740992LL; // 2^53 per RFC 9535 test expectations
+    if (!ok || val <= -SAFE_INT || val >= SAFE_INT)
+        return false; // totally out of supported range – selector invalid
+
+    return true;
 }
 
 // ──────────────────────────────────────────────────────────────────────

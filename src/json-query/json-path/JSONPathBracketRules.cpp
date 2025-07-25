@@ -83,7 +83,22 @@ namespace matchers {
 
 bool matchesUnionComma(QStringView content)
 {
-    return content.contains(u',');
+    // Only match if there are top-level commas (not inside parentheses or brackets)
+    int parenDepth = 0;
+    int bracketDepth = 0;
+    
+    for (qsizetype i = 0; i < content.size(); ++i) {
+        const QChar c = content[i];
+        if      (c == u'(') ++parenDepth;
+        else if (c == u')') --parenDepth;
+        else if (c == u'[') ++bracketDepth;
+        else if (c == u']') --bracketDepth;
+        else if (c == u',' && parenDepth == 0 && bracketDepth == 0) {
+            return true; // Found top-level comma
+        }
+    }
+    
+    return false; // No top-level commas found
 }
 
 bool matchesWildcard(QStringView content)
@@ -116,55 +131,13 @@ bool matchesSlice(QStringView content)
 
 bool matchesFilterWithParens(QStringView content)
 {
-    return content.trimmed().startsWith(u"?(") && content.trimmed().endsWith(u")");
+    // Match any filter expression that starts with ?( - it may have additional content after )
+    return content.startsWith(u"?(");
 }
 
 bool matchesFilterWithoutParens(QStringView content)
 {
-    QStringView trimmed = content.trimmed();
-    if (!trimmed.startsWith(u'?')) return false;
-    if (trimmed.startsWith(u"?(")) return false; // This should be handled by matchesFilterWithParens
-    
-    // Check for nested brackets and quotes to distinguish top-level commas from nested commas
-    int bracketLevel = 0;
-    bool inSingleQuote = false;
-    bool inDoubleQuote = false;
-    bool escaped = false;
-    
-    for (qsizetype i = 0; i < trimmed.size(); ++i) {
-        QChar c = trimmed[i];
-        
-        if (escaped) {
-            escaped = false;
-            continue;
-        }
-        
-        if (c == u'\\') {
-            escaped = true;
-            continue;
-        }
-        
-        if (!inSingleQuote && !inDoubleQuote) {
-            if (c == u'[') {
-                bracketLevel++;
-            } else if (c == u']') {
-                bracketLevel--;
-            } else if (c == u'\'') {
-                inSingleQuote = true;
-            } else if (c == u'"') {
-                inDoubleQuote = true;
-            } else if (c == u',' && bracketLevel == 0) {
-                // Top-level comma found - this should be handled as union, not filter
-                return false;
-            }
-        } else if (inSingleQuote && c == u'\'') {
-            inSingleQuote = false;
-        } else if (inDoubleQuote && c == u'"') {
-            inDoubleQuote = false;
-        }
-    }
-    
-    return true;
+    return content.startsWith(u'?') && !content.startsWith(u"?(");
 }
 
 bool matchesPlaceholder(QStringView content)
@@ -210,30 +183,52 @@ std::expected<void, Error> handleWildcard(QStringView /*content*/, BracketSink& 
 std::expected<void, Error> handleSingleIndex(QStringView content, BracketSink& out)
 {
     QStringView trimmed = content.trimmed();
-    bool ok = false;
-    int index = trimmed.toInt(&ok);
-    if (!ok) {
-        qCDebug(jsonPathLog) << "handleSingleIndex: failed to parse" << trimmed;
-        return std::unexpected(Error::InvalidIndex);
+    qCDebug(jsonPathLog) << "BR_RULE index-single check" << trimmed.toString();
+    
+    if (!isValidIndexLiteral(trimmed)) {
+        qCDebug(jsonPathLog) << "handleSingleIndex: invalid index literal" << trimmed;
+        return std::unexpected(Error::InvalidSlice);
     }
     
-    qCDebug(jsonPathLog) << "handleSingleIndex: parsed index" << index;
-    out.index(index);
+    bool ok = false;
+    qlonglong val = trimmed.toLongLong(&ok);
+    if (!ok) {
+        qCDebug(jsonPathLog) << "handleSingleIndex: failed to parse" << trimmed;
+        return std::unexpected(Error::InvalidSlice);
+    }
+    
+    int idx = (val > std::numeric_limits<int>::max()) ? std::numeric_limits<int>::max()
+             : (val < std::numeric_limits<int>::min()) ? std::numeric_limits<int>::min()
+             : static_cast<int>(val);
+    
+    qCDebug(jsonPathLog) << "  emitting index token" << idx;
+    out.index(idx);
     return {};
 }
 
 std::expected<void, Error> handleIndexList(QStringView content, BracketSink& out)
 {
+    qCDebug(jsonPathLog) << "BR_RULE index-list raw" << content.toString();
+    
     const auto parts = content.split(u',');
-    for (const auto& part : parts) {
-        QStringView trimmed = part.trimmed();
-        bool ok = false;
-        int index = trimmed.toInt(&ok);
-        if (!ok) {
-            qCDebug(jsonPathLog) << "handleIndexList: failed to parse" << trimmed;
-            return std::unexpected(Error::InvalidIndex);
+    for (QStringView p : parts) {
+        QStringView t = p.trimmed();
+        
+        if (!isValidIndexLiteral(t)) {
+            qCDebug(jsonPathLog) << "handleIndexList: invalid index literal" << t;
+            return std::unexpected(Error::InvalidSlice);
         }
-        out.index(index);
+        
+        bool ok = false;
+        qlonglong val = t.toLongLong(&ok);
+        if (!ok) return std::unexpected(Error::InvalidSlice);
+        
+        int idx = (val > std::numeric_limits<int>::max()) ? std::numeric_limits<int>::max()
+                 : (val < std::numeric_limits<int>::min()) ? std::numeric_limits<int>::min()
+                 : static_cast<int>(val);
+        
+        qCDebug(jsonPathLog) << "  list element emit" << idx;
+        out.index(idx);
     }
     return {};
 }
@@ -362,12 +357,13 @@ std::expected<void, Error> handleUnionComma(QStringView content, BracketSink& ou
     
     for (const QString& segment : segments) {
         QStringView segmentView(segment);
-        qCDebug(jsonPathLog) << "handleUnionComma: processing segment" << segmentView.toString();
+        QStringView trimmedSegment = segmentView.trimmed(); // Trim whitespace from each segment
+        qCDebug(jsonPathLog) << "handleUnionComma: processing segment" << trimmedSegment.toString();
         
         // Use dispatcher to process each segment, but exclude union rule to prevent recursion
-        auto result = BracketRuleDispatcher::processSegmentExcludingUnion(segmentView, out);
+        auto result = BracketRuleDispatcher::processSegmentExcludingUnion(trimmedSegment, out);
         if (!result) {
-            qCDebug(jsonPathLog) << "handleUnionComma: failed to process segment" << segmentView.toString();
+            qCDebug(jsonPathLog) << "handleUnionComma: failed to process segment" << trimmedSegment.toString();
             return result;
         }
     }
@@ -386,25 +382,25 @@ std::vector<BracketRuleMetadata> BracketRuleDispatcher::createRules()
 {
     return {
         {
+            .name = "union_comma",
+            .priority = 1300,  // Highest priority - must split unions before processing individual elements
+            .matcher = matchers::matchesUnionComma,
+            .handler = handlers::handleUnionComma,
+            .description = "Union of multiple selectors separated by commas (e.g., '1,2,3' or '?@.a,?@.b')"
+        },
+        {
             .name = "filter_with_parens",
-            .priority = 1200,  // Highest priority for filter expressions
+            .priority = 1200,  // High priority for filter expressions
             .matcher = matchers::matchesFilterWithParens,
             .handler = handlers::handleFilterWithParens,
             .description = "Filter expression with parentheses (e.g., '?(@.a == 1)')"
         },
         {
             .name = "filter_without_parens",
-            .priority = 1100,  // Second highest priority for filter expressions
+            .priority = 1100,
             .matcher = matchers::matchesFilterWithoutParens,
             .handler = handlers::handleFilterWithoutParens,
-            .description = "Filter expression without parentheses (e.g., '?@.a == 1')"
-        },
-        {
-            .name = "union_comma",
-            .priority = 1000,
-            .matcher = matchers::matchesUnionComma,
-            .handler = handlers::handleUnionComma,
-            .description = "Union with comma-separated selectors (e.g., 'a,b,c')"
+            .description = "Filter expression without parentheses (e.g., '?@.a')"
         },
         {
             .name = "wildcard",

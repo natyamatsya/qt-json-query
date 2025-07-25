@@ -51,6 +51,7 @@ splitTopLevelMultiple(QStringView sv, QLatin1StringView delim)
 {
     const qsizetype nDelim = delim.size();
     int parenDepth = 0;
+    int bracketDepth = 0;  // Track square bracket depth
     QVector<QString> parts;
     qsizetype lastStart = 0;
     
@@ -59,7 +60,9 @@ splitTopLevelMultiple(QStringView sv, QLatin1StringView delim)
         const QChar c = sv[i];
         if      (c == u'(') ++parenDepth;
         else if (c == u')') --parenDepth;
-        else if (parenDepth == 0 && sv.mid(i, nDelim) == delim)
+        else if (c == u'[') ++bracketDepth;
+        else if (c == u']') --bracketDepth;
+        else if (parenDepth == 0 && bracketDepth == 0 && sv.mid(i, nDelim) == delim)
         {
             // Found delimiter at top level - add part
             parts.append(QString(sv.mid(lastStart, i - lastStart)));
