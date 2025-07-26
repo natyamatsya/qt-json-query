@@ -7,7 +7,6 @@
 #include "json-query/json-path/JSONPathCompile.hpp"
 #include "json-query/json-path/JSONPathEvalError.hpp"
 #include "json-query/json-path/internal/PathEvalCtx.hpp"
-#include "json-query/json-path/internal/ResultStreamer.hpp"
 
 // Forward declarations for TableGen architecture
 namespace json_query::json_path::internal {
@@ -218,7 +217,6 @@ namespace json_query::json_path::detail {
 using json_query::json_path::Token;
 using json_query::json_path::EvalError;
 using json_query::json_path::detail::PathEvalCtx;
-using json_query::json_path::internal::ResultStreamer;
 
 // ---------------------------------------------------------------------------
 //  Token evaluation dispatch system

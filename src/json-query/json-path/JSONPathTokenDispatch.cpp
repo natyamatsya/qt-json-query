@@ -10,7 +10,6 @@
 
 namespace json_query::json_path::detail {
 
-using json_query::json_path::internal::ResultStreamer;
 using json_query::json_path::internal::TokenDispatcher;
 using internal::acquirePooledArray;
 
@@ -183,8 +182,8 @@ template bool ErrorHandlingDispatchTable<
     ErrorHandlingStrategy::PermissiveRecursiveContext,
     ErrorHandlingStrategy::StrictPropertyChain,
     ErrorHandlingStrategy::DefaultPermissive
->::dispatch<ConceptResultStreamer<ResultCollector>>(
+>::dispatch<ResultStreamer<ResultCollector>>(
     const Token& tk, qsizetype tokenPos, const detail::PathEvalCtx& ctx,
-    const QJsonArray& src, const ConceptResultStreamer<ResultCollector>& streamer);
+    const QJsonArray& src, const ResultStreamer<ResultCollector>& streamer);
 
 } // namespace json_query::json_path::internal

@@ -1,6 +1,5 @@
 #include "json-query/json-path/JSONPathWildcardRecursive.hpp"
 #include "json-query/json-path/internal/ContainerCursor.hpp"
-#include "json-query/json-path/internal/ResultStreamer.hpp"
 #include "json-query/json-path/internal/ArrayPool.hpp"
 #include "json-query/json-path/internal/IterativeRecursiveDescent.hpp"
 #include <QDebug>
@@ -8,7 +7,6 @@
 namespace json_query::json_path::detail {
 
 using json_query::json_path::internal::ContainerCursor;
-using json_query::json_path::internal::ResultStreamer;
 using internal::acquirePooledArray;
 using internal::IterativeRecursiveDescent;
 
@@ -31,17 +29,6 @@ static std::expected<QJsonArray, EvalError> __wildcardObjectImpl(const QJsonObje
     // Move result to avoid copying
     QJsonArray finalResult = std::move(out);
     return finalResult;
-}
-
-static void __evaluateRecursiveImplStreaming(const QJsonValue& value, const ResultStreamer& streamer)
-{
-    // Use iterative implementation to reduce call stack memory overhead
-    auto result = IterativeRecursiveDescent::evaluateIterative(value, streamer);
-    if (!result) {
-        // Handle error - for streaming, we can't propagate errors easily
-        // This maintains backward compatibility with the original streaming interface
-        qWarning() << "Iterative recursive descent failed with error:" << static_cast<int>(result.error());
-    }
 }
 
 static std::expected<QJsonArray, EvalError> __evaluateRecursiveImpl(const QJsonValue& value)

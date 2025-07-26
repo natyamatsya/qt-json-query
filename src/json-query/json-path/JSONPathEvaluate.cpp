@@ -334,10 +334,10 @@ std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token&
 {
     QJsonArray result;
     ResultCollector collector(&result);
-    auto conceptStreamer = collector.getConceptStreamer();
+    auto streamer = collector.getStreamer();
     
     // Use TableGen-inspired error handling dispatch directly
-    internal::ErrorHandlingDispatcher::dispatch(tk, tokenPos, ctx, src, conceptStreamer);
+    internal::ErrorHandlingDispatcher::dispatch(tk, tokenPos, ctx, src, streamer);
     
     // Check if an error occurred during processing
     if (collector.hasError()) {
