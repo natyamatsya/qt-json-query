@@ -1407,22 +1407,8 @@ std::optional<Token> parseEmbeddedFunction(QString s)
         result.key = s;
         
         if (needsRootContext) {
-            // Use context filter for root context evaluation
-            QString expr = s;
-            
-            result.embedContextFilter([expr](const QJsonValue& j, const QJsonValue& root) -> bool {
-                // Re-parse the expression at runtime to avoid capture issues
-                static const ctll::fixed_string<35> funcCompPat = "^(.*?)\\s*(==|!=|<|>|<=|>=)\\s*(.*?)$";
-                auto m = ctre::match<funcCompPat>(expr.toStdString());
-                if (!m) return false;
-                
-                QString left = QString::fromStdString(std::string(m.get<1>()));
-                QString op = QString::fromStdString(std::string(m.get<2>()));
-                QString right = QString::fromStdString(std::string(m.get<3>()));
-                
-                bool leftHasFunc = left.contains(QRegularExpression("\\b(length|count|match|search|value)\\s*\\("));
-                bool rightHasFunc = right.contains(QRegularExpression("\\b(length|count|match|search|value)\\s*\\("));
-                
+            // Use context filter for root context evaluation with compile-time parsed values
+            result.embedContextFilter([left, op, right, leftHasFunc, rightHasFunc](const QJsonValue& j, const QJsonValue& root) -> bool {
                 QJsonValue leftVal, rightVal;
                 
                 // Evaluate left side
@@ -1437,7 +1423,7 @@ std::optional<Token> parseEmbeddedFunction(QString s)
                     // Property access - RFC 9535 "nothing" semantics
                     QString prop = left.mid(2);
                     QJsonValue val = j.toObject().value(prop);
-                    leftVal = val.isUndefined() ? QJsonValue(0) : val; // Undefined becomes 0
+                    leftVal = val.isUndefined() ? QJsonValue() : val; // Undefined becomes Nothing
                 } else {
                     leftVal = parseJsonLiteral(left);
                 }
@@ -1454,14 +1440,26 @@ std::optional<Token> parseEmbeddedFunction(QString s)
                     // Property access - RFC 9535 "nothing" semantics
                     QString prop = right.mid(2);
                     QJsonValue val = j.toObject().value(prop);
-                    rightVal = val.isUndefined() ? QJsonValue(0) : val; // Undefined becomes 0
+                    rightVal = val.isUndefined() ? QJsonValue() : val; // Undefined becomes Nothing
                 } else {
                     rightVal = parseJsonLiteral(right);
                 }
                 
-                // Perform comparison
-                if (op == "==") return leftVal == rightVal;
-                if (op == "!=") return leftVal != rightVal;
+                // Perform comparison with RFC 9535 "Nothing" semantics
+                // Nothing == Nothing should be true
+                bool leftIsNothing = leftVal.isUndefined();
+                bool rightIsNothing = rightVal.isUndefined();
+                
+                if (op == "==") {
+                    if (leftIsNothing && rightIsNothing) return true;  // Nothing == Nothing
+                    if (leftIsNothing || rightIsNothing) return false; // Nothing != any value
+                    return leftVal == rightVal;
+                }
+                if (op == "!=") {
+                    if (leftIsNothing && rightIsNothing) return false; // Nothing == Nothing
+                    if (leftIsNothing || rightIsNothing) return true;  // Nothing != any value
+                    return leftVal != rightVal;
+                }
                 if (op == "<") return compareValues(leftVal, rightVal) < 0;
                 if (op == ">") return compareValues(leftVal, rightVal) > 0;
                 if (op == "<=") return compareValues(leftVal, rightVal) <= 0;
@@ -1474,13 +1472,13 @@ std::optional<Token> parseEmbeddedFunction(QString s)
             
             result.embedFilter([expr](const QJsonValue& j) -> bool {
                 // Re-parse the expression at runtime to avoid capture issues
-                static const ctll::fixed_string<35> funcCompPat = "^(.*?)\\s*(==|!=|<|>|<=|>=)\\s*(.*?)$";
+                constexpr auto funcCompPat = ctll::fixed_string{"^(.*?)\\s*(==|!=|<|>|<=|>=)\\s*(.*?)$"};
                 auto m = ctre::match<funcCompPat>(expr.toStdString());
                 if (!m) return false;
                 
-                QString left = QString::fromStdString(std::string(m.get<1>()));
-                QString op = QString::fromStdString(std::string(m.get<2>()));
-                QString right = QString::fromStdString(std::string(m.get<3>()));
+                QString left = QString::fromStdString(std::string(m.template get<1>()));
+                QString op = QString::fromStdString(std::string(m.template get<2>()));
+                QString right = QString::fromStdString(std::string(m.template get<3>()));
                 
                 bool leftHasFunc = left.contains(QRegularExpression("\\b(length|count|match|search|value)\\s*\\("));
                 bool rightHasFunc = right.contains(QRegularExpression("\\b(length|count|match|search|value)\\s*\\("));
@@ -1494,7 +1492,7 @@ std::optional<Token> parseEmbeddedFunction(QString s)
                     // Property access - RFC 9535 "nothing" semantics
                     QString prop = left.mid(2);
                     QJsonValue val = j.toObject().value(prop);
-                    leftVal = val.isUndefined() ? QJsonValue(0) : val; // Undefined becomes 0
+                    leftVal = val.isUndefined() ? QJsonValue() : val; // Undefined becomes Nothing
                 } else {
                     leftVal = parseJsonLiteral(left);
                 }
@@ -1506,14 +1504,26 @@ std::optional<Token> parseEmbeddedFunction(QString s)
                     // Property access - RFC 9535 "nothing" semantics
                     QString prop = right.mid(2);
                     QJsonValue val = j.toObject().value(prop);
-                    rightVal = val.isUndefined() ? QJsonValue(0) : val; // Undefined becomes 0
+                    rightVal = val.isUndefined() ? QJsonValue() : val; // Undefined becomes Nothing
                 } else {
                     rightVal = parseJsonLiteral(right);
                 }
                 
-                // Perform comparison
-                if (op == "==") return leftVal == rightVal;
-                if (op == "!=") return leftVal != rightVal;
+                // Perform comparison with RFC 9535 "Nothing" semantics
+                // Nothing == Nothing should be true
+                bool leftIsNothing = leftVal.isUndefined();
+                bool rightIsNothing = rightVal.isUndefined();
+                
+                if (op == "==") {
+                    if (leftIsNothing && rightIsNothing) return true;  // Nothing == Nothing
+                    if (leftIsNothing || rightIsNothing) return false; // Nothing != any value
+                    return leftVal == rightVal;
+                }
+                if (op == "!=") {
+                    if (leftIsNothing && rightIsNothing) return false; // Nothing == Nothing
+                    if (leftIsNothing || rightIsNothing) return true;  // Nothing != any value
+                    return leftVal != rightVal;
+                }
                 if (op == "<") return compareValues(leftVal, rightVal) < 0;
                 if (op == ">") return compareValues(leftVal, rightVal) > 0;
                 if (op == "<=") return compareValues(leftVal, rightVal) <= 0;
