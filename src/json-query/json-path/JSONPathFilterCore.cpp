@@ -821,6 +821,73 @@ std::optional<Token> parseEmbeddedIn(QString s)
     return std::nullopt;
 }
 
+template<ctll::fixed_string Pattern>
+std::optional<Token> parseEmbeddedComparePropToProp(const QString& s)
+{
+    if (auto m = ctre::match<Pattern>(to_sv(s))) {
+        const QString leftProp = to_qstr(m.template get<1>().to_view());
+        const QString op = to_qstr(m.template get<2>().to_view());
+        const QString rightProp = to_qstr(m.template get<3>().to_view());
+        
+        Token token;
+        token.kind = Token::Kind::Filter;
+        token.key = s;
+        
+        token.embedFilter([leftProp, op, rightProp](const QJsonValue& j) {
+            // Property-to-property comparison: @.a==@.b
+            if (!j.isObject()) return false;
+            
+            const auto obj = j.toObject();
+            const QJsonValue leftValue = obj.value(leftProp);
+            const QJsonValue rightValue = obj.value(rightProp);
+            
+            // Use the same logic as legacy performComparison function
+            // Handle undefined values
+            if (leftValue.type() == QJsonValue::Undefined || rightValue.type() == QJsonValue::Undefined) {
+                if (op == "==") return leftValue.type() == rightValue.type(); // both undefined
+                if (op == "!=") return leftValue.type() != rightValue.type(); // one undefined, one not
+                return false; // ordering comparisons require same type
+            }
+            
+            // Use deep equality for == and !=
+            if (op == "==") return leftValue == rightValue;
+            if (op == "!=") return leftValue != rightValue;
+            
+            // For ordering comparisons, ensure same type
+            if (leftValue.type() != rightValue.type()) return false;
+            
+            // Handle ordering comparisons by type
+            if (leftValue.isDouble() && rightValue.isDouble()) {
+                double left = leftValue.toDouble();
+                double right = rightValue.toDouble();
+                if (op == "<") return left < right;
+                if (op == ">") return left > right;
+                if (op == "<=") return left <= right;
+                if (op == ">=") return left >= right;
+            } else if (leftValue.isBool() && rightValue.isBool()) {
+                bool left = leftValue.toBool();
+                bool right = rightValue.toBool();
+                if (op == "<") return !left && right;  // false < true
+                if (op == ">") return left && !right;  // true > false
+                if (op == "<=") return !left || right; // false <= anything, true <= true
+                if (op == ">=") return left || !right; // true >= anything, false >= false
+            } else if (leftValue.isString() && rightValue.isString()) {
+                QString left = leftValue.toString();
+                QString right = rightValue.toString();
+                if (op == "<") return left < right;
+                if (op == ">") return left > right;
+                if (op == "<=") return left <= right;
+                if (op == ">=") return left >= right;
+            }
+            
+            return false; // unsupported comparison
+        });
+        
+        return token;
+    }
+    return std::nullopt;
+}
+
 std::optional<Token> parseEmbeddedCompare(QString s)
 {
     s = stripOuterParens(s);
@@ -836,6 +903,7 @@ std::optional<Token> parseEmbeddedCompare(QString s)
     constexpr auto idxPat = ctll::fixed_string{R"(@\[(-?\d+)\]\s*(==|!=|>=|<=|>|<)\s*(.+))"};
     constexpr auto selfPat = ctll::fixed_string{R"(^@\s*(==|!=|>=|<=|>|<)\s*(.+)$)"};
     constexpr auto selfSelfPat = ctll::fixed_string{R"(^(@|\$)\s*(==|!=|>=|<=|>|<)\s*(@|\$)$)"};  // Self-comparison: @==@, $==$, etc.
+    constexpr auto propToPropPat = ctll::fixed_string{R"(@\.([\w$]+)\s*(==|!=|>=|<=|>|<)\s*@\.([\w$]+))"};  // Property-to-property: @.a==@.b
     
     // Try self-comparison pattern first (more specific)
     if (auto m = ctre::match<selfSelfPat>(to_sv(s))) {
@@ -875,6 +943,10 @@ std::optional<Token> parseEmbeddedCompare(QString s)
     }
     if (auto t = parseEmbeddedCompareIndex<idxPat>(s)) {
         qCDebug(jsonPathLog) << "parseEmbeddedCompare: matched index pattern";
+        return t;
+    }
+    if (auto t = parseEmbeddedComparePropToProp<propToPropPat>(s)) {
+        qCDebug(jsonPathLog) << "parseEmbeddedCompare: matched property-to-property pattern";
         return t;
     }
     if (auto t = parseEmbeddedSelfValue<selfPat>(s)) {
