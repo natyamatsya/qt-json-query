@@ -26,6 +26,21 @@ concept ResultCollectorConcept = requires(T& collector, const QJsonValue& value,
 };
 
 /**
+ * @brief Concept defining the interface for result streamers
+ * 
+ * A ResultStreamerConcept must provide methods to emit values and handle errors.
+ * This concept ensures compile-time type safety for streaming operations.
+ */
+template<typename T>
+concept ResultStreamerConcept = requires(T& streamer, const QJsonValue& value, const QJsonArray& array, EvalError error) {
+    streamer.emitValue(value);                                   // Must have emitValue method
+    streamer.emitArray(array);                                   // Must have emitArray method
+    { streamer.canEmit() } -> std::convertible_to<bool>;        // Must be able to check if can emit
+    { streamer.canHandleErrors() } -> std::convertible_to<bool>; // Must indicate error handling capability
+    streamer.handleError(error);                                // Must have error handling method
+};
+
+/**
  * @brief Zero-overhead result streaming interface using concepts
  * 
  * ResultStreamer provides direct member function calls without any
@@ -155,6 +170,16 @@ public:
     }
 
     /**
+     * @brief Emit all values from a QJsonArray (for compatibility with streaming interface)
+     * @param array Array containing values to emit
+     */
+    void emitArray(const QJsonArray& array) {
+        for (const auto& value : array) {
+            collect(value);
+        }
+    }
+
+    /**
      * @brief Collect a single value into the results array (concept requirement)
      * @param value The value to add to the results
      */
@@ -182,6 +207,14 @@ public:
      */
     [[nodiscard]] bool canHandleErrors() const noexcept {
         return hasErrorHandler_;
+    }
+
+    /**
+     * @brief Check if the collector can emit results (concept requirement)
+     * @return true (always, since results array is required)
+     */
+    [[nodiscard]] bool canEmit() const noexcept {
+        return results_ != nullptr;
     }
 
     /**

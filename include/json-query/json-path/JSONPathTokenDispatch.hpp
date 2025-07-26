@@ -1,12 +1,12 @@
 #pragma once
 
-#include <QJsonArray>
 #include <QJsonValue>
+#include <QJsonArray>
 #include <expected>
-
 #include "json-query/json-path/JSONPathCompile.hpp"
 #include "json-query/json-path/JSONPathEvalError.hpp"
 #include "json-query/json-path/internal/PathEvalCtx.hpp"
+#include "json-query/json-path/internal/ResultStreamer.hpp"
 
 // Forward declarations for TableGen architecture
 namespace json_query::json_path::internal {
@@ -88,11 +88,11 @@ struct ErrorHandlingDef<ErrorHandlingStrategy::DefaultPermissive> {
 // Template for error handling strategy implementations
 template<ErrorHandlingStrategy Strategy>
 struct ErrorHandlingProcessor {
-    template<typename StreamerType>
+    template<internal::ResultStreamerConcept StreamerType>
     static void processFailure(const Token& tk, EvalError error, const StreamerType& streamer, 
                               bool& anySuccess, EvalError& lastError) = delete;
     
-    template<typename StreamerType>
+    template<internal::ResultStreamerConcept StreamerType>
     static void processFinalResult(const Token& tk, const StreamerType& streamer, 
                                   bool anySuccess, EvalError lastError) = delete;
 };
@@ -100,56 +100,54 @@ struct ErrorHandlingProcessor {
 // Specialization for Permissive Direct Access processing
 template<>
 struct ErrorHandlingProcessor<ErrorHandlingStrategy::PermissiveDirectAccess> {
-    template<typename StreamerType>
+    template<internal::ResultStreamerConcept StreamerType>
     static void processFailure(const Token& tk, EvalError error, const StreamerType& streamer, 
                               bool& anySuccess, EvalError& lastError) {
         lastError = error;
         // Continue processing - permissive error handling
     }
     
-    template<typename StreamerType>
+    template<internal::ResultStreamerConcept StreamerType>
     static void processFinalResult(const Token& tk, const StreamerType& streamer, 
                                   bool anySuccess, EvalError lastError) {
-        // For permissive error handling, don't emit error if no results (RFC 9535 compliance)
-        // Empty result for RFC 9535 compliance - no emission needed
+        // For direct access, we don't emit anything on failure
     }
 };
 
 // Specialization for Permissive Recursive Context processing
 template<>
 struct ErrorHandlingProcessor<ErrorHandlingStrategy::PermissiveRecursiveContext> {
-    template<typename StreamerType>
+    template<internal::ResultStreamerConcept StreamerType>
     static void processFailure(const Token& tk, EvalError error, const StreamerType& streamer, 
                               bool& anySuccess, EvalError& lastError) {
         lastError = error;
-        // Continue processing - permissive error handling after recursive descent
+        // Continue processing - permissive error handling
     }
     
-    template<typename StreamerType>
+    template<internal::ResultStreamerConcept StreamerType>
     static void processFinalResult(const Token& tk, const StreamerType& streamer, 
                                   bool anySuccess, EvalError lastError) {
-        // For permissive error handling, don't emit error if no results (RFC 9535 compliance)
-        // Empty result for RFC 9535 compliance - no emission needed
+        // For recursive context, we don't emit anything on failure
     }
 };
 
 // Specialization for Strict Property Chain processing
 template<>
 struct ErrorHandlingProcessor<ErrorHandlingStrategy::StrictPropertyChain> {
-    template<typename StreamerType>
+    template<internal::ResultStreamerConcept StreamerType>
     static void processFailure(const Token& tk, EvalError error, const StreamerType& streamer, 
                               bool& anySuccess, EvalError& lastError) {
         lastError = error;
-        // Strict error handling: propagate errors immediately (property chain access)
-        streamer.handleError(lastError);
-        // Note: This should cause early return in the calling function
+        if (streamer.canHandleErrors()) {
+            streamer.handleError(error);
+        }
     }
     
-    template<typename StreamerType>
+    template<internal::ResultStreamerConcept StreamerType>
     static void processFinalResult(const Token& tk, const StreamerType& streamer, 
                                   bool anySuccess, EvalError lastError) {
-        // For strict error handling, emit error if no results
-        if (!anySuccess) {
+        // For strict property chains, we propagate errors
+        if (!anySuccess && streamer.canHandleErrors()) {
             streamer.handleError(lastError);
         }
     }
@@ -158,20 +156,17 @@ struct ErrorHandlingProcessor<ErrorHandlingStrategy::StrictPropertyChain> {
 // Specialization for Default Permissive processing
 template<>
 struct ErrorHandlingProcessor<ErrorHandlingStrategy::DefaultPermissive> {
-    template<typename StreamerType>
+    template<internal::ResultStreamerConcept StreamerType>
     static void processFailure(const Token& tk, EvalError error, const StreamerType& streamer, 
                               bool& anySuccess, EvalError& lastError) {
         lastError = error;
-        // Continue processing - default permissive error handling
+        // Default permissive - continue processing
     }
     
-    template<typename StreamerType>
+    template<internal::ResultStreamerConcept StreamerType>
     static void processFinalResult(const Token& tk, const StreamerType& streamer, 
                                   bool anySuccess, EvalError lastError) {
-        // Only emit error if ALL evaluations failed (non-permissive contexts)
-        if (!anySuccess) {
-            streamer.handleError(lastError);
-        }
+        // Default permissive - no special error handling
     }
 };
 
@@ -181,19 +176,19 @@ struct ErrorHandlingDispatchTable;
 
 template<ErrorHandlingStrategy FirstStrategy, ErrorHandlingStrategy... RestStrategies>
 struct ErrorHandlingDispatchTable<FirstStrategy, RestStrategies...> {
-    template<typename StreamerType>
+    template<internal::ResultStreamerConcept StreamerType>
     static bool dispatch(const Token& tk, qsizetype tokenPos, const detail::PathEvalCtx& ctx,
                         const QJsonArray& src, const StreamerType& streamer);
 
 private:
-    template<ErrorHandlingStrategy Strategy, typename StreamerType>
+    template<ErrorHandlingStrategy Strategy, internal::ResultStreamerConcept StreamerType>
     static bool processWithStrategy(const Token& tk, qsizetype tokenPos, const detail::PathEvalCtx& ctx,
                                    const QJsonArray& src, const StreamerType& streamer);
 };
 
 template<>
 struct ErrorHandlingDispatchTable<> {
-    template<typename StreamerType>
+    template<internal::ResultStreamerConcept StreamerType>
     static bool dispatch(const Token& tk, qsizetype tokenPos, const detail::PathEvalCtx& ctx,
                         const QJsonArray& src, const StreamerType& streamer) {
         // Should never reach here with proper strategy coverage
@@ -225,7 +220,7 @@ using json_query::json_path::detail::PathEvalCtx;
 std::expected<QJsonArray, EvalError> evaluateTokenExpected(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v);
 std::expected<QJsonArray, EvalError> evaluateToken(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v);
 
-template<typename StreamerType>
+template<internal::ResultStreamerConcept StreamerType>
 void fanOutStreamingImpl(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src, 
                         const StreamerType& streamer, qsizetype tokenPos)
 {

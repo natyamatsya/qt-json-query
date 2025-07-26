@@ -86,7 +86,7 @@ namespace json_query::json_path::internal {
 
 // Template specialization implementation for recursive dispatch
 template<ErrorHandlingStrategy FirstStrategy, ErrorHandlingStrategy... RestStrategies>
-template<typename StreamerType>
+template<internal::ResultStreamerConcept StreamerType>
 bool ErrorHandlingDispatchTable<FirstStrategy, RestStrategies...>::dispatch(
     const Token& tk, qsizetype tokenPos, const detail::PathEvalCtx& ctx,
     const QJsonArray& src, const StreamerType& streamer) {
@@ -103,7 +103,7 @@ bool ErrorHandlingDispatchTable<FirstStrategy, RestStrategies...>::dispatch(
 
 // Private helper for strategy processing
 template<ErrorHandlingStrategy FirstStrategy, ErrorHandlingStrategy... RestStrategies>
-template<ErrorHandlingStrategy Strategy, typename StreamerType>
+template<ErrorHandlingStrategy Strategy, internal::ResultStreamerConcept StreamerType>
 bool ErrorHandlingDispatchTable<FirstStrategy, RestStrategies...>::processWithStrategy(
     const Token& tk, qsizetype tokenPos, const detail::PathEvalCtx& ctx,
     const QJsonArray& src, const StreamerType& streamer) {
@@ -182,8 +182,8 @@ template bool ErrorHandlingDispatchTable<
     ErrorHandlingStrategy::PermissiveRecursiveContext,
     ErrorHandlingStrategy::StrictPropertyChain,
     ErrorHandlingStrategy::DefaultPermissive
->::dispatch<ResultStreamer<ResultCollector>>(
+>::dispatch<internal::ResultStreamer<internal::ResultCollector>>(
     const Token& tk, qsizetype tokenPos, const detail::PathEvalCtx& ctx,
-    const QJsonArray& src, const ResultStreamer<ResultCollector>& streamer);
+    const QJsonArray& src, const internal::ResultStreamer<internal::ResultCollector>& streamer);
 
 } // namespace json_query::json_path::internal

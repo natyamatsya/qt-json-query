@@ -5,6 +5,7 @@
 #include <QJsonObject>
 #include <vector>
 #include <expected>
+#include "json-query/json-path/JSONPathEvalError.hpp"
 #include "json-query/json-path/internal/ResultStreamer.hpp"
 #include "json-query/json-path/internal/ArrayPool.hpp"
 #include "json-query/json-path/JSONPathExpected.hpp"
@@ -37,10 +38,10 @@ public:
      * @param streamer Result streamer for emitting found values
      * @return std::expected<void, EvalError> Success or error
      */
-    template<typename ResultStreamer>
+    template<json_query::json_path::internal::ResultStreamerConcept StreamerType>
     static std::expected<void, EvalError> evaluateIterative(
         const QJsonValue& rootValue, 
-        ResultStreamer& streamer) {
+        StreamerType& streamer) {
         
         // Use a reusable stack to minimize allocations
         thread_local std::vector<StackFrame> stack;
@@ -114,11 +115,11 @@ public:
      * @param streamer Result streamer for emitting values
      * @return std::expected<void, EvalError> Success or error
      */
-    template<typename ResultStreamer>
+    template<json_query::json_path::internal::ResultStreamerConcept StreamerType>
     static std::expected<void, EvalError> evaluateIterativeDepthLimited(
         const QJsonValue& rootValue,
         size_t maxDepth,
-        ResultStreamer& streamer) {
+        StreamerType& streamer) {
         
         struct DepthFrame {
             QJsonValue value;
