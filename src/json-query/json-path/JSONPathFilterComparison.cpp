@@ -1,0 +1,224 @@
+#include "json-query/json-path/JSONPathFilterComparison.hpp"
+#include "json-query/json-path/JSONPathFilterHelpers.hpp"
+#include "json-query/json-path/JSONPathLog.hpp"
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QtCore/qmath.h>
+
+namespace json_query::json_path::detail {
+
+// Template specializations for type-specific comparisons
+template<>
+bool compareValue<ComparisonType::Numeric>(const QJsonValue& v, const QString& op, const double& numVal)
+{
+    if (!v.isDouble()) {
+        // RFC 9535: Cross-type comparisons - different types are never equal
+        if (op == "==") return false;
+        if (op == "!=") return true;
+        return false; // Ordering comparisons only work within same type
+    }
+    const double val = v.toDouble();
+    
+    if (op == "==") return qFuzzyCompare(val, numVal);
+    if (op == "!=") return !qFuzzyCompare(val, numVal);
+    if (op == "<")  return val < numVal;
+    if (op == ">")  return val > numVal;
+    if (op == "<=") return val <= numVal;
+    if (op == ">=") return val >= numVal;
+    return false;
+}
+
+template<>
+bool compareValue<ComparisonType::Boolean>(const QJsonValue& v, const QString& op, const bool& boolVal)
+{
+    if (!v.isBool()) {
+        // RFC 9535: Cross-type comparisons - different types are never equal
+        if (op == "==") return false;
+        if (op == "!=") return true;
+        return false; // Ordering comparisons only work within same type
+    }
+    const bool val = v.toBool();
+    
+    if (op == "==") return val == boolVal;
+    if (op == "!=") return val != boolVal;
+    // Boolean ordering: false < true
+    if (op == "<")  return !val && boolVal;
+    if (op == ">")  return val && !boolVal;
+    if (op == "<=") return !val || boolVal;
+    if (op == ">=") return val || !boolVal;
+    return false;
+}
+
+template<>
+bool compareValue<ComparisonType::Null>(const QJsonValue& v, const QString& op, const std::nullptr_t&)
+{
+    const bool isNull = v.isNull();
+    if (op == "==") return isNull;
+    if (op == "!=") return !isNull;
+    
+    // RFC 9535: null ordering comparisons
+    if (isNull) {
+        // null compared to null: <= and >= are true (null equals itself), < and > are false
+        if (op == "<=") return true;  // null <= null is true
+        if (op == ">=") return true;  // null >= null is true
+        if (op == "<") return false;  // null < null is false
+        if (op == ">") return false;  // null > null is false
+    }
+    
+    return false; // non-null values don't match null ordering comparisons
+}
+
+template<>
+bool compareValue<ComparisonType::String>(const QJsonValue& v, const QString& op, const QString& rhs)
+{
+    if (!v.isString()) {
+        // RFC 9535: Cross-type comparisons - different types are never equal
+        if (op == "==") return false;
+        if (op == "!=") return true;
+        return false; // Ordering comparisons only work within same type
+    }
+    const QString val = v.toString();
+    
+    if (op == "==") return val == rhs;
+    if (op == "!=") return val != rhs;
+    if (op == "<")  return val < rhs;
+    if (op == ">")  return val > rhs;
+    if (op == "<=") return val <= rhs;
+    if (op == ">=") return val >= rhs;
+    return false;
+}
+
+template<>
+bool compareValue<ComparisonType::DeepEquality>(const QJsonValue& v, const QString& op, const QString& rhs)
+{
+    // Parse RHS as JSON for deep comparison
+    QJsonParseError error;
+    QJsonDocument doc = QJsonDocument::fromJson(rhs.toUtf8(), &error);
+    if (error.error != QJsonParseError::NoError) {
+        return false; // Invalid JSON
+    }
+    
+    const QJsonValue rhsValue = doc.isArray() ? QJsonValue(doc.array()) : 
+                               doc.isObject() ? QJsonValue(doc.object()) : 
+                               QJsonValue();
+    
+    if (op == "==") return v == rhsValue;
+    if (op == "!=") return v != rhsValue;
+    return false; // Deep equality only supports == and !=
+}
+
+// ComparisonContext implementation
+bool ComparisonContext::compare(const QJsonValue& v) const
+{
+    switch (type) {
+        case ComparisonType::Numeric:
+            return compareValue<ComparisonType::Numeric>(v, op, numVal);
+        case ComparisonType::Boolean:
+            return compareValue<ComparisonType::Boolean>(v, op, boolVal);
+        case ComparisonType::Null:
+            return compareValue<ComparisonType::Null>(v, op, nullptr);
+        case ComparisonType::String:
+            return compareValue<ComparisonType::String>(v, op, rhs);
+        case ComparisonType::DeepEquality:
+            return compareValue<ComparisonType::DeepEquality>(v, op, rhs);
+    }
+    return false;
+}
+
+// Monadic helper to parse and classify RHS values, eliminating if-else cascades
+[[nodiscard]] std::optional<ComparisonContext> parseRhsValue(const QString& op, QString rhs) {
+    const bool isNum = isValidJsonNumber(rhs);
+    const bool isBool = (rhs == "true" || rhs == "false");
+    const bool isNull = (rhs == "null");
+    const bool rhsQuoted = (rhs.startsWith('"') && rhs.endsWith('"')) || 
+                          (rhs.startsWith('\'') && rhs.endsWith('\''));
+    
+    // Early return for invalid unquoted non-literals
+    if (!isNum && !isBool && !isNull && !rhsQuoted) {
+        return std::nullopt;
+    }
+    
+    // Parse values using functional composition instead of if-else cascade
+    auto parseNumeric = [&]() -> std::optional<ComparisonContext> {
+        if (!isNum) return std::nullopt;
+        return ComparisonContext{op, rhs, rhs.toDouble(), false, ComparisonType::Numeric, rhsQuoted};
+    };
+    
+    auto parseBoolean = [&]() -> std::optional<ComparisonContext> {
+        if (!isBool) return std::nullopt;
+        return ComparisonContext{op, rhs, 0.0, (rhs == "true"), ComparisonType::Boolean, rhsQuoted};
+    };
+    
+    auto parseNull = [&]() -> std::optional<ComparisonContext> {
+        if (!isNull) return std::nullopt;
+        return ComparisonContext{op, rhs, 0.0, false, ComparisonType::Null, rhsQuoted};
+    };
+    
+    auto parseString = [&]() -> std::optional<ComparisonContext> {
+        QString processedRhs = rhs;
+        if (!isNum && !isBool && !isNull) {
+            (void)unquote(processedRhs);
+        }
+        ComparisonType type = rhsQuoted ? ComparisonType::String : ComparisonType::DeepEquality;
+        return ComparisonContext{op, processedRhs, 0.0, false, type, rhsQuoted};
+    };
+    
+    // Monadic chaining to try each parser in priority order
+    return parseNumeric()
+        .or_else(parseBoolean)
+        .or_else(parseNull)
+        .or_else(parseString);
+}
+
+// Monadic operator dispatch helper to eliminate repetitive if-else chains
+template<typename T>
+bool applyOperator(const QString& op, const T& left, const T& right) {
+    if (op == "==") return left == right;
+    if (op == "!=") return left != right;
+    if (op == "<") return left < right;
+    if (op == ">") return left > right;
+    if (op == "<=") return left <= right;
+    if (op == ">=") return left >= right;
+    return false;
+}
+
+// Specialized operator dispatch for floating point numbers with fuzzy comparison
+template<>
+bool applyOperator<double>(const QString& op, const double& left, const double& right) {
+    if (op == "==") return qFuzzyCompare(left, right);
+    if (op == "!=") return !qFuzzyCompare(left, right);
+    if (op == "<") return left < right;
+    if (op == ">") return left > right;
+    if (op == "<=") return left <= right;
+    if (op == ">=") return left >= right;
+    return false;
+}
+
+// Specialized operator dispatch for booleans with custom ordering (false < true)
+template<>
+bool applyOperator<bool>(const QString& op, const bool& left, const bool& right)
+{
+    if (op == "==") return left == right;
+    if (op == "!=") return left != right;
+    if (op == "<")  return !left && right;  // false < true
+    if (op == ">")  return left && !right;  // true > false
+    if (op == "<=") return !left || right;  // false <= anything, true <= true
+    if (op == ">=") return left || !right;  // true >= anything, false >= false
+    return false;
+}
+
+// Specialized operator dispatch for QString with string comparison
+template<>
+bool applyOperator<QString>(const QString& op, const QString& left, const QString& right)
+{
+    if (op == "==") return left == right;
+    if (op == "!=") return left != right;
+    if (op == "<")  return left < right;
+    if (op == ">")  return left > right;
+    if (op == "<=") return left <= right;
+    if (op == ">=") return left >= right;
+    return false;
+}
+
+} // namespace json_query::json_path::detail

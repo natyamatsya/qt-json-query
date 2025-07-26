@@ -12,7 +12,11 @@ set(JSON_QUERY_SOURCES
     json-path/JSONPathParseUtils.cpp
     json-path/JSONPathBracketRules.cpp
     json-path/JSONPathParsers.cpp
-    json-path/JSONPathFilter.cpp
+    json-path/JSONPathFilterHelpers.cpp
+    json-path/JSONPathFilterComparison.cpp
+    json-path/JSONPathFilterParsers.cpp
+    json-path/JSONPathFilterFunctions.cpp
+    json-path/JSONPathFilterCore.cpp
     json-path/JSONPathContextFilter.cpp
     json-path/JSONPathTokenEvaluators.cpp
     json-path/JSONPathPointerConversion.cpp

@@ -254,9 +254,6 @@ std::expected<void, Error> handleFilterWithParens(QStringView content, BracketSi
     if (auto token = compileContextFilter(expr, out.contextFilters, out.filters)) {
         out.pushFilter(*token);
         return {};
-    } else if (auto token = compileFilter(expr, out.filters)) {
-        out.pushFilter(*token);
-        return {};
     } else {
         qCDebug(jsonPathLog) << "handleFilterWithParens: failed to compile filter" << expr;
         return std::unexpected(Error::UnsupportedFilter);
@@ -272,9 +269,6 @@ std::expected<void, Error> handleFilterWithoutParens(QStringView content, Bracke
     qCDebug(jsonPathLog) << "handleFilterWithoutParens: processing expression" << expr;
     
     if (auto token = compileContextFilter(expr, out.contextFilters, out.filters)) {
-        out.pushFilter(*token);
-        return {};
-    } else if (auto token = compileFilter(expr, out.filters)) {
         out.pushFilter(*token);
         return {};
     } else {

@@ -1,0 +1,241 @@
+#include "json-query/json-path/JSONPathFilterFunctions.hpp"
+#include "json-query/json-path/JSONPathFilterHelpers.hpp"
+#include "json-query/json-path/JSONPath.hpp"
+#include "json-query/json-path/JSONPathHelpers.hpp"
+#include "json-query/utils/JSONQueryUtils.hpp"
+#include <QJsonDocument>
+#include <QJsonParseError>
+#include <ctre.hpp>
+
+namespace json_query::json_path::detail {
+
+using json_query::utils::to_sv;
+using json_query::utils::to_qstr;
+
+// Helper function to evaluate function calls like length(@.a) or value($..c)
+// Refactored to use explicit error handling for JSONPath evaluation
+QJsonValue evaluateFunction(const QString& funcExpr, const QJsonValue& context) {
+    // Parse function syntax using monadic pattern
+    auto parseFunctionSyntax = [](const QString& expr) -> std::optional<std::pair<QString, QString>> {
+        int openParen = expr.indexOf('(');
+        int closeParen = expr.lastIndexOf(')');
+        if (openParen == -1 || closeParen == -1) {
+            return std::nullopt; // Invalid function syntax
+        }
+        
+        QString funcName = expr.mid(0, openParen).trimmed();
+        QString args = expr.mid(openParen + 1, closeParen - openParen - 1).trimmed();
+        return std::make_pair(funcName, args);
+    };
+    
+    // Evaluate argument value using monadic pattern
+    auto evaluateArgument = [&context](const QString& args) -> QJsonValue {
+        if (args.startsWith("@.")) {
+            QString prop = args.mid(2);
+            return context.toObject().value(prop);
+        } else if (args == "@") {
+            return context;
+        }
+        return context; // Default to context
+    };
+    
+    // Calculate length using monadic pattern
+    auto calculateLength = [](const QJsonValue& value) -> QJsonValue {
+        // RFC 9535 "nothing" semantics with explicit error handling
+        if (value.isUndefined() || value.isNull()) return QJsonValue(0);
+        if (value.isString()) return QJsonValue(value.toString().length());
+        if (value.isArray()) return QJsonValue(value.toArray().size());
+        if (value.isObject()) return QJsonValue(value.toObject().size());
+        return QJsonValue(0); // Other types have no length
+    };
+    
+    // Evaluate JSONPath value using explicit error handling
+    auto evaluateJsonPathValue = [&context](const QString& args) -> QJsonValue {
+        if (args.startsWith("$")) {
+            // JSONPath expression evaluation with proper error handling
+            using json_query::JSONPath;
+            auto pathResult = JSONPath::create(args);
+            if (!pathResult) {
+                return QJsonValue(); // Return null for invalid JSONPath
+            }
+            
+            auto evalResult = pathResult->evaluateAll(context);
+            if (!evalResult) {
+                return QJsonValue(); // Return null for evaluation errors
+            }
+            
+            return QJsonValue(evalResult->size());
+        } else if (args.startsWith("@.")) {
+            QString prop = args.mid(2);
+            QJsonValue val = context.toObject().value(prop);
+            return val.isUndefined() ? QJsonValue() : val;
+        } else if (args == "@") {
+            return context;
+        }
+        return QJsonValue(); // Undefined for complex paths
+    };
+    
+    // Main function evaluation using explicit error handling
+    auto parsed = parseFunctionSyntax(funcExpr);
+    if (!parsed) {
+        return QJsonValue(); // Invalid function syntax
+    }
+    
+    const auto& [funcName, args] = *parsed;
+    
+    if (funcName == "length") {
+        return calculateLength(evaluateArgument(args));
+    } else if (funcName == "value") {
+        return evaluateJsonPathValue(args);
+    }
+    return QJsonValue(); // Unknown function
+}
+
+// Helper function to parse JSON literals from strings
+// Refactored to use monadic error handling patterns
+QJsonValue parseJsonLiteral(const QString& literal) {
+    QString trimmed = literal.trimmed();
+    
+    // Parse literal using monadic pattern with optional chaining
+    auto parseNull = [](const QString& s) -> std::optional<QJsonValue> {
+        return (s == "null") ? std::optional<QJsonValue>{QJsonValue()} : std::nullopt;
+    };
+    
+    auto parseBoolean = [](const QString& s) -> std::optional<QJsonValue> {
+        if (s == "true") return QJsonValue(true);
+        if (s == "false") return QJsonValue(false);
+        return std::nullopt;
+    };
+    
+    auto parseNumber = [](const QString& s) -> std::optional<QJsonValue> {
+        bool ok;
+        double num = s.toDouble(&ok);
+        return ok ? std::optional<QJsonValue>{QJsonValue(num)} : std::nullopt;
+    };
+    
+    auto parseQuotedString = [](const QString& s) -> std::optional<QJsonValue> {
+        if ((s.startsWith('"') && s.endsWith('"')) ||
+            (s.startsWith('\'') && s.endsWith('\''))) {
+            return QJsonValue(s.mid(1, s.length() - 2));
+        }
+        return std::nullopt;
+    };
+    
+    // Try parsing in order using monadic chaining
+    return parseNull(trimmed)
+        .or_else([&]() { return parseBoolean(trimmed); })
+        .or_else([&]() { return parseNumber(trimmed); })
+        .or_else([&]() { return parseQuotedString(trimmed); })
+        .value_or(QJsonValue(trimmed)); // Default to string
+}
+
+// Helper function to compare QJsonValues for ordering
+int compareValues(const QJsonValue& left, const QJsonValue& right) {
+    // Handle null values
+    if (left.isNull() && right.isNull()) return 0;
+    if (left.isNull()) return -1;
+    if (right.isNull()) return 1;
+    
+    // Handle numbers
+    if (left.isDouble() && right.isDouble()) {
+        double l = left.toDouble();
+        double r = right.toDouble();
+        if (l < r) return -1;
+        if (l > r) return 1;
+        return 0;
+    }
+    
+    // Handle strings
+    if (left.isString() && right.isString()) {
+        return left.toString().compare(right.toString());
+    }
+    
+    // Handle booleans
+    if (left.isBool() && right.isBool()) {
+        bool l = left.toBool();
+        bool r = right.toBool();
+        if (l == r) return 0;
+        return l ? 1 : -1; // true > false
+    }
+    
+    // Different types - use type ordering
+    int leftType = static_cast<int>(left.type());
+    int rightType = static_cast<int>(right.type());
+    return leftType - rightType;
+}
+
+// Parse function calls like length() and value() in filter expressions
+std::optional<Token> parseFunction(QString s, QVector<FilterFn>& out)
+{
+    // Pattern for function call comparisons: func(...) op value or value op func(...)
+    constexpr auto funcCompPat = ctll::fixed_string{R"(^(.*?)\s*(==|!=|<|>|<=|>=)\s*(.*?)$)"};
+    
+    if (auto m = ctre::match<funcCompPat>(to_sv(s))) {
+        QString left = to_qstr(m.template get<1>().to_view()).trimmed();
+        QString op = to_qstr(m.template get<2>().to_view());
+        QString right = to_qstr(m.template get<3>().to_view()).trimmed();
+        
+        // Check if either side contains a function call
+        bool leftHasFunc = left.contains("(") && left.contains(")");
+        bool rightHasFunc = right.contains("(") && right.contains(")");
+        
+        if (!leftHasFunc && !rightHasFunc) {
+            return std::nullopt; // No function calls found
+        }
+        
+        // Check if any function call needs root context (value($...))
+        bool needsRootContext = false;
+        if (leftHasFunc && left.contains("value($")) needsRootContext = true;
+        if (rightHasFunc && right.contains("value($")) needsRootContext = true;
+        
+        if (needsRootContext) {
+            // This needs to be handled by context-aware filter infrastructure
+            // Return nullopt to let context-aware compilation handle it
+            return std::nullopt;
+        }
+        
+        Builder b{out};
+        return b.add([left, op, right, leftHasFunc, rightHasFunc](const QJsonValue& j) -> bool {
+            QJsonValue leftVal, rightVal;
+            
+            // Evaluate left side
+            if (leftHasFunc) {
+                leftVal = evaluateFunction(left, j);
+            } else if (left.startsWith("@.")) {
+                // Property access - RFC 9535 "nothing" semantics
+                QString prop = left.mid(2);
+                QJsonValue val = j.toObject().value(prop);
+                leftVal = val.isUndefined() ? QJsonValue(0) : val; // Undefined becomes 0
+            } else {
+                // Literal value
+                leftVal = parseJsonLiteral(left);
+            }
+            
+            // Evaluate right side  
+            if (rightHasFunc) {
+                rightVal = evaluateFunction(right, j);
+            } else if (right.startsWith("@.")) {
+                // Property access - RFC 9535 "nothing" semantics
+                QString prop = right.mid(2);
+                QJsonValue val = j.toObject().value(prop);
+                rightVal = val.isUndefined() ? QJsonValue(0) : val; // Undefined becomes 0
+            } else {
+                // Literal value
+                rightVal = parseJsonLiteral(right);
+            }
+            
+            // Perform comparison
+            if (op == "==") return leftVal == rightVal;
+            if (op == "!=") return leftVal != rightVal;
+            if (op == "<") return compareValues(leftVal, rightVal) < 0;
+            if (op == ">") return compareValues(leftVal, rightVal) > 0;
+            if (op == "<=") return compareValues(leftVal, rightVal) <= 0;
+            if (op == ">=") return compareValues(leftVal, rightVal) >= 0;
+            return false;
+        }, s);
+    }
+    
+    return std::nullopt;
+}
+
+} // namespace json_query::json_path::detail
