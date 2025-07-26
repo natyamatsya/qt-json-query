@@ -295,17 +295,18 @@ std::expected<json_query::json_path::CompilationResult, json_query::json_path::E
 
 std::optional<Token> compileEmbeddedFilter(const QString& expr)
 {
-    qCDebug(jsonPathLog) << "compileEmbeddedFilter() expr=" << expr;
+    QString s = json_query::json_path::detail::stripOuterParens(expr);
+    qCDebug(jsonPathLog) << "compileEmbeddedFilter() expr=" << expr << "stripped=" << s;
     
     // Try embedded filter parsing functions in priority order (lowest precedence first)
-    if (auto token = detail::parseEmbeddedOr(expr)) return token;      // Lowest precedence
-    if (auto token = detail::parseEmbeddedAnd(expr)) return token;     // Higher precedence
-    if (auto token = detail::parseEmbeddedNot(expr)) return token;     // Negation
-    if (auto token = detail::parseEmbeddedIn(expr)) return token;      // In operator
-    if (auto token = detail::parseEmbeddedExists(expr)) return token;  // Existence checks
-    if (auto token = detail::parseEmbeddedSelfCmp(expr)) return token; // Self comparisons
-    if (auto token = detail::parseEmbeddedCompare(expr)) return token; // Basic comparisons
-    if (auto token = detail::parseEmbeddedRegex(expr)) return token;   // Regex patterns
+    if (auto token = detail::parseEmbeddedOr(s)) return token;      // Lowest precedence
+    if (auto token = detail::parseEmbeddedAnd(s)) return token;     // Higher precedence
+    if (auto token = detail::parseEmbeddedNot(s)) return token;     // Negation
+    if (auto token = detail::parseEmbeddedIn(s)) return token;      // In operator
+    if (auto token = detail::parseEmbeddedExists(s)) return token;  // Existence checks
+    if (auto token = detail::parseEmbeddedSelfCmp(s)) return token; // Self comparisons
+    if (auto token = detail::parseEmbeddedCompare(s)) return token; // Basic comparisons
+    if (auto token = detail::parseEmbeddedRegex(s)) return token;   // Regex patterns
     
     qCDebug(jsonPathLog) << "compileEmbeddedFilter: no embedded parser matched";
     return std::nullopt;

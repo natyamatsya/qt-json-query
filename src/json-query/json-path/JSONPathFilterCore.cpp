@@ -749,14 +749,15 @@ namespace json_query::json_path::detail {
 
 std::optional<Token> parseEmbeddedOr(QString s)
 {
+    qCDebug(jsonPathLog) << "parseEmbeddedOr: trying to parse" << s;
     if (auto split = splitTopLevel(s, "||"_L1); split) {
         auto [lhs, rhs] = *split;
         
         qCDebug(jsonPathLog) << "parseEmbeddedOr: splitting" << s << "into lhs=" << lhs << "rhs=" << rhs;
         
         // Parse both sides recursively
-        auto leftToken = compileEmbeddedFilter(lhs);
-        auto rightToken = compileEmbeddedFilter(rhs);
+        auto leftToken = compileEmbeddedFilter(lhs.trimmed());
+        auto rightToken = compileEmbeddedFilter(rhs.trimmed());
         
         if (!leftToken || !rightToken) {
             qCDebug(jsonPathLog) << "parseEmbeddedOr: failed to parse one or both sides";
@@ -778,6 +779,7 @@ std::optional<Token> parseEmbeddedOr(QString s)
         qCDebug(jsonPathLog) << "parseEmbeddedOr: successfully created composite OR filter";
         return result;
     }
+    qCDebug(jsonPathLog) << "parseEmbeddedOr: splitTopLevel failed for" << s;
     return std::nullopt;
 }
 
@@ -788,9 +790,9 @@ std::optional<Token> parseEmbeddedAnd(QString s)
         
         qCDebug(jsonPathLog) << "parseEmbeddedAnd: splitting" << s << "into lhs=" << lhs << "rhs=" << rhs;
         
-        // Parse both sides recursively
-        auto leftToken = compileEmbeddedFilter(lhs);
-        auto rightToken = compileEmbeddedFilter(rhs);
+        // Parse both sides recursively (trim like legacy implementation)
+        auto leftToken = compileEmbeddedFilter(lhs.trimmed());
+        auto rightToken = compileEmbeddedFilter(rhs.trimmed());
         
         if (!leftToken || !rightToken) {
             qCDebug(jsonPathLog) << "parseEmbeddedAnd: failed to parse one or both sides";
