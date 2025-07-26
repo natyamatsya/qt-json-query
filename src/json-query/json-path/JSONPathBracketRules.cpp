@@ -624,7 +624,9 @@ std::expected<void, Error> handleUnionComma(QStringView content, EmbeddedBracket
     const auto segments = splitUnionSegments(content);
     
     for (const auto& segment : segments) {
-        auto result = EmbeddedBracketRuleDispatcher::processSegmentExcludingUnion(QStringView(segment), out);
+        // Trim each segment before processing (like legacy implementation)
+        auto trimmedSegment = QStringView(segment).trimmed();
+        auto result = EmbeddedBracketRuleDispatcher::processSegmentExcludingUnion(trimmedSegment, out);
         if (!result) {
             return result;
         }

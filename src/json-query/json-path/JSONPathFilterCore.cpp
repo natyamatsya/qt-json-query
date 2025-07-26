@@ -749,18 +749,13 @@ namespace json_query::json_path::detail {
 
 std::optional<Token> parseEmbeddedOr(QString s)
 {
-    qCDebug(jsonPathLog) << "parseEmbeddedOr: trying to parse" << s;
     if (auto split = splitTopLevel(s, "||"_L1); split) {
         auto [lhs, rhs] = *split;
         
-        qCDebug(jsonPathLog) << "parseEmbeddedOr: splitting" << s << "into lhs=" << lhs << "rhs=" << rhs;
-        
-        // Parse both sides recursively
         auto leftToken = compileEmbeddedFilter(lhs.trimmed());
         auto rightToken = compileEmbeddedFilter(rhs.trimmed());
         
         if (!leftToken || !rightToken) {
-            qCDebug(jsonPathLog) << "parseEmbeddedOr: failed to parse one or both sides";
             return std::nullopt;
         }
         
@@ -776,10 +771,8 @@ std::optional<Token> parseEmbeddedOr(QString s)
             return leftResult || rightResult;
         });
         
-        qCDebug(jsonPathLog) << "parseEmbeddedOr: successfully created composite OR filter";
         return result;
     }
-    qCDebug(jsonPathLog) << "parseEmbeddedOr: splitTopLevel failed for" << s;
     return std::nullopt;
 }
 
@@ -788,14 +781,10 @@ std::optional<Token> parseEmbeddedAnd(QString s)
     if (auto split = splitTopLevel(s, "&&"_L1); split) {
         auto [lhs, rhs] = *split;
         
-        qCDebug(jsonPathLog) << "parseEmbeddedAnd: splitting" << s << "into lhs=" << lhs << "rhs=" << rhs;
-        
-        // Parse both sides recursively (trim like legacy implementation)
         auto leftToken = compileEmbeddedFilter(lhs.trimmed());
         auto rightToken = compileEmbeddedFilter(rhs.trimmed());
         
         if (!leftToken || !rightToken) {
-            qCDebug(jsonPathLog) << "parseEmbeddedAnd: failed to parse one or both sides";
             return std::nullopt;
         }
         
@@ -811,7 +800,6 @@ std::optional<Token> parseEmbeddedAnd(QString s)
             return leftResult && rightResult;
         });
         
-        qCDebug(jsonPathLog) << "parseEmbeddedAnd: successfully created composite AND filter";
         return result;
     }
     return std::nullopt;
@@ -976,8 +964,6 @@ std::optional<Token> parseEmbeddedCompare(QString s)
     // Trim whitespace from logical operator splitting
     s = s.trimmed();
     
-    qCDebug(jsonPathLog) << "parseEmbeddedCompare: trying to parse" << s;
-    
     // Try embedded comparison patterns using the template functions
     constexpr auto dotPat = ctll::fixed_string{R"(@\.([\w$]+)\s*(==|!=|>=|<=|>|<)\s*(.+))"};
     constexpr auto brkPat = ctll::fixed_string{R"(@\[['\"]([^'"]+)['\"]\]\s*(==|!=|>=|<=|>|<)\s*(.+))"};
@@ -1011,37 +997,29 @@ std::optional<Token> parseEmbeddedCompare(QString s)
                 return false;  // Unknown operator
             });
             
-            qCDebug(jsonPathLog) << "parseEmbeddedCompare: matched self-comparison pattern";
             return token;
         }
     }
     
     if (auto t = parseEmbeddedCompare1<dotPat>(s)) {
-        qCDebug(jsonPathLog) << "parseEmbeddedCompare: matched dot pattern";
         return t;
     }
     if (auto t = parseEmbeddedCompare1<brkPat>(s)) {
-        qCDebug(jsonPathLog) << "parseEmbeddedCompare: matched bracket pattern";
         return t;
     }
     if (auto t = parseEmbeddedCompareIndex<idxPat>(s)) {
-        qCDebug(jsonPathLog) << "parseEmbeddedCompare: matched index pattern";
         return t;
     }
     if (auto t = parseEmbeddedComparePropToProp<propToPropPat>(s)) {
-        qCDebug(jsonPathLog) << "parseEmbeddedCompare: matched property-to-property pattern";
         return t;
     }
     if (auto t = parseEmbeddedComparePropToArrayIdx<propToArrayIdxPat>(s)) {
-        qCDebug(jsonPathLog) << "parseEmbeddedCompare: matched property-to-array-index pattern";
         return t;
     }
     if (auto t = parseEmbeddedSelfValue<selfPat>(s)) {
-        qCDebug(jsonPathLog) << "parseEmbeddedCompare: matched self pattern";
         return t;
     }
     
-    qCDebug(jsonPathLog) << "parseEmbeddedCompare: no patterns matched for" << s;
     return std::nullopt;
 }
 
@@ -1065,8 +1043,6 @@ std::optional<Token> parseEmbeddedExists(QString s)
     
     // Trim whitespace from logical operator splitting
     s = s.trimmed();
-    
-    qCDebug(jsonPathLog) << "parseEmbeddedExists: trying to parse" << s;
     
     // Enhanced existence patterns for better coverage
     constexpr auto dotExistsPat = ctll::fixed_string{R"(@\.([\w$]+))"};
@@ -1107,7 +1083,6 @@ std::optional<Token> parseEmbeddedExists(QString s)
             return false;  // No matching elements found
         });
         
-        qCDebug(jsonPathLog) << "parseEmbeddedExists: matched nested filter existence pattern";
         return token;
     }
     
@@ -1123,7 +1098,6 @@ std::optional<Token> parseEmbeddedExists(QString s)
             return !j.isUndefined();
         });
         
-        qCDebug(jsonPathLog) << "parseEmbeddedExists: matched relative context existence pattern";
         return token;
     }
     
@@ -1138,7 +1112,6 @@ std::optional<Token> parseEmbeddedExists(QString s)
             return true;
         });
         
-        qCDebug(jsonPathLog) << "parseEmbeddedExists: matched absolute root existence pattern";
         return token;
     }
     
@@ -1158,7 +1131,6 @@ std::optional<Token> parseEmbeddedExists(QString s)
             return false;  // Primitive values don't have "children"
         });
         
-        qCDebug(jsonPathLog) << "parseEmbeddedExists: matched wildcard existence pattern";
         return token;
     }
     
@@ -1177,7 +1149,6 @@ std::optional<Token> parseEmbeddedExists(QString s)
             return false;  // Slices only apply to arrays
         });
         
-        qCDebug(jsonPathLog) << "parseEmbeddedExists: matched slice existence pattern";
         return token;
     }
     
@@ -1235,7 +1206,6 @@ std::optional<Token> parseEmbeddedExists(QString s)
             return false;
         });
         
-        qCDebug(jsonPathLog) << "parseEmbeddedExists: matched multiple selector existence pattern";
         return token;
     }
     
@@ -1250,7 +1220,6 @@ std::optional<Token> parseEmbeddedExists(QString s)
             return true;
         });
         
-        qCDebug(jsonPathLog) << "parseEmbeddedExists: matched absolute wildcard existence pattern";
         return token;
     }
     
@@ -1281,7 +1250,6 @@ std::optional<Token> parseEmbeddedExists(QString s)
             return true;
         });
         
-        qCDebug(jsonPathLog) << "parseEmbeddedExists: matched absolute complex existence pattern";
         return token;
     }
     
@@ -1297,7 +1265,6 @@ std::optional<Token> parseEmbeddedExists(QString s)
             return j.isObject() && j.toObject().contains(prop);
         });
         
-        qCDebug(jsonPathLog) << "parseEmbeddedExists: matched absolute dot existence pattern";
         return token;
     }
     
@@ -1316,7 +1283,6 @@ std::optional<Token> parseEmbeddedExists(QString s)
             return false;  // Non-objects don't have properties
         });
         
-        qCDebug(jsonPathLog) << "parseEmbeddedExists: matched basic property existence pattern";
         return token;
     }
     
@@ -1335,7 +1301,6 @@ std::optional<Token> parseEmbeddedExists(QString s)
             return false;  // Non-objects don't have properties
         });
         
-        qCDebug(jsonPathLog) << "parseEmbeddedExists: matched bracket property existence pattern";
         return token;
     }
     
@@ -1362,11 +1327,9 @@ std::optional<Token> parseEmbeddedExists(QString s)
             return false;  // Non-arrays don't have indices
         });
         
-        qCDebug(jsonPathLog) << "parseEmbeddedExists: matched index existence pattern";
         return token;
     }
     
-    qCDebug(jsonPathLog) << "parseEmbeddedExists: no patterns matched for" << s;
     return std::nullopt;
 }
 
@@ -1381,13 +1344,11 @@ std::optional<Token> parseEmbeddedNot(QString s)
     // Check if the expression starts with '!' (negation)
     if (s.startsWith('!')) {
         QString innerExpr = s.mid(1).trimmed();
-        qCDebug(jsonPathLog) << "parseEmbeddedNot: negating expression" << innerExpr;
         
         // Parse the inner expression recursively
         auto innerToken = compileEmbeddedFilter(innerExpr);
         
         if (!innerToken) {
-            qCDebug(jsonPathLog) << "parseEmbeddedNot: failed to parse inner expression" << innerExpr;
             return std::nullopt;
         }
         
@@ -1402,7 +1363,6 @@ std::optional<Token> parseEmbeddedNot(QString s)
             return !innerResult;
         });
         
-        qCDebug(jsonPathLog) << "parseEmbeddedNot: successfully created negated filter";
         return result;
     }
     return std::nullopt;
