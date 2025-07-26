@@ -2,6 +2,7 @@
 #include "json-query/json-path/JSONPathParseUtils.hpp"
 #include "json-query/json-path/JSONPathBracketRules.hpp"
 #include "json-query/json-path/JSONPathParsers.hpp"
+#include "json-query/json-path/JSONPathFilterParsers.hpp"
 
 #include <iostream>
 #include <QDebug>
@@ -305,6 +306,48 @@ std::expected<json_query::json_path::CompilationResult, json_query::json_path::E
             qCDebug(json_query::json_path::jsonPathLog) << "compile: compilePath failed with error" << static_cast<int>(error);
             return std::unexpected(error);
         });
+}
+
+// ──────────────────────────────────────────────────────────────────────
+//  Modern Embedded Filter Compilation Implementation (Zero-Overhead)
+// ──────────────────────────────────────────────────────────────────────
+
+std::optional<Token> compileEmbeddedFilter(const QString& expr)
+{
+    qCDebug(jsonPathLog) << "compileEmbeddedFilter() expr=" << expr;
+    
+    // Try embedded filter parsing functions in priority order
+    if (auto token = detail::parseEmbeddedCompare(expr)) return token;
+    if (auto token = detail::parseEmbeddedExists(expr)) return token;
+    if (auto token = detail::parseEmbeddedRegex(expr)) return token;
+    if (auto token = detail::parseEmbeddedOr(expr)) return token;
+    if (auto token = detail::parseEmbeddedAnd(expr)) return token;
+    if (auto token = detail::parseEmbeddedIn(expr)) return token;
+    if (auto token = detail::parseEmbeddedSelfCmp(expr)) return token;
+    if (auto token = detail::parseEmbeddedNot(expr)) return token;
+    
+    qCDebug(jsonPathLog) << "compileEmbeddedFilter: no embedded parser matched";
+    return std::nullopt;
+}
+
+std::optional<Token> compileEmbeddedContextFilter(const QString& expr)
+{
+    qCDebug(jsonPathLog) << "compileEmbeddedContextFilter() expr=" << expr;
+    
+    // Try embedded context filter parsing first
+    if (auto token = parseEmbeddedAbsolutePathContext(expr)) return token;
+    
+    // Fall back to regular embedded filter parsing
+    return compileEmbeddedFilter(expr);
+}
+
+std::optional<Token> parseEmbeddedAbsolutePathContext(QString s)
+{
+    qCDebug(jsonPathLog) << "parseEmbeddedAbsolutePathContext() s=" << s;
+    
+    // This will be implemented with embedded context filters
+    // For now, return nullopt to maintain build compatibility
+    return std::nullopt;
 }
 
 } // namespace json_query::json_path

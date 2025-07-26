@@ -314,4 +314,134 @@ std::optional<json_query::json_path::Token> parseSelfCmp(QString s, QVector<json
 std::optional<json_query::json_path::Token> parseNot(QString s, QVector<json_query::json_path::FilterFn>& out);
 std::optional<json_query::json_path::Token> parseAbsolutePath(QString s, QVector<json_query::json_path::FilterFn>& out);
 
-} // namespace json_query::json_path::detail
+// ──────────────────────────────────────────────────────────────────────
+//  Modern Embedded Filter Parser Functions (Zero-Overhead)
+// ──────────────────────────────────────────────────────────────────────
+
+// Template implementations for embedded filter patterns - must be in header for templates
+template<ctll::fixed_string Pattern>
+std::optional<Token> parseEmbeddedCompare1(const QString& s)
+{
+    if (auto m = ctre::match<Pattern>(to_sv(s))) {
+        const QString prop = to_qstr(m.template get<1>().to_view());
+        const QString op = to_qstr(m.template get<2>().to_view());
+        const QString rhs = to_qstr(m.template get<3>().to_view());
+        
+        // Parse RHS value using existing comparison context logic
+        auto ctx = parseRhsValue(op, rhs);
+        if (!ctx) return std::nullopt;
+        
+        Token token;
+        token.kind = Token::Kind::Filter;
+        token.key = s;
+        
+        // Embed filter directly into token
+        token.embedFilter([prop, ctx = *ctx](const QJsonValue& j) {
+            const auto obj = j.toObject();
+            const auto v = obj.value(prop);
+            return ctx.compare(v);
+        });
+        
+        return token;
+    }
+    return std::nullopt;
+}
+
+template<ctll::fixed_string Pattern>
+std::optional<Token> parseEmbeddedCompareIndex(const QString& s)
+{
+    if (auto m = ctre::match<Pattern>(to_sv(s))) {
+        const QString indexStr = to_qstr(m.template get<1>().to_view());
+        const QString op = to_qstr(m.template get<2>().to_view());
+        const QString rhs = to_qstr(m.template get<3>().to_view());
+        
+        // Parse RHS value using existing comparison context logic
+        auto ctx = parseRhsValue(op, rhs);
+        if (!ctx) return std::nullopt;
+        
+        bool ok;
+        int index = indexStr.toInt(&ok);
+        if (!ok) return std::nullopt;
+        
+        Token token;
+        token.kind = Token::Kind::Filter;
+        token.key = s;
+        
+        // Embed filter directly into token
+        token.embedFilter([index, ctx = *ctx](const QJsonValue& j) {
+            if (!j.isArray()) return false;
+            const auto arr = j.toArray();
+            if (index < 0 || index >= arr.size()) return false;
+            const auto v = arr[index];
+            return ctx.compare(v);
+        });
+        
+        return token;
+    }
+    return std::nullopt;
+}
+
+template<ctll::fixed_string Pattern>
+std::optional<Token> parseEmbeddedSelfValue(const QString& s)
+{
+    if (auto m = ctre::match<Pattern>(to_sv(s))) {
+        const QString op = to_qstr(m.template get<1>().to_view());
+        const QString rhs = to_qstr(m.template get<2>().to_view());
+        
+        // Parse RHS value using existing comparison context logic
+        auto ctx = parseRhsValue(op, rhs);
+        if (!ctx) return std::nullopt;
+        
+        Token token;
+        token.kind = Token::Kind::Filter;
+        token.key = s;
+        
+        // Embed filter directly into token
+        token.embedFilter([ctx = *ctx](const QJsonValue& j) {
+            return ctx.compare(j);
+        });
+        
+        return token;
+    }
+    return std::nullopt;
+}
+
+template<ctll::fixed_string Pattern>
+std::optional<Token> parseEmbeddedRegex1(const QString& s)
+{
+    if (auto m = ctre::match<Pattern>(to_sv(s))) {
+        const QString prop = to_qstr(m.template get<1>().to_view());
+        const QString pattern = to_qstr(m.template get<2>().to_view());
+        
+        // Create regex object
+        QRegularExpression regex(pattern);
+        if (!regex.isValid()) return std::nullopt;
+        
+        Token token;
+        token.kind = Token::Kind::Filter;
+        token.key = s;
+        
+        // Embed regex filter directly into token
+        token.embedFilter([prop, regex](const QJsonValue& j) {
+            const auto obj = j.toObject();
+            const auto v = obj.value(prop);
+            if (!v.isString()) return false;
+            return regex.match(v.toString()).hasMatch();
+        });
+        
+        return token;
+    }
+    return std::nullopt;
+}
+
+// Individual embedded filter parser functions
+std::optional<Token> parseEmbeddedOr(QString s);
+std::optional<Token> parseEmbeddedAnd(QString s);
+std::optional<Token> parseEmbeddedIn(QString s);
+std::optional<Token> parseEmbeddedCompare(QString s);
+std::optional<Token> parseEmbeddedRegex(QString s);
+std::optional<Token> parseEmbeddedExists(QString s);
+std::optional<Token> parseEmbeddedSelfCmp(QString s);
+std::optional<Token> parseEmbeddedNot(QString s);
+
+} // namespace detail

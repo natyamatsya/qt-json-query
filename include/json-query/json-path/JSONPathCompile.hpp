@@ -721,6 +721,28 @@ compileContextFilter(const QString& expr, QVector<ContextFilterFn>& contextFilte
 parseAbsolutePathContext(QString s, QVector<ContextFilterFn>& out);
 
 // ──────────────────────────────────────────────────────────────────────
+//  Modern Embedded Filter Compilation API (Zero-Overhead)
+// ──────────────────────────────────────────────────────────────────────
+
+/// Compile a filter expression into a Token with embedded filter (modern API)
+/// @param expr The filter expression string
+/// @return Token with embedded filter, or nullopt if compilation failed
+[[nodiscard]] std::optional<Token> 
+compileEmbeddedFilter(const QString& expr);
+
+/// Context-aware filter compilation with embedded filter (modern API)
+/// @param expr The filter expression string
+/// @return Token with embedded context filter, or nullopt if compilation failed
+[[nodiscard]] std::optional<Token> 
+compileEmbeddedContextFilter(const QString& expr);
+
+/// Parse absolute path references with embedded context filter (modern API)
+/// @param s The absolute path reference string
+/// @return Token with embedded context filter, or nullopt if compilation failed
+[[nodiscard]] std::optional<Token>
+parseEmbeddedAbsolutePathContext(QString s);
+
+// ──────────────────────────────────────────────────────────────────────
 //  Convenience API
 // ──────────────────────────────────────────────────────────────────────
 
