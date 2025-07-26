@@ -825,6 +825,9 @@ std::optional<Token> parseEmbeddedCompare(QString s)
 {
     s = stripOuterParens(s);
     
+    // Trim whitespace from logical operator splitting
+    s = s.trimmed();
+    
     qCDebug(jsonPathLog) << "parseEmbeddedCompare: trying to parse" << s;
     
     // Try embedded comparison patterns using the template functions
@@ -896,6 +899,9 @@ std::optional<Token> parseEmbeddedRegex(QString s)
 
 std::optional<Token> parseEmbeddedExists(QString s)
 {
+    // Trim whitespace from logical operator splitting
+    s = s.trimmed();
+    
     qCDebug(jsonPathLog) << "parseEmbeddedExists: trying to parse" << s;
     
     // Enhanced existence patterns for better coverage
