@@ -28,6 +28,9 @@
 
 namespace json_query::json_path::detail {
 
+// Forward declaration for fanOut function used in TokenProcessingStrategy
+std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src, qsizetype tokenPos);
+
 using json_query::json_path::internal::ContainerCursor;
 using json_query::json_path::internal::ResultCollector;
 using internal::acquirePooledArray;

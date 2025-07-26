@@ -35,83 +35,6 @@ std::expected<QJsonArray, EvalError> evaluateToken(const PathEvalCtx& ctx, const
 //  Streaming-optimized fan-out helper
 // ---------------------------------------------------------------------------
 
-template<typename StreamerType>
-void fanOutStreamingImpl(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src, 
-                        const StreamerType& streamer, qsizetype tokenPos)
-{
-    qCDebug(jsonPathLog) << "[fanOutStreaming] kind=" << static_cast<int>(tk.kind) 
-                         << "srcType" << static_cast<int>(src.first().type()) 
-                         << "seg size=" << src.size();
-
-    bool anySuccess = false;
-    EvalError lastError = EvalError::TypeMismatchObject; // Default error
-    
-    // Determine if we should use permissive or strict error handling
-    bool usePermissiveErrorHandling = false;
-    
-    if (tk.kind == Token::Kind::Index) {
-        if (tokenPos == 1) {
-            // Direct array access: always use permissive error handling (RFC 9535)
-            usePermissiveErrorHandling = true;
-        } else if (tokenPos > 1) {
-            // Check if we're in a recursive descent context by looking back through tokens
-            bool inRecursiveContext = false;
-            for (qsizetype i = tokenPos - 1; i >= 1; --i) {
-                const Token& prevToken = ctx.tokens[i];
-                if (prevToken.kind == Token::Kind::Recursive) {
-                    // Found recursive descent in the token chain
-                    inRecursiveContext = true;
-                    break;
-                } else if (prevToken.kind == Token::Kind::Key) {
-                    // Property access breaks the recursive context
-                    break;
-                }
-                // Index tokens continue the recursive context
-            }
-            
-            if (inRecursiveContext) {
-                // After recursive descent: use permissive error handling (RFC 9535)
-                usePermissiveErrorHandling = true;
-            } else {
-                // After property chain: use strict error handling (UpstreamArrayIndexOOB)
-                usePermissiveErrorHandling = false;
-            }
-        }
-    }
-
-    for (const auto& srcValue : src) {
-        auto result = evaluateTokenExpected(ctx, tk, srcValue);
-        if (result) {
-            // Success: stream results directly
-            anySuccess = true;
-            streamer.emitArray(*result);
-        } else {
-            // Failure: record error
-            lastError = result.error();
-            qCDebug(jsonPathLog) << "[fanOutStreaming] token evaluation failed:" << static_cast<int>(result.error());
-            
-            // Context-aware error handling for Index tokens
-            if (tk.kind == Token::Kind::Index && !usePermissiveErrorHandling) {
-                // Strict error handling: propagate errors immediately (property chain access)
-                streamer.handleError(lastError);
-                return;
-            }
-            // Permissive error handling: continue processing (direct access or after recursive descent)
-        }
-    }
-    
-    // For permissive error handling, don't emit error if no results (RFC 9535 compliance)
-    if (tk.kind == Token::Kind::Index && usePermissiveErrorHandling && !anySuccess) {
-        // Empty result for RFC 9535 compliance - no emission needed
-        return;
-    }
-    
-    // Only emit error if ALL evaluations failed (non-permissive contexts)
-    if (!anySuccess) {
-        streamer.handleError(lastError);
-    }
-}
-
 // Legacy overload for backward compatibility with ResultStreamer
 void fanOutStreaming(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src, 
                     const ResultStreamer& streamer, qsizetype tokenPos)
@@ -164,5 +87,115 @@ std::expected<QJsonArray, EvalError> dispatchKeyList(const PathEvalCtx& ctx, con
 {
     return json_query::json_path::detail::evalExpected<Token::Kind::KeyList>(ctx, tk, v);
 }
+
+} // namespace json_query::json_path::internal
+
+// ---------------------------------------------------------------------------
+//  TableGen-inspired Error Handling Dispatch Implementation
+// ---------------------------------------------------------------------------
+
+namespace json_query::json_path::internal {
+
+// Template specialization implementation for recursive dispatch
+template<ErrorHandlingStrategy FirstStrategy, ErrorHandlingStrategy... RestStrategies>
+template<typename StreamerType>
+bool ErrorHandlingDispatchTable<FirstStrategy, RestStrategies...>::dispatch(
+    const Token& tk, qsizetype tokenPos, const detail::PathEvalCtx& ctx,
+    const QJsonArray& src, const StreamerType& streamer) {
+    
+    if constexpr (ErrorHandlingDef<FirstStrategy>::enabled) {
+        if (ErrorHandlingDef<FirstStrategy>::matches(tk, tokenPos, ctx)) {
+            return processWithStrategy<FirstStrategy>(tk, tokenPos, ctx, src, streamer);
+        }
+    }
+    
+    // Try next strategy in the dispatch table
+    return ErrorHandlingDispatchTable<RestStrategies...>::dispatch(tk, tokenPos, ctx, src, streamer);
+}
+
+// Private helper for strategy processing
+template<ErrorHandlingStrategy FirstStrategy, ErrorHandlingStrategy... RestStrategies>
+template<ErrorHandlingStrategy Strategy, typename StreamerType>
+bool ErrorHandlingDispatchTable<FirstStrategy, RestStrategies...>::processWithStrategy(
+    const Token& tk, qsizetype tokenPos, const detail::PathEvalCtx& ctx,
+    const QJsonArray& src, const StreamerType& streamer) {
+    
+    bool anySuccess = false;
+    EvalError lastError = EvalError::TypeMismatchObject; // Default error
+    bool shouldEarlyReturn = false;
+    
+    for (const auto& srcValue : src) {
+        // Use the appropriate dispatch function based on token kind
+        std::expected<QJsonArray, EvalError> result;
+        
+        switch (tk.kind) {
+            case Token::Kind::Key:
+                result = dispatchKey(ctx, tk, srcValue);
+                break;
+            case Token::Kind::Index:
+                result = dispatchIndex(ctx, tk, srcValue);
+                break;
+            case Token::Kind::Slice:
+                result = dispatchSlice(ctx, tk, srcValue);
+                break;
+            case Token::Kind::Wildcard:
+                result = dispatchWildcard(ctx, tk, srcValue);
+                break;
+            case Token::Kind::Recursive:
+                result = dispatchRecursive(ctx, tk, srcValue);
+                break;
+            case Token::Kind::Filter:
+                result = dispatchFilter(ctx, tk, srcValue);
+                break;
+            case Token::Kind::KeyList:
+                result = dispatchKeyList(ctx, tk, srcValue);
+                break;
+            default:
+                result = std::unexpected(EvalError::TypeMismatchObject);
+                break;
+        }
+        
+        if (result) {
+            // Success: stream results directly
+            anySuccess = true;
+            streamer.emitArray(*result);
+        } else {
+            // Failure: process according to strategy
+            ErrorHandlingProcessor<Strategy>::processFailure(tk, result.error(), streamer, anySuccess, lastError);
+            
+            // Check for early return (strict error handling)
+            if constexpr (Strategy == ErrorHandlingStrategy::StrictPropertyChain) {
+                shouldEarlyReturn = true;
+                break;
+            }
+        }
+    }
+    
+    if (shouldEarlyReturn) {
+        return true; // Indicate early return occurred
+    }
+    
+    // Process final result according to strategy
+    ErrorHandlingProcessor<Strategy>::processFinalResult(tk, streamer, anySuccess, lastError);
+    return false; // Normal completion
+}
+
+} // namespace json_query::json_path::internal
+
+// ---------------------------------------------------------------------------
+//  Explicit Template Instantiations
+// ---------------------------------------------------------------------------
+
+namespace json_query::json_path::internal {
+
+// Explicit instantiation for the specific template parameters used in the codebase
+template bool ErrorHandlingDispatchTable<
+    ErrorHandlingStrategy::PermissiveDirectAccess,
+    ErrorHandlingStrategy::PermissiveRecursiveContext,
+    ErrorHandlingStrategy::StrictPropertyChain,
+    ErrorHandlingStrategy::DefaultPermissive
+>::dispatch<ConceptResultStreamer<ResultCollector>>(
+    const Token& tk, qsizetype tokenPos, const detail::PathEvalCtx& ctx,
+    const QJsonArray& src, const ConceptResultStreamer<ResultCollector>& streamer);
 
 } // namespace json_query::json_path::internal
