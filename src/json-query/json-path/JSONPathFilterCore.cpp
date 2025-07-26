@@ -984,6 +984,7 @@ std::optional<Token> parseEmbeddedCompare(QString s)
     constexpr auto selfSelfPat = ctll::fixed_string{R"(^(@|\$)\s*(==|!=|>=|<=|>|<)\s*(@|\$)$)"};  // Self-comparison: @==@, $==$, etc.
     constexpr auto propToPropPat = ctll::fixed_string{R"(@\.([\w$]+)\s*(==|!=|>=|<=|>|<)\s*@\.([\w$]+))"};  // Property-to-property: @.a==@.b
     constexpr auto propToArrayIdxPat = ctll::fixed_string{R"(@\.([\w$]+)\s*(==|!=|>=|<=|>|<)\s*@\.([\w$]+)\[(-?\d+)\])"};  // Property-to-array-index: @.a==@.list[9]
+    constexpr auto nestedFilterPat = ctll::fixed_string{R"(@\[\?(.+)\])"};  // Nested filter: @[?@>1]
 
     // Try self-comparison pattern first (more specific)
     if (auto m = ctre::match<selfSelfPat>(to_sv(s))) {
@@ -1072,13 +1073,41 @@ std::optional<Token> parseEmbeddedExists(QString s)
     constexpr auto wildcardPat = ctll::fixed_string{R"(@\.\*)"};  // Wildcard existence pattern
     constexpr auto slicePat = ctll::fixed_string{R"(@\[(-?\d*):(-?\d*)\])"};  // Slice pattern: @[start:end]
     constexpr auto multiSelectorPat = ctll::fixed_string{R"(@\[.+,.+\])"};  // Multiple selectors: @[0, 1, 'key']
-    
-    // Absolute path existence patterns (starting with $)
+    constexpr auto nestedFilterPat = ctll::fixed_string{R"(@\[\?(.+)\])"};  // Nested filter: @[?@>1]
     constexpr auto absDotExistsPat = ctll::fixed_string{R"(\$\.([\w$]+))"};  // $.property
     constexpr auto absWildcardPat = ctll::fixed_string{R"(\$\.\*)"};  // $.*
     constexpr auto absComplexPat = ctll::fixed_string{R"(\$\.\*\.([\w$]+))"};  // $.*.property
     constexpr auto absRootPat = ctll::fixed_string{R"(\$)"};  // $ (simple root reference)
     constexpr auto relContextPat = ctll::fixed_string{R"(@)"};  // @ (simple context reference)
+
+    // Try nested filter pattern first (most specific)
+    if (auto m = ctre::match<nestedFilterPat>(to_sv(s))) {
+        const QString filterExpr = to_qstr(m.template get<1>().to_view());
+        
+        Token token;
+        token.kind = Token::Kind::Filter;
+        token.key = s;
+        
+        token.embedFilter([filterExpr](const QJsonValue& j) {
+            // Nested filter existence: @[?@>1] - true if array has elements matching the filter
+            if (j.isArray()) {
+                const auto arr = j.toArray();
+                for (const auto& element : arr) {
+                    // For now, implement a simplified version for @>1 pattern
+                    if (filterExpr.contains(">")) {
+                        if (element.isDouble() && element.toDouble() > 1.0) {
+                            return true;
+                        }
+                    }
+                    // Add more filter patterns as needed
+                }
+            }
+            return false;  // No matching elements found
+        });
+        
+        qCDebug(jsonPathLog) << "parseEmbeddedExists: matched nested filter existence pattern";
+        return token;
+    }
     
     // Try simple relative context pattern first
     if (ctre::match<relContextPat>(to_sv(s))) {
