@@ -601,7 +601,13 @@ QVector<QStringView> splitUnionSegments(QStringView content)
     // Use the existing splitTopLevelMultiple function for consistency
     auto result = splitTopLevelMultiple(content, QLatin1StringView(","));
     if (result) {
-        return *result;
+        // Convert QVector<QString> to QVector<QStringView>
+        QVector<QStringView> segments;
+        segments.reserve(result->size());
+        for (const QString& str : *result) {
+            segments.append(QStringView(str));
+        }
+        return segments;
     }
     // Fallback: simple split if complex parsing fails
     return content.split(u',');
