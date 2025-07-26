@@ -120,3 +120,43 @@ endif()
 gtest_discover_tests(rfc9535_tests
     DISCOVERY_MODE PRE_TEST
     TEST_PREFIX "RFC9535/")
+
+# ---------------------------------------------------------------------------
+# CompactContextFilterStorage lifetime fix test
+# ---------------------------------------------------------------------------
+add_executable(compact_context_filter_fix_test
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_compact_context_filter_standalone.cpp
+)
+
+target_include_directories(compact_context_filter_fix_test PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+)
+
+target_link_libraries(compact_context_filter_fix_test PRIVATE
+    Qt6::Core
+)
+
+target_compile_features(compact_context_filter_fix_test PRIVATE cxx_std_23)
+
+# Register the lifetime fix test with CTest
+add_test(NAME CompactContextFilterStorageLifetimeFix COMMAND compact_context_filter_fix_test)
+
+# ---------------------------------------------------------------------------
+# Comprehensive variant-based storage test
+# ---------------------------------------------------------------------------
+add_executable(variant_storage_comprehensive_test
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_variant_storage_comprehensive.cpp
+)
+
+target_include_directories(variant_storage_comprehensive_test PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+)
+
+target_link_libraries(variant_storage_comprehensive_test PRIVATE
+    Qt6::Core
+)
+
+target_compile_features(variant_storage_comprehensive_test PRIVATE cxx_std_23)
+
+# Register the comprehensive variant storage test with CTest
+add_test(NAME VariantStorageComprehensive COMMAND variant_storage_comprehensive_test)

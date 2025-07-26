@@ -15,6 +15,7 @@
 #include <expected>
 #include <optional>
 #include <memory>
+#include <variant>
 
 namespace json_query::json_path
 {
@@ -156,9 +157,7 @@ namespace json_query::json_path
         /**
          * @brief Default constructor creates empty storage
          */
-        CompactFilterStorage() : buffer_{}, evaluator_(nullptr), isInline_(false) {
-            // Initialize union to buffer state
-        }
+        CompactFilterStorage() = default;
         
         /**
          * @brief Construct with a filter that fits in the small buffer
@@ -171,12 +170,14 @@ namespace json_query::json_path
             using FilterType = std::decay_t<Filter>;
             static_assert(sizeof(FilterType) <= BufferSize, "Filter too large for inline storage");
             
-            new (buffer_.data()) FilterType(std::forward<Filter>(filter));
-            evaluator_ = [](const void* storage, const QJsonValue& value) -> bool {
-                const auto* filter = static_cast<const FilterType*>(storage);
+            InlineStorage storage;
+            new (storage.buffer.data()) FilterType(std::forward<Filter>(filter));
+            storage.evaluator = [](const void* data, const QJsonValue& value) -> bool {
+                const auto* filter = static_cast<const FilterType*>(data);
                 return (*filter)(value);
             };
-            isInline_ = true;
+            
+            storage_ = std::move(storage);
         }
         
         /**
@@ -188,69 +189,41 @@ namespace json_query::json_path
             requires (sizeof(std::decay_t<Filter>) > BufferSize || !std::is_trivially_copyable_v<std::decay_t<Filter>>)
         {
             using FilterType = std::decay_t<Filter>;
-            sharedFilter_ = std::make_shared<FilterType>(std::forward<Filter>(filter));
-            evaluator_ = [](const void* storage, const QJsonValue& value) -> bool {
-                const auto* sharedPtr = static_cast<const std::shared_ptr<FilterType>*>(storage);
-                return (**sharedPtr)(value);
+            
+            HeapStorage storage;
+            storage.sharedFilter = std::make_shared<FilterType>(std::forward<Filter>(filter));
+            storage.evaluator = [](const std::shared_ptr<void>& ptr, const QJsonValue& value) -> bool {
+                const auto* filter = static_cast<const FilterType*>(ptr.get());
+                return (*filter)(value);
             };
-            isInline_ = false;
+            
+            storage_ = std::move(storage);
         }
         
         /**
-         * @brief Copy constructor with proper storage handling
+         * @brief Copy constructor (automatic with variant)
          */
-        CompactFilterStorage(const CompactFilterStorage& other) 
-            : evaluator_(other.evaluator_), isInline_(other.isInline_) {
-            if (isInline_) {
-                std::memcpy(buffer_.data(), other.buffer_.data(), BufferSize);
-            } else {
-                new (&sharedFilter_) std::shared_ptr<void>(other.sharedFilter_);
-            }
-        }
+        CompactFilterStorage(const CompactFilterStorage&) = default;
         
         /**
-         * @brief Move constructor with proper storage handling
+         * @brief Move constructor (automatic with variant)
          */
-        CompactFilterStorage(CompactFilterStorage&& other) noexcept
-            : evaluator_(other.evaluator_), isInline_(other.isInline_) {
-            if (isInline_) {
-                std::memcpy(buffer_.data(), other.buffer_.data(), BufferSize);
-            } else {
-                new (&sharedFilter_) std::shared_ptr<void>(std::move(other.sharedFilter_));
-            }
-            other.evaluator_ = nullptr;
-        }
+        CompactFilterStorage(CompactFilterStorage&&) noexcept = default;
         
         /**
-         * @brief Copy assignment operator
+         * @brief Copy assignment operator (automatic with variant)
          */
-        CompactFilterStorage& operator=(const CompactFilterStorage& other) {
-            if (this != &other) {
-                this->~CompactFilterStorage();
-                new (this) CompactFilterStorage(other);
-            }
-            return *this;
-        }
+        CompactFilterStorage& operator=(const CompactFilterStorage&) = default;
         
         /**
-         * @brief Move assignment operator
+         * @brief Move assignment operator (automatic with variant)
          */
-        CompactFilterStorage& operator=(CompactFilterStorage&& other) noexcept {
-            if (this != &other) {
-                this->~CompactFilterStorage();
-                new (this) CompactFilterStorage(std::move(other));
-            }
-            return *this;
-        }
+        CompactFilterStorage& operator=(CompactFilterStorage&&) noexcept = default;
         
         /**
-         * @brief Destructor with proper cleanup
+         * @brief Destructor (automatic with variant)
          */
-        ~CompactFilterStorage() {
-            if (!isInline_ && evaluator_) {
-                sharedFilter_.~shared_ptr();
-            }
-        }
+        ~CompactFilterStorage() = default;
         
         /**
          * @brief Evaluate the stored filter
@@ -258,13 +231,18 @@ namespace json_query::json_path
          * @return true if the value passes the filter
          */
         [[nodiscard]] bool evaluate(const QJsonValue& value) const {
-            if (!evaluator_) return false;
-            
-            if (isInline_) {
-                return evaluator_(buffer_.data(), value);
-            } else {
-                return evaluator_(&sharedFilter_, value);
-            }
+            return std::visit([&](const auto& storage) -> bool {
+                using StorageType = std::decay_t<decltype(storage)>;
+                
+                if constexpr (std::is_same_v<StorageType, EmptyStorage>) {
+                    return false;
+                } else if constexpr (std::is_same_v<StorageType, InlineStorage>) {
+                    return storage.evaluator(storage.buffer.data(), value);
+                } else if constexpr (std::is_same_v<StorageType, HeapStorage>) {
+                    return storage.evaluator(storage.sharedFilter, value);
+                }
+                return false;
+            }, storage_);
         }
         
         /**
@@ -272,7 +250,7 @@ namespace json_query::json_path
          * @return true if a filter is stored
          */
         [[nodiscard]] bool hasFilter() const noexcept {
-            return evaluator_ != nullptr;
+            return !std::holds_alternative<EmptyStorage>(storage_);
         }
         
         /**
@@ -280,19 +258,28 @@ namespace json_query::json_path
          * @return true if using inline storage
          */
         [[nodiscard]] bool isInlineStorage() const noexcept {
-            return isInline_;
+            return std::holds_alternative<InlineStorage>(storage_);
         }
         
     private:
-        union {
-            std::array<std::byte, BufferSize> buffer_;
-            std::shared_ptr<void> sharedFilter_;
+        // Empty state
+        struct EmptyStorage {};
+        
+        // Inline storage for small filters
+        struct InlineStorage {
+            std::array<std::byte, BufferSize> buffer;
+            bool (*evaluator)(const void*, const QJsonValue&) = nullptr;
         };
         
-        bool (*evaluator_)(const void*, const QJsonValue&) = nullptr;
-        bool isInline_ = false;
+        // Heap storage for large filters
+        struct HeapStorage {
+            std::shared_ptr<void> sharedFilter;
+            bool (*evaluator)(const std::shared_ptr<void>&, const QJsonValue&) = nullptr;
+        };
+        
+        std::variant<EmptyStorage, InlineStorage, HeapStorage> storage_;
     };
-    
+
     /**
      * @brief Context filter storage with small buffer optimization
      */
@@ -302,9 +289,7 @@ namespace json_query::json_path
         /**
          * @brief Default constructor creates empty storage
          */
-        CompactContextFilterStorage() : buffer_{}, evaluator_(nullptr), isInline_(false) {
-            // Initialize union to buffer state
-        }
+        CompactContextFilterStorage() = default;
         
         /**
          * @brief Construct with a context filter that fits in the small buffer
@@ -316,12 +301,14 @@ namespace json_query::json_path
             using FilterType = std::decay_t<Filter>;
             static_assert(sizeof(FilterType) <= BufferSize, "Context filter too large for inline storage");
             
-            new (buffer_.data()) FilterType(std::forward<Filter>(filter));
-            evaluator_ = [](const void* storage, const QJsonValue& currentNode, const QJsonValue& rootDocument) -> bool {
-                const auto* filter = static_cast<const FilterType*>(storage);
+            InlineStorage storage;
+            new (storage.buffer.data()) FilterType(std::forward<Filter>(filter));
+            storage.evaluator = [](const void* data, const QJsonValue& currentNode, const QJsonValue& rootDocument) -> bool {
+                const auto* filter = static_cast<const FilterType*>(data);
                 return (*filter)(currentNode, rootDocument);
             };
-            isInline_ = true;
+            
+            storage_ = std::move(storage);
         }
         
         /**
@@ -332,69 +319,41 @@ namespace json_query::json_path
             requires (sizeof(std::decay_t<Filter>) > BufferSize || !std::is_trivially_copyable_v<std::decay_t<Filter>>)
         {
             using FilterType = std::decay_t<Filter>;
-            sharedFilter_ = std::make_shared<FilterType>(std::forward<Filter>(filter));
-            evaluator_ = [](const void* storage, const QJsonValue& currentNode, const QJsonValue& rootDocument) -> bool {
-                const auto* sharedPtr = static_cast<const std::shared_ptr<FilterType>*>(storage);
-                return (**sharedPtr)(currentNode, rootDocument);
+            
+            HeapStorage storage;
+            storage.sharedFilter = std::make_shared<FilterType>(std::forward<Filter>(filter));
+            storage.evaluator = [](const std::shared_ptr<void>& ptr, const QJsonValue& currentNode, const QJsonValue& rootDocument) -> bool {
+                const auto* filter = static_cast<const FilterType*>(ptr.get());
+                return (*filter)(currentNode, rootDocument);
             };
-            isInline_ = false;
+            
+            storage_ = std::move(storage);
         }
         
         /**
-         * @brief Copy constructor with proper storage handling
+         * @brief Copy constructor (automatic with variant)
          */
-        CompactContextFilterStorage(const CompactContextFilterStorage& other)
-            : evaluator_(other.evaluator_), isInline_(other.isInline_) {
-            if (isInline_) {
-                std::memcpy(buffer_.data(), other.buffer_.data(), BufferSize);
-            } else {
-                new (&sharedFilter_) std::shared_ptr<void>(other.sharedFilter_);
-            }
-        }
+        CompactContextFilterStorage(const CompactContextFilterStorage&) = default;
         
         /**
-         * @brief Move constructor with proper storage handling
+         * @brief Move constructor (automatic with variant)
          */
-        CompactContextFilterStorage(CompactContextFilterStorage&& other) noexcept
-            : evaluator_(other.evaluator_), isInline_(other.isInline_) {
-            if (isInline_) {
-                std::memcpy(buffer_.data(), other.buffer_.data(), BufferSize);
-            } else {
-                new (&sharedFilter_) std::shared_ptr<void>(std::move(other.sharedFilter_));
-            }
-            other.evaluator_ = nullptr;
-        }
+        CompactContextFilterStorage(CompactContextFilterStorage&&) noexcept = default;
         
         /**
-         * @brief Copy assignment operator
+         * @brief Copy assignment operator (automatic with variant)
          */
-        CompactContextFilterStorage& operator=(const CompactContextFilterStorage& other) {
-            if (this != &other) {
-                this->~CompactContextFilterStorage();
-                new (this) CompactContextFilterStorage(other);
-            }
-            return *this;
-        }
+        CompactContextFilterStorage& operator=(const CompactContextFilterStorage&) = default;
         
         /**
-         * @brief Move assignment operator
+         * @brief Move assignment operator (automatic with variant)
          */
-        CompactContextFilterStorage& operator=(CompactContextFilterStorage&& other) noexcept {
-            if (this != &other) {
-                this->~CompactContextFilterStorage();
-                new (this) CompactContextFilterStorage(std::move(other));
-            }
-            return *this;
-        }
+        CompactContextFilterStorage& operator=(CompactContextFilterStorage&&) noexcept = default;
         
         /**
-         * @brief Destructor with proper cleanup
+         * @brief Destructor (automatic with variant)
          */
-        ~CompactContextFilterStorage() {
-            if (!isInline_ && evaluator_) {
-                sharedFilter_.~shared_ptr();
-            }
-        }
+        ~CompactContextFilterStorage() = default;
         
         /**
          * @brief Evaluate the stored context filter
@@ -403,13 +362,18 @@ namespace json_query::json_path
          * @return true if the value passes the filter
          */
         [[nodiscard]] bool evaluateContext(const QJsonValue& currentNode, const QJsonValue& rootDocument) const {
-            if (!evaluator_) return false;
-            
-            if (isInline_) {
-                return evaluator_(buffer_.data(), currentNode, rootDocument);
-            } else {
-                return evaluator_(&sharedFilter_, currentNode, rootDocument);
-            }
+            return std::visit([&](const auto& storage) -> bool {
+                using StorageType = std::decay_t<decltype(storage)>;
+                
+                if constexpr (std::is_same_v<StorageType, EmptyStorage>) {
+                    return false;
+                } else if constexpr (std::is_same_v<StorageType, InlineStorage>) {
+                    return storage.evaluator(storage.buffer.data(), currentNode, rootDocument);
+                } else if constexpr (std::is_same_v<StorageType, HeapStorage>) {
+                    return storage.evaluator(storage.sharedFilter, currentNode, rootDocument);
+                }
+                return false;
+            }, storage_);
         }
         
         /**
@@ -417,7 +381,7 @@ namespace json_query::json_path
          * @return true if a context filter is stored
          */
         [[nodiscard]] bool hasFilter() const noexcept {
-            return evaluator_ != nullptr;
+            return !std::holds_alternative<EmptyStorage>(storage_);
         }
         
         /**
@@ -425,19 +389,28 @@ namespace json_query::json_path
          * @return true if using inline storage
          */
         [[nodiscard]] bool isInlineStorage() const noexcept {
-            return isInline_;
+            return std::holds_alternative<InlineStorage>(storage_);
         }
         
     private:
-        union {
-            std::array<std::byte, BufferSize> buffer_;
-            std::shared_ptr<void> sharedFilter_;
+        // Empty state
+        struct EmptyStorage {};
+        
+        // Inline storage for small filters
+        struct InlineStorage {
+            std::array<std::byte, BufferSize> buffer;
+            bool (*evaluator)(const void*, const QJsonValue&, const QJsonValue&) = nullptr;
         };
         
-        bool (*evaluator_)(const void*, const QJsonValue&, const QJsonValue&) = nullptr;
-        bool isInline_ = false;
+        // Heap storage for large filters
+        struct HeapStorage {
+            std::shared_ptr<void> sharedFilter;
+            bool (*evaluator)(const std::shared_ptr<void>&, const QJsonValue&, const QJsonValue&) = nullptr;
+        };
+        
+        std::variant<EmptyStorage, InlineStorage, HeapStorage> storage_;
     };
-    
+
     /**
      * @brief Zero-overhead embedded filter for Token struct
      * 
