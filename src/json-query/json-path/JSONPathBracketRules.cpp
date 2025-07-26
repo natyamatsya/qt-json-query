@@ -601,21 +601,21 @@ std::expected<void, Error> handleUnquotedKey(QStringView /*content*/, EmbeddedBr
 }
 
 // Helper function to split union segments
-QVector<QStringView> splitUnionSegments(QStringView content)
+QVector<QString> splitUnionSegments(QStringView content)
 {
     // Use the existing splitTopLevelMultiple function for consistency
     auto result = splitTopLevelMultiple(content, QLatin1StringView(","));
     if (result) {
-        // Convert QVector<QString> to QVector<QStringView>
-        QVector<QStringView> segments;
-        segments.reserve(result->size());
-        for (const QString& str : *result) {
-            segments.append(QStringView(str));
-        }
-        return segments;
+        return *result;
     }
     // Fallback: simple split if complex parsing fails
-    return content.split(u',');
+    auto segments = content.split(u',');
+    QVector<QString> stringSegments;
+    stringSegments.reserve(segments.size());
+    for (const auto& segment : segments) {
+        stringSegments.append(segment.toString());
+    }
+    return stringSegments;
 }
 
 // Forward declaration for embedded union handler
@@ -624,7 +624,7 @@ std::expected<void, Error> handleUnionComma(QStringView content, EmbeddedBracket
     const auto segments = splitUnionSegments(content);
     
     for (const auto& segment : segments) {
-        auto result = EmbeddedBracketRuleDispatcher::processSegmentExcludingUnion(segment, out);
+        auto result = EmbeddedBracketRuleDispatcher::processSegmentExcludingUnion(QStringView(segment), out);
         if (!result) {
             return result;
         }
