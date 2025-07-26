@@ -15,350 +15,396 @@ namespace json_query::json_path::detail {
 using json_query::utils::to_sv;
 using json_query::utils::to_qstr;
 
+// Existence filter type enumeration for compile-time dispatch
+enum class ExistenceFilterType {
+    PropertyDot,        // @.prop
+    PropertyBracket,    // @["prop"]
+    Root,              // @
+    RootRef,           // $
+    Wildcard,          // @.*
+    ArraySlice,        // @[1:3]
+    MultiSelector,     // @[0,'a',1]
+    NestedFilter,      // @[?expr]
+    // Negated variants
+    NegPropertyDot,    // !@.prop
+    NegPropertyBracket,// !@["prop"]
+    NegRoot,           // !@
+    NegRootRef,        // !$
+    NegWildcard,       // !@.*
+    NegArraySlice,     // !@[1:3]
+    NegMultiSelector,  // !@[0,'a',1]
+    NegNestedFilter,   // !@[?expr]
+    Unknown
+};
+
+// Pattern descriptor for TableGen-like declarative dispatch
+template<ExistenceFilterType Type>
+struct ExistencePatternDef {
+    static constexpr const char* pattern = "";
+    static constexpr bool enabled = false;
+};
+
+// Template specializations for each existence filter type (TableGen-style definitions)
+
+template<> struct ExistencePatternDef<ExistenceFilterType::PropertyDot> {
+    static constexpr auto pattern = ctll::fixed_string{R"(^@\.([\w$]+)$)"};
+    static constexpr bool enabled = true;
+};
+
+template<> struct ExistencePatternDef<ExistenceFilterType::NegPropertyDot> {
+    static constexpr auto pattern = ctll::fixed_string{R"(^!@\.([\w$]+)$)"};
+    static constexpr bool enabled = true;
+};
+
+template<> struct ExistencePatternDef<ExistenceFilterType::PropertyBracket> {
+    static constexpr auto pattern = ctll::fixed_string{R"(^@\[['\"]([^'"]+)['\"]\]$)"};
+    static constexpr bool enabled = true;
+};
+
+template<> struct ExistencePatternDef<ExistenceFilterType::NegPropertyBracket> {
+    static constexpr auto pattern = ctll::fixed_string{R"(^!@\[['\"]([^'"]+)['\"]\]$)"};
+    static constexpr bool enabled = true;
+};
+
+template<> struct ExistencePatternDef<ExistenceFilterType::ArraySlice> {
+    static constexpr auto pattern = ctll::fixed_string{R"(^@\[(-?\d+):(-?\d+)\]$)"};
+    static constexpr bool enabled = true;
+};
+
+template<> struct ExistencePatternDef<ExistenceFilterType::NegArraySlice> {
+    static constexpr auto pattern = ctll::fixed_string{R"(^!@\[(-?\d+):(-?\d+)\]$)"};
+    static constexpr bool enabled = true;
+};
+
+template<> struct ExistencePatternDef<ExistenceFilterType::MultiSelector> {
+    static constexpr auto pattern = ctll::fixed_string{R"(^@\[([^?:][^:]*)\]$)"};
+    static constexpr bool enabled = true;
+};
+
+template<> struct ExistencePatternDef<ExistenceFilterType::NegMultiSelector> {
+    static constexpr auto pattern = ctll::fixed_string{R"(^!@\[([^?:][^:]*)\]$)"};
+    static constexpr bool enabled = true;
+};
+
+template<> struct ExistencePatternDef<ExistenceFilterType::NestedFilter> {
+    static constexpr auto pattern = ctll::fixed_string{R"(^@\[\?(.+)\]$)"};
+    static constexpr bool enabled = true;
+};
+
+template<> struct ExistencePatternDef<ExistenceFilterType::NegNestedFilter> {
+    static constexpr auto pattern = ctll::fixed_string{R"(^!@\[\?(.+)\]$)"};
+    static constexpr bool enabled = true;
+};
+
+// Token factory template specializations for each filter type
+template<ExistenceFilterType Type>
+struct ExistenceTokenFactory {
+    static std::optional<json_query::json_path::Token> create(const QString& input, QVector<json_query::json_path::FilterFn>& out) {
+        return std::nullopt; // Default: not implemented
+    }
+};
+
+// Property existence token factory
+template<>
+struct ExistenceTokenFactory<ExistenceFilterType::PropertyDot> {
+    static std::optional<json_query::json_path::Token> create(const QString& input, QVector<json_query::json_path::FilterFn>& out) {
+        if constexpr (ExistencePatternDef<ExistenceFilterType::PropertyDot>::enabled) {
+            if (auto m = ctre::match<ExistencePatternDef<ExistenceFilterType::PropertyDot>::pattern>(to_sv(input))) {
+                QString prop = to_qstr(m.template get<1>().to_view());
+                Builder b{out};
+                return b.add([prop](const QJsonValue& j) -> bool {
+                    return j.toObject().contains(prop);
+                }, QString("@.%1").arg(prop));
+            }
+        }
+        return std::nullopt;
+    }
+};
+
+template<>
+struct ExistenceTokenFactory<ExistenceFilterType::NegPropertyDot> {
+    static std::optional<json_query::json_path::Token> create(const QString& input, QVector<json_query::json_path::FilterFn>& out) {
+        if constexpr (ExistencePatternDef<ExistenceFilterType::NegPropertyDot>::enabled) {
+            if (auto m = ctre::match<ExistencePatternDef<ExistenceFilterType::NegPropertyDot>::pattern>(to_sv(input))) {
+                QString prop = to_qstr(m.template get<1>().to_view());
+                Builder b{out};
+                return b.add([prop](const QJsonValue& j) -> bool {
+                    return !j.toObject().contains(prop);
+                }, QString("!@.%1").arg(prop));
+            }
+        }
+        return std::nullopt;
+    }
+};
+
+template<>
+struct ExistenceTokenFactory<ExistenceFilterType::PropertyBracket> {
+    static std::optional<json_query::json_path::Token> create(const QString& input, QVector<json_query::json_path::FilterFn>& out) {
+        if constexpr (ExistencePatternDef<ExistenceFilterType::PropertyBracket>::enabled) {
+            if (auto m = ctre::match<ExistencePatternDef<ExistenceFilterType::PropertyBracket>::pattern>(to_sv(input))) {
+                QString prop = to_qstr(m.template get<1>().to_view());
+                Builder b{out};
+                return b.add([prop](const QJsonValue& j) -> bool {
+                    return j.toObject().contains(prop);
+                }, QString("@[\"%1\"]").arg(prop));
+            }
+        }
+        return std::nullopt;
+    }
+};
+
+template<>
+struct ExistenceTokenFactory<ExistenceFilterType::NegPropertyBracket> {
+    static std::optional<json_query::json_path::Token> create(const QString& input, QVector<json_query::json_path::FilterFn>& out) {
+        if constexpr (ExistencePatternDef<ExistenceFilterType::NegPropertyBracket>::enabled) {
+            if (auto m = ctre::match<ExistencePatternDef<ExistenceFilterType::NegPropertyBracket>::pattern>(to_sv(input))) {
+                QString prop = to_qstr(m.template get<1>().to_view());
+                Builder b{out};
+                return b.add([prop](const QJsonValue& j) -> bool {
+                    return !j.toObject().contains(prop);
+                }, QString("!@[\"%1\"]").arg(prop));
+            }
+        }
+        return std::nullopt;
+    }
+};
+
+template<>
+struct ExistenceTokenFactory<ExistenceFilterType::ArraySlice> {
+    static std::optional<json_query::json_path::Token> create(const QString& input, QVector<json_query::json_path::FilterFn>& out) {
+        if constexpr (ExistencePatternDef<ExistenceFilterType::ArraySlice>::enabled) {
+            if (auto m = ctre::match<ExistencePatternDef<ExistenceFilterType::ArraySlice>::pattern>(to_sv(input))) {
+                QString startStr = to_qstr(m.template get<1>().to_view());
+                QString endStr = to_qstr(m.template get<2>().to_view());
+                int start = startStr.isEmpty() ? -1 : startStr.toInt();
+                int end = endStr.isEmpty() ? -1 : endStr.toInt();
+                Builder b{out};
+                return b.add([start, end](const QJsonValue& j) -> bool {
+                    const auto arr = j.toArray();
+                    int actualStart = (start == -1) ? 0 : start;
+                    int actualEnd = (end == -1) ? arr.size() : end;
+                    return actualStart < arr.size() && actualEnd > actualStart;
+                }, QString("@[%1:%2]").arg(start).arg(end));
+            }
+        }
+        return std::nullopt;
+    }
+};
+
+template<>
+struct ExistenceTokenFactory<ExistenceFilterType::NegArraySlice> {
+    static std::optional<json_query::json_path::Token> create(const QString& input, QVector<json_query::json_path::FilterFn>& out) {
+        if constexpr (ExistencePatternDef<ExistenceFilterType::NegArraySlice>::enabled) {
+            if (auto m = ctre::match<ExistencePatternDef<ExistenceFilterType::NegArraySlice>::pattern>(to_sv(input))) {
+                QString startStr = to_qstr(m.template get<1>().to_view());
+                QString endStr = to_qstr(m.template get<2>().to_view());
+                int start = startStr.isEmpty() ? -1 : startStr.toInt();
+                int end = endStr.isEmpty() ? -1 : endStr.toInt();
+                Builder b{out};
+                return b.add([start, end](const QJsonValue& j) -> bool {
+                    const auto arr = j.toArray();
+                    int actualStart = (start == -1) ? 0 : start;
+                    int actualEnd = (end == -1) ? arr.size() : end;
+                    return actualStart >= arr.size() || actualEnd <= actualStart;
+                }, QString("!@[%1:%2]").arg(start).arg(end));
+            }
+        }
+        return std::nullopt;
+    }
+};
+
+template<>
+struct ExistenceTokenFactory<ExistenceFilterType::MultiSelector> {
+    static std::optional<json_query::json_path::Token> create(const QString& input, QVector<json_query::json_path::FilterFn>& out) {
+        if constexpr (ExistencePatternDef<ExistenceFilterType::MultiSelector>::enabled) {
+            if (auto m = ctre::match<ExistencePatternDef<ExistenceFilterType::MultiSelector>::pattern>(to_sv(input))) {
+                QString selectorsStr = to_qstr(m.template get<1>().to_view());
+                Builder b{out};
+                return b.add([selectorsStr](const QJsonValue& j) -> bool {
+                    QStringList selectors = selectorsStr.split(',');
+                    for (const QString& selectorRaw : selectors) {
+                        QString selector = selectorRaw.trimmed();
+                        
+                        if ((selector.startsWith('"') && selector.endsWith('"')) ||
+                            (selector.startsWith('\'') && selector.endsWith('\''))) {
+                            QString key = selector.mid(1, selector.size()-2);
+                            if (j.isObject() && j.toObject().contains(key)) {
+                                return true;
+                            }
+                        } else {
+                            bool ok;
+                            int index = selector.toInt(&ok);
+                            if (ok && j.isArray()) {
+                                const auto arr = j.toArray();
+                                if (index >= 0 && index < arr.size()) {
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                    return false;
+                }, QString("@[%1]").arg(selectorsStr));
+            }
+        }
+        return std::nullopt;
+    }
+};
+
+template<>
+struct ExistenceTokenFactory<ExistenceFilterType::NegMultiSelector> {
+    static std::optional<json_query::json_path::Token> create(const QString& input, QVector<json_query::json_path::FilterFn>& out) {
+        if constexpr (ExistencePatternDef<ExistenceFilterType::NegMultiSelector>::enabled) {
+            if (auto m = ctre::match<ExistencePatternDef<ExistenceFilterType::NegMultiSelector>::pattern>(to_sv(input))) {
+                QString selectorsStr = to_qstr(m.template get<1>().to_view());
+                Builder b{out};
+                return b.add([selectorsStr](const QJsonValue& j) -> bool {
+                    QStringList selectors = selectorsStr.split(',');
+                    for (const QString& selectorRaw : selectors) {
+                        QString selector = selectorRaw.trimmed();
+                        
+                        if ((selector.startsWith('"') && selector.endsWith('"')) ||
+                            (selector.startsWith('\'') && selector.endsWith('\''))) {
+                            QString key = selector.mid(1, selector.size()-2);
+                            if (j.isObject() && j.toObject().contains(key)) {
+                                return false; // Found one, so negation is false
+                            }
+                        } else {
+                            bool ok;
+                            int index = selector.toInt(&ok);
+                            if (ok && j.isArray()) {
+                                const auto arr = j.toArray();
+                                if (index >= 0 && index < arr.size()) {
+                                    return false; // Found one, so negation is false
+                                }
+                            }
+                        }
+                    }
+                    return true; // None found, so negation is true
+                }, QString("!@[%1]").arg(selectorsStr));
+            }
+        }
+        return std::nullopt;
+    }
+};
+
+template<>
+struct ExistenceTokenFactory<ExistenceFilterType::NestedFilter> {
+    static std::optional<json_query::json_path::Token> create(const QString& input, QVector<json_query::json_path::FilterFn>& out) {
+        if constexpr (ExistencePatternDef<ExistenceFilterType::NestedFilter>::enabled) {
+            if (auto m = ctre::match<ExistencePatternDef<ExistenceFilterType::NestedFilter>::pattern>(to_sv(input))) {
+                QString filterExpr = to_qstr(m.template get<1>().to_view());
+                Builder b{out};
+                return b.add([filterExpr](const QJsonValue& j) -> bool {
+                    if (!j.isArray()) return false;
+                    
+                    const auto arr = j.toArray();
+                    QVector<json_query::json_path::FilterFn> innerFilterFns;
+                    auto innerToken = json_query::json_path::compileFilter(filterExpr, innerFilterFns);
+                    if (!innerToken || innerFilterFns.isEmpty()) return false;
+                    
+                    json_query::json_path::FilterFn innerFilterFn = innerFilterFns.last();
+                    for (const auto& element : arr) {
+                        if (innerFilterFn(element)) return true;
+                    }
+                    return false;
+                }, QString("@[?%1]").arg(filterExpr));
+            }
+        }
+        return std::nullopt;
+    }
+};
+
+template<>
+struct ExistenceTokenFactory<ExistenceFilterType::NegNestedFilter> {
+    static std::optional<json_query::json_path::Token> create(const QString& input, QVector<json_query::json_path::FilterFn>& out) {
+        if constexpr (ExistencePatternDef<ExistenceFilterType::NegNestedFilter>::enabled) {
+            if (auto m = ctre::match<ExistencePatternDef<ExistenceFilterType::NegNestedFilter>::pattern>(to_sv(input))) {
+                QString filterExpr = to_qstr(m.template get<1>().to_view());
+                Builder b{out};
+                return b.add([filterExpr](const QJsonValue& j) -> bool {
+                    if (!j.isArray()) return true; // Non-arrays don't match, so negation is true
+                    
+                    const auto arr = j.toArray();
+                    QVector<json_query::json_path::FilterFn> innerFilterFns;
+                    auto innerToken = json_query::json_path::compileFilter(filterExpr, innerFilterFns);
+                    if (!innerToken || innerFilterFns.isEmpty()) return true;
+                    
+                    json_query::json_path::FilterFn innerFilterFn = innerFilterFns.last();
+                    for (const auto& element : arr) {
+                        if (innerFilterFn(element)) return false; // Found match, so negation is false
+                    }
+                    return true; // No matches, so negation is true
+                }, QString("!@[?%1]").arg(filterExpr));
+            }
+        }
+        return std::nullopt;
+    }
+};
+
+// TableGen-inspired dispatch table with compile-time priority ordering
+template<ExistenceFilterType... Types>
+struct ExistenceDispatchTable {
+    static std::optional<json_query::json_path::Token> dispatch(const QString& input, QVector<json_query::json_path::FilterFn>& out) {
+        std::optional<json_query::json_path::Token> result;
+        ((result = ExistenceTokenFactory<Types>::create(input, out)) || ...);
+        return result;
+    }
+};
+
+// Dispatch with priority order: negated patterns first (more specific), then regular patterns
+using ExistenceDispatcher = ExistenceDispatchTable<
+    ExistenceFilterType::NegPropertyDot,
+    ExistenceFilterType::NegPropertyBracket,
+    ExistenceFilterType::NegArraySlice,
+    ExistenceFilterType::NegMultiSelector,
+    ExistenceFilterType::NegNestedFilter,
+    ExistenceFilterType::PropertyDot,
+    ExistenceFilterType::PropertyBracket,
+    ExistenceFilterType::ArraySlice,
+    ExistenceFilterType::MultiSelector,
+    ExistenceFilterType::NestedFilter
+>;
+
 // Individual parser function implementations (non-template)
 // Note: parseOr, parseAnd, parseIn, parseCompare, parseRegex are implemented in JSONPathFilterCore.cpp
 
 std::optional<json_query::json_path::Token> parseExists(QString s, QVector<json_query::json_path::FilterFn>& out)
 {
-    // Existence patterns for various JSONPath expressions
-    constexpr auto dotPat = ctll::fixed_string{R"(^@\.([\w$]+)$)"};
-    constexpr auto brkPat = ctll::fixed_string{R"(^@\[['\"]([^'"]+)['\"]\]$)"};
-    constexpr auto rootPat = ctll::fixed_string{R"(^@$)"};
-    constexpr auto wildcardPat = ctll::fixed_string{R"(^@\.\*$)"};
+    // Execute TableGen-style dispatch
+    if (auto result = ExistenceDispatcher::dispatch(s, out)) {
+        return result;
+    }
     
-    // Root reference pattern for $[?$] - checks if root document exists
-    constexpr auto rootRefPat = ctll::fixed_string{R"(^\$$)"};
-    
-    // Negated patterns
-    constexpr auto negRootPat = ctll::fixed_string{R"(^!@$)"};
-    constexpr auto negWildcardPat = ctll::fixed_string{R"(^!@\.\*$)"};
-    constexpr auto negDotPat = ctll::fixed_string{R"(^!@\.([\w$]+)$)"};
-    constexpr auto negBrkPat = ctll::fixed_string{R"(^!@\[['\"]([^'"]+)['\"]\]$)"};
-    constexpr auto negRootRefPat = ctll::fixed_string{R"(^!\$$)"};
-    
-    // Array slice patterns for existence tests
-    constexpr auto arraySlicePat = ctll::fixed_string{R"(^@\[(-?\d+):(-?\d+)\]$)"};
-    constexpr auto negArraySlicePat = ctll::fixed_string{R"(^!@\[(-?\d+):(-?\d+)\]$)"};
-    
-    // Multi-selector existence patterns for tests like @[0, 0, 'a'] or @[1, 'key']
-    // Exclude nested filter patterns that start with ? (those should be handled by nested filter patterns)
-    constexpr auto multiSelectorPat = ctll::fixed_string{R"(^@\[([^?:][^:]*)\]$)"};
-    constexpr auto negMultiSelectorPat = ctll::fixed_string{R"(^!@\[([^?:][^:]*)\]$)"};
-    
-    // Nested filter pattern for tests like @[?@>1] - apply filter to current array/object
-    constexpr auto nestedFilterPat = ctll::fixed_string{R"(^@\[\?(.+)\]$)"};
-    constexpr auto negNestedFilterPat = ctll::fixed_string{R"(^!@\[\?(.+)\]$)"};
-    
-    // Function to create existence test token
-    auto makeExistenceToken = [&](const QString& prop) -> json_query::json_path::Token {
-        Builder b{out};
-        return b.add([prop](const QJsonValue& j) -> bool {
-            // RFC 9535: existence filters check for property presence, not truthiness
-            return j.toObject().contains(prop);
-        }, QString("@.%1").arg(prop));
-    };
-
-    auto makeArrayIndexToken = [&](int index) -> json_query::json_path::Token {
-        Builder b{out};
-        return b.add([index](const QJsonValue& j) -> bool {
-            // RFC 9535: existence filters check for element presence, not truthiness
-            const auto arr = j.toArray();
-            return index >= 0 && index < arr.size();
-        }, QString("@[%1]").arg(index));
-    };
-
-    auto makeArraySliceToken = [&](int start, int end) -> json_query::json_path::Token {
-        Builder b{out};
-        return b.add([start, end](const QJsonValue& j) -> bool {
-            // RFC 9535: existence filters check for element presence, not truthiness
-            const auto arr = j.toArray();
-            int actualStart = (start == -1) ? 0 : start;
-            int actualEnd = (end == -1) ? arr.size() : end;
-            return actualStart < arr.size() && actualEnd > actualStart;
-        }, QString("@[%1:%2]").arg(start).arg(end));
-    };
-
-    auto makeRootToken = [&]() -> json_query::json_path::Token {
+    // Handle special cases that don't fit the pattern-based approach
+    if (s == "@.*") {
         Builder b{out};
         return b.add([](const QJsonValue& j) -> bool {
-            // The root always exists unless it's explicitly undefined
-            return !j.isUndefined();
-        }, QString("$"));
-    };
-
-    auto makeWildcardToken = [&]() -> json_query::json_path::Token {
-        Builder b{out};
-        return b.add([](const QJsonValue& j) -> bool {
-            // RFC 9535: wildcard existence filters check for element/property presence
-            if (j.isObject()) {
-                const auto obj = j.toObject();
-                // If object has any properties, then @.* is true
-                return !obj.isEmpty();
-            } else if (j.isArray()) {
-                const auto arr = j.toArray();
-                // If array has any elements, then @.* is true
-                return !arr.isEmpty();
-            }
-            return false; // Primitives have no properties or elements
+            if (j.isObject()) return !j.toObject().isEmpty();
+            if (j.isArray()) return !j.toArray().isEmpty();
+            return false;
         }, QString("@.*"));
-    };
-
-    auto makeNegatedToken = [&](const QString& prop) -> json_query::json_path::Token {
-        Builder b{out};
-        return b.add([prop](const QJsonValue& j) -> bool {
-            // RFC 9535: negated existence filters check for property absence
-            return !j.toObject().contains(prop);
-        }, QString("!@.%1").arg(prop));
-    };
-
-    auto makeNegatedArrayIndexToken = [&](int index) -> json_query::json_path::Token {
-        Builder b{out};
-        return b.add([index](const QJsonValue& j) -> bool {
-            // RFC 9535: negated existence filters check for element absence
-            const auto arr = j.toArray();
-            return index < 0 || index >= arr.size();
-        }, QString("!@[%1]").arg(index));
-    };
-
-    auto makeNegatedArraySliceToken = [&](int start, int end) -> json_query::json_path::Token {
-        Builder b{out};
-        return b.add([start, end](const QJsonValue& j) -> bool {
-            // RFC 9535: negated existence filters check for element absence
-            const auto arr = j.toArray();
-            int actualStart = (start == -1) ? 0 : start;
-            int actualEnd = (end == -1) ? arr.size() : end;
-            return actualStart >= arr.size() || actualEnd <= actualStart;
-        }, QString("!@[%1:%2]").arg(start).arg(end));
-    };
-
-    auto makeNegatedRootToken = [&]() -> json_query::json_path::Token {
-        Builder b{out};
-        return b.add([](const QJsonValue& j) -> bool {
-            // The root is absent only if it's explicitly undefined
-            return j.isUndefined();
-        }, QString("!$"));
-    };
-
-    auto makeNegatedWildcardToken = [&]() -> json_query::json_path::Token {
-        Builder b{out};
-        return b.add([](const QJsonValue& j) -> bool {
-            // RFC 9535: negated wildcard existence filters check for element/property absence
-            if (j.isObject()) {
-                const auto obj = j.toObject();
-                // If object has no properties, then !@.* is true
-                return obj.isEmpty();
-            } else if (j.isArray()) {
-                const auto arr = j.toArray();
-                // If array has no elements, then !@.* is true
-                return arr.isEmpty();
-            }
-            return true; // Primitives have no properties or elements
-        }, QString("!@.*"));
-    };
-
-    auto makeMultiSelectorToken = [&](const QString& selectorsStr) -> json_query::json_path::Token {
-        Builder b{out};
-        return b.add([selectorsStr](const QJsonValue& j) -> bool {
-            // Multi-selector existence test: check if any of the selectors can be applied to j
-            // Parse the selectors string and check each one
-            QStringList selectors = selectorsStr.split(',');
-            for (const QString& selectorRaw : selectors) {
-                QString selector = selectorRaw.trimmed();
-                bool exists = false;
-                
-                // Check if it's a quoted string selector
-                if ((selector.startsWith('"') && selector.endsWith('"')) || 
-                    (selector.startsWith('\'') && selector.endsWith('\''))) {
-                    QString key = selector.mid(1, selector.size()-2);
-                    if (j.isObject()) {
-                        const auto obj = j.toObject();
-                        exists = obj.contains(key);
-                    }
-                }
-                // Check if it's a numeric index selector
-                else {
-                    bool ok;
-                    int index = selector.toInt(&ok);
-                    if (ok && j.isArray()) {
-                        const auto arr = j.toArray();
-                        exists = (index >= 0 && index < arr.size()) || 
-                                (index < 0 && (-index) <= arr.size());
-                    }
-                }
-                
-                if (exists) return true; // If any selector exists, return true
-            }
-            return false; // None of the selectors exist
-        }, QString("@[%1]").arg(selectorsStr));
-    };
-
-    auto makeNegatedMultiSelectorToken = [&](const QString& selectorsStr) -> json_query::json_path::Token {
-        Builder b{out};
-        return b.add([selectorsStr](const QJsonValue& j) -> bool {
-            // Negated multi-selector existence test: check if none of the selectors can be applied to j
-            QStringList selectors = selectorsStr.split(',');
-            for (const QString& selectorRaw : selectors) {
-                QString selector = selectorRaw.trimmed();
-                bool exists = false;
-                
-                // Check if it's a quoted string selector
-                if ((selector.startsWith('"') && selector.endsWith('"')) || 
-                    (selector.startsWith('\'') && selector.endsWith('\''))) {
-                    QString key = selector.mid(1, selector.size()-2);
-                    if (j.isObject()) {
-                        const auto obj = j.toObject();
-                        exists = obj.contains(key);
-                    }
-                }
-                // Check if it's a numeric index selector
-                else {
-                    bool ok;
-                    int index = selector.toInt(&ok);
-                    if (ok && j.isArray()) {
-                        const auto arr = j.toArray();
-                        exists = (index >= 0 && index < arr.size()) || 
-                                (index < 0 && (-index) <= arr.size());
-                    }
-                }
-                
-                if (exists) return false; // If any selector exists, negation is false
-            }
-            return true; // None of the selectors exist, so negation is true
-        }, QString("!@[%1]").arg(selectorsStr));
-    };
-
-    auto makeNestedFilterToken = [&](const QString& filterExpr) -> json_query::json_path::Token {
-        Builder b{out};
-        return b.add([filterExpr](const QJsonValue& j) -> bool {
-            if (!j.isArray()) {
-                return false; // Nested filters only work on arrays
-            }
-            
-            const auto arr = j.toArray();
-            
-            // Compile the inner filter expression
-            QVector<json_query::json_path::FilterFn> innerFilterFns;
-            auto innerToken = json_query::json_path::compileFilter(filterExpr, innerFilterFns);
-            if (!innerToken || innerFilterFns.isEmpty()) {
-                return false; // Failed to compile inner filter
-            }
-            
-            json_query::json_path::FilterFn innerFilterFn = innerFilterFns.last();
-            
-            // Apply the inner filter to each array element
-            for (int i = 0; i < arr.size(); ++i) {
-                const auto& element = arr[i];
-                bool matches = innerFilterFn(element);
-                if (matches) {
-                    return true; // Found at least one matching element
-                }
-            }
-            return false; // No elements matched the inner filter
-        }, QString("@[?%1]").arg(filterExpr));
-    };
-
-    auto makeNegatedNestedFilterToken = [&](const QString& filterExpr) -> json_query::json_path::Token {
-        Builder b{out};
-        return b.add([filterExpr](const QJsonValue& j) -> bool {
-            // Negated nested filter existence test: compile and apply the inner filter to array elements
-            if (!j.isArray()) {
-                return true; // Non-arrays don't match nested filters, so negation is true
-            }
-            
-            const auto arr = j.toArray();
-            
-            // Compile the inner filter expression
-            QVector<json_query::json_path::FilterFn> innerFilterFns;
-            auto innerToken = json_query::json_path::compileFilter(filterExpr, innerFilterFns);
-            if (!innerToken || innerFilterFns.isEmpty()) {
-                return true; // Failed to compile inner filter, so negation is true
-            }
-            
-            json_query::json_path::FilterFn innerFilterFn = innerFilterFns.last();
-            
-            // Apply the inner filter to each array element
-            for (int i = 0; i < arr.size(); ++i) {
-                const auto& element = arr[i];
-                bool matches = innerFilterFn(element);
-                if (matches) {
-                    return false; // Found a matching element, so negation is false
-                }
-            }
-            return true; // No elements matched the inner filter, so negation is true
-        }, QString("!@[?%1]").arg(filterExpr));
-    };
-
-    // Check negated patterns first (more specific)
-    if (auto m = ctre::match<negRootPat>(to_sv(s)))
-        return makeNegatedRootToken();
-    if (auto m = ctre::match<negWildcardPat>(to_sv(s)))
-        return makeNegatedWildcardToken();
-    if (auto m = ctre::match<negArraySlicePat>(to_sv(s))) {
-        QString startStr = to_qstr(m.template get<1>().to_view());
-        QString endStr = to_qstr(m.template get<2>().to_view());
-        int start = startStr.isEmpty() ? 0 : startStr.toInt();
-        int end = endStr.isEmpty() ? -1 : endStr.toInt();
-        return makeNegatedArraySliceToken(start, end);
     }
-    if (auto m = ctre::match<negDotPat>(to_sv(s)))
-        return makeNegatedToken(to_qstr(m.template get<1>().to_view()));
-    if (auto m = ctre::match<negBrkPat>(to_sv(s)))
-        return makeNegatedToken(to_qstr(m.template get<1>().to_view()));
-    if (auto m = ctre::match<negRootRefPat>(to_sv(s)))
-        return makeNegatedRootToken();
-
-    // Root reference existence filter: $[?$] - always true (root document always exists)
-    if (ctre::match<rootRefPat>(to_sv(s))) {
+    if (s == "!@.*") {
         Builder b{out};
         return b.add([](const QJsonValue& j) -> bool {
-            // Root document always exists
+            if (j.isObject()) return j.toObject().isEmpty();
+            if (j.isArray()) return j.toArray().isEmpty();
             return true;
-        }, QString("$"));
+        }, QString("!@.*"));
     }
-
-    // Check for root existence filter
-    if (auto m = ctre::match<rootPat>(to_sv(s)))
-        return makeRootToken();
-    
-    // Check for wildcard existence filter
-    if (auto m = ctre::match<wildcardPat>(to_sv(s)))
-        return makeWildcardToken();
-    
-    // Check for array access patterns
-    if (auto m = ctre::match<arraySlicePat>(to_sv(s))) {
-        QString startStr = to_qstr(m.template get<1>().to_view());
-        QString endStr = to_qstr(m.template get<2>().to_view());
-        int start = startStr.isEmpty() ? 0 : startStr.toInt();
-        int end = endStr.isEmpty() ? -1 : endStr.toInt();
-        return makeArraySliceToken(start, end);
+    if (s == "@" || s == "$") {
+        Builder b{out};
+        return b.add([](const QJsonValue& j) -> bool {
+            return !j.isUndefined();
+        }, s);
+    }
+    if (s == "!@" || s == "!$") {
+        Builder b{out};
+        return b.add([](const QJsonValue& j) -> bool {
+            return j.isUndefined();
+        }, s);
     }
     
-    // RFC 9535: Support existence filters like $[?@.a] but reject incomplete predicates
-    // The distinction is context-dependent and handled by the parsing order
-    
-    if (auto m = ctre::match<dotPat>(to_sv(s)))
-        return makeExistenceToken(to_qstr(m.template get<1>().to_view()));
-    if (auto m = ctre::match<brkPat>(to_sv(s)))
-        return makeExistenceToken(to_qstr(m.template get<1>().to_view()));
-    
-    // Multi-selector existence patterns
-    if (auto m = ctre::match<multiSelectorPat>(to_sv(s))) {
-        QString selectorsStr = to_qstr(m.template get<1>().to_view());
-        return makeMultiSelectorToken(selectorsStr);
-    }
-    if (auto m = ctre::match<negMultiSelectorPat>(to_sv(s))) {
-        QString selectorsStr = to_qstr(m.template get<1>().to_view());
-        return makeNegatedMultiSelectorToken(selectorsStr);
-    }
-
-    if (auto m = ctre::match<nestedFilterPat>(to_sv(s))) {
-        QString filterExpr = to_qstr(m.template get<1>().to_view());
-        return makeNestedFilterToken(filterExpr);
-    }
-    if (auto m = ctre::match<negNestedFilterPat>(to_sv(s))) {
-        QString filterExpr = to_qstr(m.template get<1>().to_view());
-        return makeNegatedNestedFilterToken(filterExpr);
-    }
     return std::nullopt;
 }
 
