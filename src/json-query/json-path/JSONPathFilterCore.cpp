@@ -1386,48 +1386,141 @@ std::optional<Token> parseEmbeddedFunction(QString s)
             return std::nullopt; // No function calls found
         }
         
+        // Check if any function call needs root context (value($...))
+        bool needsRootContext = false;
+        if (leftHasFunc && left.contains("value($")) {
+            qCDebug(jsonPathLog) << "Left side contains value($...): " << left;
+            needsRootContext = true;
+        }
+        if (rightHasFunc && right.contains("value($")) {
+            qCDebug(jsonPathLog) << "Right side contains value($...): " << right;
+            needsRootContext = true;
+        }
+        
+        qCDebug(jsonPathLog) << "needsRootContext=" << needsRootContext << "left=" << left << "right=" << right;
+        
         // Create embedded filter for function call comparison
         Token result;
         result.kind = Token::Kind::Filter;
+        result.index = 0;
+        result.hash = 0;
         result.key = s;
         
-        // Embed the function call comparison logic
-        result.embedFilter([left, op, right, leftHasFunc, rightHasFunc](const QJsonValue& j) -> bool {
-            QJsonValue leftVal, rightVal;
+        if (needsRootContext) {
+            // Use context filter for root context evaluation
+            QString expr = s;
             
-            // Evaluate left side
-            if (leftHasFunc) {
-                leftVal = evaluateFunction(left, j);
-            } else if (left.startsWith("@.")) {
-                // Property access - RFC 9535 "nothing" semantics
-                QString prop = left.mid(2);
-                QJsonValue val = j.toObject().value(prop);
-                leftVal = val.isUndefined() ? QJsonValue(0) : val; // Undefined becomes 0
-            } else {
-                leftVal = parseJsonLiteral(left);
-            }
+            result.embedContextFilter([expr](const QJsonValue& j, const QJsonValue& root) -> bool {
+                // Re-parse the expression at runtime to avoid capture issues
+                static const ctll::fixed_string<35> funcCompPat = "^(.*?)\\s*(==|!=|<|>|<=|>=)\\s*(.*?)$";
+                auto m = ctre::match<funcCompPat>(expr.toStdString());
+                if (!m) return false;
+                
+                QString left = QString::fromStdString(std::string(m.get<1>()));
+                QString op = QString::fromStdString(std::string(m.get<2>()));
+                QString right = QString::fromStdString(std::string(m.get<3>()));
+                
+                bool leftHasFunc = left.contains(QRegularExpression("\\b(length|count|match|search|value)\\s*\\("));
+                bool rightHasFunc = right.contains(QRegularExpression("\\b(length|count|match|search|value)\\s*\\("));
+                
+                QJsonValue leftVal, rightVal;
+                
+                // Evaluate left side
+                if (leftHasFunc) {
+                    // For value($...) functions, use root context
+                    if (left.contains("value($")) {
+                        leftVal = evaluateFunction(left, root);
+                    } else {
+                        leftVal = evaluateFunction(left, j);
+                    }
+                } else if (left.startsWith("@.")) {
+                    // Property access - RFC 9535 "nothing" semantics
+                    QString prop = left.mid(2);
+                    QJsonValue val = j.toObject().value(prop);
+                    leftVal = val.isUndefined() ? QJsonValue(0) : val; // Undefined becomes 0
+                } else {
+                    leftVal = parseJsonLiteral(left);
+                }
+                
+                // Evaluate right side  
+                if (rightHasFunc) {
+                    // For value($...) functions, use root context
+                    if (right.contains("value($")) {
+                        rightVal = evaluateFunction(right, root);
+                    } else {
+                        rightVal = evaluateFunction(right, j);
+                    }
+                } else if (right.startsWith("@.")) {
+                    // Property access - RFC 9535 "nothing" semantics
+                    QString prop = right.mid(2);
+                    QJsonValue val = j.toObject().value(prop);
+                    rightVal = val.isUndefined() ? QJsonValue(0) : val; // Undefined becomes 0
+                } else {
+                    rightVal = parseJsonLiteral(right);
+                }
+                
+                // Perform comparison
+                if (op == "==") return leftVal == rightVal;
+                if (op == "!=") return leftVal != rightVal;
+                if (op == "<") return compareValues(leftVal, rightVal) < 0;
+                if (op == ">") return compareValues(leftVal, rightVal) > 0;
+                if (op == "<=") return compareValues(leftVal, rightVal) <= 0;
+                if (op == ">=") return compareValues(leftVal, rightVal) >= 0;
+                return false;
+            });
+        } else {
+            // Use regular filter for non-root context evaluation
+            QString expr = s;
             
-            // Evaluate right side  
-            if (rightHasFunc) {
-                rightVal = evaluateFunction(right, j);
-            } else if (right.startsWith("@.")) {
-                // Property access - RFC 9535 "nothing" semantics
-                QString prop = right.mid(2);
-                QJsonValue val = j.toObject().value(prop);
-                rightVal = val.isUndefined() ? QJsonValue(0) : val; // Undefined becomes 0
-            } else {
-                rightVal = parseJsonLiteral(right);
-            }
-            
-            // Perform comparison
-            if (op == "==") return leftVal == rightVal;
-            if (op == "!=") return leftVal != rightVal;
-            if (op == "<") return compareValues(leftVal, rightVal) < 0;
-            if (op == ">") return compareValues(leftVal, rightVal) > 0;
-            if (op == "<=") return compareValues(leftVal, rightVal) <= 0;
-            if (op == ">=") return compareValues(leftVal, rightVal) >= 0;
-            return false;
-        });
+            result.embedFilter([expr](const QJsonValue& j) -> bool {
+                // Re-parse the expression at runtime to avoid capture issues
+                static const ctll::fixed_string<35> funcCompPat = "^(.*?)\\s*(==|!=|<|>|<=|>=)\\s*(.*?)$";
+                auto m = ctre::match<funcCompPat>(expr.toStdString());
+                if (!m) return false;
+                
+                QString left = QString::fromStdString(std::string(m.get<1>()));
+                QString op = QString::fromStdString(std::string(m.get<2>()));
+                QString right = QString::fromStdString(std::string(m.get<3>()));
+                
+                bool leftHasFunc = left.contains(QRegularExpression("\\b(length|count|match|search|value)\\s*\\("));
+                bool rightHasFunc = right.contains(QRegularExpression("\\b(length|count|match|search|value)\\s*\\("));
+                
+                QJsonValue leftVal, rightVal;
+                
+                // Evaluate left side
+                if (leftHasFunc) {
+                    leftVal = evaluateFunction(left, j);
+                } else if (left.startsWith("@.")) {
+                    // Property access - RFC 9535 "nothing" semantics
+                    QString prop = left.mid(2);
+                    QJsonValue val = j.toObject().value(prop);
+                    leftVal = val.isUndefined() ? QJsonValue(0) : val; // Undefined becomes 0
+                } else {
+                    leftVal = parseJsonLiteral(left);
+                }
+                
+                // Evaluate right side  
+                if (rightHasFunc) {
+                    rightVal = evaluateFunction(right, j);
+                } else if (right.startsWith("@.")) {
+                    // Property access - RFC 9535 "nothing" semantics
+                    QString prop = right.mid(2);
+                    QJsonValue val = j.toObject().value(prop);
+                    rightVal = val.isUndefined() ? QJsonValue(0) : val; // Undefined becomes 0
+                } else {
+                    rightVal = parseJsonLiteral(right);
+                }
+                
+                // Perform comparison
+                if (op == "==") return leftVal == rightVal;
+                if (op == "!=") return leftVal != rightVal;
+                if (op == "<") return compareValues(leftVal, rightVal) < 0;
+                if (op == ">") return compareValues(leftVal, rightVal) > 0;
+                if (op == "<=") return compareValues(leftVal, rightVal) <= 0;
+                if (op == ">=") return compareValues(leftVal, rightVal) >= 0;
+                return false;
+            });
+        }
         
         return result;
     }

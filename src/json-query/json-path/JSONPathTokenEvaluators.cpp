@@ -118,9 +118,12 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::Filter>(const PathEvalCtx
     if (tk.hasEmbeddedFilter()) {
         if (v.isArray()) {
             const QJsonArray arr = v.toArray();
-            auto cursor = ContainerCursor::array(arr);
-            for (const auto& item : cursor) {
-                bool pass = tk.evaluateEmbeddedFilter(item);
+            for (const auto& item : arr) {
+                // Check if this filter needs root context (contains value($...))
+                bool needsRootContext = tk.key.contains("value($");
+                bool pass = needsRootContext ? 
+                    tk.evaluateEmbeddedContextFilter(item, ctx.rootDocument) : 
+                    tk.evaluateEmbeddedFilter(item);
                 if (pass) {
                     out.append(item);
                 }
@@ -129,7 +132,11 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::Filter>(const PathEvalCtx
             const QJsonObject obj = v.toObject();
             auto cursor = ContainerCursor::object(obj);
             for (const auto& val : cursor) {
-                bool pass = tk.evaluateEmbeddedFilter(val);
+                // Check if this filter needs root context (contains value($...))
+                bool needsRootContext = tk.key.contains("value($");
+                bool pass = needsRootContext ? 
+                    tk.evaluateEmbeddedContextFilter(val, ctx.rootDocument) : 
+                    tk.evaluateEmbeddedFilter(val);
                 if (pass) {
                     out.append(val);
                 }

@@ -62,7 +62,13 @@ QJsonValue evaluateFunction(const QString& funcCall, const QJsonValue& context)
                 return QJsonValue(); // Return null for evaluation errors
             }
             
-            return QJsonValue(evalResult->size());
+            // RFC 9535 "value" function semantics: return the first value if any, otherwise "nothing"
+            if (evalResult->isEmpty()) {
+                return QJsonValue(); // Return null for no results (RFC 9535 "nothing")
+            }
+            
+            // Return the first value found
+            return evalResult->first();
         } else if (args.startsWith("@.")) {
             QString prop = args.mid(2);
             QJsonValue val = context.toObject().value(prop);

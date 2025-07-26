@@ -678,7 +678,8 @@ toString(Error e) noexcept
 // Compiled result structure containing tokens and filters
 struct Compiled { 
     QVector<Token> tokens; 
-    // Legacy filter storage removed - now using embedded filters only
+    QVector<FilterFn> filters; // Legacy filter storage
+    QVector<ContextFilterFn> contextFilters; // Legacy context filter storage
 };
 
 // ──────────────────────────────────────────────────────────────────────

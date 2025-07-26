@@ -341,8 +341,6 @@ std::optional<Token> parseEmbeddedAbsolutePathContext(QString s)
 {
     qCDebug(jsonPathLog) << "parseEmbeddedAbsolutePathContext() s=" << s;
     
-    // This will be implemented with embedded context filters
-    // For now, return nullopt to maintain build compatibility
     return std::nullopt;
 }
 
