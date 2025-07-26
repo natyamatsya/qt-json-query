@@ -109,258 +109,588 @@ std::optional<Token> parseIn(QString s, QVector<FilterFn>& out)
     return std::nullopt;
 }
 
+// ============================================================================
+// LLVM TableGen-Inspired Comparison Filter Architecture
+// ============================================================================
+
+// Enum representing all comparison filter types with priority ordering
+enum class ComparisonFilterType {
+    // Null comparisons (highest priority - most specific)
+    NullPropertyDot,      // @.prop == null
+    NullPropertyBracket,  // @["key"] == null  
+    NullArrayIndex,       // @[index] == null
+    
+    // Self comparisons (high priority)
+    DirectSelf,           // @ == @
+    SelfPropertyDot,      // @.prop == @
+    SelfPropertyBracket,  // @["key"] == @
+    SelfArrayIndex,       // @[index] == @
+    SelfValue,            // @ == value
+    
+    // Property-to-property comparisons (medium priority)
+    PropertyToProperty,   // @.a == @.b
+    PropertyToArray,      // @.prop == @.list[9]
+    ArrayToProperty,      // @.list[9] == @.prop
+    
+    // Basic property comparisons (lowest priority - most general)
+    BasicPropertyDot,     // @.prop == value
+    BasicPropertyBracket, // @["key"] == value
+    BasicArrayIndex       // @[index] == value
+};
+
+// Pattern definition template specializations (TableGen-style record definitions)
+template<ComparisonFilterType Type>
+struct ComparisonPatternDef {
+    static constexpr bool enabled = false;
+    static constexpr ctll::fixed_string pattern{""};
+};
+
+// Null comparison patterns
+template<>
+struct ComparisonPatternDef<ComparisonFilterType::NullPropertyDot> {
+    static constexpr bool enabled = true;
+    static constexpr ctll::fixed_string pattern{R"(@\.([\w$]+)\s*(==|!=)\s*null)"};
+};
+
+template<>
+struct ComparisonPatternDef<ComparisonFilterType::NullPropertyBracket> {
+    static constexpr bool enabled = true;
+    static constexpr ctll::fixed_string pattern{R"(@\[['\"]([^'"]+)['\"]\]\s*(==|!=)\s*null)"};
+};
+
+template<>
+struct ComparisonPatternDef<ComparisonFilterType::NullArrayIndex> {
+    static constexpr bool enabled = true;
+    static constexpr ctll::fixed_string pattern{R"(@\[(-?\d+)\]\s*(==|!=)\s*null)"};
+};
+
+// Self comparison patterns
+template<>
+struct ComparisonPatternDef<ComparisonFilterType::DirectSelf> {
+    static constexpr bool enabled = true;
+    static constexpr ctll::fixed_string pattern{R"(^@\s*(==|!=|>=|<=|>|<)\s*@$)"};
+};
+
+template<>
+struct ComparisonPatternDef<ComparisonFilterType::SelfPropertyDot> {
+    static constexpr bool enabled = true;
+    static constexpr ctll::fixed_string pattern{R"(@\.([\w$]+)\s*(==|!=|>=|<=|>|<)\s*@)"};
+};
+
+template<>
+struct ComparisonPatternDef<ComparisonFilterType::SelfPropertyBracket> {
+    static constexpr bool enabled = true;
+    static constexpr ctll::fixed_string pattern{R"(@\[['\"]([^'"]+)['\"]\]\s*(==|!=|>=|<=|>|<)\s*@)"};
+};
+
+template<>
+struct ComparisonPatternDef<ComparisonFilterType::SelfArrayIndex> {
+    static constexpr bool enabled = true;
+    static constexpr ctll::fixed_string pattern{R"(@\[(-?\d+)\]\s*(==|!=|>=|<=|>|<)\s*@)"};
+};
+
+template<>
+struct ComparisonPatternDef<ComparisonFilterType::SelfValue> {
+    static constexpr bool enabled = true;
+    static constexpr ctll::fixed_string pattern{R"(^@\s*(==|!=|>=|<=|>|<)\s*(.+)$)"};
+};
+
+// Property-to-property comparison patterns
+template<>
+struct ComparisonPatternDef<ComparisonFilterType::PropertyToProperty> {
+    static constexpr bool enabled = true;
+    static constexpr ctll::fixed_string pattern{R"(@\.([\w$]+)\s*(==|!=|<|>|<=|>=)\s*@\.([\w$]+))"};
+};
+
+template<>
+struct ComparisonPatternDef<ComparisonFilterType::PropertyToArray> {
+    static constexpr bool enabled = true;
+    static constexpr ctll::fixed_string pattern{R"(@\.([\w$]+)\s*(==|!=|<|>|<=|>=)\s*@\.([\w$]+)\[(-?\d+)\])"};
+};
+
+template<>
+struct ComparisonPatternDef<ComparisonFilterType::ArrayToProperty> {
+    static constexpr bool enabled = true;
+    static constexpr ctll::fixed_string pattern{R"(@\.([\w$]+)\[(-?\d+)\]\s*(==|!=|<|>|<=|>=)\s*@\.([\w$]+))"};
+};
+
+// Basic property comparison patterns
+template<>
+struct ComparisonPatternDef<ComparisonFilterType::BasicPropertyDot> {
+    static constexpr bool enabled = true;
+    static constexpr ctll::fixed_string pattern{R"(@\.([\w$]+)\s*(==|!=|>=|<=|>|<)\s*(.+))"};
+};
+
+template<>
+struct ComparisonPatternDef<ComparisonFilterType::BasicPropertyBracket> {
+    static constexpr bool enabled = true;
+    static constexpr ctll::fixed_string pattern{R"(@\[['\"]([^'"]+)['\"]\]\s*(==|!=|>=|<=|>|<)\s*(.+))"};
+};
+
+template<>
+struct ComparisonPatternDef<ComparisonFilterType::BasicArrayIndex> {
+    static constexpr bool enabled = true;
+    static constexpr ctll::fixed_string pattern{R"(@\[(-?\d+)\]\s*(==|!=|>=|<=|>|<)\s*(.+))"};
+};
+
+// Token factory template specializations (TableGen-style code generation)
+template<ComparisonFilterType Type>
+struct ComparisonTokenFactory {
+    static std::optional<Token> create(const QString& s, QVector<FilterFn>& out) {
+        return std::nullopt; // Default: not implemented
+    }
+};
+
+// Helper function for value comparison logic (eliminates code duplication)
+inline bool performComparison(const QJsonValue& leftVal, const QString& op, const QJsonValue& rightVal) {
+    // Handle undefined values
+    if (leftVal.type() == QJsonValue::Undefined || rightVal.type() == QJsonValue::Undefined) {
+        if (op == "==") return leftVal.type() == rightVal.type(); // both undefined
+        if (op == "!=") return leftVal.type() != rightVal.type(); // one undefined, one not
+        return false; // ordering comparisons require same type
+    }
+    
+    // Use deep equality for == and !=
+    if (op == "==") return leftVal == rightVal;
+    if (op == "!=") return leftVal != rightVal;
+    
+    // For ordering comparisons, ensure same type
+    if (leftVal.type() != rightVal.type()) return false;
+    
+    // Handle ordering comparisons by type
+    if (leftVal.isDouble() && rightVal.isDouble()) {
+        double left = leftVal.toDouble();
+        double right = rightVal.toDouble();
+        if (op == "<") return left < right;
+        if (op == ">") return left > right;
+        if (op == "<=") return left <= right;
+        if (op == ">=") return left >= right;
+    } else if (leftVal.isBool() && rightVal.isBool()) {
+        bool left = leftVal.toBool();
+        bool right = rightVal.toBool();
+        if (op == "<") return !left && right;  // false < true
+        if (op == ">") return left && !right;  // true > false
+        if (op == "<=") return !left || right; // false <= anything, true <= true
+        if (op == ">=") return left || !right; // true >= anything, false >= false
+    } else if (leftVal.isString() && rightVal.isString()) {
+        QString left = leftVal.toString();
+        QString right = rightVal.toString();
+        if (op == "<") return left < right;
+        if (op == ">") return left > right;
+        if (op == "<=") return left <= right;
+        if (op == ">=") return left >= right;
+    }
+    
+    return false; // unsupported comparison
+}
+
+// Null comparison factories
+template<>
+struct ComparisonTokenFactory<ComparisonFilterType::NullPropertyDot> {
+    static std::optional<Token> create(const QString& s, QVector<FilterFn>& out) {
+        if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::NullPropertyDot>::pattern>(to_sv(s))) {
+            const QString prop = to_qstr(m.template get<1>().to_view());
+            const QString op = to_qstr(m.template get<2>().to_view());
+            
+            Builder b{out};
+            return b.add([prop, op](const QJsonValue& j){
+                const auto obj = j.toObject();
+                const auto v = obj.value(prop);
+                return performComparison(v, op, QJsonValue(QJsonValue::Null));
+            }, prop);
+        }
+        return std::nullopt;
+    }
+};
+
+template<>
+struct ComparisonTokenFactory<ComparisonFilterType::NullPropertyBracket> {
+    static std::optional<Token> create(const QString& s, QVector<FilterFn>& out) {
+        if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::NullPropertyBracket>::pattern>(to_sv(s))) {
+            const QString prop = to_qstr(m.template get<1>().to_view());
+            const QString op = to_qstr(m.template get<2>().to_view());
+            
+            Builder b{out};
+            return b.add([prop, op](const QJsonValue& j){
+                const auto obj = j.toObject();
+                const auto v = obj.value(prop);
+                return performComparison(v, op, QJsonValue(QJsonValue::Null));
+            }, QString("@[\"%1\"]").arg(prop));
+        }
+        return std::nullopt;
+    }
+};
+
+template<>
+struct ComparisonTokenFactory<ComparisonFilterType::NullArrayIndex> {
+    static std::optional<Token> create(const QString& s, QVector<FilterFn>& out) {
+        if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::NullArrayIndex>::pattern>(to_sv(s))) {
+            const QString prop = to_qstr(m.template get<1>().to_view());
+            const QString op = to_qstr(m.template get<2>().to_view());
+            
+            Builder b{out};
+            return b.add([prop, op](const QJsonValue& j){
+                bool ok;
+                int index = prop.toInt(&ok);
+                if (!ok) return false; // Invalid index
+                
+                if (j.isArray()) {
+                    const auto arr = j.toArray();
+                    if (index < 0 || index >= arr.size()) {
+                        // Out of bounds: compare with undefined/null
+                        QJsonValue undefined; // QJsonValue::Undefined
+                        return performComparison(undefined, op, QJsonValue(QJsonValue::Null));
+                    } else {
+                        const auto v = arr[index];
+                        return performComparison(v, op, QJsonValue(QJsonValue::Null));
+                    }
+                } else {
+                    // Non-arrays don't have array indices: compare with undefined/null
+                    QJsonValue undefined; // QJsonValue::Undefined
+                    return performComparison(undefined, op, QJsonValue(QJsonValue::Null));
+                }
+            }, QString("@[%1]").arg(prop));
+        }
+        return std::nullopt;
+    }
+};
+
+// Self comparison factories
+template<>
+struct ComparisonTokenFactory<ComparisonFilterType::DirectSelf> {
+    static std::optional<Token> create(const QString& s, QVector<FilterFn>& out) {
+        if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::DirectSelf>::pattern>(to_sv(s))) {
+            const QString op = to_qstr(m.template get<1>().to_view());
+            
+            Builder b{out};
+            return b.add([op](const QJsonValue& j){
+                // Direct self-comparison: @ == @ is always true, @ != @ is always false
+                // For ordering operators, self-comparison is always false
+                if (op == "==") return true;
+                if (op == "!=") return false;
+                return false;
+            }, QString("@%1@").arg(op));
+        }
+        return std::nullopt;
+    }
+};
+
+template<>
+struct ComparisonTokenFactory<ComparisonFilterType::SelfPropertyDot> {
+    static std::optional<Token> create(const QString& s, QVector<FilterFn>& out) {
+        if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::SelfPropertyDot>::pattern>(to_sv(s))) {
+            const QString prop = to_qstr(m.template get<1>().to_view());
+            const QString op = to_qstr(m.template get<2>().to_view());
+            
+            Builder b{out};
+            return b.add([prop, op](const QJsonValue& j){
+                const auto obj = j.toObject();
+                const auto v = obj.value(prop);
+                return performComparison(v, op, j);
+            }, QString("%1%2@").arg(prop, op));
+        }
+        return std::nullopt;
+    }
+};
+
+template<>
+struct ComparisonTokenFactory<ComparisonFilterType::SelfPropertyBracket> {
+    static std::optional<Token> create(const QString& s, QVector<FilterFn>& out) {
+        if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::SelfPropertyBracket>::pattern>(to_sv(s))) {
+            const QString prop = to_qstr(m.template get<1>().to_view());
+            const QString op = to_qstr(m.template get<2>().to_view());
+            
+            Builder b{out};
+            return b.add([prop, op](const QJsonValue& j){
+                const auto obj = j.toObject();
+                const auto v = obj.value(prop);
+                return performComparison(v, op, j);
+            }, QString("@[\"%1\"]%2@").arg(prop, op));
+        }
+        return std::nullopt;
+    }
+};
+
+template<>
+struct ComparisonTokenFactory<ComparisonFilterType::SelfArrayIndex> {
+    static std::optional<Token> create(const QString& s, QVector<FilterFn>& out) {
+        if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::SelfArrayIndex>::pattern>(to_sv(s))) {
+            const QString prop = to_qstr(m.template get<1>().to_view());
+            const QString op = to_qstr(m.template get<2>().to_view());
+            
+            Builder b{out};
+            return b.add([prop, op](const QJsonValue& j){
+                bool ok;
+                int index = prop.toInt(&ok);
+                if (!ok) return false; // Invalid index
+                
+                if (j.isArray()) {
+                    const auto arr = j.toArray();
+                    if (index < 0 || index >= arr.size()) {
+                        // Out of bounds: compare with undefined
+                        QJsonValue undefined; // QJsonValue::Undefined
+                        return performComparison(undefined, op, j);
+                    } else {
+                        const auto v = arr[index];
+                        return performComparison(v, op, j);
+                    }
+                } else {
+                    // Non-arrays don't have array indices: compare with undefined
+                    QJsonValue undefined; // QJsonValue::Undefined
+                    return performComparison(undefined, op, j);
+                }
+            }, QString("@[%1]%2@").arg(prop, op));
+        }
+        return std::nullopt;
+    }
+};
+
+template<>
+struct ComparisonTokenFactory<ComparisonFilterType::SelfValue> {
+    static std::optional<Token> create(const QString& s, QVector<FilterFn>& out) {
+        if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::SelfValue>::pattern>(to_sv(s))) {
+            const QString op = to_qstr(m.template get<1>().to_view());
+            const QString rhs = to_qstr(m.template get<2>().to_view());
+            
+            // Parse RHS value using existing comparison context logic
+            auto ctx = parseRhsValue(op, rhs);
+            if (!ctx) return std::nullopt;
+            
+            Builder b{out};
+            return b.add([ctx = *ctx](const QJsonValue& j){
+                return ctx.compare(j);
+            }, QString("@%1%2").arg(op, rhs));
+        }
+        return std::nullopt;
+    }
+};
+
+// Property-to-property comparison factories
+template<>
+struct ComparisonTokenFactory<ComparisonFilterType::PropertyToProperty> {
+    static std::optional<Token> create(const QString& s, QVector<FilterFn>& out) {
+        if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::PropertyToProperty>::pattern>(to_sv(s))) {
+            const QString leftProp = to_qstr(m.template get<1>().to_view());
+            const QString op = to_qstr(m.template get<2>().to_view());
+            const QString rightProp = to_qstr(m.template get<3>().to_view());
+            
+            Builder b{out};
+            return b.add([leftProp, op, rightProp](const QJsonValue& j){
+                const auto obj = j.toObject();
+                const auto leftVal = obj.value(leftProp);
+                const auto rightVal = obj.value(rightProp);
+                return performComparison(leftVal, op, rightVal);
+            }, QString("%1%2%3").arg(leftProp, op, rightProp));
+        }
+        return std::nullopt;
+    }
+};
+
+template<>
+struct ComparisonTokenFactory<ComparisonFilterType::PropertyToArray> {
+    static std::optional<Token> create(const QString& s, QVector<FilterFn>& out) {
+        if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::PropertyToArray>::pattern>(to_sv(s))) {
+            const QString leftProp = to_qstr(m.template get<1>().to_view());
+            const QString op = to_qstr(m.template get<2>().to_view());
+            const QString rightProp = to_qstr(m.template get<3>().to_view());
+            const QString rightIndex = to_qstr(m.template get<4>().to_view());
+            
+            Builder b{out};
+            return b.add([leftProp, op, rightProp, rightIndex](const QJsonValue& j){
+                const auto obj = j.toObject();
+                const auto leftVal = obj.value(leftProp);
+                const auto rightArr = obj.value(rightProp).toArray();
+                
+                bool ok;
+                int idx = rightIndex.toInt(&ok);
+                QJsonValue rightVal;
+                
+                // Handle out-of-bounds or invalid index as undefined
+                if (!ok || idx < 0 || idx >= rightArr.size()) {
+                    rightVal = QJsonValue(QJsonValue::Undefined);
+                } else {
+                    rightVal = rightArr.at(idx);
+                }
+                
+                return performComparison(leftVal, op, rightVal);
+            }, QString("%1%2%3[%4]").arg(leftProp, op, rightProp, rightIndex));
+        }
+        return std::nullopt;
+    }
+};
+
+template<>
+struct ComparisonTokenFactory<ComparisonFilterType::ArrayToProperty> {
+    static std::optional<Token> create(const QString& s, QVector<FilterFn>& out) {
+        if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::ArrayToProperty>::pattern>(to_sv(s))) {
+            const QString leftProp = to_qstr(m.template get<1>().to_view());
+            const QString leftIndex = to_qstr(m.template get<2>().to_view());
+            const QString op = to_qstr(m.template get<3>().to_view());
+            const QString rightProp = to_qstr(m.template get<4>().to_view());
+            
+            Builder b{out};
+            return b.add([leftProp, leftIndex, op, rightProp](const QJsonValue& j){
+                const auto obj = j.toObject();
+                const auto leftArr = obj.value(leftProp).toArray();
+                const auto rightVal = obj.value(rightProp);
+                
+                bool ok;
+                int idx = leftIndex.toInt(&ok);
+                QJsonValue leftVal;
+                
+                // Handle out-of-bounds or invalid index as undefined
+                if (!ok || idx < 0 || idx >= leftArr.size()) {
+                    leftVal = QJsonValue(QJsonValue::Undefined);
+                } else {
+                    leftVal = leftArr.at(idx);
+                }
+                
+                return performComparison(leftVal, op, rightVal);
+            }, QString("%1[%2]%3%4").arg(leftProp, leftIndex, op, rightProp));
+        }
+        return std::nullopt;
+    }
+};
+
+// Basic property comparison factories
+template<>
+struct ComparisonTokenFactory<ComparisonFilterType::BasicPropertyDot> {
+    static std::optional<Token> create(const QString& s, QVector<FilterFn>& out) {
+        if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::BasicPropertyDot>::pattern>(to_sv(s))) {
+            const QString prop = to_qstr(m.template get<1>().to_view());
+            const QString op = to_qstr(m.template get<2>().to_view());
+            const QString rhs = to_qstr(m.template get<3>().to_view());
+            
+            // Parse RHS value using existing comparison context logic
+            auto ctx = parseRhsValue(op, rhs);
+            if (!ctx) return std::nullopt;
+            
+            Builder b{out};
+            return b.add([prop, ctx = *ctx](const QJsonValue& j){
+                const auto obj = j.toObject();
+                const auto v = obj.value(prop);
+                return ctx.compare(v);
+            }, prop);
+        }
+        return std::nullopt;
+    }
+};
+
+template<>
+struct ComparisonTokenFactory<ComparisonFilterType::BasicPropertyBracket> {
+    static std::optional<Token> create(const QString& s, QVector<FilterFn>& out) {
+        if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::BasicPropertyBracket>::pattern>(to_sv(s))) {
+            const QString prop = to_qstr(m.template get<1>().to_view());
+            const QString op = to_qstr(m.template get<2>().to_view());
+            const QString rhs = to_qstr(m.template get<3>().to_view());
+            
+            // Parse RHS value using existing comparison context logic
+            auto ctx = parseRhsValue(op, rhs);
+            if (!ctx) return std::nullopt;
+            
+            Builder b{out};
+            return b.add([prop, ctx = *ctx](const QJsonValue& j){
+                const auto obj = j.toObject();
+                const auto v = obj.value(prop);
+                return ctx.compare(v);
+            }, QString("@[\"%1\"]").arg(prop));
+        }
+        return std::nullopt;
+    }
+};
+
+template<>
+struct ComparisonTokenFactory<ComparisonFilterType::BasicArrayIndex> {
+    static std::optional<Token> create(const QString& s, QVector<FilterFn>& out) {
+        if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::BasicArrayIndex>::pattern>(to_sv(s))) {
+            const QString prop = to_qstr(m.template get<1>().to_view());
+            const QString op = to_qstr(m.template get<2>().to_view());
+            const QString rhs = to_qstr(m.template get<3>().to_view());
+            
+            // Parse RHS value using existing comparison context logic
+            auto ctx = parseRhsValue(op, rhs);
+            if (!ctx) return std::nullopt;
+            
+            Builder b{out};
+            return b.add([prop, ctx = *ctx](const QJsonValue& j){
+                bool ok;
+                int index = prop.toInt(&ok);
+                if (!ok) return false; // Invalid index
+                
+                if (j.isArray()) {
+                    const auto arr = j.toArray();
+                    if (index < 0 || index >= arr.size()) {
+                        // Out of bounds: compare with undefined
+                        QJsonValue undefined; // QJsonValue::Undefined
+                        return ctx.compare(undefined);
+                    } else {
+                        const auto v = arr[index];
+                        return ctx.compare(v);
+                    }
+                } else {
+                    // Non-arrays don't have array indices: compare with undefined
+                    QJsonValue undefined; // QJsonValue::Undefined
+                    return ctx.compare(undefined);
+                }
+            }, QString("@[%1]").arg(prop));
+        }
+        return std::nullopt;
+    }
+};
+
+// Variadic template dispatch table (TableGen-inspired compile-time dispatch)
+template<ComparisonFilterType... Types>
+struct ComparisonDispatchTable {
+    static std::optional<Token> dispatch(const QString& s, QVector<FilterFn>& out) {
+        return dispatchImpl<Types...>(s, out);
+    }
+    
+private:
+    template<ComparisonFilterType First, ComparisonFilterType... Rest>
+    static std::optional<Token> dispatchImpl(const QString& s, QVector<FilterFn>& out) {
+        if (auto result = ComparisonTokenFactory<First>::create(s, out)) {
+            return result;
+        }
+        if constexpr (sizeof...(Rest) > 0) {
+            return dispatchImpl<Rest...>(s, out);
+        }
+        return std::nullopt;
+    }
+};
+
+// Complete dispatch table with priority ordering (most specific first)
+using ComparisonDispatcher = ComparisonDispatchTable<
+    // Null comparisons (highest priority)
+    ComparisonFilterType::NullPropertyDot,
+    ComparisonFilterType::NullPropertyBracket,
+    ComparisonFilterType::NullArrayIndex,
+    
+    // Self comparisons (high priority)
+    ComparisonFilterType::DirectSelf,
+    ComparisonFilterType::SelfPropertyDot,
+    ComparisonFilterType::SelfPropertyBracket,
+    ComparisonFilterType::SelfArrayIndex,
+    ComparisonFilterType::SelfValue,
+    
+    // Property-to-property comparisons (medium priority)
+    ComparisonFilterType::PropertyToProperty,
+    ComparisonFilterType::PropertyToArray,
+    ComparisonFilterType::ArrayToProperty,
+    
+    // Basic property comparisons (lowest priority)
+    ComparisonFilterType::BasicPropertyDot,
+    ComparisonFilterType::BasicPropertyBracket,
+    ComparisonFilterType::BasicArrayIndex
+>;
+
+// ============================================================================
+// Refactored parseCompare Function (TableGen-Inspired Architecture)
+// ============================================================================
+
 std::optional<Token> parseCompare(QString s, QVector<FilterFn>& out)
 {
-    constexpr auto dotPat = ctll::fixed_string{R"(@\.([\w$]+)\s*(==|!=|>=|<=|>|<)\s*(.+))"};
-    constexpr auto brkPat = ctll::fixed_string{R"(@\[['\"]([^'"]+)['\"]\]\s*(==|!=|>=|<=|>|<)\s*(.+))"};
-    constexpr auto idxPat = ctll::fixed_string{R"(@\[(-?\d+)\]\s*(==|!=|>=|<=|>|<)\s*(.+))"};
-    
-    // Null comparison patterns
-    constexpr auto dotNullPat = ctll::fixed_string{R"(@\.([\w$]+)\s*(==|!=)\s*null)"};
-    constexpr auto brkNullPat = ctll::fixed_string{R"(@\[['\"]([^'"]+)['\"]\]\s*(==|!=)\s*null)"};
-    constexpr auto idxNullPat = ctll::fixed_string{R"(@\[(-?\d+)\]\s*(==|!=)\s*null)"};
-    
-    // Self comparison patterns
-    constexpr auto dotSelfPat = ctll::fixed_string{R"(@\.([\w$]+)\s*(==|!=|>=|<=|>|<)\s*@)"};
-    constexpr auto brkSelfPat = ctll::fixed_string{R"(@\[['\"]([^'"]+)['\"]\]\s*(==|!=|>=|<=|>|<)\s*@)"};
-    constexpr auto idxSelfPat = ctll::fixed_string{R"(@\[(-?\d+)\]\s*(==|!=|>=|<=|>|<)\s*@)"};
-    
-    // Property-to-property comparison patterns: @.a == @.b
-    constexpr auto propToPropPat = ctll::fixed_string{R"(@\.([\w$]+)\s*(==|!=|<|>|<=|>=)\s*@\.([\w$]+))"};
-    
-    // Property-to-property with array indexing: @.a == @.list[9] or @.list[9] == @.a
-    constexpr auto propToArrayPat = ctll::fixed_string{R"(@\.([\w$]+)\s*(==|!=|<|>|<=|>=)\s*@\.([\w$]+)\[(-?\d+)\])"};
-    constexpr auto arrayToPropPat = ctll::fixed_string{R"(@\.([\w$]+)\[(-?\d+)\]\s*(==|!=|<|>|<=|>=)\s*@\.([\w$]+))"};
-    
-    // Direct self-comparison pattern: @==@ or @!=@
-    constexpr auto directSelfPat = ctll::fixed_string{R"(^@\s*(==|!=|>=|<=|>|<)\s*@$)"};
-    
-    // Direct self-comparison with value pattern: @ == value
-    constexpr auto selfValuePat = ctll::fixed_string{R"(^@\s*(==|!=|>=|<=|>|<)\s*(.+)$)"};
-
-    // Try null comparisons first (more specific)
-    if (auto t = parseNullCompare<dotNullPat>(s, out)) return t;
-    if (auto t = parseNullCompare<brkNullPat>(s, out)) return t;
-    if (auto t = parseNullCompareIndex<idxNullPat>(s, out)) return t;
-    
-    // Try self comparisons
-    // Direct self-comparison first (most specific)
-    if (ctre::match<directSelfPat>(to_sv(s))) {
-        auto m = ctre::match<directSelfPat>(to_sv(s));
-        const QString op = to_qstr(m.template get<1>().to_view());
-        
-        Builder b{out};
-        return b.add([op](const QJsonValue& j){
-            // Direct self-comparison: @ == @ is always true, @ != @ is always false
-            // For ordering operators, self-comparison is always false
-            if (op == "==") return true;
-            if (op == "!=") return false;
-            return false;
-        }, QString("@%1@").arg(op));
-    }
-
-    if (auto t = parseSelfCompare<dotSelfPat>(s, out)) return t;
-    if (auto t = parseSelfCompare<brkSelfPat>(s, out)) return t;
-    if (auto t = parseSelfCompareIndex<idxSelfPat>(s, out)) return t;
-
-    // Try direct self-comparison with value
-    if (auto t = parseSelfValue<selfValuePat>(s, out)) return t;
-
-    // Try property-to-property comparisons
-    if (ctre::match<propToPropPat>(to_sv(s))) {
-        auto m = ctre::match<propToPropPat>(to_sv(s));
-        const QString leftProp = to_qstr(m.template get<1>().to_view());
-        const QString op = to_qstr(m.template get<2>().to_view());
-        const QString rightProp = to_qstr(m.template get<3>().to_view());
-        
-        Builder b{out};
-        return b.add([leftProp, op, rightProp](const QJsonValue& j){
-            const auto obj = j.toObject();
-            const auto leftVal = obj.value(leftProp);
-            const auto rightVal = obj.value(rightProp);
-            
-            // Handle missing properties as null for comparison
-            if (leftVal.type() == QJsonValue::Undefined || rightVal.type() == QJsonValue::Undefined) {
-                if (op == "==") return leftVal.type() == rightVal.type(); // both undefined
-                if (op == "!=") return leftVal.type() != rightVal.type(); // one undefined, one not
-                return false; // ordering comparisons require same type
-            }
-            
-            // Use deep equality for == and !=
-            if (op == "==") return leftVal == rightVal;
-            if (op == "!=") return leftVal != rightVal;
-            
-            // For ordering comparisons, ensure same type
-            if (leftVal.type() != rightVal.type()) return false;
-            
-            // Handle ordering comparisons by type
-            if (leftVal.isDouble() && rightVal.isDouble()) {
-                double left = leftVal.toDouble();
-                double right = rightVal.toDouble();
-                if (op == "<") return left < right;
-                if (op == ">") return left > right;
-                if (op == "<=") return left <= right;
-                if (op == ">=") return left >= right;
-            } else if (leftVal.isBool() && rightVal.isBool()) {
-                bool left = leftVal.toBool();
-                bool right = rightVal.toBool();
-                if (op == "<") return !left && right;  // false < true
-                if (op == ">") return left && !right;  // true > false
-                if (op == "<=") return !left || right; // false <= anything, true <= true
-                if (op == ">=") return left || !right; // true >= anything, false >= false
-            } else if (leftVal.isString() && rightVal.isString()) {
-                QString left = leftVal.toString();
-                QString right = rightVal.toString();
-                if (op == "<") return left < right;
-                if (op == ">") return left > right;
-                if (op == "<=") return left <= right;
-                if (op == ">=") return left >= right;
-            }
-            
-            return false; // unsupported comparison
-        }, QString("%1%2%3").arg(leftProp, op, rightProp));
-    }
-
-    // Try property-to-array comparisons
-    if (ctre::match<propToArrayPat>(to_sv(s))) {
-        auto m = ctre::match<propToArrayPat>(to_sv(s));
-        const QString leftProp = to_qstr(m.template get<1>().to_view());
-        const QString op = to_qstr(m.template get<2>().to_view());
-        const QString rightProp = to_qstr(m.template get<3>().to_view());
-        const QString rightIndex = to_qstr(m.template get<4>().to_view());
-        
-        Builder b{out};
-        return b.add([leftProp, op, rightProp, rightIndex](const QJsonValue& j){
-            const auto obj = j.toObject();
-            const auto leftVal = obj.value(leftProp);
-            const auto rightArr = obj.value(rightProp).toArray();
-            
-            bool ok;
-            int idx = rightIndex.toInt(&ok);
-            QJsonValue rightVal;
-            
-            // Handle out-of-bounds or invalid index as undefined
-            if (!ok || idx < 0 || idx >= rightArr.size()) {
-                rightVal = QJsonValue(QJsonValue::Undefined);
-            } else {
-                rightVal = rightArr.at(idx);
-            }
-            
-            // Handle missing properties and out-of-bounds indices as undefined for comparison
-            if (leftVal.type() == QJsonValue::Undefined || rightVal.type() == QJsonValue::Undefined) {
-                if (op == "==") return leftVal.type() == rightVal.type(); // both undefined
-                if (op == "!=") return leftVal.type() != rightVal.type(); // one undefined, one not
-                return false; // ordering comparisons require same type
-            }
-            
-            // Use deep equality for == and !=
-            if (op == "==") return leftVal == rightVal;
-            if (op == "!=") return leftVal != rightVal;
-            
-            // For ordering comparisons, ensure same type
-            if (leftVal.type() != rightVal.type()) return false;
-            
-            // Handle ordering comparisons by type
-            if (leftVal.isDouble() && rightVal.isDouble()) {
-                double left = leftVal.toDouble();
-                double right = rightVal.toDouble();
-                if (op == "<") return left < right;
-                if (op == ">") return left > right;
-                if (op == "<=") return left <= right;
-                if (op == ">=") return left >= right;
-            } else if (leftVal.isBool() && rightVal.isBool()) {
-                bool left = leftVal.toBool();
-                bool right = rightVal.toBool();
-                if (op == "<") return !left && right;
-                if (op == ">") return left && !right;
-                if (op == "<=") return !left || right;
-                if (op == ">=") return left || !right;
-            } else if (leftVal.isString() && rightVal.isString()) {
-                QString left = leftVal.toString();
-                QString right = rightVal.toString();
-                if (op == "<") return left < right;
-                if (op == ">") return left > right;
-                if (op == "<=") return left <= right;
-                if (op == ">=") return left >= right;
-            }
-            
-            return false;
-        }, QString("%1%2%3[%4]").arg(leftProp, op, rightProp, rightIndex));
-    }
-
-    // Try array-to-property comparisons (reverse of above)
-    if (ctre::match<arrayToPropPat>(to_sv(s))) {
-        auto m = ctre::match<arrayToPropPat>(to_sv(s));
-        const QString leftProp = to_qstr(m.template get<1>().to_view());
-        const QString leftIndex = to_qstr(m.template get<2>().to_view());
-        const QString op = to_qstr(m.template get<3>().to_view());
-        const QString rightProp = to_qstr(m.template get<4>().to_view());
-        
-        Builder b{out};
-        return b.add([leftProp, leftIndex, op, rightProp](const QJsonValue& j){
-            const auto obj = j.toObject();
-            const auto leftArr = obj.value(leftProp).toArray();
-            const auto rightVal = obj.value(rightProp);
-            
-            bool ok;
-            int idx = leftIndex.toInt(&ok);
-            QJsonValue leftVal;
-            
-            // Handle out-of-bounds or invalid index as undefined
-            if (!ok || idx < 0 || idx >= leftArr.size()) {
-                leftVal = QJsonValue(QJsonValue::Undefined);
-            } else {
-                leftVal = leftArr.at(idx);
-            }
-            
-            // Handle missing properties and out-of-bounds indices as undefined for comparison
-            if (leftVal.type() == QJsonValue::Undefined || rightVal.type() == QJsonValue::Undefined) {
-                if (op == "==") return leftVal.type() == rightVal.type(); // both undefined
-                if (op == "!=") return leftVal.type() != rightVal.type(); // one undefined, one not
-                return false; // ordering comparisons require same type
-            }
-            
-            // Use deep equality for == and !=
-            if (op == "==") return leftVal == rightVal;
-            if (op == "!=") return leftVal != rightVal;
-            
-            // For ordering comparisons, ensure same type
-            if (leftVal.type() != rightVal.type()) return false;
-            
-            // Handle ordering comparisons by type
-            if (leftVal.isDouble() && rightVal.isDouble()) {
-                double left = leftVal.toDouble();
-                double right = rightVal.toDouble();
-                if (op == "<") return left < right;
-                if (op == ">") return left > right;
-                if (op == "<=") return left <= right;
-                if (op == ">=") return left >= right;
-            } else if (leftVal.isBool() && rightVal.isBool()) {
-                bool left = leftVal.toBool();
-                bool right = rightVal.toBool();
-                if (op == "<") return !left && right;
-                if (op == ">") return left && !right;
-                if (op == "<=") return !left || right;
-                if (op == ">=") return left || !right;
-            } else if (leftVal.isString() && rightVal.isString()) {
-                QString left = leftVal.toString();
-                QString right = rightVal.toString();
-                if (op == "<") return left < right;
-                if (op == ">") return left > right;
-                if (op == "<=") return left <= right;
-                if (op == ">=") return left >= right;
-            }
-            
-            return false;
-        }, QString("%1[%2]%3%4").arg(leftProp, leftIndex, op, rightProp));
-    }
-
-    // Try basic property comparisons using template dispatch
-    if (auto t = parseCompare1<dotPat>(s, out)) return t;
-    if (auto t = parseCompare1<brkPat>(s, out)) return t;
-    if (auto t = parseCompareIndex<idxPat>(s, out)) return t;
-    
-    return std::nullopt;
+    // Use TableGen-inspired compile-time dispatch with priority ordering
+    return ComparisonDispatcher::dispatch(s, out);
 }
 
 std::optional<Token> parseRegex(QString s, QVector<FilterFn>& out)
