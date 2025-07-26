@@ -29,152 +29,271 @@ int normalizeIndex(int idx, int size)
     return idx < 0 ? size + idx : idx;
 }
 
-std::expected<QJsonArray, EvalError> evalSlice(const QJsonArray& array, const Slice& s)
-{
-    // Use pooled array to reduce allocations
-    auto pooledArray = acquirePooledArray();
-    QJsonArray& out = *pooledArray;
+// ---------------------------------------------------------------------------
+//  TableGen-Inspired evalSlice Architecture
+// ---------------------------------------------------------------------------
 
-    const int len = array.size();
-    constexpr qsizetype SENTINEL = std::numeric_limits<qsizetype>::max();
+/**
+ * @brief Slice processing strategy types for compile-time dispatch
+ * 
+ * Each type represents a distinct slice processing pattern with specific
+ * characteristics and optimization opportunities.
+ */
+enum class SliceProcessingType {
+    ZeroStep,        // step == 0 (empty result, RFC 9535 compliance)
+    ForwardSlice,    // step > 0 (forward iteration)
+    BackwardSlice,   // step < 0 (backward iteration)
+    DefaultSlice     // fallback for edge cases
+};
 
-    // Step normalisation ----------------------------------------------------
-    qsizetype step = s.step;
-    if (step == 0)
-        return QJsonArray{}; // Empty result for zero step (RFC 9535 compliance)
+/**
+ * @brief TableGen-style slice processing pattern definitions
+ * 
+ * Each specialization defines the characteristics and matching logic
+ * for a specific slice processing strategy.
+ */
+template<SliceProcessingType Type>
+struct SliceProcessingDef {
+    static constexpr bool enabled = false;
+    static constexpr int priority = 0;
+    
+    static bool matches(const Slice& s, int len) { return false; }
+};
 
-    qsizetype start = s.start;
-    qsizetype stop  = s.end;
-
-    const bool forward = step > 0;
-
-    // ---------------- Python's PySlice_AdjustIndices ----------------------
-    auto translate_default = [&](qsizetype &idx, bool isStart){
-        if (idx != SENTINEL) return;
-        if (forward)
-            idx = isStart ? 0 : len;
-        else
-            idx = isStart ? (len - 1) : -1;
-    };
-
-    translate_default(start, /*isStart=*/true);
-    translate_default(stop,  /*isStart=*/false);
-
-    // Convert negatives, then clamp
-    auto fix_index = [&](qsizetype &idx, bool isStart){
-        if (idx < 0) idx += len;
-
-        if (forward) {
-            if (idx < 0) idx = 0;
-            if (idx > len) idx = len;
-        } else {
-            if (idx < -1) idx = -1;
-            if (idx >= len) idx = len - 1;
-        }
-    };
-
-    fix_index(start, /*isStart=*/true);
-    fix_index(stop , /*isStart=*/false);
-
-    // Final CPython-style clamp on stop depending on step sign
-    if (forward) {
-        if (stop > len) stop = len;
-    } else {
-        if (stop < -1) stop = -1;
+// Specialization for zero step handling
+template<>
+struct SliceProcessingDef<SliceProcessingType::ZeroStep> {
+    static constexpr bool enabled = true;
+    static constexpr int priority = 1000;  // Highest priority
+    
+    static bool matches(const Slice& s, int len) {
+        return s.step == 0;
     }
+};
 
-    // If stop was omitted (SENTINEL) and we have negative step, Python sets stop = -1 after adjustments
-    if (!forward && s.end == SENTINEL)
-        stop = -1;
+// Specialization for forward slice processing
+template<>
+struct SliceProcessingDef<SliceProcessingType::ForwardSlice> {
+    static constexpr bool enabled = true;
+    static constexpr int priority = 800;
+    
+    static bool matches(const Slice& s, int len) {
+        return s.step > 0;
+    }
+};
 
-    qCDebug(jsonPathLog) << "evalSlice norm start="<<start<<" stop="<<stop<<" step="<<step;
+// Specialization for backward slice processing
+template<>
+struct SliceProcessingDef<SliceProcessingType::BackwardSlice> {
+    static constexpr bool enabled = true;
+    static constexpr int priority = 700;
+    
+    static bool matches(const Slice& s, int len) {
+        return s.step < 0;
+    }
+};
 
-    qCDebug(jsonPathLog) << "iterating " << (forward ? "forward" : "backward");
+// Specialization for default slice processing
+template<>
+struct SliceProcessingDef<SliceProcessingType::DefaultSlice> {
+    static constexpr bool enabled = true;
+    static constexpr int priority = 100;  // Lowest priority (fallback)
+    
+    static bool matches(const Slice& s, int len) {
+        return true;  // Always matches as fallback
+    }
+};
 
-    // Iterate -------------------------------------------------------------
-    if (forward) {
-        qsizetype i = start;
-        while (i < stop) {
+/**
+ * @brief Template specialization strategies for slice processing
+ * 
+ * Each strategy implements the specific slice processing logic
+ * for its corresponding slice processing type.
+ */
+template<SliceProcessingType Type>
+struct SliceProcessingStrategy {
+    static std::expected<QJsonArray, EvalError> process(const QJsonArray& array, const Slice& s) {
+        // Default implementation should never be called
+        return std::unexpected(EvalError::InvalidSlice);
+    }
+};
+
+// Zero step strategy: Return empty array (RFC 9535 compliance)
+template<>
+struct SliceProcessingStrategy<SliceProcessingType::ZeroStep> {
+    static std::expected<QJsonArray, EvalError> process(const QJsonArray& array, const Slice& s) {
+        qCDebug(jsonPathLog) << "evalSlice: zero step, returning empty array";
+        return QJsonArray{};  // Empty result for zero step (RFC 9535 compliance)
+    }
+};
+
+// Forward slice strategy: Positive step iteration
+template<>
+struct SliceProcessingStrategy<SliceProcessingType::ForwardSlice> {
+    static std::expected<QJsonArray, EvalError> process(const QJsonArray& array, const Slice& s) {
+        auto pooledArray = acquirePooledArray();
+        QJsonArray& out = *pooledArray;
+
+        const int len = array.size();
+        constexpr qsizetype SENTINEL = std::numeric_limits<qsizetype>::max();
+
+        qsizetype start = s.start;
+        qsizetype stop = s.end;
+        qsizetype step = s.step;
+
+        // Default translation for forward iteration
+        if (start == SENTINEL) start = 0;
+        if (stop == SENTINEL) stop = len;
+
+        // Convert negatives and clamp for forward iteration
+        if (start < 0) start += len;
+        if (stop < 0) stop += len;
+        
+        if (start < 0) start = 0;
+        if (start > len) start = len;
+        if (stop < 0) stop = 0;
+        if (stop > len) stop = len;
+
+        qCDebug(jsonPathLog) << "evalSlice forward: start=" << start << " stop=" << stop << " step=" << step;
+
+        // Forward iteration
+        for (qsizetype i = start; i < stop; i += step) {
             if (i >= 0 && i < len) {
-                qCDebug(jsonPathLog) << "  visiting i="<<i;
+                qCDebug(jsonPathLog) << "  visiting i=" << i;
                 out.append(array[static_cast<int>(i)]);
             }
-            // Prevent overflow when i + step would wrap
-            if (step <= 0) break; // should not happen, guard
-            if (i > std::numeric_limits<qsizetype>::max() - step)
-                break;
-            i += step;
         }
-    } else {
-        qsizetype i = start;
-        while (i > stop) {
+
+        qCDebug(jsonPathLog) << "evalSlice result size=" << out.size();
+        return QJsonArray(std::move(out));
+    }
+};
+
+// Backward slice strategy: Negative step iteration
+template<>
+struct SliceProcessingStrategy<SliceProcessingType::BackwardSlice> {
+    static std::expected<QJsonArray, EvalError> process(const QJsonArray& array, const Slice& s) {
+        auto pooledArray = acquirePooledArray();
+        QJsonArray& out = *pooledArray;
+
+        const int len = array.size();
+        constexpr qsizetype SENTINEL = std::numeric_limits<qsizetype>::max();
+
+        qsizetype start = s.start;
+        qsizetype stop = s.end;
+        qsizetype step = s.step;
+
+        // Default translation for backward iteration
+        if (start == SENTINEL) start = len - 1;
+        if (stop == SENTINEL) stop = -1;
+
+        // Convert negatives and clamp for backward iteration
+        if (start < 0) start += len;
+        if (stop < 0) stop += len;
+        
+        if (start < -1) start = -1;
+        if (start >= len) start = len - 1;
+        if (stop < -1) stop = -1;
+        if (stop >= len) stop = len - 1;
+
+        // Special case: if original stop was SENTINEL, set to -1 after adjustments
+        if (s.end == SENTINEL) stop = -1;
+
+        qCDebug(jsonPathLog) << "evalSlice backward: start=" << start << " stop=" << stop << " step=" << step;
+
+        // Backward iteration
+        for (qsizetype i = start; i > stop; i += step) {
             if (i >= 0 && i < len) {
-                qCDebug(jsonPathLog) << "  visiting i="<<i;
+                qCDebug(jsonPathLog) << "  visiting i=" << i;
                 out.append(array[static_cast<int>(i)]);
             }
             // Prevent underflow when i + step would wrap
-            if (step >= 0) break; // should not happen, guard
             if (i < std::numeric_limits<qsizetype>::min() - step)
                 break;
-            i += step;
         }
+
+        qCDebug(jsonPathLog) << "evalSlice result size=" << out.size();
+        return QJsonArray(std::move(out));
     }
+};
 
-    qCDebug(jsonPathLog) << "evalSlice result size="<<out.size();
-
-    // Move result to avoid copying
-    QJsonArray finalResult = std::move(out);
-    return finalResult;
-}
-
-bool addsMultiplicity(const Token& tk)
-{
-    switch (tk.kind) {
-    case Token::Kind::Wildcard:
-    case Token::Kind::Recursive:
-    case Token::Kind::KeyList:
-        return true;
-    default:
-        return false;
+// Default slice strategy: Fallback implementation
+template<>
+struct SliceProcessingStrategy<SliceProcessingType::DefaultSlice> {
+    static std::expected<QJsonArray, EvalError> process(const QJsonArray& array, const Slice& s) {
+        qCDebug(jsonPathLog) << "evalSlice: using default strategy";
+        // This should rarely be reached, but provides a safe fallback
+        return QJsonArray{};
     }
-}
+};
 
-QJsonValue squash(QJsonArray arr, bool multi)
-{
-    if (multi || arr.size() != 1)
-        return arr;
-    return arr[0];
-}
+/**
+ * @brief Recursive template dispatch table for slice processing strategies
+ * 
+ * Uses variadic templates and fold expressions for priority-ordered dispatch.
+ * Strategies are evaluated in priority order until a match is found.
+ */
+template<SliceProcessingType... Types>
+struct SliceProcessingDispatchTable;
 
-QJsonValue applyTrailing(json_path::FunctionType fn, const QJsonValue& v)
-{
-    using enum json_path::FunctionType;
-
-    switch (fn) {
-    case None:   return v;
-
-    case Length:
-        if (v.isArray())  return v.toArray().size();
-        if (v.isObject()) return v.toObject().size();
-        return 0;
-
-    case Min:
-    case Max:
-        if (!v.isArray()) return QJsonValue(QJsonValue::Undefined);
-        {
-            const auto arr = v.toArray();
-            bool first=true; double best=0.0;
-            for (const auto& e : arr) {
-                if (!e.isDouble()) continue;
-                const double d = e.toDouble();
-                if (first || (fn==Min ? d<best : d>best))
-                    best = d, first = false;
+// Recursive case: try first type, then recurse
+template<SliceProcessingType FirstType, SliceProcessingType... RestTypes>
+struct SliceProcessingDispatchTable<FirstType, RestTypes...> {
+    static std::expected<QJsonArray, EvalError> dispatch(const QJsonArray& array, const Slice& s) {
+        if constexpr (SliceProcessingDef<FirstType>::enabled) {
+            if (SliceProcessingDef<FirstType>::matches(s, array.size())) {
+                return SliceProcessingStrategy<FirstType>::process(array, s);
             }
-            return first ? QJsonValue(QJsonValue::Undefined)
-                         : QJsonValue(best);
+        }
+        
+        // Recurse to remaining types
+        if constexpr (sizeof...(RestTypes) > 0) {
+            return SliceProcessingDispatchTable<RestTypes...>::dispatch(array, s);
+        } else {
+            // No more strategies to try
+            return std::unexpected(EvalError::InvalidSlice);
         }
     }
-    std::unreachable();
+};
+
+// Base case: empty dispatch table
+template<>
+struct SliceProcessingDispatchTable<> {
+    static std::expected<QJsonArray, EvalError> dispatch(const QJsonArray& array, const Slice& s) {
+        return std::unexpected(EvalError::InvalidSlice);
+    }
+};
+
+/**
+ * @brief TableGen-inspired slice processing dispatcher
+ * 
+ * Defines the priority-ordered list of slice processing strategies
+ * and provides the main dispatch entry point.
+ */
+struct SliceProcessingDispatcher {
+    // Priority-ordered strategy list (highest priority first)
+    using DispatchTable = SliceProcessingDispatchTable<
+        SliceProcessingType::ZeroStep,        // Priority 1000
+        SliceProcessingType::ForwardSlice,    // Priority 800
+        SliceProcessingType::BackwardSlice,   // Priority 700
+        SliceProcessingType::DefaultSlice     // Priority 100
+    >;
+    
+    static std::expected<QJsonArray, EvalError> dispatch(const QJsonArray& array, const Slice& s) {
+        return DispatchTable::dispatch(array, s);
+    }
+};
+
+/**
+ * @brief Refactored evalSlice using TableGen-inspired architecture
+ * 
+ * Replaces the monolithic conditional logic with elegant compile-time
+ * dispatch based on slice processing strategies.
+ */
+std::expected<QJsonArray, EvalError> evalSlice(const QJsonArray& array, const Slice& s)
+{
+    // Use TableGen-inspired dispatch for zero-overhead strategy selection
+    return SliceProcessingDispatcher::dispatch(array, s);
 }
 
 // ---------------------------------------------------------------------------
@@ -475,6 +594,56 @@ std::expected<QJsonArray, EvalError> processBranchUniqueSelection(
     
     // Deduplicate results
     return deduplicateJsonValues(results, root);
+}
+
+bool addsMultiplicity(const Token& tk)
+{
+    switch (tk.kind) {
+    case Token::Kind::Wildcard:
+    case Token::Kind::Recursive:
+    case Token::Kind::KeyList:
+        return true;
+    default:
+        return false;
+    }
+}
+
+QJsonValue squash(QJsonArray arr, bool multi)
+{
+    if (multi || arr.size() != 1)
+        return arr;
+    return arr[0];
+}
+
+QJsonValue applyTrailing(json_path::FunctionType fn, const QJsonValue& v)
+{
+    using enum json_path::FunctionType;
+
+    switch (fn) {
+    case None:   return v;
+
+    case Length:
+        if (v.isArray())  return v.toArray().size();
+        if (v.isObject()) return v.toObject().size();
+        return 0;
+
+    case Min:
+    case Max:
+        if (!v.isArray()) return QJsonValue(QJsonValue::Undefined);
+        {
+            const auto arr = v.toArray();
+            bool first=true; double best=0.0;
+            for (const auto& e : arr) {
+                if (!e.isDouble()) continue;
+                const double d = e.toDouble();
+                if (first || (fn==Min ? d<best : d>best))
+                    best = d, first = false;
+            }
+            return first ? QJsonValue(QJsonValue::Undefined)
+                         : QJsonValue(best);
+        }
+    }
+    std::unreachable();
 }
 
 } // namespace json_query::json_path::detail
