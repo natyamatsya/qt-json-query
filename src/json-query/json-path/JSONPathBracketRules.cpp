@@ -464,13 +464,21 @@ std::expected<void, Error> handleSingleIndex(QStringView content, EmbeddedBracke
     }
     
     bool ok = false;
-    int index = trimmed.toString().toInt(&ok);
+    // Use toLongLong to handle large integers like ±9007199254740991 (JavaScript MIN/MAX_SAFE_INTEGER)
+    qint64 index = trimmed.toString().toLongLong(&ok);
     if (!ok) {
-        qCDebug(jsonPathLog) << "handleSingleIndex: failed to convert to int" << trimmed;
+        qCDebug(jsonPathLog) << "handleSingleIndex: failed to convert to long long" << trimmed;
         return std::unexpected(Error::InvalidIndex);
     }
     
-    out.index(index);
+    // Convert to int for the token (with range checking)
+    if (index < INT_MIN || index > INT_MAX) {
+        // For very large indices, they will be out of range for any practical array
+        // but RFC 9535 requires us to accept them and let evaluation handle the bounds
+        out.index(index > 0 ? INT_MAX : INT_MIN);
+    } else {
+        out.index(static_cast<int>(index));
+    }
     return {};
 }
 
