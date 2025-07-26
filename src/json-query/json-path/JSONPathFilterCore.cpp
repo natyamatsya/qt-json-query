@@ -1156,15 +1156,52 @@ std::optional<Token> parseEmbeddedExists(QString s)
         token.kind = Token::Kind::Filter;
         token.key = s;
         
-        token.embedFilter([](const QJsonValue& j) {
-            // Multiple selector existence: true if any selector would return a value
-            // Simplified: true if object has properties or array has elements
-            if (j.isObject()) {
-                return !j.toObject().isEmpty();
-            } else if (j.isArray()) {
-                return !j.toArray().isEmpty();
+        token.embedFilter([s](const QJsonValue& j) {
+            // Multiple selector existence: parse the selectors and check if ANY would return values
+            // Extract the content between brackets: @[0, 0, 'a'] -> "0, 0, 'a'"
+            QString content = s;
+            if (content.startsWith("@[") && content.endsWith("]")) {
+                content = content.mid(2, content.length() - 3);
             }
-            return false;  // Primitive values don't support selectors
+            
+            // Split by comma and check each selector
+            QStringList selectors = content.split(',', Qt::SkipEmptyParts);
+            for (const QString& selector : selectors) {
+                QString trimmedSelector = selector.trimmed();
+                
+                // Check if this individual selector would return a value
+                bool selectorExists = false;
+                
+                // Handle quoted string selectors (property names)
+                if ((trimmedSelector.startsWith("'") && trimmedSelector.endsWith("'")) ||
+                    (trimmedSelector.startsWith("\"") && trimmedSelector.endsWith("\""))) {
+                    QString propName = trimmedSelector.mid(1, trimmedSelector.length() - 2);
+                    if (j.isObject()) {
+                        selectorExists = j.toObject().contains(propName);
+                    }
+                }
+                // Handle numeric selectors (array indices)
+                else {
+                    bool ok;
+                    int index = trimmedSelector.toInt(&ok);
+                    if (ok && j.isArray()) {
+                        const auto arr = j.toArray();
+                        // Handle negative indices
+                        if (index < 0) {
+                            index = arr.size() + index;
+                        }
+                        selectorExists = (index >= 0 && index < arr.size());
+                    }
+                }
+                
+                // If any selector exists, the whole expression is true
+                if (selectorExists) {
+                    return true;
+                }
+            }
+            
+            // No selectors exist
+            return false;
         });
         
         qCDebug(jsonPathLog) << "parseEmbeddedExists: matched multiple selector existence pattern";
