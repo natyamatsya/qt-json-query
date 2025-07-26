@@ -316,15 +316,15 @@ std::optional<Token> compileEmbeddedFilter(const QString& expr)
 {
     qCDebug(jsonPathLog) << "compileEmbeddedFilter() expr=" << expr;
     
-    // Try embedded filter parsing functions in priority order
-    if (auto token = detail::parseEmbeddedCompare(expr)) return token;
-    if (auto token = detail::parseEmbeddedExists(expr)) return token;
-    if (auto token = detail::parseEmbeddedRegex(expr)) return token;
-    if (auto token = detail::parseEmbeddedOr(expr)) return token;
-    if (auto token = detail::parseEmbeddedAnd(expr)) return token;
-    if (auto token = detail::parseEmbeddedIn(expr)) return token;
-    if (auto token = detail::parseEmbeddedSelfCmp(expr)) return token;
-    if (auto token = detail::parseEmbeddedNot(expr)) return token;
+    // Try embedded filter parsing functions in priority order (lowest precedence first)
+    if (auto token = detail::parseEmbeddedOr(expr)) return token;      // Lowest precedence
+    if (auto token = detail::parseEmbeddedAnd(expr)) return token;     // Higher precedence
+    if (auto token = detail::parseEmbeddedNot(expr)) return token;     // Negation
+    if (auto token = detail::parseEmbeddedIn(expr)) return token;      // In operator
+    if (auto token = detail::parseEmbeddedExists(expr)) return token;  // Existence checks
+    if (auto token = detail::parseEmbeddedSelfCmp(expr)) return token; // Self comparisons
+    if (auto token = detail::parseEmbeddedCompare(expr)) return token; // Basic comparisons
+    if (auto token = detail::parseEmbeddedRegex(expr)) return token;   // Regex patterns
     
     qCDebug(jsonPathLog) << "compileEmbeddedFilter: no embedded parser matched";
     return std::nullopt;

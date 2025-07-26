@@ -752,9 +752,31 @@ std::optional<Token> parseEmbeddedOr(QString s)
     if (auto split = splitTopLevel(s, "||"_L1); split) {
         auto [lhs, rhs] = *split;
         
-        // For now, use a simplified approach - just try to parse the left side
-        // TODO: Implement full OR logic with proper embedded filter composition
-        return parseEmbeddedCompare(lhs);
+        qCDebug(jsonPathLog) << "parseEmbeddedOr: splitting" << s << "into lhs=" << lhs << "rhs=" << rhs;
+        
+        // Parse both sides recursively
+        auto leftToken = compileEmbeddedFilter(lhs);
+        auto rightToken = compileEmbeddedFilter(rhs);
+        
+        if (!leftToken || !rightToken) {
+            qCDebug(jsonPathLog) << "parseEmbeddedOr: failed to parse one or both sides";
+            return std::nullopt;
+        }
+        
+        // Create composite OR filter using embedded filter composition
+        Token result;
+        result.kind = Token::Kind::Filter;
+        result.key = QString("(%1)||(%2)").arg(lhs, rhs);
+        
+        // Embed a composite filter that evaluates both sides with OR logic
+        result.embedFilter([leftToken = *leftToken, rightToken = *rightToken](const QJsonValue& value) -> bool {
+            bool leftResult = leftToken.evaluateEmbeddedFilter(value);
+            bool rightResult = rightToken.evaluateEmbeddedFilter(value);
+            return leftResult || rightResult;
+        });
+        
+        qCDebug(jsonPathLog) << "parseEmbeddedOr: successfully created composite OR filter";
+        return result;
     }
     return std::nullopt;
 }
@@ -764,9 +786,31 @@ std::optional<Token> parseEmbeddedAnd(QString s)
     if (auto split = splitTopLevel(s, "&&"_L1); split) {
         auto [lhs, rhs] = *split;
         
-        // For now, use a simplified approach - just try to parse the left side
-        // TODO: Implement full AND logic with proper embedded filter composition
-        return parseEmbeddedCompare(lhs);
+        qCDebug(jsonPathLog) << "parseEmbeddedAnd: splitting" << s << "into lhs=" << lhs << "rhs=" << rhs;
+        
+        // Parse both sides recursively
+        auto leftToken = compileEmbeddedFilter(lhs);
+        auto rightToken = compileEmbeddedFilter(rhs);
+        
+        if (!leftToken || !rightToken) {
+            qCDebug(jsonPathLog) << "parseEmbeddedAnd: failed to parse one or both sides";
+            return std::nullopt;
+        }
+        
+        // Create composite AND filter using embedded filter composition
+        Token result;
+        result.kind = Token::Kind::Filter;
+        result.key = QString("(%1)&&(%2)").arg(lhs, rhs);
+        
+        // Embed a composite filter that evaluates both sides with AND logic
+        result.embedFilter([leftToken = *leftToken, rightToken = *rightToken](const QJsonValue& value) -> bool {
+            bool leftResult = leftToken.evaluateEmbeddedFilter(value);
+            bool rightResult = rightToken.evaluateEmbeddedFilter(value);
+            return leftResult && rightResult;
+        });
+        
+        qCDebug(jsonPathLog) << "parseEmbeddedAnd: successfully created composite AND filter";
+        return result;
     }
     return std::nullopt;
 }
