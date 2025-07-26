@@ -146,6 +146,413 @@ namespace json_query::json_path
     };
 
     // ======================================================================
+    //  Zero-Overhead Copyable Filter Embedding System
+    // ======================================================================
+    
+    /**
+     * @brief Small buffer optimization for filter storage
+     * 
+     * Uses a fixed-size buffer to store small filters inline without heap allocation.
+     * Larger filters fall back to shared_ptr for copyability.
+     */
+    template<std::size_t BufferSize = 32>
+    class CompactFilterStorage {
+    public:
+        /**
+         * @brief Default constructor creates empty storage
+         */
+        CompactFilterStorage() : buffer_{}, evaluator_(nullptr), isInline_(false) {
+            // Initialize union to buffer state
+        }
+        
+        /**
+         * @brief Construct with a filter that fits in the small buffer
+         * @param filter The filter to store inline
+         */
+        template<FilterConcept Filter>
+        explicit CompactFilterStorage(Filter&& filter) 
+            requires (sizeof(std::decay_t<Filter>) <= BufferSize && std::is_trivially_copyable_v<std::decay_t<Filter>>)
+        {
+            using FilterType = std::decay_t<Filter>;
+            static_assert(sizeof(FilterType) <= BufferSize, "Filter too large for inline storage");
+            
+            new (buffer_.data()) FilterType(std::forward<Filter>(filter));
+            evaluator_ = [](const void* storage, const QJsonValue& value) -> bool {
+                const auto* filter = static_cast<const FilterType*>(storage);
+                return (*filter)(value);
+            };
+            isInline_ = true;
+        }
+        
+        /**
+         * @brief Construct with a large filter using shared storage
+         * @param filter The filter to store in shared memory
+         */
+        template<FilterConcept Filter>
+        explicit CompactFilterStorage(Filter&& filter)
+            requires (sizeof(std::decay_t<Filter>) > BufferSize || !std::is_trivially_copyable_v<std::decay_t<Filter>>)
+        {
+            using FilterType = std::decay_t<Filter>;
+            sharedFilter_ = std::make_shared<FilterType>(std::forward<Filter>(filter));
+            evaluator_ = [](const void* storage, const QJsonValue& value) -> bool {
+                const auto* sharedPtr = static_cast<const std::shared_ptr<FilterType>*>(storage);
+                return (**sharedPtr)(value);
+            };
+            isInline_ = false;
+        }
+        
+        /**
+         * @brief Copy constructor with proper storage handling
+         */
+        CompactFilterStorage(const CompactFilterStorage& other) 
+            : evaluator_(other.evaluator_), isInline_(other.isInline_) {
+            if (isInline_) {
+                std::memcpy(buffer_.data(), other.buffer_.data(), BufferSize);
+            } else {
+                new (&sharedFilter_) std::shared_ptr<void>(other.sharedFilter_);
+            }
+        }
+        
+        /**
+         * @brief Move constructor with proper storage handling
+         */
+        CompactFilterStorage(CompactFilterStorage&& other) noexcept
+            : evaluator_(other.evaluator_), isInline_(other.isInline_) {
+            if (isInline_) {
+                std::memcpy(buffer_.data(), other.buffer_.data(), BufferSize);
+            } else {
+                new (&sharedFilter_) std::shared_ptr<void>(std::move(other.sharedFilter_));
+            }
+            other.evaluator_ = nullptr;
+        }
+        
+        /**
+         * @brief Copy assignment operator
+         */
+        CompactFilterStorage& operator=(const CompactFilterStorage& other) {
+            if (this != &other) {
+                this->~CompactFilterStorage();
+                new (this) CompactFilterStorage(other);
+            }
+            return *this;
+        }
+        
+        /**
+         * @brief Move assignment operator
+         */
+        CompactFilterStorage& operator=(CompactFilterStorage&& other) noexcept {
+            if (this != &other) {
+                this->~CompactFilterStorage();
+                new (this) CompactFilterStorage(std::move(other));
+            }
+            return *this;
+        }
+        
+        /**
+         * @brief Destructor with proper cleanup
+         */
+        ~CompactFilterStorage() {
+            if (!isInline_ && evaluator_) {
+                sharedFilter_.~shared_ptr();
+            }
+        }
+        
+        /**
+         * @brief Evaluate the stored filter
+         * @param value The JSON value to filter
+         * @return true if the value passes the filter
+         */
+        [[nodiscard]] bool evaluate(const QJsonValue& value) const {
+            if (!evaluator_) return false;
+            
+            if (isInline_) {
+                return evaluator_(buffer_.data(), value);
+            } else {
+                return evaluator_(&sharedFilter_, value);
+            }
+        }
+        
+        /**
+         * @brief Check if this storage contains a filter
+         * @return true if a filter is stored
+         */
+        [[nodiscard]] bool hasFilter() const noexcept {
+            return evaluator_ != nullptr;
+        }
+        
+        /**
+         * @brief Check if the filter is stored inline (zero heap allocation)
+         * @return true if using inline storage
+         */
+        [[nodiscard]] bool isInlineStorage() const noexcept {
+            return isInline_;
+        }
+        
+    private:
+        union {
+            std::array<std::byte, BufferSize> buffer_;
+            std::shared_ptr<void> sharedFilter_;
+        };
+        
+        bool (*evaluator_)(const void*, const QJsonValue&) = nullptr;
+        bool isInline_ = false;
+    };
+    
+    /**
+     * @brief Context filter storage with small buffer optimization
+     */
+    template<std::size_t BufferSize = 32>
+    class CompactContextFilterStorage {
+    public:
+        /**
+         * @brief Default constructor creates empty storage
+         */
+        CompactContextFilterStorage() : buffer_{}, evaluator_(nullptr), isInline_(false) {
+            // Initialize union to buffer state
+        }
+        
+        /**
+         * @brief Construct with a context filter that fits in the small buffer
+         */
+        template<ContextFilterConcept Filter>
+        explicit CompactContextFilterStorage(Filter&& filter)
+            requires (sizeof(std::decay_t<Filter>) <= BufferSize && std::is_trivially_copyable_v<std::decay_t<Filter>>)
+        {
+            using FilterType = std::decay_t<Filter>;
+            static_assert(sizeof(FilterType) <= BufferSize, "Context filter too large for inline storage");
+            
+            new (buffer_.data()) FilterType(std::forward<Filter>(filter));
+            evaluator_ = [](const void* storage, const QJsonValue& currentNode, const QJsonValue& rootDocument) -> bool {
+                const auto* filter = static_cast<const FilterType*>(storage);
+                return (*filter)(currentNode, rootDocument);
+            };
+            isInline_ = true;
+        }
+        
+        /**
+         * @brief Construct with a large context filter using shared storage
+         */
+        template<ContextFilterConcept Filter>
+        explicit CompactContextFilterStorage(Filter&& filter)
+            requires (sizeof(std::decay_t<Filter>) > BufferSize || !std::is_trivially_copyable_v<std::decay_t<Filter>>)
+        {
+            using FilterType = std::decay_t<Filter>;
+            sharedFilter_ = std::make_shared<FilterType>(std::forward<Filter>(filter));
+            evaluator_ = [](const void* storage, const QJsonValue& currentNode, const QJsonValue& rootDocument) -> bool {
+                const auto* sharedPtr = static_cast<const std::shared_ptr<FilterType>*>(storage);
+                return (**sharedPtr)(currentNode, rootDocument);
+            };
+            isInline_ = false;
+        }
+        
+        /**
+         * @brief Copy constructor with proper storage handling
+         */
+        CompactContextFilterStorage(const CompactContextFilterStorage& other)
+            : evaluator_(other.evaluator_), isInline_(other.isInline_) {
+            if (isInline_) {
+                std::memcpy(buffer_.data(), other.buffer_.data(), BufferSize);
+            } else {
+                new (&sharedFilter_) std::shared_ptr<void>(other.sharedFilter_);
+            }
+        }
+        
+        /**
+         * @brief Move constructor with proper storage handling
+         */
+        CompactContextFilterStorage(CompactContextFilterStorage&& other) noexcept
+            : evaluator_(other.evaluator_), isInline_(other.isInline_) {
+            if (isInline_) {
+                std::memcpy(buffer_.data(), other.buffer_.data(), BufferSize);
+            } else {
+                new (&sharedFilter_) std::shared_ptr<void>(std::move(other.sharedFilter_));
+            }
+            other.evaluator_ = nullptr;
+        }
+        
+        /**
+         * @brief Copy assignment operator
+         */
+        CompactContextFilterStorage& operator=(const CompactContextFilterStorage& other) {
+            if (this != &other) {
+                this->~CompactContextFilterStorage();
+                new (this) CompactContextFilterStorage(other);
+            }
+            return *this;
+        }
+        
+        /**
+         * @brief Move assignment operator
+         */
+        CompactContextFilterStorage& operator=(CompactContextFilterStorage&& other) noexcept {
+            if (this != &other) {
+                this->~CompactContextFilterStorage();
+                new (this) CompactContextFilterStorage(std::move(other));
+            }
+            return *this;
+        }
+        
+        /**
+         * @brief Destructor with proper cleanup
+         */
+        ~CompactContextFilterStorage() {
+            if (!isInline_ && evaluator_) {
+                sharedFilter_.~shared_ptr();
+            }
+        }
+        
+        /**
+         * @brief Evaluate the stored context filter
+         * @param currentNode The current JSON node
+         * @param rootDocument The root document for context
+         * @return true if the value passes the filter
+         */
+        [[nodiscard]] bool evaluateContext(const QJsonValue& currentNode, const QJsonValue& rootDocument) const {
+            if (!evaluator_) return false;
+            
+            if (isInline_) {
+                return evaluator_(buffer_.data(), currentNode, rootDocument);
+            } else {
+                return evaluator_(&sharedFilter_, currentNode, rootDocument);
+            }
+        }
+        
+        /**
+         * @brief Check if this storage contains a context filter
+         * @return true if a context filter is stored
+         */
+        [[nodiscard]] bool hasFilter() const noexcept {
+            return evaluator_ != nullptr;
+        }
+        
+        /**
+         * @brief Check if the context filter is stored inline (zero heap allocation)
+         * @return true if using inline storage
+         */
+        [[nodiscard]] bool isInlineStorage() const noexcept {
+            return isInline_;
+        }
+        
+    private:
+        union {
+            std::array<std::byte, BufferSize> buffer_;
+            std::shared_ptr<void> sharedFilter_;
+        };
+        
+        bool (*evaluator_)(const void*, const QJsonValue&, const QJsonValue&) = nullptr;
+        bool isInline_ = false;
+    };
+    
+    /**
+     * @brief Zero-overhead embedded filter for Token struct
+     * 
+     * Combines regular and context filters in a single, copyable structure
+     * with small buffer optimization for maximum performance.
+     */
+    class EmbeddedFilter {
+    public:
+        /**
+         * @brief Default constructor creates empty filter
+         */
+        EmbeddedFilter() = default;
+        
+        /**
+         * @brief Construct with a regular filter
+         */
+        template<FilterConcept Filter>
+        explicit EmbeddedFilter(Filter&& filter)
+            : regularFilter_(std::forward<Filter>(filter)) {}
+        
+        /**
+         * @brief Construct with a context filter
+         */
+        template<ContextFilterConcept Filter>
+        explicit EmbeddedFilter(Filter&& filter)
+            : contextFilter_(std::forward<Filter>(filter)) {}
+        
+        /**
+         * @brief Copy constructor (fully copyable)
+         */
+        EmbeddedFilter(const EmbeddedFilter&) = default;
+        
+        /**
+         * @brief Move constructor
+         */
+        EmbeddedFilter(EmbeddedFilter&&) noexcept = default;
+        
+        /**
+         * @brief Copy assignment operator
+         */
+        EmbeddedFilter& operator=(const EmbeddedFilter&) = default;
+        
+        /**
+         * @brief Move assignment operator
+         */
+        EmbeddedFilter& operator=(EmbeddedFilter&&) noexcept = default;
+        
+        /**
+         * @brief Destructor
+         */
+        ~EmbeddedFilter() = default;
+        
+        /**
+         * @brief Evaluate regular filter
+         * @param value The JSON value to filter
+         * @return true if the value passes the filter
+         */
+        [[nodiscard]] bool evaluate(const QJsonValue& value) const {
+            return regularFilter_.evaluate(value);
+        }
+        
+        /**
+         * @brief Evaluate context filter
+         * @param currentNode The current JSON node
+         * @param rootDocument The root document for context
+         * @return true if the value passes the filter
+         */
+        [[nodiscard]] bool evaluateContext(const QJsonValue& currentNode, const QJsonValue& rootDocument) const {
+            return contextFilter_.evaluateContext(currentNode, rootDocument);
+        }
+        
+        /**
+         * @brief Check if this contains a regular filter
+         * @return true if a regular filter is embedded
+         */
+        [[nodiscard]] bool hasRegularFilter() const noexcept {
+            return regularFilter_.hasFilter();
+        }
+        
+        /**
+         * @brief Check if this contains a context filter
+         * @return true if a context filter is embedded
+         */
+        [[nodiscard]] bool hasContextFilter() const noexcept {
+            return contextFilter_.hasFilter();
+        }
+        
+        /**
+         * @brief Check if this contains any filter
+         * @return true if any filter is embedded
+         */
+        [[nodiscard]] bool hasFilter() const noexcept {
+            return hasRegularFilter() || hasContextFilter();
+        }
+        
+        /**
+         * @brief Check if filters are stored inline (zero heap allocation)
+         * @return true if using only inline storage
+         */
+        [[nodiscard]] bool isZeroOverhead() const noexcept {
+            return (!hasRegularFilter() || regularFilter_.isInlineStorage()) &&
+                   (!hasContextFilter() || contextFilter_.isInlineStorage());
+        }
+        
+    private:
+        CompactFilterStorage<32> regularFilter_;
+        CompactContextFilterStorage<32> contextFilter_;
+    };
+
+    // ======================================================================
     //  Compact, pre-decoded token layout
     // ======================================================================
     struct Slice { qsizetype start{}, end{}, step{}; };
@@ -164,6 +571,9 @@ namespace json_query::json_path
         std::size_t   filterId{};       // index into filter table
         std::size_t   contextFilterId{SIZE_MAX}; // index into context filter table (SIZE_MAX = not used)
         
+        // Zero-overhead embedded filter (new architecture)
+        std::optional<EmbeddedFilter> embeddedFilter{};
+        
         // Bracket group metadata for union vs sequential evaluation
         int           bracketGroupId{-1}; // -1 = not from bracket, >0 = bracket group ID
         
@@ -177,6 +587,51 @@ namespace json_query::json_path
          */
         [[nodiscard]] bool hasLegacyFilter() const noexcept {
             return filterId < SIZE_MAX || contextFilterId < SIZE_MAX;
+        }
+        
+        /**
+         * @brief Check if this token has an embedded filter
+         * @return true if using new embedded filter architecture
+         */
+        [[nodiscard]] bool hasEmbeddedFilter() const noexcept {
+            return embeddedFilter.has_value() && embeddedFilter->hasFilter();
+        }
+        
+        /**
+         * @brief Embed a regular filter directly in this token
+         * @param filter The filter to embed
+         */
+        template<FilterConcept Filter>
+        void embedFilter(Filter&& filter) {
+            embeddedFilter = EmbeddedFilter(std::forward<Filter>(filter));
+        }
+        
+        /**
+         * @brief Embed a context filter directly in this token
+         * @param filter The context filter to embed
+         */
+        template<ContextFilterConcept Filter>
+        void embedContextFilter(Filter&& filter) {
+            embeddedFilter = EmbeddedFilter(std::forward<Filter>(filter));
+        }
+        
+        /**
+         * @brief Evaluate the embedded filter (if present)
+         * @param value The JSON value to filter
+         * @return true if the value passes the filter, false if no filter
+         */
+        [[nodiscard]] bool evaluateEmbeddedFilter(const QJsonValue& value) const {
+            return embeddedFilter ? embeddedFilter->evaluate(value) : false;
+        }
+        
+        /**
+         * @brief Evaluate the embedded context filter (if present)
+         * @param currentNode The current JSON node
+         * @param rootDocument The root document for context
+         * @return true if the value passes the filter, false if no filter
+         */
+        [[nodiscard]] bool evaluateEmbeddedContextFilter(const QJsonValue& currentNode, const QJsonValue& rootDocument) const {
+            return embeddedFilter ? embeddedFilter->evaluateContext(currentNode, rootDocument) : false;
         }
     };   
 
