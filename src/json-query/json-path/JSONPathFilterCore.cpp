@@ -781,17 +781,32 @@ std::optional<Token> parseEmbeddedCompare(QString s)
 {
     s = stripOuterParens(s);
     
+    qCDebug(jsonPathLog) << "parseEmbeddedCompare: trying to parse" << s;
+    
     // Try embedded comparison patterns using the template functions
     constexpr auto dotPat = ctll::fixed_string{R"(@\.([\w$]+)\s*(==|!=|>=|<=|>|<)\s*(.+))"};
     constexpr auto brkPat = ctll::fixed_string{R"(@\[['\"]([^'"]+)['\"]\]\s*(==|!=|>=|<=|>|<)\s*(.+))"};
     constexpr auto idxPat = ctll::fixed_string{R"(@\[(-?\d+)\]\s*(==|!=|>=|<=|>|<)\s*(.+))"};
     constexpr auto selfPat = ctll::fixed_string{R"(^@\s*(==|!=|>=|<=|>|<)\s*(.+)$)"};
     
-    if (auto t = parseEmbeddedCompare1<dotPat>(s)) return t;
-    if (auto t = parseEmbeddedCompare1<brkPat>(s)) return t;
-    if (auto t = parseEmbeddedCompareIndex<idxPat>(s)) return t;
-    if (auto t = parseEmbeddedSelfValue<selfPat>(s)) return t;
+    if (auto t = parseEmbeddedCompare1<dotPat>(s)) {
+        qCDebug(jsonPathLog) << "parseEmbeddedCompare: matched dot pattern";
+        return t;
+    }
+    if (auto t = parseEmbeddedCompare1<brkPat>(s)) {
+        qCDebug(jsonPathLog) << "parseEmbeddedCompare: matched bracket pattern";
+        return t;
+    }
+    if (auto t = parseEmbeddedCompareIndex<idxPat>(s)) {
+        qCDebug(jsonPathLog) << "parseEmbeddedCompare: matched index pattern";
+        return t;
+    }
+    if (auto t = parseEmbeddedSelfValue<selfPat>(s)) {
+        qCDebug(jsonPathLog) << "parseEmbeddedCompare: matched self pattern";
+        return t;
+    }
     
+    qCDebug(jsonPathLog) << "parseEmbeddedCompare: no patterns matched for" << s;
     return std::nullopt;
 }
 
@@ -808,7 +823,45 @@ std::optional<Token> parseEmbeddedRegex(QString s)
 
 std::optional<Token> parseEmbeddedExists(QString s)
 {
-    // Simplified implementation for now - can be enhanced later with full pattern support
+    qCDebug(jsonPathLog) << "parseEmbeddedExists: trying to parse" << s;
+    
+    // Enhanced existence patterns for better coverage
+    constexpr auto dotExistsPat = ctll::fixed_string{R"(@\.([\w$]+))"};
+    constexpr auto brkExistsPat = ctll::fixed_string{R"(@\[['\"]([^'"]+)['\"]\])"};
+    constexpr auto idxExistsPat = ctll::fixed_string{R"(@\[(-?\d+)\])"};
+    
+    // Try basic existence patterns
+    if (auto m = ctre::match<dotExistsPat>(to_sv(s))) {
+        const QString prop = to_qstr(m.template get<1>().to_view());
+        
+        Token token;
+        token.kind = Token::Kind::Filter;
+        token.key = s;
+        
+        token.embedFilter([prop](const QJsonValue& j) {
+            return j.isObject() && j.toObject().contains(prop);
+        });
+        
+        qCDebug(jsonPathLog) << "parseEmbeddedExists: matched dot existence pattern";
+        return token;
+    }
+    
+    if (auto m = ctre::match<brkExistsPat>(to_sv(s))) {
+        const QString prop = to_qstr(m.template get<1>().to_view());
+        
+        Token token;
+        token.kind = Token::Kind::Filter;
+        token.key = s;
+        
+        token.embedFilter([prop](const QJsonValue& j) {
+            return j.isObject() && j.toObject().contains(prop);
+        });
+        
+        qCDebug(jsonPathLog) << "parseEmbeddedExists: matched bracket existence pattern";
+        return token;
+    }
+    
+    qCDebug(jsonPathLog) << "parseEmbeddedExists: no patterns matched for" << s;
     return std::nullopt;
 }
 

@@ -113,11 +113,37 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::Filter>(const PathEvalCtx
                                                                 const QJsonValue& v)
 {
     QJsonArray out;
-    if (tk.filterId >= ctx.filters.size() && tk.contextFilterId >= ctx.contextFilters.size()) {
+    
+    // First priority: Check for embedded filters (zero-overhead)
+    if (tk.hasEmbeddedFilter()) {
+        if (v.isArray()) {
+            const QJsonArray arr = v.toArray();
+            auto cursor = ContainerCursor::array(arr);
+            for (const auto& item : cursor) {
+                bool pass = tk.evaluateEmbeddedFilter(item);
+                if (pass) {
+                    out.append(item);
+                }
+            }
+        } else if (v.isObject()) {
+            const QJsonObject obj = v.toObject();
+            auto cursor = ContainerCursor::object(obj);
+            for (const auto& val : cursor) {
+                bool pass = tk.evaluateEmbeddedFilter(val);
+                if (pass) {
+                    out.append(val);
+                }
+            }
+        }
         return out;
     }
+    
+    // Second priority: Check for legacy filters
+    if (tk.filterId >= ctx.filters.size() && tk.contextFilterId >= ctx.contextFilters.size()) {
+        return out; // No filters at all
+    }
 
-    // Determine which type of filter to use
+    // Determine which type of legacy filter to use
     bool useContextFilter = (tk.contextFilterId != SIZE_MAX && tk.contextFilterId < ctx.contextFilters.size());
     
     if (v.isArray()) {

@@ -251,6 +251,13 @@ std::expected<void, Error> handleFilterWithParens(QStringView content, BracketSi
     
     qCDebug(jsonPathLog) << "handleFilterWithParens: processing expression" << expr;
     
+    // Try embedded filter compilation first (zero-overhead)
+    if (auto token = compileEmbeddedContextFilter(expr)) {
+        out.pushFilter(*token);
+        return {};
+    }
+    
+    // Fall back to legacy compilation for backward compatibility
     if (auto token = compileContextFilter(expr, out.contextFilters, out.filters)) {
         out.pushFilter(*token);
         return {};
@@ -268,6 +275,13 @@ std::expected<void, Error> handleFilterWithoutParens(QStringView content, Bracke
     
     qCDebug(jsonPathLog) << "handleFilterWithoutParens: processing expression" << expr;
     
+    // Try embedded filter compilation first (zero-overhead)
+    if (auto token = compileEmbeddedContextFilter(expr)) {
+        out.pushFilter(*token);
+        return {};
+    }
+    
+    // Fall back to legacy compilation for backward compatibility
     if (auto token = compileContextFilter(expr, out.contextFilters, out.filters)) {
         out.pushFilter(*token);
         return {};
