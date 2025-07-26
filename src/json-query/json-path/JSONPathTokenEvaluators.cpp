@@ -138,67 +138,7 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::Filter>(const PathEvalCtx
         return out;
     }
     
-    // Second priority: Check for legacy filters
-    if (tk.filterId >= ctx.filters.size() && tk.contextFilterId >= ctx.contextFilters.size()) {
-        return out; // No filters at all
-    }
-
-    // Determine which type of legacy filter to use
-    bool useContextFilter = (tk.contextFilterId != SIZE_MAX && tk.contextFilterId < ctx.contextFilters.size());
-    
-    if (v.isArray()) {
-        const QJsonArray arr = v.toArray(); // Create proper copy to avoid iterator invalidation
-        
-        if (useContextFilter) {
-            // Use ContextAwareContainerCursor for context-aware filter evaluation with zero-copy iteration
-            auto cursor = internal::makeSimpleContextCursor(arr, ctx.rootDocument, v);
-            const auto& contextFilterFn = ctx.contextFilters[tk.contextFilterId];
-            
-            for (const auto& [item, context] : cursor) {
-                bool pass = contextFilterFn(item, context.rootDocument());
-                if (pass) {
-                    out.append(item);
-                }
-            }
-        } else {
-            // Use ContainerCursor for optimized, zero-copy array iteration during regular filter evaluation
-            auto cursor = ContainerCursor::array(arr);
-            for (const auto& item : cursor) {
-                bool pass = false;
-                if (tk.filterId >= ctx.filters.size()) continue;
-                const auto& filterFn = ctx.filters[tk.filterId];
-                pass = filterFn(item);
-                if (pass)
-                    out.append(item);
-            }
-        }
-    } else if (v.isObject()) {
-        const QJsonObject obj = v.toObject(); // Create proper copy to avoid iterator invalidation
-        
-        if (useContextFilter) {
-            // Use ContextAwareContainerCursor for context-aware filter evaluation with zero-copy iteration
-            auto cursor = internal::makeSimpleContextCursor(obj, ctx.rootDocument, v);
-            const auto& contextFilterFn = ctx.contextFilters[tk.contextFilterId];
-            
-            for (const auto& [val, context] : cursor) {
-                bool pass = contextFilterFn(val, context.rootDocument());
-                if (pass) {
-                    out.append(val);
-                }
-            }
-        } else {
-            // Use ContainerCursor for optimized, zero-copy object iteration during regular filter evaluation
-            auto cursor = ContainerCursor::object(obj);
-            for (const auto& val : cursor) {
-                bool pass = false;
-                if (tk.filterId >= ctx.filters.size()) continue;
-                const auto& filterFn = ctx.filters[tk.filterId];
-                pass = filterFn(val);
-                if (pass)
-                    out.append(val);
-            }
-        }
-    }
+    // No filters available - return empty result
     return out;
 }
 

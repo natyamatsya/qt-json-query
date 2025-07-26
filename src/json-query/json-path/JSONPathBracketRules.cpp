@@ -578,15 +578,20 @@ std::expected<void, Error> handleQuotedKey(QStringView content, EmbeddedBracketS
 {
     QStringView trimmed = content.trimmed();
     
-    QString key;
-    if ((trimmed.startsWith(u'"') && trimmed.endsWith(u'"')) ||
-        (trimmed.startsWith(u'\'') && trimmed.endsWith(u'\''))) {
-        key = trimmed.mid(1, trimmed.length() - 2).toString();
-    } else {
-        return std::unexpected(Error::UnmatchedQuote);
+    if (trimmed.size() < 2) {
+        return std::unexpected(Error::InvalidSlice);
     }
     
-    return out.key(key, true); // Allow spaces in quoted keys
+    QChar quote = trimmed.front();
+    QStringView keyContent = trimmed.mid(1, trimmed.size() - 2);
+    
+    QuoteStyle style = (quote == u'\'') ? QuoteStyle::Single : QuoteStyle::Double;
+    if (!isValidQuotedKey(keyContent, style)) {
+        return std::unexpected(Error::InvalidSlice);
+    }
+    
+    QString unescapedKey = unescapeQuotedKey(keyContent);
+    return out.key(unescapedKey, true); // Allow spaces in quoted keys
 }
 
 std::expected<void, Error> handleUnquotedKey(QStringView /*content*/, EmbeddedBracketSink& /*out*/)

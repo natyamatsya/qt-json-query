@@ -32,7 +32,7 @@ JSONPath::EvalResult JSONPath::evaluate(const QJsonDocument& doc) const
 JSONPath::EvalResult JSONPath::evaluate(const QJsonValue& value) const
 {
     try {
-        json_path::detail::PathEvalCtx ctx{m_tokens, m_filters, m_contextFilters, value, m_func};
+        json_path::detail::PathEvalCtx ctx{m_tokens, value, m_func};
         
         // C++23 Monadic Chain - Elegant error propagation without manual checks!
         return json_path::detail::evaluate(ctx, value)
@@ -58,7 +58,7 @@ JSONPath::EvalArrayResult JSONPath::evaluateAll(const QJsonDocument& doc) const
 JSONPath::EvalArrayResult JSONPath::evaluateAll(const QJsonValue& value) const
 {
     try {
-        json_path::detail::PathEvalCtx ctx{m_tokens, m_filters, m_contextFilters, value, m_func};
+        json_path::detail::PathEvalCtx ctx{m_tokens, value, m_func};
         
         // C++23 Monadic Chain - Elegant error propagation without manual checks!
         return json_path::detail::evaluateAll(ctx, value)

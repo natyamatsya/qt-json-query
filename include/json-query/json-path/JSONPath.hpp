@@ -75,16 +75,12 @@ private:
     // -----------------------------------------------------------------
     //  Private "data" ctor – used only by factory                     ★
     // -----------------------------------------------------------------
-    JSONPath( json_query::json_path::FunctionType                func,
-                  QString                     original,
-                  QVector<json_query::json_path::Token>              tokens,
-                  QVector<json_query::json_path::FilterFn> filters,
-                  QVector<json_query::json_path::ContextFilterFn> contextFilters ) noexcept
+    JSONPath(json_query::json_path::FunctionType func,
+                  QString                                        original,
+                  QVector<json_query::json_path::Token>              tokens ) noexcept
             : m_func(func)
             , m_originalPath(std::move(original))
             , m_tokens(std::move(tokens))
-            , m_filters(std::move(filters))
-            , m_contextFilters(std::move(contextFilters))
         {}
 
     // -----------------------------------------------------------------
@@ -93,8 +89,7 @@ private:
     json_query::json_path::FunctionType               m_func    {json_query::json_path::FunctionType::None};
     QString                    m_originalPath;
     QVector<json_query::json_path::Token>             m_tokens;
-    QVector<json_query::json_path::FilterFn> m_filters;
-    QVector<json_query::json_path::ContextFilterFn> m_contextFilters;
+    // Legacy filter storage removed - now using embedded filters only
 
 }; // end class JSONPath
 

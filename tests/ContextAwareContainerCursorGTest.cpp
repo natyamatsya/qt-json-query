@@ -52,7 +52,7 @@ protected:
         currentContext = rootObj["items"];
         
         // Create minimal PathEvalCtx for testing
-        ctx = std::make_unique<PathEvalCtx>(tokens, filters, contextFilters, rootValue, FunctionType::None);
+        ctx = std::make_unique<PathEvalCtx>(tokens, rootValue, FunctionType::None);
     }
     
     QJsonObject rootObj;
@@ -61,8 +61,6 @@ protected:
     QJsonValue currentContext;
     
     QVector<Token> tokens;
-    QVector<FilterFn> filters;
-    QVector<ContextFilterFn> contextFilters;
     std::unique_ptr<PathEvalCtx> ctx;
 };
 
@@ -415,7 +413,7 @@ TEST_F(ContextAwareContainerCursorTest, JSONPathIntegrationScenario) {
     QJsonValue complexRootValue(complexRoot);
     QJsonValue usersContext = complexRoot["users"];
     
-    PathEvalCtx complexCtx{tokens, filters, contextFilters, complexRootValue, FunctionType::None};
+    PathEvalCtx complexCtx{tokens, complexRootValue, FunctionType::None};
     auto cursor = makeContextAwareCursor(complexRoot["users"].toArray(), complexCtx, usersContext);
     
     // Simulate filtering users based on root config and user properties

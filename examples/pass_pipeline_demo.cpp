@@ -60,9 +60,7 @@ int main() {
             // Create evaluation context similar to how JSONPath does it internally
             // We'll create a minimal context for demonstration purposes
             QVector<Token> dummyTokens;
-            QVector<FilterFn> dummyFilters;
-            QVector<ContextFilterFn> dummyContextFilters;
-            detail::PathEvalCtx evalCtx(dummyTokens, dummyFilters, dummyContextFilters, rootValue, json_query::json_path::FunctionType::None);
+            detail::PathEvalCtx evalCtx(dummyTokens, rootValue, json_query::json_path::FunctionType::None);
 
             // Create pass context and manager
             internal::PassContext passContext(evalCtx, rootValue);
