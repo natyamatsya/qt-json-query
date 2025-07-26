@@ -293,6 +293,19 @@ std::expected<json_query::json_path::CompilationResult, json_query::json_path::E
 //  Modern Embedded Filter Compilation Implementation (Zero-Overhead)
 // ──────────────────────────────────────────────────────────────────────
 
+// Forward declarations for embedded filter functions
+namespace detail {
+    std::optional<Token> parseEmbeddedOr(QString s);
+    std::optional<Token> parseEmbeddedAnd(QString s);
+    std::optional<Token> parseEmbeddedNot(QString s);
+    std::optional<Token> parseEmbeddedIn(QString s);
+    std::optional<Token> parseEmbeddedExists(QString s);
+    std::optional<Token> parseEmbeddedSelfCmp(QString s);
+    std::optional<Token> parseEmbeddedFunction(QString s);
+    std::optional<Token> parseEmbeddedCompare(QString s);
+    std::optional<Token> parseEmbeddedRegex(QString s);
+}
+
 std::optional<Token> compileEmbeddedFilter(const QString& expr)
 {
     QString s = json_query::json_path::detail::stripOuterParens(expr);
@@ -305,6 +318,7 @@ std::optional<Token> compileEmbeddedFilter(const QString& expr)
     if (auto token = detail::parseEmbeddedIn(s)) return token;      // In operator
     if (auto token = detail::parseEmbeddedExists(s)) return token;  // Existence checks
     if (auto token = detail::parseEmbeddedSelfCmp(s)) return token; // Self comparisons
+    if (auto token = detail::parseEmbeddedFunction(s)) return token; // Function calls
     if (auto token = detail::parseEmbeddedCompare(s)) return token; // Basic comparisons
     if (auto token = detail::parseEmbeddedRegex(s)) return token;   // Regex patterns
     

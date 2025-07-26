@@ -1368,4 +1368,71 @@ std::optional<Token> parseEmbeddedNot(QString s)
     return std::nullopt;
 }
 
+std::optional<Token> parseEmbeddedFunction(QString s)
+{
+    // Pattern for function call comparisons: func(...) op value or value op func(...)
+    constexpr auto funcCompPat = ctll::fixed_string{R"(^(.*?)\s*(==|!=|<|>|<=|>=)\s*(.*?)$)"};
+    
+    if (auto m = ctre::match<funcCompPat>(to_sv(s))) {
+        QString left = to_qstr(m.template get<1>().to_view()).trimmed();
+        QString op = to_qstr(m.template get<2>().to_view());
+        QString right = to_qstr(m.template get<3>().to_view()).trimmed();
+        
+        // Check if either side contains a function call
+        bool leftHasFunc = left.contains("(") && left.contains(")");
+        bool rightHasFunc = right.contains("(") && right.contains(")");
+        
+        if (!leftHasFunc && !rightHasFunc) {
+            return std::nullopt; // No function calls found
+        }
+        
+        // Create embedded filter for function call comparison
+        Token result;
+        result.kind = Token::Kind::Filter;
+        result.key = s;
+        
+        // Embed the function call comparison logic
+        result.embedFilter([left, op, right, leftHasFunc, rightHasFunc](const QJsonValue& j) -> bool {
+            QJsonValue leftVal, rightVal;
+            
+            // Evaluate left side
+            if (leftHasFunc) {
+                leftVal = evaluateFunction(left, j);
+            } else if (left.startsWith("@.")) {
+                // Property access - RFC 9535 "nothing" semantics
+                QString prop = left.mid(2);
+                QJsonValue val = j.toObject().value(prop);
+                leftVal = val.isUndefined() ? QJsonValue(0) : val; // Undefined becomes 0
+            } else {
+                leftVal = parseJsonLiteral(left);
+            }
+            
+            // Evaluate right side  
+            if (rightHasFunc) {
+                rightVal = evaluateFunction(right, j);
+            } else if (right.startsWith("@.")) {
+                // Property access - RFC 9535 "nothing" semantics
+                QString prop = right.mid(2);
+                QJsonValue val = j.toObject().value(prop);
+                rightVal = val.isUndefined() ? QJsonValue(0) : val; // Undefined becomes 0
+            } else {
+                rightVal = parseJsonLiteral(right);
+            }
+            
+            // Perform comparison
+            if (op == "==") return leftVal == rightVal;
+            if (op == "!=") return leftVal != rightVal;
+            if (op == "<") return compareValues(leftVal, rightVal) < 0;
+            if (op == ">") return compareValues(leftVal, rightVal) > 0;
+            if (op == "<=") return compareValues(leftVal, rightVal) <= 0;
+            if (op == ">=") return compareValues(leftVal, rightVal) >= 0;
+            return false;
+        });
+        
+        return result;
+    }
+    
+    return std::nullopt;
+}
+
 } // namespace json_query::json_path::detail
