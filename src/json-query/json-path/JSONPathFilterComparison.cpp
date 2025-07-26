@@ -16,7 +16,7 @@ bool compareValue<ComparisonType::Numeric>(const QJsonValue& v, const QString& o
         // RFC 9535: Cross-type comparisons - different types are never equal
         if (op == "==") return false;
         if (op == "!=") return true;
-        return false; // Ordering comparisons only work within same type
+        return false;
     }
     const double val = v.toDouble();
     
@@ -36,7 +36,7 @@ bool compareValue<ComparisonType::Boolean>(const QJsonValue& v, const QString& o
         // RFC 9535: Cross-type comparisons - different types are never equal
         if (op == "==") return false;
         if (op == "!=") return true;
-        return false; // Ordering comparisons only work within same type
+        return false;
     }
     const bool val = v.toBool();
     
@@ -53,20 +53,18 @@ bool compareValue<ComparisonType::Boolean>(const QJsonValue& v, const QString& o
 template<>
 bool compareValue<ComparisonType::Null>(const QJsonValue& v, const QString& op, const std::nullptr_t&)
 {
-    const bool isNull = v.isNull();
-    if (op == "==") return isNull;
-    if (op == "!=") return !isNull;
-    
-    // RFC 9535: null ordering comparisons
-    if (isNull) {
-        // null compared to null: <= and >= are true (null equals itself), < and > are false
-        if (op == "<=") return true;  // null <= null is true
-        if (op == ">=") return true;  // null >= null is true
-        if (op == "<") return false;  // null < null is false
-        if (op == ">") return false;  // null > null is false
+    if (!v.isNull()) {
+        if (op == "==") return false;
+        if (op == "!=") return true;
+        return false;
     }
     
-    return false; // non-null values don't match null ordering comparisons
+    // RFC 9535: null ordering comparisons
+    if (op == "==") return true;
+    if (op == "!=") return false;
+    if (op == "<=") return true;
+    if (op == ">=") return true;
+    return false; // < and > are false for null
 }
 
 template<>
@@ -76,7 +74,7 @@ bool compareValue<ComparisonType::String>(const QJsonValue& v, const QString& op
         // RFC 9535: Cross-type comparisons - different types are never equal
         if (op == "==") return false;
         if (op == "!=") return true;
-        return false; // Ordering comparisons only work within same type
+        return false;
     }
     const QString val = v.toString();
     
@@ -99,10 +97,7 @@ bool compareValue<ComparisonType::DeepEquality>(const QJsonValue& v, const QStri
         return false; // Invalid JSON
     }
     
-    const QJsonValue rhsValue = doc.isArray() ? QJsonValue(doc.array()) : 
-                               doc.isObject() ? QJsonValue(doc.object()) : 
-                               QJsonValue();
-    
+    const QJsonValue rhsValue = doc.isArray() ? QJsonValue(doc.array()) : QJsonValue(doc.object());
     if (op == "==") return v == rhsValue;
     if (op == "!=") return v != rhsValue;
     return false; // Deep equality only supports == and !=
@@ -127,16 +122,17 @@ bool ComparisonContext::compare(const QJsonValue& v) const
 }
 
 // Monadic helper to parse and classify RHS values, eliminating if-else cascades
-[[nodiscard]] std::optional<ComparisonContext> parseRhsValue(const QString& op, QString rhs) {
+[[nodiscard]] std::optional<ComparisonContext> parseRhsValue(const QString& op, QString rhs)
+{
     const bool isNum = isValidJsonNumber(rhs);
     const bool isBool = (rhs == "true" || rhs == "false");
     const bool isNull = (rhs == "null");
-    const bool rhsQuoted = (rhs.startsWith('"') && rhs.endsWith('"')) || 
-                          (rhs.startsWith('\'') && rhs.endsWith('\''));
     
-    // Early return for invalid unquoted non-literals
-    if (!isNum && !isBool && !isNull && !rhsQuoted) {
-        return std::nullopt;
+    // Check if RHS is quoted (for string vs deep equality distinction)
+    bool rhsQuoted = false;
+    if ((rhs.startsWith('"') && rhs.endsWith('"')) || 
+        (rhs.startsWith('\'') && rhs.endsWith('\''))) {
+        rhsQuoted = true;
     }
     
     // Parse values using functional composition instead of if-else cascade
@@ -158,6 +154,12 @@ bool ComparisonContext::compare(const QJsonValue& v) const
     auto parseString = [&]() -> std::optional<ComparisonContext> {
         QString processedRhs = rhs;
         if (!isNum && !isBool && !isNull) {
+            // Only accept quoted strings or valid unquoted literals
+            if (!rhsQuoted) {
+                // Reject invalid unquoted literals like "Null", "True", "False", etc.
+                // Only allow valid JSON literals (null, true, false, numbers) or quoted strings
+                return std::nullopt;
+            }
             (void)unquote(processedRhs);
         }
         ComparisonType type = rhsQuoted ? ComparisonType::String : ComparisonType::DeepEquality;
@@ -165,15 +167,13 @@ bool ComparisonContext::compare(const QJsonValue& v) const
     };
     
     // Monadic chaining to try each parser in priority order
-    return parseNumeric()
-        .or_else(parseBoolean)
-        .or_else(parseNull)
-        .or_else(parseString);
+    return parseNumeric().or_else(parseBoolean).or_else(parseNull).or_else(parseString);
 }
 
 // Monadic operator dispatch helper to eliminate repetitive if-else chains
 template<typename T>
-bool applyOperator(const QString& op, const T& left, const T& right) {
+bool applyOperator(const QString& op, const T& left, const T& right)
+{
     if (op == "==") return left == right;
     if (op == "!=") return left != right;
     if (op == "<") return left < right;
@@ -185,7 +185,8 @@ bool applyOperator(const QString& op, const T& left, const T& right) {
 
 // Specialized operator dispatch for floating point numbers with fuzzy comparison
 template<>
-bool applyOperator<double>(const QString& op, const double& left, const double& right) {
+bool applyOperator<double>(const QString& op, const double& left, const double& right)
+{
     if (op == "==") return qFuzzyCompare(left, right);
     if (op == "!=") return !qFuzzyCompare(left, right);
     if (op == "<") return left < right;
@@ -201,10 +202,11 @@ bool applyOperator<bool>(const QString& op, const bool& left, const bool& right)
 {
     if (op == "==") return left == right;
     if (op == "!=") return left != right;
-    if (op == "<")  return !left && right;  // false < true
-    if (op == ">")  return left && !right;  // true > false
-    if (op == "<=") return !left || right;  // false <= anything, true <= true
-    if (op == ">=") return left || !right;  // true >= anything, false >= false
+    // Custom boolean ordering: false < true
+    if (op == "<") return !left && right;
+    if (op == ">") return left && !right;
+    if (op == "<=") return !left || !right || left == right;
+    if (op == ">=") return left || !right || left == right;
     return false;
 }
 
@@ -214,8 +216,8 @@ bool applyOperator<QString>(const QString& op, const QString& left, const QStrin
 {
     if (op == "==") return left == right;
     if (op == "!=") return left != right;
-    if (op == "<")  return left < right;
-    if (op == ">")  return left > right;
+    if (op == "<") return left < right;
+    if (op == ">") return left > right;
     if (op == "<=") return left <= right;
     if (op == ">=") return left >= right;
     return false;

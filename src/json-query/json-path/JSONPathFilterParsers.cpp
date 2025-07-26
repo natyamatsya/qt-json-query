@@ -52,132 +52,113 @@ std::optional<json_query::json_path::Token> parseExists(QString s, QVector<json_
     // Function to create existence test token
     auto makeExistenceToken = [&](const QString& prop) -> json_query::json_path::Token {
         Builder b{out};
-        return b.add([prop](const QJsonValue& j){
-            const auto obj = j.toObject();
-            const auto v = obj.value(prop);
+        return b.add([prop](const QJsonValue& j) -> bool {
             // RFC 9535: existence filters check for property presence, not truthiness
-            // A property exists if it's present in the object, regardless of its value (including false, 0, "", [], {})
-            // Only undefined (missing) properties are considered non-existent
-            return v.type() != QJsonValue::Undefined;
-        }, prop);
+            return j.toObject().contains(prop);
+        }, QString("@.%1").arg(prop));
     };
 
-    auto makeArrayIndexToken = [&](int index)->json_query::json_path::Token {
+    auto makeArrayIndexToken = [&](int index) -> json_query::json_path::Token {
         Builder b{out};
-        return b.add([index](const QJsonValue& j){
-            if (!j.isArray()) return false; // non-arrays don't have indices
-            const auto arr = j.toArray();
-            if (index < 0 || index >= arr.size()) return false; // out of bounds is absent
-            const auto& v = arr[index];
+        return b.add([index](const QJsonValue& j) -> bool {
             // RFC 9535: existence filters check for element presence, not truthiness
-            // An array element exists if it's within bounds, regardless of its value (including false, 0, "", [], {})
-            return v.type() != QJsonValue::Undefined;
+            const auto arr = j.toArray();
+            return index >= 0 && index < arr.size();
         }, QString("@[%1]").arg(index));
     };
 
-    auto makeArraySliceToken = [&](int start, int end)->json_query::json_path::Token {
+    auto makeArraySliceToken = [&](int start, int end) -> json_query::json_path::Token {
         Builder b{out};
-        return b.add([start, end](const QJsonValue& j){
-            if (!j.isArray()) return false; // non-arrays don't have slices
-            const auto arr = j.toArray();
-            int actualStart = start < 0 ? 0 : start;
-            int actualEnd = end < 0 ? arr.size() : qMin(end, arr.size());
+        return b.add([start, end](const QJsonValue& j) -> bool {
             // RFC 9535: existence filters check for element presence, not truthiness
-            // A slice exists if it contains any elements within bounds, regardless of their values
-            return actualStart < actualEnd && actualStart < arr.size();
+            const auto arr = j.toArray();
+            int actualStart = (start == -1) ? 0 : start;
+            int actualEnd = (end == -1) ? arr.size() : end;
+            return actualStart < arr.size() && actualEnd > actualStart;
         }, QString("@[%1:%2]").arg(start).arg(end));
     };
 
-    auto makeRootToken = [&]()->json_query::json_path::Token {
+    auto makeRootToken = [&]() -> json_query::json_path::Token {
         Builder b{out};
-        return b.add([](const QJsonValue& j){
-            // RFC 9535: root existence filter checks if the root value exists
+        return b.add([](const QJsonValue& j) -> bool {
             // The root always exists unless it's explicitly undefined
-            return j.type() != QJsonValue::Undefined;
-        }, "@");
+            return !j.isUndefined();
+        }, QString("$"));
     };
 
-    auto makeWildcardToken = [&]()->json_query::json_path::Token {
+    auto makeWildcardToken = [&]() -> json_query::json_path::Token {
         Builder b{out};
-        return b.add([](const QJsonValue& j){
+        return b.add([](const QJsonValue& j) -> bool {
             // RFC 9535: wildcard existence filters check for element/property presence
             if (j.isObject()) {
                 const auto obj = j.toObject();
-                // Any property that exists (is not undefined) should match
-                return !obj.empty(); // If object has any properties, wildcard existence is true
+                // If object has any properties, then @.* is true
+                return !obj.isEmpty();
             } else if (j.isArray()) {
                 const auto arr = j.toArray();
-                // Any array element that exists should match
-                return !arr.empty(); // If array has any elements, wildcard existence is true
+                // If array has any elements, then @.* is true
+                return !arr.isEmpty();
             }
             return false; // Primitives have no properties or elements
-        }, "@.*");
+        }, QString("@.*"));
     };
 
-    auto makeNegatedToken = [&](const QString& prop)->json_query::json_path::Token {
+    auto makeNegatedToken = [&](const QString& prop) -> json_query::json_path::Token {
         Builder b{out};
-        return b.add([prop](const QJsonValue& j){
-            const auto obj = j.toObject();
-            const auto v = obj.value(prop);
-            // RFC 9535: negated existence filters check for property absence, not falsy values
-            // A property is absent only if it's undefined (missing from the object)
-            return v.type() == QJsonValue::Undefined;
-        }, "!" + prop);
+        return b.add([prop](const QJsonValue& j) -> bool {
+            // RFC 9535: negated existence filters check for property absence
+            return !j.toObject().contains(prop);
+        }, QString("!@.%1").arg(prop));
     };
 
-    auto makeNegatedArrayIndexToken = [&](int index)->json_query::json_path::Token {
+    auto makeNegatedArrayIndexToken = [&](int index) -> json_query::json_path::Token {
         Builder b{out};
-        return b.add([index](const QJsonValue& j){
-            if (!j.isArray()) return true; // non-arrays don't have indices
-            const auto arr = j.toArray();
-            if (index < 0 || index >= arr.size()) return true; // out of bounds is absent
-            const auto& v = arr[index];
+        return b.add([index](const QJsonValue& j) -> bool {
             // RFC 9535: negated existence filters check for element absence
-            return v.type() == QJsonValue::Undefined;
+            const auto arr = j.toArray();
+            return index < 0 || index >= arr.size();
         }, QString("!@[%1]").arg(index));
     };
 
-    auto makeNegatedArraySliceToken = [&](int start, int end)->json_query::json_path::Token {
+    auto makeNegatedArraySliceToken = [&](int start, int end) -> json_query::json_path::Token {
         Builder b{out};
-        return b.add([start, end](const QJsonValue& j){
-            if (!j.isArray()) return true; // non-arrays don't have slices
+        return b.add([start, end](const QJsonValue& j) -> bool {
+            // RFC 9535: negated existence filters check for element absence
             const auto arr = j.toArray();
-            int actualStart = start < 0 ? 0 : start;
-            int actualEnd = end < 0 ? arr.size() : qMin(end, arr.size());
-            // Check if slice has NO elements within bounds (negated)
-            return !(actualStart < actualEnd && actualStart < arr.size());
+            int actualStart = (start == -1) ? 0 : start;
+            int actualEnd = (end == -1) ? arr.size() : end;
+            return actualStart >= arr.size() || actualEnd <= actualStart;
         }, QString("!@[%1:%2]").arg(start).arg(end));
     };
 
-    auto makeNegatedRootToken = [&]()->json_query::json_path::Token {
+    auto makeNegatedRootToken = [&]() -> json_query::json_path::Token {
         Builder b{out};
-        return b.add([](const QJsonValue& j){
-            // RFC 9535: negated root existence filter checks if the root value is absent
+        return b.add([](const QJsonValue& j) -> bool {
             // The root is absent only if it's explicitly undefined
-            return j.type() == QJsonValue::Undefined;
-        }, "!@");
+            return j.isUndefined();
+        }, QString("!$"));
     };
 
-    auto makeNegatedWildcardToken = [&]()->json_query::json_path::Token {
+    auto makeNegatedWildcardToken = [&]() -> json_query::json_path::Token {
         Builder b{out};
-        return b.add([](const QJsonValue& j){
+        return b.add([](const QJsonValue& j) -> bool {
             // RFC 9535: negated wildcard existence filters check for element/property absence
             if (j.isObject()) {
                 const auto obj = j.toObject();
                 // If object has no properties, then !@.* is true
-                return obj.empty();
+                return obj.isEmpty();
             } else if (j.isArray()) {
                 const auto arr = j.toArray();
                 // If array has no elements, then !@.* is true
-                return arr.empty();
+                return arr.isEmpty();
             }
-            return true; // Primitives have no properties or elements, so !@.* is true
-        }, "!@.*");
+            return true; // Primitives have no properties or elements
+        }, QString("!@.*"));
     };
 
-    auto makeMultiSelectorToken = [&](const QString& selectorsStr)->json_query::json_path::Token {
+    auto makeMultiSelectorToken = [&](const QString& selectorsStr) -> json_query::json_path::Token {
         Builder b{out};
-        return b.add([selectorsStr](const QJsonValue& j){
+        return b.add([selectorsStr](const QJsonValue& j) -> bool {
             // Multi-selector existence test: check if any of the selectors can be applied to j
             // Parse the selectors string and check each one
             QStringList selectors = selectorsStr.split(',');
@@ -211,9 +192,9 @@ std::optional<json_query::json_path::Token> parseExists(QString s, QVector<json_
         }, QString("@[%1]").arg(selectorsStr));
     };
 
-    auto makeNegatedMultiSelectorToken = [&](const QString& selectorsStr)->json_query::json_path::Token {
+    auto makeNegatedMultiSelectorToken = [&](const QString& selectorsStr) -> json_query::json_path::Token {
         Builder b{out};
-        return b.add([selectorsStr](const QJsonValue& j){
+        return b.add([selectorsStr](const QJsonValue& j) -> bool {
             // Negated multi-selector existence test: check if none of the selectors can be applied to j
             QStringList selectors = selectorsStr.split(',');
             for (const QString& selectorRaw : selectors) {
@@ -246,9 +227,9 @@ std::optional<json_query::json_path::Token> parseExists(QString s, QVector<json_
         }, QString("!@[%1]").arg(selectorsStr));
     };
 
-    auto makeNestedFilterToken = [&](const QString& filterExpr)->json_query::json_path::Token {
+    auto makeNestedFilterToken = [&](const QString& filterExpr) -> json_query::json_path::Token {
         Builder b{out};
-        return b.add([filterExpr](const QJsonValue& j){
+        return b.add([filterExpr](const QJsonValue& j) -> bool {
             if (!j.isArray()) {
                 return false; // Nested filters only work on arrays
             }
@@ -276,9 +257,9 @@ std::optional<json_query::json_path::Token> parseExists(QString s, QVector<json_
         }, QString("@[?%1]").arg(filterExpr));
     };
 
-    auto makeNegatedNestedFilterToken = [&](const QString& filterExpr)->json_query::json_path::Token {
+    auto makeNegatedNestedFilterToken = [&](const QString& filterExpr) -> json_query::json_path::Token {
         Builder b{out};
-        return b.add([filterExpr](const QJsonValue& j){
+        return b.add([filterExpr](const QJsonValue& j) -> bool {
             // Negated nested filter existence test: compile and apply the inner filter to array elements
             if (!j.isArray()) {
                 return true; // Non-arrays don't match nested filters, so negation is true
@@ -329,7 +310,7 @@ std::optional<json_query::json_path::Token> parseExists(QString s, QVector<json_
     // Root reference existence filter: $[?$] - always true (root document always exists)
     if (ctre::match<rootRefPat>(to_sv(s))) {
         Builder b{out};
-        return b.add([](const QJsonValue& j){
+        return b.add([](const QJsonValue& j) -> bool {
             // Root document always exists
             return true;
         }, QString("$"));
@@ -391,14 +372,11 @@ std::optional<json_query::json_path::Token> parseSelfCmp(QString s, QVector<json
         const QString op = to_qstr(m.template get<1>().to_view());
         
         Builder b{out};
-        return b.add([op](const QJsonValue& j){
+        return b.add([op](const QJsonValue& j) -> bool {
             // Self-comparison: compare the value to itself
-            // This is always true for == and always false for !=
-            // For ordering operators, it depends on the value type
             if (op == "==") return true;
             if (op == "!=") return false;
             // For ordering operators, self-comparison is always false
-            // (a value cannot be less than, greater than itself)
             return false;
         }, QString("@%1@").arg(op));
     }

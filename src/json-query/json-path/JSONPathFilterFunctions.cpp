@@ -13,9 +13,9 @@ using json_query::utils::to_sv;
 using json_query::utils::to_qstr;
 
 // Helper function to evaluate function calls like length(@.a) or value($..c)
-// Refactored to use explicit error handling for JSONPath evaluation
-QJsonValue evaluateFunction(const QString& funcExpr, const QJsonValue& context) {
-    // Parse function syntax using monadic pattern
+QJsonValue evaluateFunction(const QString& funcCall, const QJsonValue& context)
+{
+    // Refactored to use explicit error handling for JSONPath evaluation
     auto parseFunctionSyntax = [](const QString& expr) -> std::optional<std::pair<QString, QString>> {
         int openParen = expr.indexOf('(');
         int closeParen = expr.lastIndexOf(')');
@@ -28,7 +28,7 @@ QJsonValue evaluateFunction(const QString& funcExpr, const QJsonValue& context) 
         return std::make_pair(funcName, args);
     };
     
-    // Evaluate argument value using monadic pattern
+    // Evaluate argument value
     auto evaluateArgument = [&context](const QString& args) -> QJsonValue {
         if (args.startsWith("@.")) {
             QString prop = args.mid(2);
@@ -39,9 +39,8 @@ QJsonValue evaluateFunction(const QString& funcExpr, const QJsonValue& context) 
         return context; // Default to context
     };
     
-    // Calculate length using monadic pattern
+    // Calculate length
     auto calculateLength = [](const QJsonValue& value) -> QJsonValue {
-        // RFC 9535 "nothing" semantics with explicit error handling
         if (value.isUndefined() || value.isNull()) return QJsonValue(0);
         if (value.isString()) return QJsonValue(value.toString().length());
         if (value.isArray()) return QJsonValue(value.toArray().size());
@@ -49,10 +48,9 @@ QJsonValue evaluateFunction(const QString& funcExpr, const QJsonValue& context) 
         return QJsonValue(0); // Other types have no length
     };
     
-    // Evaluate JSONPath value using explicit error handling
+    // Evaluate JSONPath value
     auto evaluateJsonPathValue = [&context](const QString& args) -> QJsonValue {
         if (args.startsWith("$")) {
-            // JSONPath expression evaluation with proper error handling
             using json_query::JSONPath;
             auto pathResult = JSONPath::create(args);
             if (!pathResult) {
@@ -75,8 +73,8 @@ QJsonValue evaluateFunction(const QString& funcExpr, const QJsonValue& context) 
         return QJsonValue(); // Undefined for complex paths
     };
     
-    // Main function evaluation using explicit error handling
-    auto parsed = parseFunctionSyntax(funcExpr);
+    // Main function evaluation
+    auto parsed = parseFunctionSyntax(funcCall);
     if (!parsed) {
         return QJsonValue(); // Invalid function syntax
     }
@@ -92,9 +90,10 @@ QJsonValue evaluateFunction(const QString& funcExpr, const QJsonValue& context) 
 }
 
 // Helper function to parse JSON literals from strings
-// Refactored to use monadic error handling patterns
-QJsonValue parseJsonLiteral(const QString& literal) {
-    QString trimmed = literal.trimmed();
+QJsonValue parseJsonLiteral(const QString& value)
+{
+    // Refactored to use monadic error handling patterns
+    QString trimmed = value.trimmed();
     
     // Parse literal using monadic pattern with optional chaining
     auto parseNull = [](const QString& s) -> std::optional<QJsonValue> {
@@ -130,7 +129,8 @@ QJsonValue parseJsonLiteral(const QString& literal) {
 }
 
 // Helper function to compare QJsonValues for ordering
-int compareValues(const QJsonValue& left, const QJsonValue& right) {
+int compareValues(const QJsonValue& left, const QJsonValue& right)
+{
     // Handle null values
     if (left.isNull() && right.isNull()) return 0;
     if (left.isNull()) return -1;
@@ -190,7 +190,6 @@ std::optional<Token> parseFunction(QString s, QVector<FilterFn>& out)
         
         if (needsRootContext) {
             // This needs to be handled by context-aware filter infrastructure
-            // Return nullopt to let context-aware compilation handle it
             return std::nullopt;
         }
         
@@ -207,7 +206,6 @@ std::optional<Token> parseFunction(QString s, QVector<FilterFn>& out)
                 QJsonValue val = j.toObject().value(prop);
                 leftVal = val.isUndefined() ? QJsonValue(0) : val; // Undefined becomes 0
             } else {
-                // Literal value
                 leftVal = parseJsonLiteral(left);
             }
             
@@ -220,7 +218,6 @@ std::optional<Token> parseFunction(QString s, QVector<FilterFn>& out)
                 QJsonValue val = j.toObject().value(prop);
                 rightVal = val.isUndefined() ? QJsonValue(0) : val; // Undefined becomes 0
             } else {
-                // Literal value
                 rightVal = parseJsonLiteral(right);
             }
             
