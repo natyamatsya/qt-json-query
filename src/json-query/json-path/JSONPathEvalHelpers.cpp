@@ -233,13 +233,13 @@ struct SliceProcessingStrategy<SliceProcessingType::DefaultSlice> {
  * Uses variadic templates and fold expressions for priority-ordered dispatch.
  * Strategies are evaluated in priority order until a match is found.
  */
-template<SliceProcessingType... Types>
-struct SliceProcessingDispatchTable;
-
-// Recursive case: try first type, then recurse
 template<SliceProcessingType FirstType, SliceProcessingType... RestTypes>
-struct SliceProcessingDispatchTable<FirstType, RestTypes...> {
-    static std::expected<QJsonArray, EvalError> dispatch(const QJsonArray& array, const Slice& s) {
+struct SliceProcessingDispatchTable {
+    static std::expected<QJsonArray, EvalError> dispatch(
+        const QJsonArray& array, 
+        const Slice& s) {
+        
+        // Try the first strategy
         if constexpr (SliceProcessingDef<FirstType>::enabled) {
             if (SliceProcessingDef<FirstType>::matches(s, array.size())) {
                 return SliceProcessingStrategy<FirstType>::process(array, s);
@@ -256,10 +256,21 @@ struct SliceProcessingDispatchTable<FirstType, RestTypes...> {
     }
 };
 
-// Base case: empty dispatch table
-template<>
-struct SliceProcessingDispatchTable<> {
-    static std::expected<QJsonArray, EvalError> dispatch(const QJsonArray& array, const Slice& s) {
+// Handle empty parameter pack
+template<SliceProcessingType FirstType>
+struct SliceProcessingDispatchTable<FirstType> {
+    static std::expected<QJsonArray, EvalError> dispatch(
+        const QJsonArray& array, 
+        const Slice& s) {
+        
+        // Try the first strategy
+        if constexpr (SliceProcessingDef<FirstType>::enabled) {
+            if (SliceProcessingDef<FirstType>::matches(s, array.size())) {
+                return SliceProcessingStrategy<FirstType>::process(array, s);
+            }
+        }
+        
+        // No more strategies to try
         return std::unexpected(EvalError::InvalidSlice);
     }
 };
@@ -294,6 +305,262 @@ std::expected<QJsonArray, EvalError> evalSlice(const QJsonArray& array, const Sl
 {
     // Use TableGen-inspired dispatch for zero-overhead strategy selection
     return SliceProcessingDispatcher::dispatch(array, s);
+}
+
+// ===========================================================================
+//  TableGen-Inspired Union Processing Architecture
+// ===========================================================================
+
+/**
+ * @brief Union processing strategy types for TableGen-inspired dispatch
+ * 
+ * Defines the different union processing strategies that can be applied
+ * based on the characteristics of the union token list.
+ */
+enum class UnionProcessingType : std::uint8_t {
+    EmptyUnion,      // Handle empty union token list (error case)
+    SingleToken,     // Handle single token union (optimization case)  
+    MultipleTokens,  // Handle multiple token union (standard case)
+    AllTokensFailed  // Handle case where all tokens fail (error aggregation)
+};
+
+/**
+ * @brief TableGen-style pattern definitions for union processing strategies
+ * 
+ * Each template specialization defines the characteristics and enabling
+ * conditions for a specific union processing strategy.
+ */
+template<UnionProcessingType Type>
+struct UnionProcessingDef {
+    static constexpr bool enabled = false;
+};
+
+// Empty union strategy: Handle empty token lists
+template<>
+struct UnionProcessingDef<UnionProcessingType::EmptyUnion> {
+    static constexpr bool enabled = true;
+    
+    static bool matches(const QVector<qsizetype>& unionTokens) {
+        return unionTokens.isEmpty();
+    }
+};
+
+// Single token strategy: Optimize single token unions
+template<>
+struct UnionProcessingDef<UnionProcessingType::SingleToken> {
+    static constexpr bool enabled = true;
+    
+    static bool matches(const QVector<qsizetype>& unionTokens) {
+        return unionTokens.size() == 1;
+    }
+};
+
+// Multiple tokens strategy: Standard union processing
+template<>
+struct UnionProcessingDef<UnionProcessingType::MultipleTokens> {
+    static constexpr bool enabled = true;
+    
+    static bool matches(const QVector<qsizetype>& unionTokens) {
+        return unionTokens.size() > 1;
+    }
+};
+
+/**
+ * @brief Template specialization strategies for union processing
+ * 
+ * Each strategy implements the specific logic for processing unions
+ * of the corresponding type with zero runtime overhead.
+ */
+template<UnionProcessingType Type>
+struct UnionProcessingStrategy {
+    static std::expected<QJsonArray, EvalError> process(
+        const PathEvalCtx& ctx, 
+        const QVector<qsizetype>& unionTokens, 
+        const QJsonArray& working, 
+        const QJsonValue& root)
+    {
+        // Default implementation should never be called
+        return std::unexpected(EvalError::InvalidSlice);
+    }
+};
+
+// Empty union strategy: Return appropriate error
+template<>
+struct UnionProcessingStrategy<UnionProcessingType::EmptyUnion> {
+    static std::expected<QJsonArray, EvalError> process(
+        const PathEvalCtx& ctx, 
+        const QVector<qsizetype>& unionTokens, 
+        const QJsonArray& working, 
+        const QJsonValue& root)
+    {
+        
+        qCDebug(jsonPathLog) << "[UnionProcessing::EmptyUnion] No tokens to process";
+        return std::unexpected(EvalError::TypeMismatchObject);
+    }
+};
+
+// Single token strategy: Optimized single token processing
+template<>
+struct UnionProcessingStrategy<UnionProcessingType::SingleToken> {
+    static std::expected<QJsonArray, EvalError> process(
+        const PathEvalCtx& ctx, 
+        const QVector<qsizetype>& unionTokens, 
+        const QJsonArray& working, 
+        const QJsonValue& root)
+    {
+        
+        qCDebug(jsonPathLog) << "[UnionProcessing::SingleToken] Processing single token optimization";
+        
+        qsizetype tokenIdx = unionTokens[0];
+        auto tokenResult = processSingleUnionToken(ctx, tokenIdx, working, root);
+        
+        if (tokenResult.success) {
+            qCDebug(jsonPathLog) << "[UnionProcessing::SingleToken] Single token succeeded with" << tokenResult.results.size() << "results";
+            return tokenResult.results;
+        } else {
+            qCDebug(jsonPathLog) << "[UnionProcessing::SingleToken] Single token failed with error" << static_cast<int>(tokenResult.error);
+            return std::unexpected(tokenResult.error);
+        }
+    }
+};
+
+// Multiple tokens strategy: Standard union processing with monadic error handling
+template<>
+struct UnionProcessingStrategy<UnionProcessingType::MultipleTokens> {
+    static std::expected<QJsonArray, EvalError> process(
+        const PathEvalCtx& ctx, 
+        const QVector<qsizetype>& unionTokens, 
+        const QJsonArray& working, 
+        const QJsonValue& root)
+    {
+        
+        qCDebug(jsonPathLog) << "[UnionProcessing::MultipleTokens] Processing" << unionTokens.size() << "tokens";
+        
+        // Monadic approach: Transform union tokens into results using monadic chaining
+        QVector<QJsonArray> resultArrays;
+        resultArrays.reserve(unionTokens.size());
+        
+        // Use monadic pattern to process each token and collect successful results
+        auto processToken = [&](qsizetype tokenIdx) -> std::optional<QJsonArray> {
+            qCDebug(jsonPathLog) << "[UnionProcessing::MultipleTokens] Processing token" << tokenIdx;
+            
+            auto tokenResult = processSingleUnionToken(ctx, tokenIdx, working, root);
+            if (tokenResult.success) {
+                qCDebug(jsonPathLog) << "[UnionProcessing::MultipleTokens] Token" << tokenIdx << "succeeded with" << tokenResult.results.size() << "results";
+                return tokenResult.results;
+            } else {
+                qCDebug(jsonPathLog) << "[UnionProcessing::MultipleTokens] Token" << tokenIdx << "failed with error" << static_cast<int>(tokenResult.error) << "- continuing with other tokens";
+                return std::nullopt; // Convert failure to empty optional for union semantics
+            }
+        };
+        
+        // Collect successful results using monadic transformation
+        EvalError lastError = EvalError::TypeMismatchObject;
+        for (qsizetype tokenIdx : unionTokens) {
+            if (auto result = processToken(tokenIdx)) {
+                resultArrays.append(*result);
+            } else {
+                // Track last error for potential failure case
+                auto tokenResult = processSingleUnionToken(ctx, tokenIdx, working, root);
+                if (!tokenResult.success) {
+                    lastError = tokenResult.error;
+                }
+            }
+        }
+        
+        // Monadic error handling: Only fail if ALL tokens failed
+        if (resultArrays.isEmpty()) {
+            qCDebug(jsonPathLog) << "[UnionProcessing::MultipleTokens] All tokens failed, returning last error" << static_cast<int>(lastError);
+            return std::unexpected(lastError);
+        }
+        
+        qCDebug(jsonPathLog) << "[UnionProcessing::MultipleTokens] Merging results from" << resultArrays.size() << "successful arrays";
+        auto mergedResults = mergeTokenResults(resultArrays, root);
+        qCDebug(jsonPathLog) << "[UnionProcessing::MultipleTokens] Merged to" << mergedResults.size() << "total results";
+        return mergedResults;
+    }
+};
+
+/**
+ * @brief Recursive template dispatch table for union processing strategies
+ * 
+ * Implements priority-ordered dispatch using recursive template expansion.
+ * Strategies are tried in order until one matches the union characteristics.
+ */
+template<UnionProcessingType FirstType, UnionProcessingType... RestTypes>
+struct UnionProcessingDispatchTable {
+    static std::expected<QJsonArray, EvalError> dispatch(
+        const PathEvalCtx& ctx, 
+        const QVector<qsizetype>& unionTokens, 
+        const QJsonArray& working, 
+        const QJsonValue& root) {
+        
+        // Try the first strategy
+        if constexpr (UnionProcessingDef<FirstType>::enabled) {
+            if (UnionProcessingDef<FirstType>::matches(unionTokens)) {
+                return UnionProcessingStrategy<FirstType>::process(ctx, unionTokens, working, root);
+            }
+        }
+        
+        // Recurse to remaining types
+        if constexpr (sizeof...(RestTypes) > 0) {
+            return UnionProcessingDispatchTable<RestTypes...>::dispatch(ctx, unionTokens, working, root);
+        } else {
+            // No more strategies to try
+            return std::unexpected(EvalError::InvalidSlice);
+        }
+    }
+};
+
+// Handle empty parameter pack
+template<UnionProcessingType FirstType>
+struct UnionProcessingDispatchTable<FirstType> {
+    static std::expected<QJsonArray, EvalError> dispatch(
+        const PathEvalCtx& ctx, 
+        const QVector<qsizetype>& unionTokens, 
+        const QJsonArray& working, 
+        const QJsonValue& root) {
+        
+        // Try the first strategy
+        if constexpr (UnionProcessingDef<FirstType>::enabled) {
+            if (UnionProcessingDef<FirstType>::matches(unionTokens)) {
+                return UnionProcessingStrategy<FirstType>::process(ctx, unionTokens, working, root);
+            }
+        }
+        
+        // No more strategies to try
+        return std::unexpected(EvalError::InvalidSlice);
+    }
+};
+
+/**
+ * @brief TableGen-inspired union processing dispatcher
+ * 
+ * Defines the priority-ordered list of union processing strategies
+ * for compile-time dispatch resolution.
+ */
+using UnionProcessingDispatcher = UnionProcessingDispatchTable<
+    UnionProcessingType::EmptyUnion,      // Highest priority: handle empty unions first
+    UnionProcessingType::SingleToken,     // High priority: optimize single token case
+    UnionProcessingType::MultipleTokens   // Standard priority: general multiple token case
+>;
+
+/**
+ * @brief Refactored processUnionTokens using TableGen-inspired architecture
+ * 
+ * Replaces the monolithic conditional logic with elegant compile-time
+ * dispatch based on union processing strategies.
+ */
+std::expected<QJsonArray, EvalError> processUnionTokens(
+    const PathEvalCtx& ctx, 
+    const QVector<qsizetype>& unionTokens, 
+    const QJsonArray& working, 
+    const QJsonValue& root)
+{
+    qCDebug(jsonPathLog) << "[processUnionTokens] Starting TableGen-inspired dispatch with" << unionTokens.size() << "tokens";
+    
+    // Use TableGen-inspired dispatch for zero-overhead strategy selection
+    return UnionProcessingDispatcher::dispatch(ctx, unionTokens, working, root);
 }
 
 // ---------------------------------------------------------------------------
@@ -427,58 +694,6 @@ QJsonArray mergeTokenResults(const QVector<QJsonArray>& resultArrays, const QJso
     }
     
     return collectedResults;
-}
-
-std::expected<QJsonArray, EvalError> processUnionTokens(
-    const PathEvalCtx& ctx, 
-    const QVector<qsizetype>& unionTokens, 
-    const QJsonArray& working, 
-    const QJsonValue& root)
-{
-    qCDebug(jsonPathLog) << "[processUnionTokens] Starting with" << unionTokens.size() << "tokens";
-    
-    // Monadic approach: Transform union tokens into results using monadic chaining
-    QVector<QJsonArray> resultArrays;
-    resultArrays.reserve(unionTokens.size());
-    
-    // Use monadic pattern to process each token and collect successful results
-    auto processToken = [&](qsizetype tokenIdx) -> std::optional<QJsonArray> {
-        qCDebug(jsonPathLog) << "[processUnionTokens] Processing token" << tokenIdx;
-        
-        auto tokenResult = processSingleUnionToken(ctx, tokenIdx, working, root);
-        if (tokenResult.success) {
-            qCDebug(jsonPathLog) << "[processUnionTokens] Token" << tokenIdx << "succeeded with" << tokenResult.results.size() << "results";
-            return tokenResult.results;
-        } else {
-            qCDebug(jsonPathLog) << "[processUnionTokens] Token" << tokenIdx << "failed with error" << static_cast<int>(tokenResult.error) << "- continuing with other tokens";
-            return std::nullopt; // Convert failure to empty optional for union semantics
-        }
-    };
-    
-    // Collect successful results using monadic transformation
-    EvalError lastError = EvalError::TypeMismatchObject;
-    for (qsizetype tokenIdx : unionTokens) {
-        if (auto result = processToken(tokenIdx)) {
-            resultArrays.append(*result);
-        } else {
-            // Track last error for potential failure case
-            auto tokenResult = processSingleUnionToken(ctx, tokenIdx, working, root);
-            if (!tokenResult.success) {
-                lastError = tokenResult.error;
-            }
-        }
-    }
-    
-    // Monadic error handling: Only fail if ALL tokens failed
-    if (resultArrays.isEmpty()) {
-        qCDebug(jsonPathLog) << "[processUnionTokens] All tokens failed, returning last error" << static_cast<int>(lastError);
-        return std::unexpected(lastError);
-    }
-    
-    qCDebug(jsonPathLog) << "[processUnionTokens] Merging results from" << resultArrays.size() << "successful arrays";
-    auto mergedResults = mergeTokenResults(resultArrays, root);
-    qCDebug(jsonPathLog) << "[processUnionTokens] Merged to" << mergedResults.size() << "total results";
-    return mergedResults;
 }
 
 // Helper: Collect keys from consecutive Key/KeyList tokens
