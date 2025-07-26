@@ -70,9 +70,71 @@ void BracketSink::index(int i)
 
 void BracketSink::pushFilter(const Token& t)
 {
-    Token copy = t;
-    copy.bracketGroupId = currentBracketGroupId;
-    tk.append(copy);
+    Token token = t;  // Copy the token
+    token.bracketGroupId = currentBracketGroupId; // Set bracket group ID
+    tk.append(std::move(token));
+}
+
+// ──────────────────────────────────────────────────────────────────────
+//  EmbeddedBracketSink Implementation (Zero-Overhead)
+// ──────────────────────────────────────────────────────────────────────
+
+std::expected<void, Error> EmbeddedBracketSink::key(QString key, bool allow)
+{
+    // Create token with bracket group ID (same logic as legacy BracketSink)
+    if (!allow && key.contains(u' '))
+        return std::unexpected(Error::BlankInKey);
+    Token t{Token::Kind::Key, 0, {}, qt_hash(key), key};
+    t.bracketGroupId = currentBracketGroupId;
+    tk.append(std::move(t));
+    return {};
+}
+
+void EmbeddedBracketSink::keyList(const QVector<QString>& keys)
+{
+    if (keys.isEmpty()) return;
+
+    Token t;
+    t.kind = Token::Kind::KeyList;
+    t.bracketGroupId = currentBracketGroupId; // Set bracket group ID
+
+    // Pack the keys into a single QString separated by '\n' so that the
+    // evaluator can split them later without ambiguity.
+    QStringList list;
+    list.reserve(keys.size());
+    for (const QString& k : keys)
+        list.append(k);
+
+    t.key = list.join(u"\n");
+    tk.append(std::move(t));
+}
+
+void EmbeddedBracketSink::wild()
+{
+    Token t{Token::Kind::Wildcard};
+    t.bracketGroupId = currentBracketGroupId; // Set bracket group ID
+    tk.append(std::move(t));
+}
+
+void EmbeddedBracketSink::slice(const Slice& s)
+{
+    Token t{Token::Kind::Slice, 0, s};
+    t.bracketGroupId = currentBracketGroupId; // Set bracket group ID
+    tk.append(std::move(t));
+}
+
+void EmbeddedBracketSink::index(int i)
+{
+    Token t{Token::Kind::Index, i};
+    t.bracketGroupId = currentBracketGroupId; // Set bracket group ID
+    tk.append(std::move(t));
+}
+
+void EmbeddedBracketSink::pushFilter(const Token& t)
+{
+    Token token = t;  // Copy the token
+    token.bracketGroupId = currentBracketGroupId; // Set bracket group ID
+    tk.append(std::move(token));
 }
 
 // ──────────────────────────────────────────────────────────────────────
@@ -352,8 +414,6 @@ std::expected<void, Error> handleUnquotedKey(QStringView /*content*/, BracketSin
 // Forward declaration for union handler
 std::expected<void, Error> handleUnionComma(QStringView content, BracketSink& out)
 {
-    qCDebug(jsonPathLog) << "handleUnionComma: processing" << content.toString();
-    
     auto segmentsResult = splitTopLevelMultiple(content, QLatin1StringView(","));
     if (!segmentsResult) {
         qCDebug(jsonPathLog) << "handleUnionComma: failed to split content";
@@ -381,6 +441,187 @@ std::expected<void, Error> handleUnionComma(QStringView content, BracketSink& ou
 }
 
 } // namespace handlers
+
+// ──────────────────────────────────────────────────────────────────────
+//  Embedded Rule Handler Functions Implementation (Zero-Overhead)
+// ──────────────────────────────────────────────────────────────────────
+
+namespace embedded_handlers {
+
+std::expected<void, Error> handleWildcard(QStringView /*content*/, EmbeddedBracketSink& out)
+{
+    out.wild();
+    return {};
+}
+
+std::expected<void, Error> handleSingleIndex(QStringView content, EmbeddedBracketSink& out)
+{
+    QStringView trimmed = content.trimmed();
+    
+    if (!isValidIndexLiteral(trimmed.toString())) {
+        qCDebug(jsonPathLog) << "handleSingleIndex: invalid index literal" << trimmed;
+        return std::unexpected(Error::InvalidIndex);
+    }
+    
+    bool ok = false;
+    int index = trimmed.toString().toInt(&ok);
+    if (!ok) {
+        qCDebug(jsonPathLog) << "handleSingleIndex: failed to convert to int" << trimmed;
+        return std::unexpected(Error::InvalidIndex);
+    }
+    
+    out.index(index);
+    return {};
+}
+
+std::expected<void, Error> handleIndexList(QStringView content, EmbeddedBracketSink& out)
+{
+    QStringView trimmed = content.trimmed();
+    const auto parts = trimmed.split(u',');
+    
+    for (const auto& part : parts) {
+        QStringView indexStr = part.trimmed();
+        if (!isValidIndexLiteral(indexStr.toString())) {
+            return std::unexpected(Error::InvalidIndex);
+        }
+        
+        bool ok = false;
+        int index = indexStr.toString().toInt(&ok);
+        if (!ok) {
+            return std::unexpected(Error::InvalidIndex);
+        }
+        
+        out.index(index);
+    }
+    return {};
+}
+
+std::expected<void, Error> handleSlice(QStringView content, EmbeddedBracketSink& out)
+{
+    auto slice = makeSlice(content.toString());
+    if (!slice) {
+        return std::unexpected(Error::InvalidSlice);
+    }
+    out.slice(*slice);
+    return {};
+}
+
+std::expected<void, Error> handleFilterWithParens(QStringView content, EmbeddedBracketSink& out)
+{
+    QStringView trimmed = content.trimmed();
+    // Extract the full expression after the '?' prefix
+    QString expr = trimmed.mid(1).toString(); // Remove '?' prefix
+    
+    qCDebug(jsonPathLog) << "handleFilterWithParens: processing expression" << expr;
+    
+    // Use embedded filter compilation only (zero-overhead)
+    if (auto token = compileEmbeddedContextFilter(expr)) {
+        out.pushFilter(*token);
+        return {};
+    } else {
+        qCDebug(jsonPathLog) << "handleFilterWithParens: failed to compile embedded filter" << expr;
+        return std::unexpected(Error::UnsupportedFilter);
+    }
+}
+
+std::expected<void, Error> handleFilterWithoutParens(QStringView content, EmbeddedBracketSink& out)
+{
+    QStringView trimmed = content.trimmed();
+    // Extract the full expression after the '?' prefix
+    QString expr = trimmed.mid(1).toString(); // Remove '?' prefix
+    
+    qCDebug(jsonPathLog) << "handleFilterWithoutParens: processing expression" << expr;
+    
+    // Use embedded filter compilation only (zero-overhead)
+    if (auto token = compileEmbeddedContextFilter(expr)) {
+        out.pushFilter(*token);
+        return {};
+    } else {
+        qCDebug(jsonPathLog) << "handleFilterWithoutParens: failed to compile embedded filter" << expr;
+        return std::unexpected(Error::UnsupportedFilter);
+    }
+}
+
+std::expected<void, Error> handlePlaceholder(QStringView content, EmbeddedBracketSink& out)
+{
+    QStringView trimmed = content.trimmed();
+    
+    if (trimmed == u"?") {
+        // Single placeholder - create an embedded filter that always returns true
+        Token filterToken;
+        filterToken.kind = Token::Kind::Filter;
+        filterToken.key = "?";
+        
+        filterToken.embedFilter([](const QJsonValue&) { return true; });
+        
+        out.pushFilter(filterToken);
+        return {};
+    }
+    
+    // Multiple placeholders - handle each one
+    const auto parts = trimmed.split(u',');
+    for (const auto& part : parts) {
+        if (part.trimmed() == u"?") {
+            Token filterToken;
+            filterToken.kind = Token::Kind::Filter;
+            filterToken.key = "?";
+            
+            filterToken.embedFilter([](const QJsonValue&) { return true; });
+            
+            out.pushFilter(filterToken);
+        }
+    }
+    return {};
+}
+
+std::expected<void, Error> handleQuotedKey(QStringView content, EmbeddedBracketSink& out)
+{
+    QStringView trimmed = content.trimmed();
+    
+    QString key;
+    if ((trimmed.startsWith(u'"') && trimmed.endsWith(u'"')) ||
+        (trimmed.startsWith(u'\'') && trimmed.endsWith(u'\''))) {
+        key = trimmed.mid(1, trimmed.length() - 2).toString();
+    } else {
+        return std::unexpected(Error::UnmatchedQuote);
+    }
+    
+    return out.key(key, true); // Allow spaces in quoted keys
+}
+
+std::expected<void, Error> handleUnquotedKey(QStringView /*content*/, EmbeddedBracketSink& /*out*/)
+{
+    // Unquoted keys are forbidden by RFC 9535
+    return std::unexpected(Error::InvalidIdentifier);
+}
+
+// Helper function to split union segments
+QVector<QStringView> splitUnionSegments(QStringView content)
+{
+    // Use the existing splitTopLevelMultiple function for consistency
+    auto result = splitTopLevelMultiple(content, QLatin1StringView(","));
+    if (result) {
+        return *result;
+    }
+    // Fallback: simple split if complex parsing fails
+    return content.split(u',');
+}
+
+// Forward declaration for embedded union handler
+std::expected<void, Error> handleUnionComma(QStringView content, EmbeddedBracketSink& out)
+{
+    const auto segments = splitUnionSegments(content);
+    
+    for (const auto& segment : segments) {
+        auto result = EmbeddedBracketRuleDispatcher::processSegmentExcludingUnion(segment, out);
+        if (!result) {
+            return result;
+        }
+    }
+    return {};
+}
+
+} // namespace embedded_handlers
 
 // ──────────────────────────────────────────────────────────────────────
 //  BracketRuleDispatcher Implementation
@@ -510,6 +751,147 @@ std::expected<void, Error> BracketRuleDispatcher::processSegmentExcludingUnion(Q
 }
 
 const BracketRuleMetadata* BracketRuleDispatcher::findRuleByName(const char* name)
+{
+    for (const auto& rule : getRules()) {
+        if (std::string_view(rule.name) == name) {
+            return &rule;
+        }
+    }
+    return nullptr;
+}
+
+} // namespace json_query::json_path::detail
+
+// ──────────────────────────────────────────────────────────────────────
+//  EmbeddedBracketRuleDispatcher Implementation (Zero-Overhead)
+// ──────────────────────────────────────────────────────────────────────
+
+namespace json_query::json_path::detail {
+
+std::vector<EmbeddedBracketRuleMetadata> EmbeddedBracketRuleDispatcher::createRules()
+{
+    return {
+        {
+            .name = "union_comma",
+            .priority = 1300,  // Highest priority - must split unions before processing individual elements
+            .matcher = matchers::matchesUnionComma,
+            .handler = embedded_handlers::handleUnionComma,
+            .description = "Union of multiple selectors separated by commas (e.g., '1,2,3' or '?@.a,?@.b')"
+        },
+        {
+            .name = "filter_with_parens",
+            .priority = 1200,  // High priority for filter expressions
+            .matcher = matchers::matchesFilterWithParens,
+            .handler = embedded_handlers::handleFilterWithParens,
+            .description = "Filter expression with parentheses (e.g., '?(@.a == 1)')"
+        },
+        {
+            .name = "filter_without_parens",
+            .priority = 1100,
+            .matcher = matchers::matchesFilterWithoutParens,
+            .handler = embedded_handlers::handleFilterWithoutParens,
+            .description = "Filter expression without parentheses (e.g., '?@.a')"
+        },
+        {
+            .name = "wildcard",
+            .priority = 900,
+            .matcher = matchers::matchesWildcard,
+            .handler = embedded_handlers::handleWildcard,
+            .description = "Wildcard selector (*)"
+        },
+        {
+            .name = "index_list",
+            .priority = 850,
+            .matcher = matchers::matchesIndexList,
+            .handler = embedded_handlers::handleIndexList,
+            .description = "Comma-separated index list (e.g., '1,2,3')"
+        },
+        {
+            .name = "single_index",
+            .priority = 800,
+            .matcher = matchers::matchesSingleIndex,
+            .handler = embedded_handlers::handleSingleIndex,
+            .description = "Single array index (e.g., '123')"
+        },
+        {
+            .name = "slice",
+            .priority = 700,
+            .matcher = matchers::matchesSlice,
+            .handler = embedded_handlers::handleSlice,
+            .description = "Array slice (e.g., '1:3:2')"
+        },
+        {
+            .name = "placeholder",
+            .priority = 500,
+            .matcher = matchers::matchesPlaceholder,
+            .handler = embedded_handlers::handlePlaceholder,
+            .description = "Placeholder filter (e.g., '?' or '?,?')"
+        },
+        {
+            .name = "quoted_key",
+            .priority = 400,
+            .matcher = matchers::matchesQuotedKey,
+            .handler = embedded_handlers::handleQuotedKey,
+            .description = "Quoted string key (e.g., \"'key'\" or '\"key\"')"
+        },
+        {
+            .name = "unquoted_key",
+            .priority = 100,
+            .matcher = matchers::matchesUnquotedKey,
+            .handler = embedded_handlers::handleUnquotedKey,
+            .description = "Unquoted key (forbidden by RFC 9535)"
+        }
+    };
+}
+
+const std::vector<EmbeddedBracketRuleMetadata>& EmbeddedBracketRuleDispatcher::getRules()
+{
+    static const auto rules = createRules();
+    return rules;
+}
+
+std::expected<void, Error> EmbeddedBracketRuleDispatcher::dispatch(QStringView content, EmbeddedBracketSink& sink)
+{
+    qCDebug(jsonPathLog) << "EmbeddedBracketRuleDispatcher::dispatch content=" << content.toString();
+    
+    // Apply rules in priority order using monadic error handling
+    for (const auto& rule : getRules()) {
+        qCDebug(jsonPathLog) << "Trying rule:" << rule.name << "(priority:" << rule.priority << ")";
+        
+        if (rule.matcher(content)) {
+            qCDebug(jsonPathLog) << "Rule" << rule.name << "matched, applying handler";
+            auto result = rule.handler(content, sink);
+            
+            if (result) {
+                qCDebug(jsonPathLog) << "Rule" << rule.name << "succeeded";
+                return {};
+            } else {
+                qCDebug(jsonPathLog) << "Rule" << rule.name << "failed with error" << static_cast<int>(result.error());
+                return result;
+            }
+        } else {
+            qCDebug(jsonPathLog) << "Rule" << rule.name << "did not match";
+        }
+    }
+    
+    qCDebug(jsonPathLog) << "No rules matched, returning UnsupportedFilter";
+    return std::unexpected(Error::UnsupportedFilter);
+}
+
+std::expected<void, Error> EmbeddedBracketRuleDispatcher::processSegmentExcludingUnion(QStringView content, EmbeddedBracketSink& sink)
+{
+    // Apply all rules except union_comma to prevent recursion
+    for (const auto& rule : getRules()) {
+        if (std::string_view(rule.name) == "union_comma") continue; // Skip union rule
+        
+        if (rule.matcher(content)) {
+            return rule.handler(content, sink);
+        }
+    }
+    return std::unexpected(Error::UnsupportedFilter);
+}
+
+const EmbeddedBracketRuleMetadata* EmbeddedBracketRuleDispatcher::findRuleByName(const char* name)
 {
     for (const auto& rule : getRules()) {
         if (std::string_view(rule.name) == name) {

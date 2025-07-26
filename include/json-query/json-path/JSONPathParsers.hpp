@@ -42,7 +42,7 @@ namespace json_query::json_path
         std::expected<qsizetype, Error> parseBare(qsizetype pos, QStringView sv, KeyBuilder& kb);
 
         /**
-         * Parse bracket notation [...]
+         * Parse bracket notation [...] (Legacy - with std::function storage)
          * @param pos Current position in the string view
          * @param sv String view being parsed
          * @param kb Key builder for token creation
@@ -55,6 +55,17 @@ namespace json_query::json_path
                                                     KeyBuilder& kb, QVector<Token>& tokens,
                                                     QVector<std::function<bool (const QJsonValue&, const QJsonValue&)>>& contextFilters,
                                                     QVector<std::function<bool (const QJsonValue&)>>& filters);
+
+        /**
+         * Parse bracket notation [...] (Embedded-only - zero-overhead, no std::function storage)
+         * @param pos Current position in the string view
+         * @param sv String view being parsed
+         * @param kb Key builder for token creation
+         * @param tokens Output vector for generated tokens
+         * @return Next position or error
+         */
+        std::expected<qsizetype, Error> parseEmbeddedBracket(qsizetype pos, QStringView sv,
+                                                            KeyBuilder& kb, QVector<Token>& tokens);
 
     } // namespace detail
 

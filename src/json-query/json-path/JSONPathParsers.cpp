@@ -176,4 +176,86 @@ std::expected<qsizetype, Error> parseBracket(qsizetype pos, QStringView sv,
     return end + 1; // Position after closing bracket
 }
 
+// ──────────────────────────────────────────────────────────────────────
+//  Embedded-Only Bracket Parser Implementation (Zero-Overhead)
+// ──────────────────────────────────────────────────────────────────────
+
+std::expected<qsizetype, Error> parseEmbeddedBracket(qsizetype pos, QStringView sv,
+                                                    KeyBuilder& kb, QVector<Token>& tokens)
+{
+    qCDebug(jsonPathLog) << "parseEmbeddedBracket: pos=" << pos << "sv.size()=" << sv.size();
+    
+    if (pos >= sv.size() || sv[pos] != u'[') {
+        qCDebug(jsonPathLog) << "parseEmbeddedBracket: not a bracket at pos=" << pos;
+        return std::unexpected(Error::UnmatchedBracket);
+    }
+
+    // Find matching closing bracket, handling nested brackets and quotes
+    qsizetype level = 0;
+    qsizetype end = pos;
+    bool inSingleQuote = false;
+    bool inDoubleQuote = false;
+    bool escaped = false;
+
+    for (qsizetype i = pos; i < sv.size(); ++i) {
+        QChar c = sv[i];
+        
+        if (escaped) {
+            escaped = false;
+            continue;
+        }
+        
+        if (c == u'\\') {
+            escaped = true;
+            continue;
+        }
+        
+        if (!inSingleQuote && !inDoubleQuote) {
+            if (c == u'[') {
+                level++;
+            } else if (c == u']') {
+                level--;
+                if (level == 0) {
+                    end = i;
+                    break;
+                }
+            } else if (c == u'\'') {
+                inSingleQuote = true;
+            } else if (c == u'"') {
+                inDoubleQuote = true;
+            }
+        } else if (inSingleQuote && c == u'\'') {
+            inSingleQuote = false;
+        } else if (inDoubleQuote && c == u'"') {
+            inDoubleQuote = false;
+        }
+    }
+
+    if (level != 0) {
+        qCDebug(jsonPathLog) << "parseEmbeddedBracket: unmatched bracket";
+        return std::unexpected(Error::UnmatchedBracket);
+    }
+
+    // Extract content between brackets
+    QStringView content = sv.mid(pos + 1, end - pos - 1);
+    qCDebug(jsonPathLog) << "parseEmbeddedBracket: content=" << content.toString();
+
+    // Generate unique bracket group ID for union tracking
+    static int nextBracketGroupId = 1;
+    int currentBracketGroupId = nextBracketGroupId++;
+
+    // Create EmbeddedBracketSink for token emission (zero-overhead)
+    EmbeddedBracketSink sink(tokens, kb, currentBracketGroupId);
+
+    // Use embedded rule dispatcher to process the bracket content
+    auto result = EmbeddedBracketRuleDispatcher::dispatch(content, sink);
+    if (!result) {
+        qCDebug(jsonPathLog) << "parseEmbeddedBracket: EmbeddedBracketRuleDispatcher::dispatch failed";
+        return std::unexpected(result.error());
+    }
+
+    qCDebug(jsonPathLog) << "parseEmbeddedBracket: successfully processed bracket content";
+    return end + 1; // Position after closing bracket
+}
+
 } // namespace json_query::json_path::detail

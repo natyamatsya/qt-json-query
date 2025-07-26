@@ -49,6 +49,24 @@ namespace json_query::json_path
             void pushFilter(const Token& t);
         };
 
+        class EmbeddedBracketSink {
+        public:
+            QVector<Token>&   tk;
+            KeyBuilder&       kb;
+            int               currentBracketGroupId;
+
+            EmbeddedBracketSink(QVector<Token>& tokens, KeyBuilder& keyBuilder, int bracketGroupId)
+                : tk(tokens), kb(keyBuilder), currentBracketGroupId(bracketGroupId) {}
+
+            // Token emission methods
+            std::expected<void, Error> key(QString key, bool allow = false);
+            void keyList(const QVector<QString>& keys);
+            void wild();
+            void slice(const Slice& s);
+            void index(int i);
+            void pushFilter(const Token& t);
+        };
+
         // ──────────────────────────────────────────────────────────────────────
         //  TableGen-Inspired Rule System Types
         // ──────────────────────────────────────────────────────────────────────
@@ -57,9 +75,10 @@ namespace json_query::json_path
         // Note: These are used as function pointers in static arrays, so std::function works better
         using BracketRuleMatcher = std::function<bool(QStringView)>;
         using BracketRuleHandler = std::function<std::expected<void, Error>(QStringView, BracketSink&)>;
+        using EmbeddedBracketRuleHandler = std::function<std::expected<void, Error>(QStringView, EmbeddedBracketSink&)>;
 
         /**
-         * Declarative rule metadata structure
+         * Declarative rule metadata structure (Legacy - with std::function storage)
          */
         struct BracketRuleMetadata {
             const char* name;               // Human-readable rule name
@@ -67,6 +86,17 @@ namespace json_query::json_path
             BracketRuleMatcher matcher;     // Pattern detection function
             BracketRuleHandler handler;     // Processing function
             const char* description;        // Documentation string
+        };
+
+        /**
+         * Declarative rule metadata structure (Embedded-only - zero-overhead)
+         */
+        struct EmbeddedBracketRuleMetadata {
+            const char* name;                      // Human-readable rule name
+            int priority;                          // Higher priority = checked first
+            BracketRuleMatcher matcher;            // Pattern detection function (same as legacy)
+            EmbeddedBracketRuleHandler handler;    // Processing function (embedded-only)
+            const char* description;               // Documentation string
         };
 
         // ──────────────────────────────────────────────────────────────────────
@@ -87,9 +117,9 @@ namespace json_query::json_path
         }
 
         // ──────────────────────────────────────────────────────────────────────
-        //  Rule Handler Functions
+        //  Rule Handler Functions (Legacy - with std::function storage)
         // ──────────────────────────────────────────────────────────────────────
-
+        
         namespace handlers {
             std::expected<void, Error> handleUnionComma(QStringView content, BracketSink& out);
             std::expected<void, Error> handleWildcard(QStringView content, BracketSink& out);
@@ -101,6 +131,23 @@ namespace json_query::json_path
             std::expected<void, Error> handlePlaceholder(QStringView content, BracketSink& out);
             std::expected<void, Error> handleQuotedKey(QStringView content, BracketSink& out);
             std::expected<void, Error> handleUnquotedKey(QStringView content, BracketSink& out);
+        }
+        
+        // ──────────────────────────────────────────────────────────────────────
+        //  Embedded Rule Handler Functions (Zero-Overhead, no std::function storage)
+        // ──────────────────────────────────────────────────────────────────────
+        
+        namespace embedded_handlers {
+            std::expected<void, Error> handleUnionComma(QStringView content, EmbeddedBracketSink& out);
+            std::expected<void, Error> handleWildcard(QStringView content, EmbeddedBracketSink& out);
+            std::expected<void, Error> handleSingleIndex(QStringView content, EmbeddedBracketSink& out);
+            std::expected<void, Error> handleIndexList(QStringView content, EmbeddedBracketSink& out);
+            std::expected<void, Error> handleSlice(QStringView content, EmbeddedBracketSink& out);
+            std::expected<void, Error> handleFilterWithParens(QStringView content, EmbeddedBracketSink& out);
+            std::expected<void, Error> handleFilterWithoutParens(QStringView content, EmbeddedBracketSink& out);
+            std::expected<void, Error> handlePlaceholder(QStringView content, EmbeddedBracketSink& out);
+            std::expected<void, Error> handleQuotedKey(QStringView content, EmbeddedBracketSink& out);
+            std::expected<void, Error> handleUnquotedKey(QStringView content, EmbeddedBracketSink& out);
         }
 
         // ──────────────────────────────────────────────────────────────────────
@@ -128,6 +175,18 @@ namespace json_query::json_path
             // Utility function to get rule metadata for debugging/documentation
             static const BracketRuleMetadata* findRuleByName(const char* name);
         };
+
+        class EmbeddedBracketRuleDispatcher {
+        public:
+            static std::vector<EmbeddedBracketRuleMetadata> createRules();
+            static const std::vector<EmbeddedBracketRuleMetadata>& getRules();
+            static std::expected<void, Error> dispatch(QStringView content, EmbeddedBracketSink& sink);
+            static const EmbeddedBracketRuleMetadata* findRuleByName(const char* name);
+            static std::expected<void, Error> processSegmentExcludingUnion(QStringView content, EmbeddedBracketSink& sink);
+        };
+
+        std::expected<void, Error> parseBracket(QStringView content, BracketSink& sink);
+        std::expected<void, Error> parseBracket(QStringView content, EmbeddedBracketSink& sink);
 
     } // namespace detail
 
