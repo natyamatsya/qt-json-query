@@ -329,25 +329,21 @@ std::expected<QJsonArray, EvalError> evaluateAll(const PathEvalCtx& ctx, const Q
         });
 }
 
-// Legacy array-based fan-out (for backward compatibility)
+// Direct array-based fan-out using TableGen dispatch
 std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src, qsizetype tokenPos)
 {
-    // Use regular QJsonArray with pointer-based ResultCollector for memory safety
     QJsonArray result;
     ResultCollector collector(&result);
-    
-    // Use zero-overhead concept-based streaming
     auto conceptStreamer = collector.getConceptStreamer();
     
-    // Explicitly call the template version to ensure proper error handling
-    fanOutStreaming<decltype(conceptStreamer)>(ctx, tk, src, conceptStreamer, tokenPos);
+    // Use TableGen-inspired error handling dispatch directly
+    internal::ErrorHandlingDispatcher::dispatch(tk, tokenPos, ctx, src, conceptStreamer);
     
-    // Check if an error occurred during streaming
+    // Check if an error occurred during processing
     if (collector.hasError()) {
         return std::unexpected(collector.getLastError());
     }
     
-    // Return result
     return result;
 }
 

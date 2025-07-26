@@ -31,17 +31,6 @@ std::expected<QJsonArray, EvalError> evaluateToken(const PathEvalCtx& ctx, const
     return evaluateTokenExpected(ctx, tk, v);
 }
 
-// ---------------------------------------------------------------------------
-//  Streaming-optimized fan-out helper
-// ---------------------------------------------------------------------------
-
-// Legacy overload for backward compatibility with ResultStreamer
-void fanOutStreaming(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src, 
-                    const ResultStreamer& streamer, qsizetype tokenPos)
-{
-    fanOutStreamingImpl(ctx, tk, src, streamer, tokenPos);
-}
-
 } // namespace json_query::json_path::detail
 
 // ---------------------------------------------------------------------------

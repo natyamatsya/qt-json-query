@@ -235,18 +235,6 @@ void fanOutStreamingImpl(const PathEvalCtx& ctx, const Token& tk, const QJsonArr
     internal::ErrorHandlingDispatcher::dispatch(tk, tokenPos, ctx, src, streamer);
 }
 
-// Legacy overload for backward compatibility with ResultStreamer
-void fanOutStreaming(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src, 
-                    const ResultStreamer& streamer, qsizetype tokenPos);
-
-// Template version for concept-based streamers
-template<typename StreamerType>
-void fanOutStreaming(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src, 
-                    const StreamerType& streamer, qsizetype tokenPos = -1)
-{
-    fanOutStreamingImpl(ctx, tk, src, streamer, tokenPos);
-}
-
 } // namespace json_query::json_path::detail
 
 namespace json_query::json_path::internal {
