@@ -29,8 +29,8 @@ namespace json_query::json_path
      * and returns a boolean indicating whether the value passes the filter.
      */
     template<typename T>
-    concept FilterConcept = requires(T& filter, const QJsonValue& value) {
-        { filter(value) } -> std::convertible_to<bool>;  // Must be callable with QJsonValue and return bool
+    concept FilterConcept = requires(T t, const QJsonValue& value) {
+        { t(value) } -> std::convertible_to<bool>;
     };
 
     /**
@@ -40,21 +40,14 @@ namespace json_query::json_path
      * the current node and root document for context-aware filtering.
      */
     template<typename T>
-    concept ContextFilterConcept = requires(T& filter, const QJsonValue& currentNode, const QJsonValue& rootDocument) {
-        { filter(currentNode, rootDocument) } -> std::convertible_to<bool>;  // Must be callable with two QJsonValues
+    concept ContextFilterConcept = requires(T t, const QJsonValue& currentNode, const QJsonValue& rootDocument) {
+        { t(currentNode, rootDocument) } -> std::convertible_to<bool>;
     };
 
-    // Legacy type aliases for backward compatibility - these will use std::function
-    // for storage in QVector containers where needed, but templates should prefer concepts
-    // Note: Must use std::function for storage in QVector containers
+    // TODO: Remove these legacy type aliases after migrating all usages to embedded filters
+    // These are temporarily kept to maintain build compatibility during refactoring
     using FilterFn = std::function<bool (const QJsonValue&)>;
-
-    // Context-aware filter function type for absolute path references
-    // Receives both current node and root document context
-    // Note: Must use std::function for storage in QVector containers
     using ContextFilterFn = std::function<bool (const QJsonValue& currentNode, const QJsonValue& rootDocument)>;
-
-    enum class FunctionType { None, Length, Min, Max };
 
     // ======================================================================
     //  Template-based zero-overhead filter tokens (forward declarations)
@@ -144,6 +137,8 @@ namespace json_query::json_path
     private:
         [[no_unique_address]] ContextFilter filter_;  // Zero overhead with empty base optimization
     };
+
+    enum class FunctionType { None, Length, Min, Max };
 
     // ======================================================================
     //  Zero-Overhead Copyable Filter Embedding System
@@ -567,10 +562,6 @@ namespace json_query::json_path
         quint32       hash{};           // cached object-key hash
         QString       key{};            // for Kind::Key / KeyList (joined by '\n') / Filter
         
-        // Legacy filter storage (for backward compatibility)
-        std::size_t   filterId{};       // index into filter table
-        std::size_t   contextFilterId{SIZE_MAX}; // index into context filter table (SIZE_MAX = not used)
-        
         // Zero-overhead embedded filter (new architecture)
         std::optional<EmbeddedFilter> embeddedFilter{};
         
@@ -582,20 +573,24 @@ namespace json_query::json_path
         }
 
         /**
-         * @brief Check if this token uses legacy filter storage
-         * @return true if using legacy index-based filter lookup
-         */
-        [[nodiscard]] bool hasLegacyFilter() const noexcept {
-            return filterId < SIZE_MAX || contextFilterId < SIZE_MAX;
-        }
-        
-        /**
          * @brief Check if this token has an embedded filter
          * @return true if using new embedded filter architecture
          */
         [[nodiscard]] bool hasEmbeddedFilter() const noexcept {
             return embeddedFilter.has_value() && embeddedFilter->hasFilter();
         }
+
+        /**
+         * @brief Check if this token uses legacy filter storage
+         * @return true if using legacy index-based filter lookup
+         */
+        [[nodiscard]] bool hasLegacyFilter() const noexcept {
+            return filterId < SIZE_MAX || contextFilterId < SIZE_MAX;
+        }
+
+        // Legacy filter storage (for backward compatibility during migration)
+        std::size_t   filterId{};       // index into filter table
+        std::size_t   contextFilterId{SIZE_MAX}; // index into context filter table (SIZE_MAX = not used)
         
         /**
          * @brief Embed a regular filter directly in this token
@@ -683,8 +678,8 @@ toString(Error e) noexcept
 // Compiled result structure containing tokens and filters
 struct Compiled { 
     QVector<Token> tokens; 
-    QVector<FilterFn> filters; 
-    QVector<ContextFilterFn> contextFilters; 
+    QVector<FilterFn> filters; // Legacy filter storage
+    QVector<ContextFilterFn> contextFilters; // Legacy context filter storage
 };
 
 // ──────────────────────────────────────────────────────────────────────
@@ -703,18 +698,25 @@ compilePath(QStringView path);
 [[nodiscard]] FunctionType 
 detectTrailingFunction(QString& path);
 
-/// Compile a filter expression into a Token with associated FilterFn
+/// Compile a filter expression into a Token with associated filter
 /// @param expr The filter expression string
-/// @param filters Output vector to store the compiled filter function
+/// @param filters Output vector to store the compiled filter function (legacy)
 /// @return Token representing the filter, or nullopt if compilation failed
 [[nodiscard]] std::optional<Token> 
 compileFilter(const QString& expr, QVector<FilterFn>& filters);
 
 /// Context-aware filter compilation for absolute path references
+/// @param expr The filter expression string
+/// @param contextFilters Output vector to store the compiled context filter function (legacy)
+/// @param filters Output vector to store the compiled filter function (legacy)
+/// @return Token representing the filter, or nullopt if compilation failed
 [[nodiscard]] std::optional<Token> 
 compileContextFilter(const QString& expr, QVector<ContextFilterFn>& contextFilters, QVector<FilterFn>& filters);
 
 /// Parse absolute path references in filter expressions (context-aware)
+/// @param s The absolute path reference string
+/// @param out Output vector to store the compiled context filter function (legacy)
+/// @return Token representing the filter, or nullopt if compilation failed
 [[nodiscard]] std::optional<Token>
 parseAbsolutePathContext(QString s, QVector<ContextFilterFn>& out);
 

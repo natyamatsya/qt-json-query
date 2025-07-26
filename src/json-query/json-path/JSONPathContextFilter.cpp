@@ -147,7 +147,7 @@ std::optional<Token> parseAbsolutePathContext(QString s, QVector<ContextFilterFn
             {
                 fns.push_back(std::move(fn));
                 const std::size_t id = fns.size() - 1;
-                Token token{Token::Kind::Filter, 0, {}, 0u, std::move(key), 0};
+                Token token{Token::Kind::Filter, 0, {}, 0u, std::move(key)};
                 token.contextFilterId = id;
                 return token;
             }
@@ -325,7 +325,7 @@ std::optional<Token> parseAbsolutePathContext(QString s, QVector<ContextFilterFn
                     {
                         fns.push_back(std::move(fn));
                         const std::size_t id = fns.size() - 1;
-                        Token token{Token::Kind::Filter, 0, {}, 0u, std::move(key), 0};
+                        Token token{Token::Kind::Filter, 0, {}, 0u, std::move(key)};
                         token.contextFilterId = id;
                         return token;
                     }
@@ -472,7 +472,7 @@ std::optional<Token> parseAbsolutePathContext(QString s, QVector<ContextFilterFn
             {
                 fns.push_back(std::move(fn));
                 const std::size_t id = fns.size() - 1;
-                Token token{Token::Kind::Filter, 0, {}, 0u, std::move(key), 0};
+                Token token{Token::Kind::Filter, 0, {}, 0u, std::move(key)};
                 token.contextFilterId = id;
                 return token;
             }

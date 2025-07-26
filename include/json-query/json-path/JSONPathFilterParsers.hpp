@@ -24,6 +24,9 @@ namespace json_query::json_path::detail {
 using json_query::utils::to_sv;
 using json_query::utils::to_qstr;
 
+// Forward declarations
+class FilterParseContext;
+
 // Template implementations for comparison patterns - must be in header for templates
 template<auto PAT>
 [[nodiscard]] std::optional<json_query::json_path::Token> parseSelfValue(QString s, QVector<json_query::json_path::FilterFn>& out)
@@ -142,8 +145,7 @@ template<auto PAT>
         const QRegularExpression regex(pattern);
         if (!regex.isValid()) return std::nullopt;
         
-        Builder b{out};
-        return b.add([prop, regex](const QJsonValue& j){
+        return Builder{out}.add([prop, regex](const QJsonValue& j){
             const auto obj = j.toObject();
             const auto v = obj.value(prop);
             if (!v.isString()) return false;
@@ -163,9 +165,35 @@ template<auto PAT>
         return parseRhsValue(op, rhs)
             .and_then([&](const ComparisonContext& ctx) -> std::optional<json_query::json_path::Token> {
                 Builder b{out};
-                return b.add([ctx](const QJsonValue& j){
-                    return ctx.compare(j);
-                });
+                
+                // Use monadic dispatch based on comparison type
+                switch (ctx.type) {
+                    case ComparisonType::Numeric:
+                        return b.add([op = ctx.op, numVal = ctx.numVal](const QJsonValue& j) {
+                            return j.isDouble() && applyOperator(op, j.toDouble(), numVal);
+                        }, QString("@"));
+                        
+                    case ComparisonType::Boolean:
+                        return b.add([op = ctx.op, boolVal = ctx.boolVal](const QJsonValue& j) {
+                            return j.isBool() && applyOperator(op, j.toBool(), boolVal);
+                        }, QString("@"));
+                        
+                    case ComparisonType::Null:
+                        return b.add([op = ctx.op](const QJsonValue& j) {
+                            bool isJNull = j.isNull();
+                            // Null only supports equality comparisons
+                            if (op == "==") return isJNull;
+                            if (op == "!=") return !isJNull;
+                            return false; // null doesn't support ordering comparisons
+                        }, QString("@"));
+                        
+                    case ComparisonType::String:
+                    case ComparisonType::DeepEquality:
+                        return b.add([op = ctx.op, value = ctx.rhs](const QJsonValue& j) {
+                            return j.isString() && applyOperator(op, j.toString(), value);
+                        }, QString("@"));
+                }
+                return std::nullopt;
             });
     }
     return std::nullopt;
@@ -181,9 +209,35 @@ template<auto PAT>
         return parseRhsValue(op, rhs)
             .and_then([&](const ComparisonContext& ctx) -> std::optional<json_query::json_path::Token> {
                 Builder b{out};
-                return b.add([ctx](const QJsonValue& j){
-                    return ctx.compare(j);
-                });
+                
+                // Use monadic dispatch based on comparison type
+                switch (ctx.type) {
+                    case ComparisonType::Numeric:
+                        return b.add([op = ctx.op, numVal = ctx.numVal](const QJsonValue& j) {
+                            return j.isDouble() && applyOperator(op, j.toDouble(), numVal);
+                        }, QString("@"));
+                        
+                    case ComparisonType::Boolean:
+                        return b.add([op = ctx.op, boolVal = ctx.boolVal](const QJsonValue& j) {
+                            return j.isBool() && applyOperator(op, j.toBool(), boolVal);
+                        }, QString("@"));
+                        
+                    case ComparisonType::Null:
+                        return b.add([op = ctx.op](const QJsonValue& j) {
+                            bool isJNull = j.isNull();
+                            // Null only supports equality comparisons
+                            if (op == "==") return isJNull;
+                            if (op == "!=") return !isJNull;
+                            return false; // null doesn't support ordering comparisons
+                        }, QString("@"));
+                        
+                    case ComparisonType::String:
+                    case ComparisonType::DeepEquality:
+                        return b.add([op = ctx.op, value = ctx.rhs](const QJsonValue& j) {
+                            return j.isString() && applyOperator(op, j.toString(), value);
+                        }, QString("@"));
+                }
+                return std::nullopt;
             });
     }
     return std::nullopt;
@@ -201,8 +255,7 @@ template<auto PAT>
         ctx.rhs = "null";
         ctx.type = ComparisonType::Null;
         
-        Builder b{out};
-        return b.add([prop, ctx](const QJsonValue& j){
+        return Builder{out}.add([prop, ctx](const QJsonValue& j){
             const auto obj = j.toObject();
             const auto v = obj.value(prop);
             return ctx.compare(v);
@@ -223,8 +276,7 @@ template<auto PAT>
         ctx.rhs = "null";
         ctx.type = ComparisonType::Null;
         
-        Builder b{out};
-        return b.add([prop, ctx](const QJsonValue& j){
+        return Builder{out}.add([prop, ctx](const QJsonValue& j){
             // Convert prop to integer for array index access
             bool ok;
             int index = prop.toInt(&ok);
