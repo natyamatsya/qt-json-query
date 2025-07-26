@@ -251,7 +251,7 @@ TokenProcessingResult processSingleUnionToken(
     
     // Process each working value using monadic pattern
     auto processWorkingValue = [&](const QJsonValue& workingValue) -> std::expected<QJsonArray, EvalError> {
-        return evaluateTokenExpected(ctx, ctx.tokens[tokenIdx], workingValue);
+        return evaluateToken(ctx, ctx.tokens[tokenIdx], workingValue);
     };
     
     // Aggregate results using monadic error handling

@@ -217,7 +217,6 @@ using json_query::json_path::detail::PathEvalCtx;
 //  Token evaluation dispatch system
 // ---------------------------------------------------------------------------
 
-std::expected<QJsonArray, EvalError> evaluateTokenExpected(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v);
 std::expected<QJsonArray, EvalError> evaluateToken(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v);
 
 template<internal::ResultStreamerConcept StreamerType>

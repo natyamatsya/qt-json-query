@@ -17,17 +17,12 @@ using internal::acquirePooledArray;
 //  Token evaluation dispatch system
 // ---------------------------------------------------------------------------
 
-std::expected<QJsonArray, EvalError> evaluateTokenExpected(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
+std::expected<QJsonArray, EvalError> evaluateToken(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
 {
     qCDebug(jsonPathLog) << "[stage] token" << (&tk - ctx.tokens.data()) << ": kind=" << static_cast<int>(tk.kind) << "working size=" << 1;
 
     // Use TableGen-inspired dispatch table
     return TokenDispatcher::dispatch(ctx, tk, v);
-}
-
-std::expected<QJsonArray, EvalError> evaluateToken(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
-{
-    return evaluateTokenExpected(ctx, tk, v);
 }
 
 } // namespace json_query::json_path::detail
@@ -40,40 +35,40 @@ namespace json_query::json_path::internal {
 
 using namespace json_query::json_path::detail;
 
-// Simple dispatch functions that call the actual evalExpected functions
-std::expected<QJsonArray, EvalError> dispatchKey(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
+// Simple dispatch functions that call the actual eval functions
+std::expected<QJsonArray, EvalError> dispatchKey(const detail::PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
 {
-    return json_query::json_path::detail::evalExpected<Token::Kind::Key>(ctx, tk, v);
+    return json_query::json_path::detail::eval<Token::Kind::Key>(ctx, tk, v);
 }
 
-std::expected<QJsonArray, EvalError> dispatchIndex(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
+std::expected<QJsonArray, EvalError> dispatchIndex(const detail::PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
 {
-    return json_query::json_path::detail::evalExpected<Token::Kind::Index>(ctx, tk, v);
+    return json_query::json_path::detail::eval<Token::Kind::Index>(ctx, tk, v);
 }
 
-std::expected<QJsonArray, EvalError> dispatchSlice(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
+std::expected<QJsonArray, EvalError> dispatchSlice(const detail::PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
 {
-    return json_query::json_path::detail::evalExpected<Token::Kind::Slice>(ctx, tk, v);
+    return json_query::json_path::detail::eval<Token::Kind::Slice>(ctx, tk, v);
 }
 
-std::expected<QJsonArray, EvalError> dispatchWildcard(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
+std::expected<QJsonArray, EvalError> dispatchWildcard(const detail::PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
 {
-    return json_query::json_path::detail::evalExpected<Token::Kind::Wildcard>(ctx, tk, v);
+    return json_query::json_path::detail::eval<Token::Kind::Wildcard>(ctx, tk, v);
 }
 
-std::expected<QJsonArray, EvalError> dispatchRecursive(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
+std::expected<QJsonArray, EvalError> dispatchRecursive(const detail::PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
 {
-    return json_query::json_path::detail::evalExpected<Token::Kind::Recursive>(ctx, tk, v);
+    return json_query::json_path::detail::eval<Token::Kind::Recursive>(ctx, tk, v);
 }
 
-std::expected<QJsonArray, EvalError> dispatchFilter(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
+std::expected<QJsonArray, EvalError> dispatchFilter(const detail::PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
 {
-    return json_query::json_path::detail::evalExpected<Token::Kind::Filter>(ctx, tk, v);
+    return json_query::json_path::detail::eval<Token::Kind::Filter>(ctx, tk, v);
 }
 
-std::expected<QJsonArray, EvalError> dispatchKeyList(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
+std::expected<QJsonArray, EvalError> dispatchKeyList(const detail::PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
 {
-    return json_query::json_path::detail::evalExpected<Token::Kind::KeyList>(ctx, tk, v);
+    return json_query::json_path::detail::eval<Token::Kind::KeyList>(ctx, tk, v);
 }
 
 } // namespace json_query::json_path::internal

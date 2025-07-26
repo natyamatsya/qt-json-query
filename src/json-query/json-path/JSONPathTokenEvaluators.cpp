@@ -11,9 +11,9 @@ using json_query::json_path::internal::ContainerCursor;
 
 // --- Key -------------------------------------------------------------------
 template<>
-std::expected<QJsonArray, EvalError> evalExpected<Token::Kind::Key>(const PathEvalCtx& /*ctx*/,
-                                                                     const Token& tk,
-                                                                     const QJsonValue& v)
+std::expected<QJsonArray, EvalError> eval<Token::Kind::Key>(const PathEvalCtx& /*ctx*/,
+                                                            const Token& tk,
+                                                            const QJsonValue& v)
 {
     // Monadic approach: check if object, then extract key if present
     auto extractFromObject = [&tk](const QJsonObject& obj) -> std::optional<QJsonArray> {
@@ -36,9 +36,9 @@ std::expected<QJsonArray, EvalError> evalExpected<Token::Kind::Key>(const PathEv
 
 // --- Index -----------------------------------------------------------------
 template<>
-std::expected<QJsonArray, EvalError> evalExpected<Token::Kind::Index>(const PathEvalCtx& ctx,
-                                                                       const Token& tk,
-                                                                       const QJsonValue& v)
+std::expected<QJsonArray, EvalError> eval<Token::Kind::Index>(const PathEvalCtx& ctx,
+                                                              const Token& tk,
+                                                              const QJsonValue& v)
 {
     // RFC 9535 compliance: "Nothing is selected from a value that is not an array"
     if (!v.isArray()) {
@@ -60,9 +60,9 @@ std::expected<QJsonArray, EvalError> evalExpected<Token::Kind::Index>(const Path
 
 // --- Slice -----------------------------------------------------------------
 template<>
-std::expected<QJsonArray, EvalError> evalExpected<Token::Kind::Slice>(const PathEvalCtx& /*ctx*/,
-                                                                       const Token& tk,
-                                                                       const QJsonValue& v)
+std::expected<QJsonArray, EvalError> eval<Token::Kind::Slice>(const PathEvalCtx& /*ctx*/,
+                                                              const Token& tk,
+                                                              const QJsonValue& v)
 {
     // Monadic approach: extract array and apply slice if present
     auto asArray = [&v]() -> std::optional<QJsonArray> {
@@ -78,9 +78,9 @@ std::expected<QJsonArray, EvalError> evalExpected<Token::Kind::Slice>(const Path
 
 // --- Wildcard --------------------------------------------------------------
 template<>
-std::expected<QJsonArray, EvalError> evalExpected<Token::Kind::Wildcard>(const PathEvalCtx& /*ctx*/,
-                                                                          const Token&,
-                                                                          const QJsonValue& v)
+std::expected<QJsonArray, EvalError> eval<Token::Kind::Wildcard>(const PathEvalCtx& /*ctx*/,
+                                                                  const Token&,
+                                                                  const QJsonValue& v)
 {
     // Monadic approach: transform value to appropriate wildcard result based on type
     auto processAsObject = [&v]() -> std::optional<std::expected<QJsonArray, EvalError>> {
@@ -99,18 +99,18 @@ std::expected<QJsonArray, EvalError> evalExpected<Token::Kind::Wildcard>(const P
 
 // --- Recursive -------------------------------------------------------------
 template<>
-std::expected<QJsonArray, EvalError> evalExpected<Token::Kind::Recursive>(const PathEvalCtx& /*ctx*/,
-                                                                           const Token&,
-                                                                           const QJsonValue& v)
+std::expected<QJsonArray, EvalError> eval<Token::Kind::Recursive>(const PathEvalCtx& /*ctx*/,
+                                                                   const Token&,
+                                                                   const QJsonValue& v)
 {
     return evaluateRecursive(v, 0);
 }
 
 // --- Filter ----------------------------------------------------------------
 template<>
-std::expected<QJsonArray, EvalError> evalExpected<Token::Kind::Filter>(const PathEvalCtx& ctx,
-                                                                        const Token& tk,
-                                                                        const QJsonValue& v)
+std::expected<QJsonArray, EvalError> eval<Token::Kind::Filter>(const PathEvalCtx& ctx,
+                                                                const Token& tk,
+                                                                const QJsonValue& v)
 {
     QJsonArray out;
     if (tk.filterId >= ctx.filters.size() && tk.contextFilterId >= ctx.contextFilters.size()) {
@@ -178,9 +178,9 @@ std::expected<QJsonArray, EvalError> evalExpected<Token::Kind::Filter>(const Pat
 
 // --- KeyList ---------------------------------------------------------------
 template<>
-std::expected<QJsonArray, EvalError> evalExpected<Token::Kind::KeyList>(const PathEvalCtx& /*ctx*/,
-                                                                         const Token& tk,
-                                                                         const QJsonValue& v)
+std::expected<QJsonArray, EvalError> eval<Token::Kind::KeyList>(const PathEvalCtx& /*ctx*/,
+                                                                const Token& tk,
+                                                                const QJsonValue& v)
 {
     // Monadic approach: extract keys from object if present, build result object
     auto extractKeysFromObject = [&tk](const QJsonObject& obj) -> std::optional<QJsonArray> {
