@@ -888,6 +888,85 @@ std::optional<Token> parseEmbeddedComparePropToProp(const QString& s)
     return std::nullopt;
 }
 
+template<ctll::fixed_string Pattern>
+std::optional<Token> parseEmbeddedComparePropToArrayIdx(const QString& s)
+{
+    if (auto m = ctre::match<Pattern>(to_sv(s))) {
+        const QString leftProp = to_qstr(m.template get<1>().to_view());
+        const QString op = to_qstr(m.template get<2>().to_view());
+        const QString rightProp = to_qstr(m.template get<3>().to_view());
+        const QString rightIndex = to_qstr(m.template get<4>().to_view());
+        
+        Token token;
+        token.kind = Token::Kind::Filter;
+        token.key = s;
+        
+        token.embedFilter([leftProp, op, rightProp, rightIndex](const QJsonValue& j) {
+            // Property-to-array-index comparison: @.a==@.list[9]
+            if (!j.isObject()) return false;
+            
+            const auto obj = j.toObject();
+            const QJsonValue leftValue = obj.value(leftProp);
+            const auto rightArr = obj.value(rightProp).toArray();
+            
+            bool ok;
+            int idx = rightIndex.toInt(&ok);
+            QJsonValue rightValue;
+            
+            // Handle out-of-bounds or invalid index as undefined
+            if (!ok || idx < 0 || idx >= rightArr.size()) {
+                rightValue = QJsonValue(QJsonValue::Undefined);
+            } else {
+                rightValue = rightArr.at(idx);
+            }
+            
+            // Use the same logic as legacy performComparison function
+            // Handle undefined values
+            if (leftValue.type() == QJsonValue::Undefined || rightValue.type() == QJsonValue::Undefined) {
+                if (op == "==") return leftValue.type() == rightValue.type(); // both undefined
+                if (op == "!=") return leftValue.type() != rightValue.type(); // one undefined, one not
+                return false; // ordering comparisons require same type
+            }
+            
+            // Use deep equality for == and !=
+            if (op == "==") return leftValue == rightValue;
+            if (op == "!=") return leftValue != rightValue;
+            
+            // For ordering comparisons, ensure same type
+            if (leftValue.type() != rightValue.type()) return false;
+            
+            // Handle ordering comparisons by type
+            if (leftValue.isDouble() && rightValue.isDouble()) {
+                double left = leftValue.toDouble();
+                double right = rightValue.toDouble();
+                if (op == "<") return left < right;
+                if (op == ">") return left > right;
+                if (op == "<=") return left <= right;
+                if (op == ">=") return left >= right;
+            } else if (leftValue.isBool() && rightValue.isBool()) {
+                bool left = leftValue.toBool();
+                bool right = rightValue.toBool();
+                if (op == "<") return !left && right;  // false < true
+                if (op == ">") return left && !right;  // true > false
+                if (op == "<=") return !left || right; // false <= anything, true <= true
+                if (op == ">=") return left || !right; // true >= anything, false >= false
+            } else if (leftValue.isString() && rightValue.isString()) {
+                QString left = leftValue.toString();
+                QString right = rightValue.toString();
+                if (op == "<") return left < right;
+                if (op == ">") return left > right;
+                if (op == "<=") return left <= right;
+                if (op == ">=") return left >= right;
+            }
+            
+            return false; // unsupported comparison
+        });
+        
+        return token;
+    }
+    return std::nullopt;
+}
+
 std::optional<Token> parseEmbeddedCompare(QString s)
 {
     s = stripOuterParens(s);
@@ -904,7 +983,8 @@ std::optional<Token> parseEmbeddedCompare(QString s)
     constexpr auto selfPat = ctll::fixed_string{R"(^@\s*(==|!=|>=|<=|>|<)\s*(.+)$)"};
     constexpr auto selfSelfPat = ctll::fixed_string{R"(^(@|\$)\s*(==|!=|>=|<=|>|<)\s*(@|\$)$)"};  // Self-comparison: @==@, $==$, etc.
     constexpr auto propToPropPat = ctll::fixed_string{R"(@\.([\w$]+)\s*(==|!=|>=|<=|>|<)\s*@\.([\w$]+))"};  // Property-to-property: @.a==@.b
-    
+    constexpr auto propToArrayIdxPat = ctll::fixed_string{R"(@\.([\w$]+)\s*(==|!=|>=|<=|>|<)\s*@\.([\w$]+)\[(-?\d+)\])"};  // Property-to-array-index: @.a==@.list[9]
+
     // Try self-comparison pattern first (more specific)
     if (auto m = ctre::match<selfSelfPat>(to_sv(s))) {
         const QString leftSide = to_qstr(m.template get<1>().to_view());
@@ -949,6 +1029,10 @@ std::optional<Token> parseEmbeddedCompare(QString s)
         qCDebug(jsonPathLog) << "parseEmbeddedCompare: matched property-to-property pattern";
         return t;
     }
+    if (auto t = parseEmbeddedComparePropToArrayIdx<propToArrayIdxPat>(s)) {
+        qCDebug(jsonPathLog) << "parseEmbeddedCompare: matched property-to-array-index pattern";
+        return t;
+    }
     if (auto t = parseEmbeddedSelfValue<selfPat>(s)) {
         qCDebug(jsonPathLog) << "parseEmbeddedCompare: matched self pattern";
         return t;
@@ -957,6 +1041,9 @@ std::optional<Token> parseEmbeddedCompare(QString s)
     qCDebug(jsonPathLog) << "parseEmbeddedCompare: no patterns matched for" << s;
     return std::nullopt;
 }
+
+template<ctll::fixed_string Pattern>
+std::optional<Token> parseEmbeddedComparePropToArrayIdx(const QString& s);
 
 std::optional<Token> parseEmbeddedRegex(QString s)
 {
@@ -971,6 +1058,8 @@ std::optional<Token> parseEmbeddedRegex(QString s)
 
 std::optional<Token> parseEmbeddedExists(QString s)
 {
+    s = stripOuterParens(s);
+    
     // Trim whitespace from logical operator splitting
     s = s.trimmed();
     
@@ -1144,34 +1233,68 @@ std::optional<Token> parseEmbeddedExists(QString s)
         return token;
     }
     
-    // Try basic existence patterns
+    // Try basic property existence pattern: @.property
     if (auto m = ctre::match<dotExistsPat>(to_sv(s))) {
         const QString prop = to_qstr(m.template get<1>().to_view());
-        
         Token token;
         token.kind = Token::Kind::Filter;
         token.key = s;
         
         token.embedFilter([prop](const QJsonValue& j) {
-            return j.isObject() && j.toObject().contains(prop);
+            // Basic property existence: @.property - true if object contains property
+            if (j.isObject()) {
+                return j.toObject().contains(prop);
+            }
+            return false;  // Non-objects don't have properties
         });
         
-        qCDebug(jsonPathLog) << "parseEmbeddedExists: matched dot existence pattern";
+        qCDebug(jsonPathLog) << "parseEmbeddedExists: matched basic property existence pattern";
         return token;
     }
     
+    // Try bracket property existence pattern: @['property'] or @["property"]
     if (auto m = ctre::match<brkExistsPat>(to_sv(s))) {
         const QString prop = to_qstr(m.template get<1>().to_view());
-        
         Token token;
         token.kind = Token::Kind::Filter;
         token.key = s;
         
         token.embedFilter([prop](const QJsonValue& j) {
-            return j.isObject() && j.toObject().contains(prop);
+            // Bracket property existence: @['property'] - true if object contains property
+            if (j.isObject()) {
+                return j.toObject().contains(prop);
+            }
+            return false;  // Non-objects don't have properties
         });
         
-        qCDebug(jsonPathLog) << "parseEmbeddedExists: matched bracket existence pattern";
+        qCDebug(jsonPathLog) << "parseEmbeddedExists: matched bracket property existence pattern";
+        return token;
+    }
+    
+    // Try index existence pattern: @[index]
+    if (auto m = ctre::match<idxExistsPat>(to_sv(s))) {
+        const QString indexStr = to_qstr(m.template get<1>().to_view());
+        bool ok;
+        const int index = indexStr.toInt(&ok);
+        if (!ok) return std::nullopt;
+        
+        Token token;
+        token.kind = Token::Kind::Filter;
+        token.key = s;
+        
+        token.embedFilter([index](const QJsonValue& j) {
+            // Index existence: @[index] - true if array has element at index
+            if (j.isArray()) {
+                const auto arr = j.toArray();
+                const int size = arr.size();
+                // Handle negative indices
+                const int actualIndex = (index < 0) ? size + index : index;
+                return actualIndex >= 0 && actualIndex < size;
+            }
+            return false;  // Non-arrays don't have indices
+        });
+        
+        qCDebug(jsonPathLog) << "parseEmbeddedExists: matched index existence pattern";
         return token;
     }
     
