@@ -177,7 +177,7 @@ struct TokenProcessingStrategy<TokenProcessingType::StandardFanOut> {
                     
                     // Use ArrayPool for deduplication array
                     auto pooledDedup{acquirePooledArray()};
-                    QJsonArray& dedup = *pooledDedup;
+                    auto& dedup = *pooledDedup;
                     
                     for (const auto& v : result) {
                         uint h;
@@ -277,7 +277,7 @@ std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const 
 
     // Use ArrayPool for better memory management of working array
     auto pooledWorkingArray{acquirePooledArray()};
-    QJsonArray& workingArray = *pooledWorkingArray;
+    auto& workingArray = *pooledWorkingArray;
     workingArray.append(root);
     
     std::expected<QJsonArray, EvalError> working = QJsonArray(workingArray);
@@ -287,7 +287,7 @@ std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const 
 
     for (qsizetype i = 1; i < ctx.tokens.size() && working; ++i)
     {
-        const Token& tk = ctx.tokens[i];
+        const auto& tk = ctx.tokens[i];
         qDebug() << "[stage] token" << i << ": kind=" << static_cast<int>(tk.kind)
                  << "working size=" << working->size();
 

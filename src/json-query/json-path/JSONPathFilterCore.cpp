@@ -1470,7 +1470,7 @@ std::optional<Token> parseEmbeddedFunction(const QString& s)
             });
         } else {
             // Use regular filter for non-root context evaluation
-            const QString& expr = s;
+            const auto& expr = s;
             
             result.embedFilter([expr](const QJsonValue& j) -> bool {
                 // Re-parse the expression at runtime to avoid capture issues

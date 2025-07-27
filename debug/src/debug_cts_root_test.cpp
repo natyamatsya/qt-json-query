@@ -25,7 +25,7 @@ int main(int argc, char *argv[])
         return 1;
     }
     
-    const JSONPath& path = *maybePath;
+    const auto& path = *maybePath;
     auto result = path.evaluate(doc);  // This is what CTS calls
     if (!result.has_value()) {
         qDebug() << "Failed to evaluate:" << static_cast<int>(result.error());

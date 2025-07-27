@@ -136,7 +136,7 @@ template<>
 struct SliceProcessingStrategy<SliceProcessingType::ForwardSlice> {
     static std::expected<QJsonArray, EvalError> process(const QJsonArray& array, const Slice& s) {
         auto pooledArray{acquirePooledArray()};
-        QJsonArray& out = *pooledArray;
+        auto& out = *pooledArray;
 
         const auto len = array.size();
         constexpr qsizetype SENTINEL = std::numeric_limits<qsizetype>::max();
@@ -178,7 +178,7 @@ template<>
 struct SliceProcessingStrategy<SliceProcessingType::BackwardSlice> {
     static std::expected<QJsonArray, EvalError> process(const QJsonArray& array, const Slice& s) {
         auto pooledArray{acquirePooledArray()};
-        QJsonArray& out = *pooledArray;
+        auto& out = *pooledArray;
 
         const auto len = array.size();
         constexpr qsizetype SENTINEL = std::numeric_limits<qsizetype>::max();
@@ -585,7 +585,7 @@ std::vector<qsizetype> collectConsecutiveSelectorTokens(const PathEvalCtx& ctx, 
     
     auto j = startIndex + 1;
     while (j < ctx.tokens.size()) {
-        const Token& nextTk = ctx.tokens[j];
+        const auto& nextTk = ctx.tokens[j];
         if (isSelectorToken(nextTk)) {
             unionTokens.push_back(j);
             ++j;
@@ -637,7 +637,7 @@ TokenProcessingResult processSingleUnionToken(
     
     // Use pooled array for efficient result collection
     auto pooledArray{acquirePooledArray()};
-    QJsonArray& results = *pooledArray;
+    auto& results = *pooledArray;
     
     // Process each working value using monadic pattern
     auto processWorkingValue = [&](const QJsonValue& workingValue) -> std::expected<QJsonArray, EvalError> {
@@ -767,7 +767,7 @@ std::expected<QJsonArray, EvalError> processBranchUniqueSelection(
     bool isLeaf)
 {
     auto keyResult{collectKeysFromTokens(ctx, i)};
-    const std::vector<QString>& keys = keyResult.keys;
+    const auto& keys = keyResult.keys;
     i = keyResult.nextIndex;
     
     if (keys.empty()) {
@@ -775,7 +775,7 @@ std::expected<QJsonArray, EvalError> processBranchUniqueSelection(
     }
     
     auto pooledArray{acquirePooledArray()};
-    QJsonArray& results = *pooledArray;
+    auto& results = *pooledArray;
     
     for (const auto& workingValue : working) {
         if (!workingValue.isObject()) continue;
@@ -849,7 +849,7 @@ KeyCollectionResult collectKeysFromTokens(const PathEvalCtx& ctx, qsizetype star
     auto i = startIndex;
     
     while (i < ctx.tokens.size()) {
-        const Token& token = ctx.tokens[i];
+        const auto& token = ctx.tokens[i];
         if (token.kind == Token::Kind::Key) {
             keys.push_back(token.key);
             ++i;

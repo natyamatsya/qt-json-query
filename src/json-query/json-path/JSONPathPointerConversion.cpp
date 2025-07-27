@@ -22,7 +22,7 @@ QString tokensToPointer(QStringList& segments, const std::vector<Token>& tokens)
 {
     // assume tokens[0] is root ($)
     for (qsizetype i = 1; i < tokens.size(); ++i) {
-        const Token& tk = tokens[i];
+        const auto& tk = tokens[i];
         switch (tk.kind) {
         case Token::Kind::Key:
             segments.append(escapePointerSegment(tk.key));

@@ -32,7 +32,7 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::Key>(const PathEvalCtx& /
     
     // Use ArrayPool for result to optimize memory allocation
     auto pooledArray{acquirePooledArray()};
-    QJsonArray& result = *pooledArray;
+    auto& result = *pooledArray;
     result.append(it.value());
     
     // Return copy since pooled array will be returned to pool
@@ -120,7 +120,7 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::Recursive>(const PathEval
     
     // If we found the current token and there's a next token
     if (currentPos >= 0 && currentPos + 1 < ctx.tokens.size()) {
-        const Token& nextToken = ctx.tokens[currentPos + 1];
+        const auto& nextToken = ctx.tokens[currentPos + 1];
         
         // Check if next token is a simple key (common pattern)
         if (nextToken.kind == Token::Kind::Key) {
@@ -149,7 +149,7 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::Filter>(const PathEvalCtx
     // Fall back to embedded filter evaluation for complex patterns
     // Use ArrayPool for result to optimize memory allocation
     auto pooledArray{acquirePooledArray()};
-    QJsonArray& out = *pooledArray;
+    auto& out = *pooledArray;
     
     // Check for embedded filters (zero-overhead)
     if (tk.hasEmbeddedFilter()) {
@@ -203,7 +203,7 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::KeyList>(const PathEvalCt
     const auto obj = v.toObject();
     const QStringList keys = tk.key.split(u'\n');
     auto pooledArray{acquirePooledArray()};
-    QJsonArray& results = *pooledArray;
+    auto& results = *pooledArray;
     
     for (const QString& key : keys) {
         if (obj.contains(key)) {

@@ -20,7 +20,7 @@ static std::expected<QJsonArray, EvalError> evaluateWildcardObjectImpl(const QJs
 {
     // Use pooled array to reduce allocations
     auto pooledArray{acquirePooledArray()};
-    QJsonArray& out = *pooledArray;
+    auto& out = *pooledArray;
     
     // Use ContainerCursor for optimized, zero-copy iteration
     auto cursor{ContainerCursor::object(obj)};
@@ -124,7 +124,7 @@ static std::expected<QJsonArray, EvalError> evaluateRecursiveDirectFastPath(
     
     // Use pooled array for results
     auto pooledArray{acquirePooledArray()};
-    QJsonArray& results = *pooledArray;
+    auto& results = *pooledArray;
     
     // Direct recursive traversal using function_ref - fixed approach
     // We use a struct with operator() to avoid circular lambda capture issues
@@ -143,7 +143,7 @@ static std::expected<QJsonArray, EvalError> evaluateRecursiveDirectFastPath(
                 
                 // Traverse nested objects/arrays with minimal overhead
                 for (auto it = obj.begin(); it != obj.end(); ++it) {
-                    const QJsonValue& nested = it.value();
+                    const auto& nested = it.value();
                     if (nested.isObject() || nested.isArray()) {
                         (*this)(nested);  // Direct recursive call
                     }
@@ -233,7 +233,7 @@ std::expected<QJsonArray, EvalError> wildcardArray(const QJsonArray& arr)
 {
     // Use pooled array to reduce allocations
     auto pooledArray{acquirePooledArray()};
-    QJsonArray& out = *pooledArray;
+    auto& out = *pooledArray;
     
     // Use ContainerCursor for optimized, zero-copy iteration
     auto cursor{ContainerCursor::array(arr)};

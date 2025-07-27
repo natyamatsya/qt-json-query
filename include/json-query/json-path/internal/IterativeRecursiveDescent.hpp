@@ -48,7 +48,7 @@ public:
         stack.push(rootValue);
         
         while (!stack.empty()) {
-            StackFrame& frame = stack.top();
+            auto& frame = stack.top();
             
             if (!frame.processed) {
                 // First time processing this frame - emit the value
@@ -137,7 +137,7 @@ public:
         stack.emplace_back(rootValue, 0);
         
         while (!stack.empty()) {
-            CacheOptimizedDepthFrame& frame = stack.back();
+            auto& frame = stack.back();
             
             if (!frame.processed) {
                 // Emit the value
@@ -229,7 +229,7 @@ public:
         stack.emplace_back(rootValue);
         
         while (!stack.empty()) {
-            StackFrame& frame = stack.back();
+            auto& frame = stack.back();
             
             // Early termination check
             if (useEarlyTermination && currentCost > maxTraversalCost) {
@@ -353,7 +353,7 @@ public:
                 
                 // Phase 3: Zero-copy iterator traversal for nested objects
                 for (auto it = obj.begin(); it != obj.end(); ++it) {
-                    const QJsonValue& value = it.value();
+                    const auto& value = it.value();
                     if (Q_LIKELY(value.isObject() || value.isArray())) {
                         optimizedStack.push_back(StackFrame{value});
                     }
@@ -364,7 +364,7 @@ public:
                 
                 // Phase 3: Reverse iteration for better cache locality
                 for (qsizetype i = arr.size() - 1; i >= 0; --i) {
-                    const QJsonValue& value = arr[i];
+                    const auto& value = arr[i];
                     if (Q_LIKELY(value.isObject() || value.isArray())) {
                         optimizedStack.push_back(StackFrame{value});
                     }

@@ -12,7 +12,7 @@ evaluateDefinite(const std::vector<Token>& tokens, const QJsonValue& root) noexc
     // Skip leading root token ('$' or '@') if present
     auto startIdx = 0;
     if (!tokens.empty() && tokens.front().kind == Token::Kind::Key) {
-        const QString& k = tokens.front().key;
+        const auto& k = tokens.front().key;
         if (k == u"$" || k == u"@") {
             startIdx = 1;
         }
@@ -20,7 +20,7 @@ evaluateDefinite(const std::vector<Token>& tokens, const QJsonValue& root) noexc
 
     for (int i = startIdx; i < tokens.size(); ++i)
     {
-        const Token& tk = tokens[i];
+        const auto& tk = tokens[i];
         switch (tk.kind)
         {
         case Key: {

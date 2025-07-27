@@ -69,7 +69,7 @@ public:
         std::cout << "\n=== Array Pooling Test ===\n";
         
         // Test pool statistics
-        ArrayPool& pool = ArrayPool::instance();
+        auto& pool = ArrayPool::instance();
         pool.clear(); // Reset for clean test
         
         // Acquire multiple arrays
