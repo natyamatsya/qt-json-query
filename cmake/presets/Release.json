@@ -13,6 +13,26 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
       }
+    },
+    {
+      "name": "release-apple-clang",
+      "inherits": "common-apple-clang",
+      "displayName": "Release (Apple Clang)",
+      "description": "Release build with Apple Clang compiler",
+      "binaryDir": "${sourceDir}/build-release-apple-clang",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "release-llvm-clang",
+      "inherits": "common-llvm-clang",
+      "displayName": "Release (LLVM Clang)",
+      "description": "Release build with LLVM Clang compiler",
+      "binaryDir": "${sourceDir}/build-release-llvm-clang",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
     }
   ],
   "buildPresets": [
@@ -20,6 +40,18 @@
       "name": "release",
       "configurePreset": "release",
       "description": "Build release configuration",
+      "jobs": 8
+    },
+    {
+      "name": "release-apple-clang",
+      "configurePreset": "release-apple-clang",
+      "description": "Build release configuration with Apple Clang",
+      "jobs": 8
+    },
+    {
+      "name": "release-llvm-clang",
+      "configurePreset": "release-llvm-clang",
+      "description": "Build release configuration with LLVM Clang",
       "jobs": 8
     }
   ]

@@ -13,6 +13,26 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug"
       }
+    },
+    {
+      "name": "debug-apple-clang",
+      "inherits": "common-apple-clang",
+      "displayName": "Debug (Apple Clang)",
+      "description": "Debug build with Apple Clang compiler",
+      "binaryDir": "${sourceDir}/build-debug-apple-clang",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "debug-llvm-clang",
+      "inherits": "common-llvm-clang",
+      "displayName": "Debug (LLVM Clang)",
+      "description": "Debug build with LLVM Clang compiler",
+      "binaryDir": "${sourceDir}/build-debug-llvm-clang",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
     }
   ],
   "buildPresets": [
@@ -20,6 +40,18 @@
       "name": "debug",
       "configurePreset": "debug",
       "description": "Build debug configuration",
+      "jobs": 8
+    },
+    {
+      "name": "debug-apple-clang",
+      "configurePreset": "debug-apple-clang",
+      "description": "Build debug configuration with Apple Clang",
+      "jobs": 8
+    },
+    {
+      "name": "debug-llvm-clang",
+      "configurePreset": "debug-llvm-clang",
+      "description": "Build debug configuration with LLVM Clang",
       "jobs": 8
     }
   ]

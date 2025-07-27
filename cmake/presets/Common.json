@@ -8,6 +8,22 @@
       "description": "Shared settings for all builds",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build-${presetName}"
+    },
+    {
+      "name": "common-apple-clang",
+      "inherits": "common",
+      "hidden": true,
+      "displayName": "Common Apple Clang",
+      "description": "Shared settings for Apple Clang builds",
+      "toolchainFile": "${sourceDir}/cmake/toolchains/apple-clang.cmake"
+    },
+    {
+      "name": "common-llvm-clang",
+      "inherits": "common",
+      "hidden": true,
+      "displayName": "Common LLVM Clang",
+      "description": "Shared settings for LLVM Clang builds",
+      "toolchainFile": "${sourceDir}/cmake/toolchains/llvm-clang.cmake"
     }
   ]
 }

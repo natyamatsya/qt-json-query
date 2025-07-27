@@ -7,9 +7,29 @@
     {
       "name": "relwithdebinfo",
       "inherits": "common",
-      "displayName": "Release with Debug Info",
-      "description": "Release build with optimizations and debug symbols for profiling",
+      "displayName": "RelWithDebInfo",
+      "description": "Release build with debug info",
       "binaryDir": "${sourceDir}/build-relwithdebinfo",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
+    },
+    {
+      "name": "relwithdebinfo-apple-clang",
+      "inherits": "common-apple-clang",
+      "displayName": "RelWithDebInfo (Apple Clang)",
+      "description": "Release build with debug info using Apple Clang compiler",
+      "binaryDir": "${sourceDir}/build-relwithdebinfo-apple-clang",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
+    },
+    {
+      "name": "relwithdebinfo-llvm-clang",
+      "inherits": "common-llvm-clang",
+      "displayName": "RelWithDebInfo (LLVM Clang)",
+      "description": "Release build with debug info using LLVM Clang compiler",
+      "binaryDir": "${sourceDir}/build-relwithdebinfo-llvm-clang",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo"
       }
@@ -19,7 +39,19 @@
     {
       "name": "relwithdebinfo",
       "configurePreset": "relwithdebinfo",
-      "description": "Build release with debug info configuration",
+      "description": "Build RelWithDebInfo configuration",
+      "jobs": 8
+    },
+    {
+      "name": "relwithdebinfo-apple-clang",
+      "configurePreset": "relwithdebinfo-apple-clang",
+      "description": "Build RelWithDebInfo configuration with Apple Clang",
+      "jobs": 8
+    },
+    {
+      "name": "relwithdebinfo-llvm-clang",
+      "configurePreset": "relwithdebinfo-llvm-clang",
+      "description": "Build RelWithDebInfo configuration with LLVM Clang",
       "jobs": 8
     }
   ]
