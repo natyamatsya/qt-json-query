@@ -3,6 +3,7 @@
 #include "json-query/json-path/JSONPathCompile.hpp"
 #include "json-query/json-path/JSONPathEvalError.hpp"
 #include "json-query/json-path/internal/PathEvalCtx.hpp"
+#include "json-query/json-path/internal/TypedTokenEvaluators.hpp"
 #include <expected>
 #include <type_traits>
 #include <array>
@@ -102,10 +103,10 @@ private:
     
 public:
     /**
-     * @brief Fast compile-time token dispatch
+     * @brief Fast compile-time token dispatch with type specialization
      * 
-     * Replaces runtime switch with O(1) array lookup, eliminating branch
-     * misprediction penalties and enabling better compiler optimizations.
+     * Combines token dispatch elimination with type specialization for maximum
+     * compile-time optimization and minimal runtime overhead.
      * 
      * @param ctx Path evaluation context
      * @param tk Token to dispatch
@@ -117,14 +118,22 @@ public:
         const Token& tk, 
         const QJsonValue& v) noexcept 
     {
-        // Direct dispatch using constexpr switch - compiler will optimize this
-        const auto dispatch_fn = getDispatchFunction(tk.kind);
-        if (dispatch_fn == nullptr) [[unlikely]] {
-            return std::unexpected(EvalError::TypeMismatchObject);
+        // Use type-specialized evaluators for common token types
+        switch (tk.kind) {
+            case Token::Kind::Key:
+            case Token::Kind::Index:
+            case Token::Kind::Wildcard:
+                // Use enhanced type-aware dispatch for maximum optimization
+                return TypedCompileTimeTokenDispatcher::dispatch(ctx, tk, v);
+            
+            default:
+                // Fallback to original dispatch for other token types
+                const auto dispatch_fn = getDispatchFunction(tk.kind);
+                if (dispatch_fn == nullptr) [[unlikely]] {
+                    return std::unexpected(EvalError::TypeMismatchObject);
+                }
+                return dispatch_fn(ctx, tk, v);
         }
-        
-        // Direct function call - no runtime branching
-        return dispatch_fn(ctx, tk, v);
     }
 };
 
