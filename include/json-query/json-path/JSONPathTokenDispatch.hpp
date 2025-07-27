@@ -245,3 +245,6 @@ std::expected<QJsonArray, EvalError> dispatchFilter(const detail::PathEvalCtx& c
 std::expected<QJsonArray, EvalError> dispatchKeyList(const detail::PathEvalCtx& ctx, const Token& tk, const QJsonValue& v);
 
 } // namespace json_query::json_path::internal
+
+// Include inline implementations for critical hot path functions
+#include "internal/JSONPathTokenDispatch.inl"

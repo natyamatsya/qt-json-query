@@ -28,4 +28,10 @@ std::expected<QJsonArray, EvalError> evaluateAll(const PathEvalCtx& ctx, const Q
 // Convenience top-level entry that uses std::expected
 std::expected<QJsonValue, EvalError> evaluate(const PathEvalCtx& ctx, const QJsonValue& root);
 
+// Direct array-based fan-out using TableGen dispatch - critical hot path
+std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src, qsizetype tokenPos);
+
 } // namespace json_query::json_path::detail
+
+// Include inline implementations for critical hot path functions
+#include "internal/JSONPathEvaluate.inl"

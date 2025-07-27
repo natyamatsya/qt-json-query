@@ -36,41 +36,9 @@ namespace json_query::json_path::internal {
 
 using namespace json_query::json_path::detail;
 
-// Simple dispatch functions that call the actual eval functions
-std::expected<QJsonArray, EvalError> dispatchKey(const detail::PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
-{
-    return json_query::json_path::detail::eval<Token::Kind::Key>(ctx, tk, v);
-}
-
-std::expected<QJsonArray, EvalError> dispatchIndex(const detail::PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
-{
-    return json_query::json_path::detail::eval<Token::Kind::Index>(ctx, tk, v);
-}
-
-std::expected<QJsonArray, EvalError> dispatchSlice(const detail::PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
-{
-    return json_query::json_path::detail::eval<Token::Kind::Slice>(ctx, tk, v);
-}
-
-std::expected<QJsonArray, EvalError> dispatchWildcard(const detail::PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
-{
-    return json_query::json_path::detail::eval<Token::Kind::Wildcard>(ctx, tk, v);
-}
-
-std::expected<QJsonArray, EvalError> dispatchRecursive(const detail::PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
-{
-    return json_query::json_path::detail::eval<Token::Kind::Recursive>(ctx, tk, v);
-}
-
-std::expected<QJsonArray, EvalError> dispatchFilter(const detail::PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
-{
-    return json_query::json_path::detail::eval<Token::Kind::Filter>(ctx, tk, v);
-}
-
-std::expected<QJsonArray, EvalError> dispatchKeyList(const detail::PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
-{
-    return json_query::json_path::detail::eval<Token::Kind::KeyList>(ctx, tk, v);
-}
+// Note: Dispatch function implementations moved to JSONPathTokenDispatch.inl
+// for inlining optimization. The inline implementations are included via
+// the header file to enable compiler inlining while keeping headers clean.
 
 } // namespace json_query::json_path::internal
 
