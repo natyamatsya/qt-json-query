@@ -6,7 +6,6 @@
 #include "json-query/json-path/JSONPath.hpp"
 #include "json-query/json-path/internal/ContainerCursor.hpp"
 #include "json-query/utils/JSONQueryUtils.hpp"
-#include <QRegularExpression>
 #include <QJsonDocument>
 #include <ctre.hpp>
 
@@ -1649,221 +1648,267 @@ std::optional<Token> parseEmbeddedNot(const QString& s)
 
 std::optional<Token> parseEmbeddedFunction(const QString& s)
 {
-    // Pattern for function call comparisons: func(...) op value or value op func(...)
-    constexpr auto funcCompPat = ctll::fixed_string{R"(^(.*?)\s*(==|!=|<|>|<=|>=)\s*(.*?)$)"};
+    // ============================================================================
+    // Rule-Based Function Evaluation Dispatch System
+    // ============================================================================
 
-    if (auto m = ctre::match<funcCompPat>(to_sv(s)))
+    // Evaluation rule types for side evaluation strategies
+    enum class EvaluationRuleType : uint8_t
     {
-        auto&& left{to_qstr(m.template get<1>().to_view()).trimmed()};
-        auto&& op{to_qstr(m.template get<2>().to_view())};
-        auto&& right{to_qstr(m.template get<3>().to_view()).trimmed()};
+        FunctionCall,   // Function call evaluation (length, count, etc.)
+        PropertyAccess, // Property access (@.property)
+        LiteralValue    // JSON literal value
+    };
 
-        // Check if either side contains a function call
-        auto leftHasFunc{left.contains("(") && left.contains(")")};
-        auto rightHasFunc{right.contains("(") && right.contains(")")};
+    // Comparison rule types for operator dispatch
+    enum class ComparisonRuleType : uint8_t
+    {
+        Equality,    // == operator
+        Inequality,  // != operator
+        LessThan,    // < operator
+        GreaterThan, // > operator
+        LessEqual,   // <= operator
+        GreaterEqual // >= operator
+    };
 
-        if (!leftHasFunc && !rightHasFunc)
-            return std::nullopt; // No function calls found
+    // Result structure for expression parsing
+    struct FunctionExpressionComponents
+    {
+        QString left;
+        QString operator_str;
+        QString right;
+        bool    leftHasFunc;
+        bool    rightHasFunc;
+        bool    needsRootContext;
+    };
 
-        // Check if any function call needs root context (value($...))
-        auto needsRootContext{false};
-        if (leftHasFunc && left.contains("value($"))
+    // Result structure for side evaluation
+    struct SideEvaluationResult
+    {
+        QJsonValue value;
+        bool       isNothing;
+        bool       success;
+    };
+
+    // Parse function comparison expression into components
+    auto parseFunctionExpression = [](const QString& s) -> FunctionExpressionComponents
+    {
+        constexpr auto funcCompPat = ctll::fixed_string{R"(^(.*?)\s*(==|!=|<|>|<=|>=)\s*(.*?)$)"};
+
+        if (auto m = ctre::match<funcCompPat>(to_sv(s)))
         {
-            qCDebug(jsonPathLog) << "Left side contains value($...): " << left;
-            needsRootContext = true;
+            auto left  = to_qstr(m.template get<1>().to_view()).trimmed();
+            auto op    = to_qstr(m.template get<2>().to_view());
+            auto right = to_qstr(m.template get<3>().to_view()).trimmed();
+
+            auto leftHasFunc  = left.contains("(") && left.contains(")");
+            auto rightHasFunc = right.contains("(") && right.contains(")");
+
+            // Check if any function call needs root context (value($...))
+            auto needsRootContext = false;
+            if (leftHasFunc && left.contains("value($"))
+            {
+                qCDebug(jsonPathLog) << "Left side contains value($...): " << left;
+                needsRootContext = true;
+            }
+            if (rightHasFunc && right.contains("value($"))
+            {
+                qCDebug(jsonPathLog) << "Right side contains value($...): " << right;
+                needsRootContext = true;
+            }
+
+            qCDebug(jsonPathLog) << "needsRootContext=" << needsRootContext << "left=" << left << "right=" << right;
+
+            return {left, op, right, leftHasFunc, rightHasFunc, needsRootContext};
         }
-        if (rightHasFunc && right.contains("value($"))
+
+        return {"", "", "", false, false, false};
+    };
+
+    // Determine evaluation rule type for expression side
+    auto determineEvaluationRuleType = [](const QString& expr, bool hasFunc) -> EvaluationRuleType
+    {
+        if (hasFunc)
+            return EvaluationRuleType::FunctionCall;
+        if (expr.startsWith("@."))
+            return EvaluationRuleType::PropertyAccess;
+        return EvaluationRuleType::LiteralValue;
+    };
+
+    // Evaluate expression side using appropriate strategy
+    auto evaluateExpressionSide =
+        [&](const QString& expr, bool hasFunc, const QJsonValue& node, const QJsonValue& root) -> SideEvaluationResult
+    {
+        auto ruleType = determineEvaluationRuleType(expr, hasFunc);
+
+        switch (ruleType)
         {
-            qCDebug(jsonPathLog) << "Right side contains value($...): " << right;
-            needsRootContext = true;
+        case EvaluationRuleType::FunctionCall:
+        {
+            QJsonValue result;
+            if (expr.contains("value($"))
+                result = evaluateFunction(expr, root);
+            else
+                result = evaluateFunction(expr, node);
+            return {result, result.isUndefined(), true};
         }
 
-        qCDebug(jsonPathLog) << "needsRootContext=" << needsRootContext << "left=" << left << "right=" << right;
-
-        // Create embedded filter for function call comparison
-        Token result;
-        result.kind  = Token::Kind::Filter;
-        result.index = 0;
-        result.hash  = 0;
-        result.key   = s;
-
-        if (needsRootContext)
+        case EvaluationRuleType::PropertyAccess:
         {
-            // Use context filter for root context evaluation with compile-time parsed values
-            result.embedContextFilter(
-                [left, op, right, leftHasFunc, rightHasFunc](const QJsonValue& j, const QJsonValue& root) -> bool
-                {
-                    QJsonValue leftVal, rightVal;
+            auto prop   = expr.mid(2);
+            auto val    = node.toObject().value(prop);
+            auto result = val.isUndefined() ? QJsonValue() : val;
+            return {result, result.isUndefined(), true};
+        }
 
-                    // Evaluate left side
-                    if (leftHasFunc)
-                    {
-                        // For value($...) functions, use root context
-                        if (left.contains("value($"))
-                            leftVal = evaluateFunction(left, root);
-                        else
-                            leftVal = evaluateFunction(left, j);
-                    }
-                    else if (left.startsWith("@."))
-                    {
-                        // Property access - RFC 9535 "nothing" semantics
-                        auto prop{left.mid(2)};
-                        auto val{j.toObject().value(prop)};
-                        leftVal = val.isUndefined() ? QJsonValue() : val; // Undefined becomes Nothing
-                    }
-                    else
-                    {
-                        leftVal = parseJsonLiteral(left);
-                    }
+        case EvaluationRuleType::LiteralValue:
+        {
+            auto result = parseJsonLiteral(expr);
+            return {result, result.isUndefined(), true};
+        }
+        }
 
-                    // Evaluate right side
-                    if (rightHasFunc)
-                    {
-                        // For value($...) functions, use root context
-                        if (right.contains("value($"))
-                            rightVal = evaluateFunction(right, root);
-                        else
-                            rightVal = evaluateFunction(right, j);
-                    }
-                    else if (right.startsWith("@."))
-                    {
-                        // Property access - RFC 9535 "nothing" semantics
-                        auto prop{right.mid(2)};
-                        auto val{j.toObject().value(prop)};
-                        rightVal = val.isUndefined() ? QJsonValue() : val; // Undefined becomes Nothing
-                    }
-                    else
-                    {
-                        rightVal = parseJsonLiteral(right);
-                    }
+        return {QJsonValue(), true, false};
+    };
 
-                    // Perform comparison with RFC 9535 "Nothing" semantics
-                    // Nothing == Nothing should be true
-                    auto leftIsNothing{leftVal.isUndefined()};
-                    auto rightIsNothing{rightVal.isUndefined()};
+    // Determine comparison rule type from operator string
+    auto determineComparisonRuleType = [](const QString& op) -> ComparisonRuleType
+    {
+        if (op == "==")
+            return ComparisonRuleType::Equality;
+        if (op == "!=")
+            return ComparisonRuleType::Inequality;
+        if (op == "<")
+            return ComparisonRuleType::LessThan;
+        if (op == ">")
+            return ComparisonRuleType::GreaterThan;
+        if (op == "<=")
+            return ComparisonRuleType::LessEqual;
+        if (op == ">=")
+            return ComparisonRuleType::GreaterEqual;
+        return ComparisonRuleType::Equality; // Default fallback
+    };
 
-                    if (op == "==")
-                    {
-                        if (leftIsNothing && rightIsNothing)
-                            return true; // Nothing == Nothing
-                        if (leftIsNothing || rightIsNothing)
-                            return false; // Nothing != any value
-                        return leftVal == rightVal;
-                    }
-                    if (op == "!=")
-                    {
-                        if (leftIsNothing && rightIsNothing)
-                            return false; // Nothing == Nothing
-                        if (leftIsNothing || rightIsNothing)
-                            return true; // Nothing != any value
-                        return leftVal != rightVal;
-                    }
-                    if (op == "<")
-                        return compareValues(leftVal, rightVal) < 0;
-                    if (op == ">")
-                        return compareValues(leftVal, rightVal) > 0;
-                    if (op == "<=")
-                        return compareValues(leftVal, rightVal) <= 0;
-                    if (op == ">=")
-                        return compareValues(leftVal, rightVal) >= 0;
+    // Perform comparison with RFC 9535 "Nothing" semantics
+    auto performNothingAwareComparison =
+        [](ComparisonRuleType ruleType, const SideEvaluationResult& left, const SideEvaluationResult& right) -> bool
+    {
+        switch (ruleType)
+        {
+        case ComparisonRuleType::Equality:
+            if (left.isNothing && right.isNothing)
+                return true; // Nothing == Nothing
+            if (left.isNothing || right.isNothing)
+                return false; // Nothing != any value
+            return left.value == right.value;
+
+        case ComparisonRuleType::Inequality:
+            if (left.isNothing && right.isNothing)
+                return false; // Nothing == Nothing
+            if (left.isNothing || right.isNothing)
+                return true; // Nothing != any value
+            return left.value != right.value;
+
+        case ComparisonRuleType::LessThan:
+            return compareValues(left.value, right.value) < 0;
+
+        case ComparisonRuleType::GreaterThan:
+            return compareValues(left.value, right.value) > 0;
+
+        case ComparisonRuleType::LessEqual:
+            return compareValues(left.value, right.value) <= 0;
+
+        case ComparisonRuleType::GreaterEqual:
+            return compareValues(left.value, right.value) >= 0;
+        }
+
+        return false;
+    };
+
+    // Function Evaluation Rule Dispatcher
+    struct FunctionEvaluationDispatcher
+    {
+        // Create context filter for root context evaluation
+        static std::function<bool(const QJsonValue&, const QJsonValue&)> createContextFilter(
+            const FunctionExpressionComponents& components,
+            const std::function<SideEvaluationResult(const QString&, bool, const QJsonValue&, const QJsonValue&)>&
+                                                                     evaluateExpressionSide,
+            const std::function<ComparisonRuleType(const QString&)>& determineComparisonRuleType,
+            const std::function<bool(ComparisonRuleType, const SideEvaluationResult&, const SideEvaluationResult&)>&
+                performNothingAwareComparison)
+        {
+            return [components, evaluateExpressionSide, determineComparisonRuleType, performNothingAwareComparison](
+                       const QJsonValue& node, const QJsonValue& root) -> bool
+            {
+                auto leftResult     = evaluateExpressionSide(components.left, components.leftHasFunc, node, root);
+                auto rightResult    = evaluateExpressionSide(components.right, components.rightHasFunc, node, root);
+                auto comparisonType = determineComparisonRuleType(components.operator_str);
+
+                return performNothingAwareComparison(comparisonType, leftResult, rightResult);
+            };
+        }
+
+        // Create regular filter for non-root context evaluation
+        static std::function<bool(const QJsonValue&)> createRegularFilter(
+            const QString& expr,
+            const std::function<SideEvaluationResult(const QString&, bool, const QJsonValue&, const QJsonValue&)>&
+                                                                     evaluateExpressionSide,
+            const std::function<ComparisonRuleType(const QString&)>& determineComparisonRuleType,
+            const std::function<bool(ComparisonRuleType, const SideEvaluationResult&, const SideEvaluationResult&)>&
+                performNothingAwareComparison)
+        {
+            return [expr, evaluateExpressionSide, determineComparisonRuleType, performNothingAwareComparison](
+                       const QJsonValue& node) -> bool
+            {
+                // Re-parse the expression at runtime to avoid capture issues
+                constexpr auto funcCompPat = ctll::fixed_string{"^(.*?)\\s*(==|!=|<|>|<=|>=)\\s*(.*?)$"};
+                auto           m           = ctre::match<funcCompPat>(expr.toStdString());
+                if (!m)
                     return false;
-                });
+
+                auto left  = QString::fromStdString(std::string(m.template get<1>()));
+                auto op    = QString::fromStdString(std::string(m.template get<2>()));
+                auto right = QString::fromStdString(std::string(m.template get<3>()));
+
+                auto leftHasFunc =
+                    ctre::search<ctll::fixed_string{R"(\b(length|count|match|search|value)\s*\()"}>(to_sv(left));
+                auto rightHasFunc =
+                    ctre::search<ctll::fixed_string{R"(\b(length|count|match|search|value)\s*\()"}>(to_sv(right));
+
+                auto leftResult     = evaluateExpressionSide(left, leftHasFunc, node, node);
+                auto rightResult    = evaluateExpressionSide(right, rightHasFunc, node, node);
+                auto comparisonType = determineComparisonRuleType(op);
+
+                return performNothingAwareComparison(comparisonType, leftResult, rightResult);
+            };
         }
-        else
-        {
-            // Use regular filter for non-root context evaluation
-            const auto& expr = s;
+    };
 
-            result.embedFilter(
-                [expr](const QJsonValue& j) -> bool
-                {
-                    // Re-parse the expression at runtime to avoid capture issues
-                    constexpr auto funcCompPat = ctll::fixed_string{"^(.*?)\\s*(==|!=|<|>|<=|>=)\\s*(.*?)$"};
-                    auto           m{ctre::match<funcCompPat>(expr.toStdString())};
-                    if (!m)
-                        return false;
+    // Main dispatch logic
+    auto components = parseFunctionExpression(s);
 
-                    auto left  = QString::fromStdString(std::string(m.template get<1>()));
-                    auto op    = QString::fromStdString(std::string(m.template get<2>()));
-                    auto right = QString::fromStdString(std::string(m.template get<3>()));
+    // Validate that we have a valid function expression
+    if (components.operator_str.isEmpty() || (!components.leftHasFunc && !components.rightHasFunc))
+        return std::nullopt;
 
-                    auto leftHasFunc{left.contains(QRegularExpression(R"(\b(length|count|match|search|value)\s*\()"))};
-                    auto rightHasFunc{
-                        right.contains(QRegularExpression(R"(\b(length|count|match|search|value)\s*\()"))};
+    Token result;
+    result.kind  = Token::Kind::Filter;
+    result.index = 0;
+    result.hash  = 0;
+    result.key   = s;
 
-                    QJsonValue leftVal, rightVal;
-
-                    // Evaluate left side
-                    if (leftHasFunc)
-                    {
-                        leftVal = evaluateFunction(left, j);
-                    }
-                    else if (left.startsWith("@."))
-                    {
-                        // Property access - RFC 9535 "nothing" semantics
-                        auto prop{left.mid(2)};
-                        auto val{j.toObject().value(prop)};
-                        leftVal = val.isUndefined() ? QJsonValue() : val; // Undefined becomes Nothing
-                    }
-                    else
-                    {
-                        leftVal = parseJsonLiteral(left);
-                    }
-
-                    // Evaluate right side
-                    if (rightHasFunc)
-                    {
-                        rightVal = evaluateFunction(right, j);
-                    }
-                    else if (right.startsWith("@."))
-                    {
-                        // Property access - RFC 9535 "nothing" semantics
-                        auto prop{right.mid(2)};
-                        auto val{j.toObject().value(prop)};
-                        rightVal = val.isUndefined() ? QJsonValue() : val; // Undefined becomes Nothing
-                    }
-                    else
-                    {
-                        rightVal = parseJsonLiteral(right);
-                    }
-
-                    // Perform comparison with RFC 9535 "Nothing" semantics
-                    // Nothing == Nothing should be true
-                    auto leftIsNothing{leftVal.isUndefined()};
-                    auto rightIsNothing{rightVal.isUndefined()};
-
-                    if (op == "==")
-                    {
-                        if (leftIsNothing && rightIsNothing)
-                            return true; // Nothing == Nothing
-                        if (leftIsNothing || rightIsNothing)
-                            return false; // Nothing != any value
-                        return leftVal == rightVal;
-                    }
-                    if (op == "!=")
-                    {
-                        if (leftIsNothing && rightIsNothing)
-                            return false; // Nothing == Nothing
-                        if (leftIsNothing || rightIsNothing)
-                            return true; // Nothing != any value
-                        return leftVal != rightVal;
-                    }
-                    if (op == "<")
-                        return compareValues(leftVal, rightVal) < 0;
-                    if (op == ">")
-                        return compareValues(leftVal, rightVal) > 0;
-                    if (op == "<=")
-                        return compareValues(leftVal, rightVal) <= 0;
-                    if (op == ">=")
-                        return compareValues(leftVal, rightVal) >= 0;
-                    return false;
-                });
-        }
-
-        return result;
+    if (components.needsRootContext)
+    {
+        result.embedContextFilter(FunctionEvaluationDispatcher::createContextFilter(
+            components, evaluateExpressionSide, determineComparisonRuleType, performNothingAwareComparison));
+    }
+    else
+    {
+        result.embedFilter(FunctionEvaluationDispatcher::createRegularFilter(
+            s, evaluateExpressionSide, determineComparisonRuleType, performNothingAwareComparison));
     }
 
-    return std::nullopt;
+    return result;
 }
 
 } // namespace json_query::json_path::detail
