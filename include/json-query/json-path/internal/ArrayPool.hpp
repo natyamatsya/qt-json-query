@@ -4,6 +4,7 @@
 #include <vector>
 #include <memory>
 #include <mutex>
+#include <json-query/Common.h>
 
 namespace json_query::json_path::internal {
 
@@ -24,15 +25,15 @@ public:
      */
     class PooledArray {
     public:
-        explicit PooledArray(ArrayPool& pool, std::unique_ptr<QJsonArray> array)
+        QT_QUERY_JSON_ALWAYS_INLINE explicit PooledArray(ArrayPool& pool, std::unique_ptr<QJsonArray> array)
             : pool_(pool), array_(std::move(array)) {
-            if (array_) {
+            if (QT_QUERY_JSON_LIKELY(array_)) {
                 *array_ = QJsonArray{}; // Ensure clean state - QJsonArray doesn't have clear()
             }
         }
         
-        ~PooledArray() {
-            if (array_) {
+        QT_QUERY_JSON_ALWAYS_INLINE ~PooledArray() {
+            if (QT_QUERY_JSON_LIKELY(array_)) {
                 pool_.returnArray(std::move(array_));
             }
         }
@@ -84,21 +85,8 @@ public:
      * Returns a clean, empty QJsonArray wrapped in a RAII container.
      * If no pooled arrays are available, creates a new one.
      */
-    PooledArray acquire() {
-        std::lock_guard<std::mutex> lock(mutex_);
-        
-        std::unique_ptr<QJsonArray> array;
-        if (!pool_.empty()) {
-            array = std::move(pool_.back());
-            pool_.pop_back();
-            *array = QJsonArray{}; // Ensure clean state - QJsonArray doesn't have clear()
-        } else {
-            array = std::make_unique<QJsonArray>();
-            ++totalCreated_;
-        }
-        
-        ++acquisitions_;
-        return PooledArray(*this, std::move(array));
+    QT_QUERY_JSON_ALWAYS_INLINE PooledArray acquire() {
+        return acquireImpl();
     }
     
     /**
@@ -143,6 +131,23 @@ private:
     ArrayPool& operator=(const ArrayPool&) = delete;
     ArrayPool(ArrayPool&&) = delete;
     ArrayPool& operator=(ArrayPool&&) = delete;
+    
+    QT_QUERY_JSON_ALWAYS_INLINE PooledArray acquireImpl() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        
+        std::unique_ptr<QJsonArray> array;
+        if (QT_QUERY_JSON_LIKELY(!pool_.empty())) {
+            array = std::move(pool_.back());
+            pool_.pop_back();
+            *array = QJsonArray{}; // Ensure clean state - QJsonArray doesn't have clear()
+        } else {
+            array = std::make_unique<QJsonArray>();
+            ++totalCreated_;
+        }
+        
+        ++acquisitions_;
+        return PooledArray(*this, std::move(array));
+    }
     
     void returnArray(std::unique_ptr<QJsonArray> array) {
         if (!array) return;
