@@ -323,7 +323,7 @@ public:
         ResultCollector& collector) {
         
         // Phase 3: Use thread-local stack with optimized allocation
-        thread_local static QVector<StackFrame> optimizedStack;
+        thread_local static std::vector<StackFrame> optimizedStack;
         optimizedStack.clear();
         
         // Reserve based on estimated depth for better memory locality
@@ -331,11 +331,12 @@ public:
         optimizedStack.reserve(static_cast<qsizetype>(estimatedDepth));
         
         // Initialize with root
-        optimizedStack.append(StackFrame{root});
+        optimizedStack.push_back(StackFrame{root});
         
         // Phase 3: Optimized traversal loop with branch prediction hints
-        while (!optimizedStack.isEmpty()) {
-            StackFrame current = optimizedStack.takeLast();
+        while (!optimizedStack.empty()) {
+            StackFrame current = optimizedStack.back();
+            optimizedStack.pop_back();
             
             // Branch prediction: Most common case is Object traversal
             if (Q_LIKELY(current.value.isObject())) {
@@ -353,7 +354,7 @@ public:
                 for (auto it = obj.begin(); it != obj.end(); ++it) {
                     const QJsonValue& value = it.value();
                     if (Q_LIKELY(value.isObject() || value.isArray())) {
-                        optimizedStack.append(StackFrame{value});
+                        optimizedStack.push_back(StackFrame{value});
                     }
                 }
             }
@@ -364,7 +365,7 @@ public:
                 for (qsizetype i = arr.size() - 1; i >= 0; --i) {
                     const QJsonValue& value = arr[i];
                     if (Q_LIKELY(value.isObject() || value.isArray())) {
-                        optimizedStack.append(StackFrame{value});
+                        optimizedStack.push_back(StackFrame{value});
                     }
                 }
             }
