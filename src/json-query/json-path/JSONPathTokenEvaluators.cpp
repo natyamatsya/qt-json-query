@@ -113,16 +113,20 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::Filter>(const PathEvalCtx
                                                                 const Token& tk,
                                                                 const QJsonValue& v)
 {
-    QJsonArray out;
+    // Use ArrayPool for result to optimize memory allocation
+    auto pooledArray = acquirePooledArray();
+    QJsonArray& out = *pooledArray;
     
     // First priority: Check for embedded filters (zero-overhead)
     if (tk.hasEmbeddedFilter()) {
+        // Pre-compute context requirement check to avoid repeated string operations
+        const bool needsRootContext = tk.key.contains("value($");
+        
         if (v.isArray()) {
             const QJsonArray arr = v.toArray();
+            
             for (const auto& item : arr) {
-                // Check if this filter needs root context (contains value($...))
-                bool needsRootContext = tk.key.contains("value($");
-                bool pass = needsRootContext ? 
+                const bool pass = needsRootContext ? 
                     tk.evaluateEmbeddedContextFilter(item, ctx.rootDocument) : 
                     tk.evaluateEmbeddedFilter(item);
                 if (pass) {
@@ -131,11 +135,10 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::Filter>(const PathEvalCtx
             }
         } else if (v.isObject()) {
             const QJsonObject obj = v.toObject();
+            
             auto cursor = ContainerCursor::object(obj);
             for (const auto& val : cursor) {
-                // Check if this filter needs root context (contains value($...))
-                bool needsRootContext = tk.key.contains("value($");
-                bool pass = needsRootContext ? 
+                const bool pass = needsRootContext ? 
                     tk.evaluateEmbeddedContextFilter(val, ctx.rootDocument) : 
                     tk.evaluateEmbeddedFilter(val);
                 if (pass) {
@@ -143,11 +146,13 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::Filter>(const PathEvalCtx
                 }
             }
         }
-        return out;
+        
+        // Return copy since pooled array will be returned to pool
+        return QJsonArray(out);
     }
     
     // No filters available - return empty result
-    return out;
+    return QJsonArray(out);
 }
 
 // --- KeyList ---------------------------------------------------------------
