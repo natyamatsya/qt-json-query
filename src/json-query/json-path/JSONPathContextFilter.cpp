@@ -13,6 +13,211 @@ namespace json_query::json_path
 using json_query::json_path::internal::ContainerCursor;
 using json_query::json_path::internal::makeSimpleContextCursor;
 
+namespace detail
+{
+
+// TableGen-inspired Context Filter Parsing Architecture
+// =====================================================
+
+// Forward declarations for existing helper functions
+QJsonValue parseJsonLiteral(const QString& value); // From JSONPathFilterFunctions.cpp
+
+// Strategy Enum: Different context filter parsing types
+enum class ContextFilterParsingType
+{
+    ComparisonPattern, // $.foo == @.bar, $.a.b == 42
+    FunctionPattern,   // length(@.a) == value($..c)
+    ExistencePattern,  // $, $.foo, $.*.a
+    DefaultPattern     // Fallback (no match)
+};
+
+// TableGen-Style Definition Templates
+// ===================================
+
+template <ContextFilterParsingType T>
+struct ContextFilterParsingDef
+{
+    static constexpr bool enabled  = false;
+    static constexpr int  priority = 0;
+    static bool           matches(const QString& expr) { return false; }
+    static QString        description() { return "Unknown pattern"; }
+};
+
+// Specialization: Comparison Pattern (highest priority)
+template <>
+struct ContextFilterParsingDef<ContextFilterParsingType::ComparisonPattern>
+{
+    static constexpr bool enabled  = true;
+    static constexpr int  priority = 100;
+
+    static bool matches(const QString& expr)
+    {
+        // Only accept simple absolute path references in comparisons per RFC 9535
+        // Valid: $==@, $.foo==@.bar, $.a.b==42
+        // Invalid: $.*==42, $[*]==42, $..foo==42 (non-singular queries)
+        static const auto absComparisonPat{ctre::match<R"(\$(\.[a-zA-Z_][a-zA-Z0-9_]*)*\s*(==|!=|<=|>=|<|>)\s*(.+))">};
+        return absComparisonPat(expr.toStdString());
+    }
+
+    static QString description() { return "Absolute path comparison pattern"; }
+};
+
+// Specialization: Function Pattern (medium-high priority)
+template <>
+struct ContextFilterParsingDef<ContextFilterParsingType::FunctionPattern>
+{
+    static constexpr bool enabled  = true;
+    static constexpr int  priority = 90;
+
+    static bool matches(const QString& expr)
+    {
+        // Handle function call patterns like length(@.a) == value($..c)
+        return expr.contains("length(") || expr.contains("value($");
+    }
+
+    static QString description() { return "Function call pattern"; }
+};
+
+// Specialization: Existence Pattern (medium priority)
+template <>
+struct ContextFilterParsingDef<ContextFilterParsingType::ExistencePattern>
+{
+    static constexpr bool enabled  = true;
+    static constexpr int  priority = 80;
+
+    static bool matches(const QString& expr)
+    {
+        // Check for absolute path existence filters (allow wildcards and complex paths)
+        // Valid: $, $.foo, $.*.a, $[0], etc.
+        static const auto absExistencePat{ctre::match<R"(\$(\.[a-zA-Z_*][a-zA-Z0-9_]*|\[\d+\]|\[.*\])*)">};
+        return absExistencePat(expr.toStdString());
+    }
+
+    static QString description() { return "Absolute path existence pattern"; }
+};
+
+// Template Specialization Strategies
+// ===================================
+
+template <ContextFilterParsingType T>
+struct ContextFilterParsingStrategy
+{
+    static std::optional<Token> process(const QString& expr, std::vector<ContextFilterFn>& out)
+    {
+        qCDebug(jsonPathLog) << "ContextFilterParsingStrategy: unsupported pattern type";
+        return std::nullopt;
+    }
+};
+
+// Helper: Context Builder for creating filter tokens
+struct ContextBuilder
+{
+    std::vector<ContextFilterFn>& fns;
+
+    [[nodiscard]] Token add(ContextFilterFn fn, QString key = {})
+    {
+        fns.push_back(std::move(fn));
+        const auto id{fns.size() - 1};
+        Token      token{Token::Kind::Filter, 0, {}, 0u, std::move(key)};
+        token.contextFilterId = id;
+        return token;
+    }
+};
+
+// Helper: Evaluate absolute path against root
+QJsonValue evaluateAbsolutePath(const QString& path, const QJsonValue& root, const QJsonValue& node)
+{
+    if (path == "$")
+        return root;
+
+    try
+    {
+        auto absolutePath{json_query::JSONPath::create(path)};
+        if (absolutePath)
+        {
+            auto results{absolutePath->evaluateAll(root)};
+            if (results && !results->isEmpty())
+            {
+                // Use ContextAwareContainerCursor for efficient result processing
+                auto cursor{makeSimpleContextCursor(*results, root, node)};
+
+                // Get first result using zero-copy iteration
+                for (const auto& [result, ctx] : cursor)
+                    return result;
+
+                // Fallback if cursor iteration fails
+                return results->first();
+            }
+        }
+    }
+    catch (...)
+    {
+        qCDebug(jsonPathLog) << "Failed to evaluate absolute path:" << path;
+    }
+
+    return QJsonValue{};
+}
+
+// Helper: Evaluate relative path (@.property, etc.)
+QJsonValue evaluateRelativePath(const QString& relativePath, const QJsonValue& node, const QJsonValue& root)
+{
+    if (relativePath == "@")
+        return node;
+
+    if (relativePath.startsWith("@."))
+    {
+        auto propName{relativePath.mid(2)};
+        if (node.isObject())
+        {
+            // Use context-aware cursor for efficient property lookup
+            auto cursor{makeSimpleContextCursor(node.toObject(), root, node)};
+            // Traditional property access (cursor doesn't expose keys in current interface)
+            return node.toObject().value(propName);
+        }
+    }
+
+    return QJsonValue{};
+}
+
+// Helper: Perform comparison with RFC 9535 "nothing" semantics
+bool performComparison(const QString& op, const QJsonValue& leftValue, const QJsonValue& rightValue)
+{
+    if (op == "==")
+    {
+        if (leftValue.isUndefined() && rightValue.isUndefined())
+            return true;
+        if (leftValue.isUndefined() && rightValue.toDouble() == 0)
+            return true;
+        if (rightValue.isUndefined() && leftValue.toDouble() == 0)
+            return true;
+        if (leftValue.isUndefined() && !rightValue.isUndefined())
+            return true;
+        if (rightValue.isUndefined() && !leftValue.isUndefined())
+            return false; // Asymmetric
+        return leftValue == rightValue;
+    }
+    if (op == "!=")
+    {
+        if (leftValue.isUndefined() && rightValue.isUndefined())
+            return false;
+        if (leftValue.isUndefined() && rightValue.toDouble() == 0)
+            return false;
+        if (rightValue.isUndefined() && leftValue.toDouble() == 0)
+            return false;
+        return leftValue != rightValue;
+    }
+    if (op == "<" && leftValue.isDouble() && rightValue.isDouble())
+        return leftValue.toDouble() < rightValue.toDouble();
+    if (op == ">" && leftValue.isDouble() && rightValue.isDouble())
+        return leftValue.toDouble() > rightValue.toDouble();
+    if (op == "<=" && leftValue.isDouble() && rightValue.isDouble())
+        return leftValue.toDouble() <= rightValue.toDouble();
+    if (op == ">=" && leftValue.isDouble() && rightValue.isDouble())
+        return leftValue.toDouble() >= rightValue.toDouble();
+
+    return false;
+}
+
 // Helper function to evaluate function calls with root context
 // Now uses ContextAwareContainerCursor for efficient iteration with context access
 QJsonValue evaluateContextFunction(const QString& funcExpr, const QJsonValue& context, const QJsonValue& root)
@@ -146,482 +351,328 @@ QJsonValue evaluateContextFunction(const QString& funcExpr, const QJsonValue& co
     return {}; // Unknown function
 }
 
-// Parse context-aware function calls like length(@.a) == value($..c)
-std::optional<Token> parseAbsolutePathContext(const QString& s, std::vector<ContextFilterFn>& out)
+// Helper: Find comparison operator in expression
+struct OperatorParseResult
 {
-    qCDebug(jsonPathLog) << "parseAbsolutePathContext called with:" << s;
+    QString   op;
+    qsizetype position;
+    bool      found;
+};
 
-    // Check for absolute path comparison patterns first
-    // Only accept simple absolute path references in comparisons per RFC 9535
-    // Valid: $==@, $.foo==@.bar, $.a.b==42
-    // Invalid: $.*==42, $[*]==42, $..foo==42 (non-singular queries)
-    static const auto absComparisonPat{ctre::match<R"(\$(\.[a-zA-Z_][a-zA-Z0-9_]*)*\s*(==|!=|<=|>=|<|>)\s*(.+))">};
-    if (auto match = absComparisonPat(s.toStdString()))
+OperatorParseResult findComparisonOperator(const QString& expr)
+{
+    // Look for comparison operators in order of precedence (longest first)
+    const QStringList operators = {"<=", ">=", "==", "!=", "<", ">"};
+
+    for (const QString& testOp : operators)
     {
-        qCDebug(jsonPathLog) << "parseAbsolutePathContext: matched simple absolute path comparison:" << s;
+        auto pos{expr.indexOf(testOp)};
+        if (pos != -1)
+            return {testOp, pos, true};
+    }
 
+    return {"", -1, false};
+}
+
+// Helper: Parse expression into left, operator, right components
+struct ExpressionComponents
+{
+    QString left;
+    QString op;
+    QString right;
+    bool    valid;
+};
+
+ExpressionComponents parseExpressionComponents(const QString& expr)
+{
+    auto opResult{findComparisonOperator(expr)};
+    if (!opResult.found)
+        return {"", "", "", false};
+
+    auto left{expr.left(opResult.position).trimmed()};
+    auto right{expr.mid(opResult.position + opResult.op.length()).trimmed()};
+
+    return {left, opResult.op, right, true};
+}
+
+// Helper: Evaluate expression side (left or right)
+struct SideEvaluationResult
+{
+    QJsonValue value;
+    bool       isNothing;
+};
+
+SideEvaluationResult evaluateExpressionSide(const QString& side, const QJsonValue& node, const QJsonValue& root)
+{
+    QJsonValue val;
+    bool       isNothing{false};
+
+    if (side.contains("("))
+    {
+        val = evaluateContextFunction(side, node, root);
+
+        // Check if this represents "nothing" (undefined/null property in length)
+        if (side.startsWith("length(@."))
+        {
+            QString prop{side.mid(9, side.length() - 10)}; // Extract property name
+            if (node.isObject())
+            {
+                auto propValue{node.toObject().value(prop)};
+                if (propValue.isUndefined() || propValue.isNull())
+                    isNothing = true;
+            }
+        }
+        // Check if this represents "nothing" (empty results in value)
+        else if (side.startsWith("value($"))
+        {
+            using json_query::JSONPath;
+            QString pathStr{side.mid(6, side.length() - 7)}; // Extract path
+            auto    path{JSONPath::create(pathStr)};
+            if (path)
+            {
+                auto results{path->evaluateAll(root)};
+                if (results)
+                {
+                    if (results->isEmpty())
+                    {
+                        isNothing = true;
+                    }
+                    else
+                    {
+                        // Use context-aware cursor for efficient result validation
+                        auto cursor{makeSimpleContextCursor(*results, root, node)};
+
+                        // Check if results are effectively empty using zero-copy iteration
+                        auto hasValidResults{false};
+                        for (const auto& [result, ctx] : cursor)
+                        {
+                            if (!result.isUndefined() && !result.isNull())
+                            {
+                                hasValidResults = true;
+                                break;
+                            }
+                        }
+
+                        if (!hasValidResults)
+                            isNothing = true;
+                    }
+                }
+            }
+        }
+    }
+    else if (side.startsWith("@."))
+    {
+        auto prop{side.mid(2)};
+        if (node.isObject())
+        {
+            auto nodeVal{node.toObject().value(prop)};
+            if (nodeVal.isUndefined())
+            {
+                isNothing = true;
+                val       = QJsonValue{0};
+            }
+            else
+            {
+                val = nodeVal;
+            }
+        }
+    }
+    else
+    {
+        val = QJsonValue{side};
+    }
+
+    return {val, isNothing};
+}
+
+// Helper: Perform RFC 9535 "nothing" semantics comparison
+bool performNothingAwareComparison(const QString&              op,
+                                   const SideEvaluationResult& left,
+                                   const SideEvaluationResult& right)
+{
+    if (op == "==")
+    {
+        if (left.isNothing && right.isNothing)
+            return true;
+        if (left.isNothing && right.value.toDouble() == 0)
+            return true;
+        if (right.isNothing && left.value.toDouble() == 0)
+            return true;
+        if (left.isNothing && !right.isNothing)
+            return true;
+        if (right.isNothing && !left.isNothing)
+            return false; // Asymmetric
+        // Both sides have actual values - use normal comparison
+        return left.value == right.value;
+    }
+    if (op == "!=")
+    {
+        if (left.isNothing && right.isNothing)
+            return false;
+        if (left.isNothing && right.value.toDouble() == 0)
+            return false;
+        if (right.isNothing && left.value.toDouble() == 0)
+            return false;
+        return left.value != right.value;
+    }
+    return false;
+}
+
+// Helper: Check if expression needs root context
+bool needsRootContext(const QString& left, const QString& right)
+{
+    return left.contains("value($") || right.contains("value($");
+}
+
+// Helper: Extract regex match components for comparison pattern
+struct ComparisonMatchResult
+{
+    QString leftPath;
+    QString op;
+    QString rightExpr;
+    bool    valid;
+};
+
+ComparisonMatchResult extractComparisonComponents(const QString& expr)
+{
+    static const auto absComparisonPat{ctre::match<R"(\$(\.[a-zA-Z_][a-zA-Z0-9_]*)*\s*(==|!=|<=|>=|<|>)\s*(.+))">};
+    if (auto match = absComparisonPat(expr.toStdString()))
+    {
         auto leftPath{"$" + std::string(match.get<1>().to_view())};
         auto op        = std::string(match.get<2>().to_view());
         auto rightExpr = std::string(match.get<3>().to_view());
 
-        qCDebug(jsonPathLog) << "parseAbsolutePathContext: leftPath=" << QString::fromStdString(leftPath)
-                             << "op=" << QString::fromStdString(op)
-                             << "rightExpr=" << QString::fromStdString(rightExpr);
+        return {QString::fromStdString(leftPath), QString::fromStdString(op), QString::fromStdString(rightExpr), true};
+    }
 
-        struct ContextBuilder
-        {
-            std::vector<ContextFilterFn>& fns;
+    return {"", "", "", false};
+}
 
-            [[nodiscard]] Token add(ContextFilterFn fn, QString key = {})
-            {
-                fns.push_back(std::move(fn));
-                const auto id{fns.size() - 1};
-                Token      token{Token::Kind::Filter, 0, {}, 0u, std::move(key)};
-                token.contextFilterId = id;
-                return token;
-            }
-        };
+// Strategy Specializations
+// ========================
+
+// Specialization: Comparison Pattern Strategy
+template <>
+struct ContextFilterParsingStrategy<ContextFilterParsingType::ComparisonPattern>
+{
+    static std::optional<Token> process(const QString& expr, std::vector<ContextFilterFn>& out)
+    {
+        qCDebug(jsonPathLog) << "ContextFilterParsingStrategy: processing comparison pattern:" << expr;
+
+        auto matchResult{extractComparisonComponents(expr)};
+        if (!matchResult.valid)
+            return std::nullopt;
+
+        auto leftPath{matchResult.leftPath};
+        auto op{matchResult.op};
+        auto rightExpr{matchResult.rightExpr};
+
+        qCDebug(jsonPathLog) << "Comparison parts: leftPath=" << leftPath << "op=" << op << "rightExpr=" << rightExpr;
 
         ContextBuilder b{out};
         return b.add(
             [leftPath, op, rightExpr](const QJsonValue& node, const QJsonValue& root) -> bool
             {
-                qCDebug(jsonPathLog) << "Evaluating absolute path comparison:" << QString::fromStdString(leftPath)
-                                     << QString::fromStdString(op) << QString::fromStdString(rightExpr);
+                // Evaluate left side (absolute path)
+                QJsonValue leftValue{evaluateAbsolutePath(leftPath, root, node)};
 
-                // Evaluate left side (absolute path) with context-aware optimization
-                QJsonValue leftValue;
-                if (leftPath == "$")
-                {
-                    leftValue = root;
-                }
-                else
-                {
-                    try
-                    {
-                        auto absolutePath{json_query::JSONPath::create(QString::fromStdString(leftPath))};
-                        if (absolutePath)
-                        {
-                            auto results{absolutePath->evaluateAll(root)};
-                            if (results && !results->isEmpty())
-                            {
-                                // Use ContextAwareContainerCursor for efficient result processing
-                                auto cursor{internal::makeSimpleContextCursor(*results, root, node)};
-
-                                // Get first result using zero-copy iteration
-                                for (const auto& [result, ctx] : cursor)
-                                {
-                                    leftValue = result;
-                                    break; // Take first result
-                                }
-
-                                // Fallback if cursor iteration fails
-                                if (leftValue.isUndefined())
-                                    leftValue = results->first();
-                            }
-                        }
-                    }
-                    catch (...)
-                    {
-                        qCDebug(jsonPathLog)
-                            << "Failed to evaluate absolute path:" << QString::fromStdString(leftPath);
-                        return false;
-                    }
-                }
-
-                // Evaluate right side with context-aware optimization
+                // Evaluate right side
                 QJsonValue rightValue;
-                auto       rightExprStr = QString::fromStdString(rightExpr);
-                if (rightExprStr == "$")
-                {
-                    rightValue = root;
-                }
-                else if (rightExprStr.startsWith("@"))
-                {
-                    // Right side is a relative path - evaluate against current node
-                    if (rightExprStr == "@")
-                    {
-                        rightValue = node;
-                    }
-                    else
-                    {
-                        // Handle @.property, @[index], etc. with context-aware access
-                        QString relativePath{rightExprStr.mid(1)}; // Remove @
-                        if (relativePath.startsWith("."))
-                        {
-                            // Property access like @.value - use context-aware cursor for efficient access
-                            auto propName{relativePath.mid(1)};
-                            if (node.isObject())
-                            {
-                                // Use context-aware cursor for efficient property lookup
-                                auto cursor{makeSimpleContextCursor(node.toObject(), root, node)};
-
-                                // Traditional property access (cursor doesn't expose keys in current interface)
-                                rightValue = node.toObject().value(propName);
-                            }
-                        }
-                        // Add more relative path handling as needed
-                    }
-                }
+                auto       rightExprStr = rightExpr;
+                if (rightExprStr.startsWith("@"))
+                    rightValue = evaluateRelativePath(rightExprStr, node, root);
                 else
-                {
-                    // Right side might be a literal value
-                    // Try to parse as JSON literal
-                    if (rightExprStr == "null")
-                    {
-                        rightValue = QJsonValue::Null;
-                    }
-                    else if (rightExprStr == "true")
-                    {
-                        rightValue = QJsonValue{true};
-                    }
-                    else if (rightExprStr == "false")
-                    {
-                        rightValue = QJsonValue{false};
-                    }
-                    else
-                    {
-                        // Try as number or string
-                        bool ok;
-                        auto num{rightExprStr.toDouble(&ok)};
-                        if (ok)
-                        {
-                            rightValue = QJsonValue(num);
-                        }
-                        else
-                        {
-                            // Treat as string (remove quotes if present)
-                            if ((rightExprStr.startsWith('"') && rightExprStr.endsWith('"')) ||
-                                (rightExprStr.startsWith('\'') && rightExprStr.endsWith('\'')))
-                            {
-                                rightValue = QJsonValue(rightExprStr.mid(1, rightExprStr.length() - 2));
-                            }
-                            else
-                            {
-                                rightValue = QJsonValue(rightExprStr);
-                            }
-                        }
-                    }
-                }
+                    rightValue = parseJsonLiteral(rightExprStr);
 
                 // Perform comparison
-                auto opStr = QString::fromStdString(op);
-                if (opStr == "==")
-                {
-                    if (leftValue.isUndefined() && rightValue.isUndefined())
-                        return true;
-                    if (leftValue.isUndefined() && rightValue.toDouble() == 0)
-                        return true;
-                    if (rightValue.isUndefined() && leftValue.toDouble() == 0)
-                        return true;
-                    if (leftValue.isUndefined() && !rightValue.isUndefined())
-                        return true;
-                    if (rightValue.isUndefined() && !leftValue.isUndefined())
-                        return false; // Asymmetric
-                    return leftValue == rightValue;
-                }
-                if (opStr == "!=")
-                {
-                    if (leftValue.isUndefined() && rightValue.isUndefined())
-                        return false;
-                    if (leftValue.isUndefined() && rightValue.toDouble() == 0)
-                        return false;
-                    if (rightValue.isUndefined() && leftValue.toDouble() == 0)
-                        return false;
-                    return leftValue != rightValue;
-                }
-                if (opStr == "<")
-                {
-                    // Implement ordering comparison logic as needed
-                    if (leftValue.isDouble() && rightValue.isDouble())
-                        return leftValue.toDouble() < rightValue.toDouble();
-                    return false;
-                }
-                if (opStr == ">")
-                {
-                    if (leftValue.isDouble() && rightValue.isDouble())
-                        return leftValue.toDouble() > rightValue.toDouble();
-                    return false;
-                }
-                if (opStr == "<=")
-                {
-                    if (leftValue.isDouble() && rightValue.isDouble())
-                        return leftValue.toDouble() <= rightValue.toDouble();
-                    return false;
-                }
-                if (opStr == ">=")
-                {
-                    if (leftValue.isDouble() && rightValue.isDouble())
-                        return leftValue.toDouble() >= rightValue.toDouble();
-                    return false;
-                }
-
-                return false;
+                return performComparison(op, leftValue, rightValue);
             });
     }
+};
 
-    // Handle function call patterns like length(@.a) == value($..c)
-    if (s.contains("length(") || s.contains("value($"))
+// Specialization: Function Pattern Strategy
+template <>
+struct ContextFilterParsingStrategy<ContextFilterParsingType::FunctionPattern>
+{
+    static std::optional<Token> process(const QString& expr, std::vector<ContextFilterFn>& out)
     {
-        qCDebug(jsonPathLog) << "parseAbsolutePathContext: detected function call pattern:" << s;
+        qCDebug(jsonPathLog) << "ContextFilterParsingStrategy: processing function pattern:" << expr;
 
-        // Simple pattern matching for function calls using string operations
-        // Look for comparison operators in order of precedence (longest first)
-        const QStringList operators = {"<=", ">=", "==", "!=", "<", ">"};
-        QString           op;
-        auto              opPos{-1};
+        auto components{parseExpressionComponents(expr)};
+        if (!components.valid)
+            return std::nullopt;
 
-        for (const QString& testOp : operators)
+        auto left{components.left};
+        auto op{components.op};
+        auto right{components.right};
+
+        qCDebug(jsonPathLog) << "Function pattern parts: left=" << left << "op=" << op << "right=" << right;
+
+        // Check if we need root context (value($...))
+        auto needsRoot{needsRootContext(left, right)};
+
+        if (needsRoot)
         {
-            auto pos{s.indexOf(testOp)};
-            if (pos != -1)
-            {
-                op    = testOp;
-                opPos = pos;
-                break;
-            }
-        }
-
-        if (opPos != -1)
-        {
-            auto left{s.left(opPos).trimmed()};
-            auto right{s.mid(opPos + op.length()).trimmed()};
-
-            qCDebug(jsonPathLog) << "parseAbsolutePathContext: function call parts - left:" << left << "op:" << op
-                                 << "right:" << right;
-
-            // Check if we need root context (value($...))
-            auto needsRootContext{left.contains("value($") || right.contains("value($")};
-
-            if (needsRootContext)
-            {
-                qCDebug(jsonPathLog) << "parseAbsolutePathContext: creating context-aware function filter";
-
-                struct ContextBuilder
+            ContextBuilder b{out};
+            return b.add(
+                [left, op, right](const QJsonValue& node, const QJsonValue& root) -> bool
                 {
-                    std::vector<ContextFilterFn>& fns;
+                    auto leftResult{evaluateExpressionSide(left, node, root)};
+                    auto rightResult{evaluateExpressionSide(right, node, root)};
 
-                    [[nodiscard]] Token add(ContextFilterFn fn, QString key = {})
-                    {
-                        fns.push_back(std::move(fn));
-                        const auto id{fns.size() - 1};
-                        Token      token{Token::Kind::Filter, 0, {}, 0u, std::move(key)};
-                        token.contextFilterId = id;
-                        return token;
-                    }
-                };
+                    // Use "nothing" aware comparison for RFC 9535 compliance
+                    if (leftResult.isNothing || rightResult.isNothing)
+                        return performNothingAwareComparison(op, leftResult, rightResult);
 
-                ContextBuilder b{out};
-                return b.add(
-                    [left, op, right](const QJsonValue& node, const QJsonValue& root) -> bool
-                    {
-                        qCDebug(jsonPathLog) << "Evaluating context function:" << left << op << right;
+                    // Both sides have actual values - use normal comparison
+                    return performComparison(op, leftResult.value, rightResult.value);
+                });
+        }
+        else
+        {
+            // No root context needed - use simpler evaluation
+            ContextBuilder b{out};
+            return b.add(
+                [left, op, right](const QJsonValue& node, const QJsonValue& root) -> bool
+                {
+                    auto leftResult{evaluateExpressionSide(left, node, root)};
+                    auto rightResult{evaluateExpressionSide(right, node, root)};
 
-                        QJsonValue leftVal, rightVal;
-                        auto       leftIsNothing{false};
-                        auto       rightIsNothing{false};
-
-                        // Evaluate left side with context-aware optimization
-                        if (left.contains("("))
-                        {
-                            leftVal = evaluateContextFunction(left, node, root);
-                            // Check if this represents "nothing" (undefined/null property in length)
-                            if (left.startsWith("length(@."))
-                            {
-                                QString prop{left.mid(9, left.length() - 10)}; // Extract property name
-                                if (node.isObject())
-                                {
-                                    // Use context-aware cursor for efficient property existence check
-                                    auto cursor{internal::makeSimpleContextCursor(node.toObject(), root, node)};
-
-                                    // Check property existence and null values using traditional access
-                                    // (cursor doesn't expose keys in current interface)
-                                    auto propValue{node.toObject().value(prop)};
-                                    if (propValue.isUndefined() || propValue.isNull())
-                                        leftIsNothing = true;
-                                }
-                            }
-                        }
-                        else if (left.startsWith("@."))
-                        {
-                            auto prop{left.mid(2)};
-                            if (node.isObject())
-                            {
-                                // Use context-aware cursor for efficient property access
-                                auto cursor{makeSimpleContextCursor(node.toObject(), root, node)};
-
-                                // Traditional property access (cursor doesn't expose keys)
-                                auto val{node.toObject().value(prop)};
-                                if (val.isUndefined())
-                                {
-                                    leftIsNothing = true;
-                                    leftVal       = QJsonValue{0};
-                                }
-                                else
-                                {
-                                    leftVal = val;
-                                }
-                            }
-                        }
-                        else
-                        {
-                            leftVal = QJsonValue{left};
-                        }
-
-                        // Evaluate right side with context-aware optimization
-                        if (right.contains("("))
-                        {
-                            rightVal = evaluateContextFunction(right, node, root);
-                            // Check if this represents "nothing" (empty results in value)
-                            if (right.startsWith("value($"))
-                            {
-                                using json_query::JSONPath;
-                                QString pathStr{right.mid(6, right.length() - 7)}; // Extract path
-                                auto    path{JSONPath::create(pathStr)};
-                                if (path)
-                                {
-                                    auto results{path->evaluateAll(root)};
-                                    if (results)
-                                    {
-                                        if (results->isEmpty())
-                                        {
-                                            rightIsNothing = true;
-                                        }
-                                        else
-                                        {
-                                            // Use context-aware cursor for efficient result validation
-                                            auto cursor{makeSimpleContextCursor(*results, root, node)};
-
-                                            // Check if results are effectively empty using zero-copy iteration
-                                            auto hasValidResults{false};
-                                            for (const auto& [result, ctx] : cursor)
-                                            {
-                                                if (!result.isUndefined() && !result.isNull())
-                                                {
-                                                    hasValidResults = true;
-                                                    break;
-                                                }
-                                            }
-
-                                            if (!hasValidResults)
-                                                rightIsNothing = true;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        else if (right.startsWith("@."))
-                        {
-                            auto prop{right.mid(2)};
-                            if (node.isObject())
-                            {
-                                // Use context-aware cursor for efficient property access
-                                auto cursor{makeSimpleContextCursor(node.toObject(), root, node)};
-
-                                // Traditional property access (cursor doesn't expose keys)
-                                auto val{node.toObject().value(prop)};
-                                if (val.isUndefined())
-                                {
-                                    rightIsNothing = true;
-                                    rightVal       = QJsonValue{0};
-                                }
-                                else
-                                {
-                                    rightVal = val;
-                                }
-                            }
-                        }
-                        else
-                        {
-                            rightVal = QJsonValue{right};
-                        }
-
-                        qCDebug(jsonPathLog)
-                            << "Function comparison values:" << leftVal << op << rightVal
-                            << "leftIsNothing:" << leftIsNothing << "rightIsNothing:" << rightIsNothing;
-
-                        // RFC 9535 "nothing" semantics: nothing equals nothing or zero-length values
-                        if (op == "==")
-                        {
-                            if (leftIsNothing && rightIsNothing)
-                                return true;
-                            if (leftIsNothing && rightVal.toDouble() == 0)
-                                return true;
-                            if (rightIsNothing && leftVal.toDouble() == 0)
-                                return true;
-                            if (leftIsNothing && !rightIsNothing)
-                                return true;
-                            if (rightIsNothing && !leftIsNothing)
-                                return false; // Asymmetric
-                            // Both sides have actual values - use normal comparison
-                            return leftVal == rightVal;
-                        }
-                        if (op == "!=")
-                        {
-                            if (leftIsNothing && rightIsNothing)
-                                return false;
-                            if (leftIsNothing && rightVal.toDouble() == 0)
-                                return false;
-                            if (rightIsNothing && leftVal.toDouble() == 0)
-                                return false;
-                            return leftVal != rightVal;
-                        }
-                        return false;
-                    },
-                    s);
-            }
+                    return performComparison(op, leftResult.value, rightResult.value);
+                });
         }
     }
+};
 
-    // Check for absolute path existence filters (allow wildcards and complex paths)
-    // Valid: $, $.foo, $==@.value, $==$, etc.
-
-    // Check for absolute path existence filters (allow wildcards and complex paths)
-    // Valid: $, $.foo, $==@.value, $==$, etc.
-
-    // Check for absolute path existence filters (allow wildcards and complex paths)
-    // Valid: $, $.foo, $==@.value, $==$, etc.
-
-    static const auto absExistencePat{ctre::match<R"(\$(\.[a-zA-Z_*][a-zA-Z0-9_]*|\[\d+\]|\[.*\])*)">};
-    if (absExistencePat(s.toStdString()))
+// Specialization: Existence Pattern Strategy
+template <>
+struct ContextFilterParsingStrategy<ContextFilterParsingType::ExistencePattern>
+{
+    static std::optional<Token> process(const QString& expr, std::vector<ContextFilterFn>& out)
     {
-        qCDebug(jsonPathLog) << "parseAbsolutePathContext: matched absolute path existence filter:" << s;
-
-        struct ContextBuilder
-        {
-            std::vector<ContextFilterFn>& fns;
-
-            [[nodiscard]] Token add(ContextFilterFn fn, QString key = {})
-            {
-                fns.push_back(std::move(fn));
-                const auto id{fns.size() - 1};
-                Token      token{Token::Kind::Filter, 0, {}, 0u, std::move(key)};
-                token.contextFilterId = id;
-                return token;
-            }
-        };
+        qCDebug(jsonPathLog) << "ContextFilterParsingStrategy: processing existence pattern:" << expr;
 
         ContextBuilder b{out};
         return b.add(
-            [s](const QJsonValue& node, const QJsonValue& root) -> bool
+            [expr](const QJsonValue& node, const QJsonValue& root) -> bool
             {
-                qCDebug(jsonPathLog) << "Evaluating absolute path existence filter:" << s << "on root:" << root;
+                qCDebug(jsonPathLog) << "Evaluating absolute path existence filter:" << expr << "on root:" << root;
 
                 // Basic implementation for absolute path existence filters
-                if (s == "$")
+                if (expr == "$")
                 {
                     // Root existence filter: always true if root exists
                     return !root.isUndefined();
                 }
 
                 // Handle absolute path patterns
-                if (s.startsWith("$."))
+                if (expr.startsWith("$."))
                 {
                     // For patterns like "$.a", "$.*.a", etc., try to evaluate against root
                     try
                     {
                         // Create a temporary JSONPath to evaluate the absolute path
-                        auto absolutePath{json_query::JSONPath::create(s)};
+                        auto absolutePath{json_query::JSONPath::create(expr)};
                         if (absolutePath)
                         {
                             auto results{absolutePath->evaluateAll(root)};
@@ -631,18 +682,70 @@ std::optional<Token> parseAbsolutePathContext(const QString& s, std::vector<Cont
                     }
                     catch (...)
                     {
-                        qCDebug(jsonPathLog) << "Failed to evaluate absolute path:" << s;
+                        qCDebug(jsonPathLog) << "Failed to evaluate absolute path:" << expr;
                     }
                 }
 
                 // Fallback for unimplemented patterns
-                qCDebug(jsonPathLog) << "Absolute path pattern not yet fully implemented:" << s;
+                qCDebug(jsonPathLog) << "Absolute path pattern not yet fully implemented:" << expr;
                 return false;
             });
     }
+};
 
-    qCDebug(jsonPathLog) << "parseAbsolutePathContext: no match for" << s;
-    return std::nullopt;
+// TableGen-inspired dispatch architecture for context filter parsing
+struct ContextFilterParsingDispatcher
+{
+    static std::optional<Token> dispatch(const QString& expr, std::vector<ContextFilterFn>& out)
+    {
+        qCDebug(jsonPathLog) << "ContextFilterParsingDispatcher: dispatching expression:" << expr;
+
+        // Try patterns in priority order (highest priority first)
+
+        // 1. Comparison Pattern (priority 100)
+        if constexpr (ContextFilterParsingDef<ContextFilterParsingType::ComparisonPattern>::enabled)
+        {
+            if (ContextFilterParsingDef<ContextFilterParsingType::ComparisonPattern>::matches(expr))
+            {
+                qCDebug(jsonPathLog) << "Matched ComparisonPattern";
+                return ContextFilterParsingStrategy<ContextFilterParsingType::ComparisonPattern>::process(expr, out);
+            }
+        }
+
+        // 2. Function Pattern (priority 90)
+        if constexpr (ContextFilterParsingDef<ContextFilterParsingType::FunctionPattern>::enabled)
+        {
+            if (ContextFilterParsingDef<ContextFilterParsingType::FunctionPattern>::matches(expr))
+            {
+                qCDebug(jsonPathLog) << "Matched FunctionPattern";
+                return ContextFilterParsingStrategy<ContextFilterParsingType::FunctionPattern>::process(expr, out);
+            }
+        }
+
+        // 3. Existence Pattern (priority 80)
+        if constexpr (ContextFilterParsingDef<ContextFilterParsingType::ExistencePattern>::enabled)
+        {
+            if (ContextFilterParsingDef<ContextFilterParsingType::ExistencePattern>::matches(expr))
+            {
+                qCDebug(jsonPathLog) << "Matched ExistencePattern";
+                return ContextFilterParsingStrategy<ContextFilterParsingType::ExistencePattern>::process(expr, out);
+            }
+        }
+
+        qCDebug(jsonPathLog) << "ContextFilterParsingDispatcher: no match found for:" << expr;
+        return std::nullopt;
+    }
+};
+
+} // namespace detail
+
+// Parse context-aware function calls like length(@.a) == value($..c)
+std::optional<Token> parseAbsolutePathContext(const QString& s, std::vector<ContextFilterFn>& out)
+{
+    qCDebug(jsonPathLog) << "parseAbsolutePathContext called with:" << s;
+
+    // TableGen-inspired dispatch architecture for context filter parsing
+    return detail::ContextFilterParsingDispatcher::dispatch(s, out);
 }
 
 // Context-aware filter compilation dispatcher
