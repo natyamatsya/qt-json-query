@@ -91,7 +91,7 @@ public:
             newPos = alignedPos + size;
         }
         
-        auto* result = reinterpret_cast<void*>(currentBlock_ + alignedPos);
+        auto result = reinterpret_cast<void*>(currentBlock_ + alignedPos);
         currentPos_ = newPos;
         totalAllocated_ += size;
         
@@ -122,7 +122,7 @@ public:
     template<typename T>
     T* constructArray(size_t count) {
         void* memory = allocate(sizeof(T) * count, alignof(T));
-        auto* array = reinterpret_cast<T*>(memory);
+        auto array = reinterpret_cast<T*>(memory);
         
         // Default construct each element
         for (size_t i = 0; i < count; ++i) {
@@ -169,8 +169,8 @@ public:
     };
     
     Stats getStats() const {
-        size_t currentBlockUsed = currentPos_;
-        size_t currentBlockRemaining = currentEnd_ - currentPos_;
+        auto currentBlockUsed = currentPos_;
+        auto currentBlockRemaining = currentEnd_ - currentPos_;
         double utilization = totalAllocated_ > 0 ? 
             (static_cast<double>(totalAllocated_) / (blocks_.size() * blockSize_) * 100.0) : 0.0;
         
@@ -198,7 +198,7 @@ private:
     
     void* allocateLargeObject(size_t size, size_t alignment) {
         // Allocate a dedicated block for large objects
-        size_t alignedSize = alignUp(size, alignment);
+        auto alignedSize = alignUp(size, alignment);
         void* largeBlock = std::malloc(alignedSize);
         if (!largeBlock) {
             throw std::bad_alloc();

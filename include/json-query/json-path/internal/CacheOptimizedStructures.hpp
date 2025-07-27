@@ -102,7 +102,7 @@ public:
     }
     
     size_t totalAllocated() const {
-        size_t total = 0;
+        auto total = 0;
         for (const auto& pool : pools_) {
             total += (FRAMES_PER_POOL - pool->available());
         }
@@ -293,7 +293,7 @@ private:
     
 public:
     const QString& intern(QStringView key) {
-        uint32_t hash = qHash(key);
+        auto hash = qHash(key);
         
         // Linear search for small cache (cache-friendly)
         for (auto& cached : cache_) {

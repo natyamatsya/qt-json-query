@@ -281,7 +281,7 @@ std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const 
     workingArray.append(root);
     
     std::expected<QJsonArray, EvalError> working = QJsonArray(workingArray);
-    bool multi = false;
+    auto multi = false;
 
     using json_query::json_path::internal::qt_hash;
 
@@ -291,7 +291,7 @@ std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const 
         qDebug() << "[stage] token" << i << ": kind=" << static_cast<int>(tk.kind)
                  << "working size=" << working->size();
 
-        bool prevRecursive = (i>0 && ctx.tokens[i-1].kind == Token::Kind::Recursive);
+        auto prevRecursive = (i>0 && ctx.tokens[i-1].kind == Token::Kind::Recursive);
         
         qCDebug(jsonPathLog) << "[evalStandard] Token" << i << "kind=" << static_cast<int>(tk.kind) << "prevRecursive=" << prevRecursive;
 
@@ -309,7 +309,7 @@ std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const 
     // Special case: for root selector ($), we should return the root document itself
     // not wrapped in an array, because the root selector should return the complete document
     // as a single result
-    bool isRootSelectorOnly = (ctx.tokens.size() == 1);
+    auto isRootSelectorOnly = (ctx.tokens.size() == 1);
     if (isRootSelectorOnly) {
         // Return the first (and only) element from the working array, which is the root document
         if (!working->empty()) {
@@ -318,7 +318,7 @@ std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const 
         return QJsonValue{QJsonValue::Undefined};
     }
 
-    QJsonValue collapsed = squash(*std::move(working), multi);
+    auto collapsed = squash(*std::move(working), multi);
     if (collapsed.isUndefined())
         return emptyResult(); // RFC 9535: no matches 
 

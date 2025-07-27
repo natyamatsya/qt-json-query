@@ -23,7 +23,7 @@ template<typename Callable>
 void benchmark_calls(const std::string& name, Callable&& func, int iterations) {
     auto start{std::chrono::high_resolution_clock::now()};
     
-    int sum = 0;
+    auto sum = 0;
     for (int i = 0; i < iterations; ++i) {
         sum += func(i);
     }
@@ -67,13 +67,13 @@ int main() {
     
     // function_ref version
     auto func_ref_benchmark = [&](int x) {
-        stdcompat::function_ref<int(int)> ref = multiply_by_3;
+        auto ref = multiply_by_3;
         return ref(x);
     };
     
     // std::function version  
     auto std_func_benchmark = [&](int x) {
-        std::function<int(int)> func = multiply_by_3;
+        auto func = multiply_by_3;
         return func(x);
     };
     
@@ -86,7 +86,7 @@ int main() {
     std::cout << "3. Callback-Style Usage:" << std::endl;
     
     JSONPathProcessor processor;
-    std::vector<int> results = {1, 4, 9, 16, 25};
+    auto results = {1, 4, 9, 16, 25};
     
     // Using lambda as callback
     processor.processResults(results, [](int value) {

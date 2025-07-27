@@ -138,7 +138,7 @@ struct SliceProcessingStrategy<SliceProcessingType::ForwardSlice> {
         auto pooledArray{acquirePooledArray()};
         QJsonArray& out = *pooledArray;
 
-        const int len = array.size();
+        const auto len = array.size();
         constexpr qsizetype SENTINEL = std::numeric_limits<qsizetype>::max();
 
         qsizetype start = s.start;
@@ -180,7 +180,7 @@ struct SliceProcessingStrategy<SliceProcessingType::BackwardSlice> {
         auto pooledArray{acquirePooledArray()};
         QJsonArray& out = *pooledArray;
 
-        const int len = array.size();
+        const auto len = array.size();
         constexpr qsizetype SENTINEL = std::numeric_limits<qsizetype>::max();
 
         qsizetype start = s.start;
@@ -583,7 +583,7 @@ std::vector<qsizetype> collectConsecutiveSelectorTokens(const PathEvalCtx& ctx, 
     std::vector<qsizetype> unionTokens;
     unionTokens.push_back(startIndex);
     
-    qsizetype j = startIndex + 1;
+    auto j = startIndex + 1;
     while (j < ctx.tokens.size()) {
         const Token& nextTk = ctx.tokens[j];
         if (isSelectorToken(nextTk)) {
@@ -601,7 +601,7 @@ std::vector<qsizetype> collectConsecutiveSelectorTokens(const PathEvalCtx& ctx, 
 bool areTokensFromSameBracketGroup(const PathEvalCtx& ctx, const std::vector<qsizetype>& tokenIndices) {
     if (tokenIndices.size() <= 1) return false;
     
-    int firstBracketGroupId = ctx.tokens[tokenIndices[0]].bracketGroupId;
+    auto firstBracketGroupId = ctx.tokens[tokenIndices[0]].bracketGroupId;
     
     // If first token is not from a bracket, this can't be a bracket union
     if (firstBracketGroupId <= 0) {
@@ -619,11 +619,11 @@ bool areTokensFromSameBracketGroup(const PathEvalCtx& ctx, const std::vector<qsi
 }
 
 UnionDetectionResult detectUnionTokens(const PathEvalCtx& ctx, qsizetype startIndex) {
-    std::vector<qsizetype> unionTokens = collectConsecutiveSelectorTokens(ctx, startIndex);
-    bool shouldUseUnion = areTokensFromSameBracketGroup(ctx, unionTokens);
-    qsizetype nextIndex = startIndex + unionTokens.size();
+    auto unionTokens = collectConsecutiveSelectorTokens(ctx, startIndex);
+    auto shouldUseUnion = areTokensFromSameBracketGroup(ctx, unionTokens);
+    auto nextIndex = startIndex + unionTokens.size();
     
-    return {unionTokens, shouldUseUnion, nextIndex};
+    return {unionTokens, shouldUseUnion, static_cast<qsizetype>(nextIndex)};
 }
 
 // Helper: Process a single union token and collect its results
@@ -780,7 +780,7 @@ std::expected<QJsonArray, EvalError> processBranchUniqueSelection(
     for (const auto& workingValue : working) {
         if (!workingValue.isObject()) continue;
         
-        const QJsonObject obj = workingValue.toObject();
+        const auto obj = workingValue.toObject();
         
         if (isLeaf) {
             processObjectForLeafSelection(obj, keys, workingValue, &results);
@@ -832,7 +832,7 @@ QJsonValue applyTrailing(json_path::FunctionType fn, const QJsonValue& v)
             bool first=true; double best=0.0;
             for (const auto& e : arr) {
                 if (!e.isDouble()) continue;
-                const double d = e.toDouble();
+                const auto d = e.toDouble();
                 if (first || (fn==Min ? d<best : d>best))
                     best = d, first = false;
             }
@@ -844,10 +844,9 @@ QJsonValue applyTrailing(json_path::FunctionType fn, const QJsonValue& v)
 }
 
 // Helper: Collect keys from consecutive Key/KeyList tokens
-KeyCollectionResult collectKeysFromTokens(const PathEvalCtx& ctx, qsizetype startIndex)
-{
+KeyCollectionResult collectKeysFromTokens(const PathEvalCtx& ctx, qsizetype startIndex) {
     std::vector<QString> keys;
-    qsizetype i = startIndex;
+    auto i = startIndex;
     
     while (i < ctx.tokens.size()) {
         const Token& token = ctx.tokens[i];

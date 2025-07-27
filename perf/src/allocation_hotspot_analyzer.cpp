@@ -29,7 +29,7 @@ public:
         std::vector<HotspotResult> results;
         
         // Create test data with varying complexity
-        QJsonObject testData = createTestData();
+        auto testData = createTestData();
         QJsonValue rootValue(testData);
         
         // Test cases designed to stress different allocation patterns
@@ -113,10 +113,10 @@ private:
             }
             
             // Measure memory and performance
-            const int iterations = 100;
+            const auto iterations = 100;
             auto start{std::chrono::high_resolution_clock::now()};
             
-            size_t totalResults = 0;
+            auto totalResults = 0;
             for (int i = 0; i < iterations; ++i) {
                 auto result{path.evaluate(testData)};
                 if (result) {
@@ -131,13 +131,13 @@ private:
             auto end{std::chrono::high_resolution_clock::now()};
             auto duration{std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)};
             
-            double avgDuration = static_cast<double>(duration.count()) / iterations;
-            size_t avgResults = totalResults / iterations;
-            double memoryPerResult = avgResults > 0 ? (avgDuration / avgResults) : avgDuration;
+            auto avgDuration = static_cast<double>(duration.count()) / iterations;
+            auto avgResults = totalResults / iterations;
+            auto memoryPerResult = avgResults > 0 ? (avgDuration / avgResults) : avgDuration;
             
             // Estimate peak memory (simplified heuristic based on operation type)
-            size_t estimatedPeakMB = 0;
-            std::string bottleneck = "Unknown";
+            auto estimatedPeakMB = 0;
+            auto bottleneck = "Unknown";
             
             if (jsonPath.contains("largeArray")) {
                 estimatedPeakMB = 5; // Large array operations
@@ -156,7 +156,7 @@ private:
                 bottleneck = "Minimal allocation";
             }
             
-            return {testName, estimatedPeakMB, avgDuration, avgResults, memoryPerResult, bottleneck};
+            return {testName, static_cast<size_t>(estimatedPeakMB), avgDuration, static_cast<size_t>(avgResults), memoryPerResult, bottleneck};
             
         } catch (const std::exception& e) {
             return {testName, 0, 0, 0, 0, std::string("Error: ") + e.what()};
