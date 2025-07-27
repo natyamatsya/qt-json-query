@@ -168,8 +168,8 @@ int compareValues(const QJsonValue& left, const QJsonValue& right)
     }
     
     // Different types - use type ordering
-    int leftType = static_cast<int>(left.type());
-    int rightType = static_cast<int>(right.type());
+    auto leftType = static_cast<int>(left.type());
+    auto rightType = static_cast<int>(right.type());
     return leftType - rightType;
 }
 

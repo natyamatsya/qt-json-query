@@ -91,7 +91,7 @@ public:
             newPos = alignedPos + size;
         }
         
-        void* result = reinterpret_cast<void*>(currentBlock_ + alignedPos);
+        auto* result = reinterpret_cast<void*>(currentBlock_ + alignedPos);
         currentPos_ = newPos;
         totalAllocated_ += size;
         
@@ -122,7 +122,7 @@ public:
     template<typename T>
     T* constructArray(size_t count) {
         void* memory = allocate(sizeof(T) * count, alignof(T));
-        T* array = reinterpret_cast<T*>(memory);
+        auto* array = reinterpret_cast<T*>(memory);
         
         // Default construct each element
         for (size_t i = 0; i < count; ++i) {
