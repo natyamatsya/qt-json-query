@@ -47,8 +47,10 @@ target_include_directories(json_query
 )
 
 # Link QtCore (Qt JSON classes live here)
-
 target_link_libraries(json_query PUBLIC Qt6::Core)
+
+# Compile out qDebug calls for performance optimization
+target_compile_definitions(json_query PRIVATE QT_NO_DEBUG_OUTPUT)
 
 # Link CTRE header-only interface when available
 if(TARGET ctre_interface)

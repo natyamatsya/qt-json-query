@@ -3,11 +3,13 @@
 #include "json-query/json-path/JSONPathEvalError.hpp"  // EvalError
 #include "json-query/json-path/internal/ContainerCursor.hpp"  // ContainerCursor for optimized iteration
 #include "json-query/json-path/internal/ContextAwareContainerCursor.hpp"  // ContextAwareContainerCursor for context-aware iteration
+#include "json-query/json-path/internal/ArrayPool.hpp"  // ArrayPool for memory optimization
 #include <expected>
 
 namespace json_query::json_path::detail {
 
 using json_query::json_path::internal::ContainerCursor;
+using internal::acquirePooledArray;
 
 // --- Key -------------------------------------------------------------------
 template<>
@@ -15,23 +17,24 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::Key>(const PathEvalCtx& /
                                                             const Token& tk,
                                                             const QJsonValue& v)
 {
-    // Monadic approach: check if object, then extract key if present
-    auto extractFromObject = [&tk](const QJsonObject& obj) -> std::optional<QJsonArray> {
-        if (obj.contains(tk.key)) {
-            QJsonArray result;
-            result.append(obj[tk.key]);
-            return result;
-        }
-        return std::nullopt;
-    };
-
-    auto asObject = [&v]() -> std::optional<QJsonObject> {
-        return v.isObject() ? std::make_optional(v.toObject()) : std::nullopt;
-    };
-
-    return asObject()
-        .and_then(extractFromObject)
-        .value_or(QJsonArray{});
+    // Fast path: direct object key lookup without unnecessary allocations
+    if (!v.isObject()) {
+        return QJsonArray{}; // Empty result for non-objects
+    }
+    
+    const QJsonObject obj = v.toObject();
+    const auto it = obj.find(tk.key);
+    if (it == obj.end()) {
+        return QJsonArray{}; // Key not found
+    }
+    
+    // Use ArrayPool for result to optimize memory allocation
+    auto pooledArray = acquirePooledArray();
+    QJsonArray& result = *pooledArray;
+    result.append(it.value());
+    
+    // Return copy since pooled array will be returned to pool
+    return QJsonArray(result);
 }
 
 // --- Index -----------------------------------------------------------------
@@ -82,19 +85,17 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::Wildcard>(const PathEvalC
                                                                   const Token&,
                                                                   const QJsonValue& v)
 {
-    // Monadic approach: transform value to appropriate wildcard result based on type
-    auto processAsObject = [&v]() -> std::optional<std::expected<QJsonArray, EvalError>> {
-        return v.isObject() ? std::make_optional(wildcardObject(v.toObject())) : std::nullopt;
-    };
-
-    auto processAsArray = [&v]() -> std::optional<std::expected<QJsonArray, EvalError>> {
-        return v.isArray() ? std::make_optional(wildcardArray(v.toArray())) : std::nullopt;
-    };
-
-    // Use monadic chaining to try object first, then array, then return empty
-    return processAsObject()
-        .or_else(processAsArray)
-        .value_or(std::expected<QJsonArray, EvalError>{QJsonArray{}}); // Empty result for primitives
+    // Fast path: direct type checking and processing without monadic overhead
+    if (v.isObject()) {
+        return wildcardObject(v.toObject());
+    }
+    
+    if (v.isArray()) {
+        return wildcardArray(v.toArray());
+    }
+    
+    // Empty result for primitives (not an error in JSONPath)
+    return QJsonArray{};
 }
 
 // --- Recursive -------------------------------------------------------------
