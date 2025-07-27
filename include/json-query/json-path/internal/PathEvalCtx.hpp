@@ -1,6 +1,6 @@
 #pragma once
 
-#include <QVector>
+#include <vector>
 #include <QString>
 #include <QJsonValue>
 
@@ -22,13 +22,13 @@ public:
     using Token              = json_path::Token;
     using Function           = json_path::FunctionType;
 
-    PathEvalCtx(const QVector<Token>&   t,
+    PathEvalCtx(const std::vector<Token>&   t,
                 const QJsonValue& root,
                 Function                 fn) noexcept
         : tokens{t}, rootDocument{root}, trailingFn{fn} {}
 
     // Data members are intentionally const refs – PathEvalCtx is just a view.
-    const QVector<Token>&   tokens;
+    const std::vector<Token>&   tokens;
     const QJsonValue& rootDocument;
     Function                 trailingFn {Function::None};
 };

@@ -7,6 +7,7 @@
 #include <QJsonArray>
 #include <QStringView>
 #include <QVector>
+#include <vector>
 
 // ────────────────────────────── STL / C++23
 #include <expected>
@@ -78,7 +79,7 @@ private:
     // -----------------------------------------------------------------
     JSONPath(json_query::json_path::FunctionType func,
                   QString                                        original,
-                  QVector<json_query::json_path::Token>              tokens ) noexcept
+                  std::vector<json_query::json_path::Token>              tokens ) noexcept
             : m_func(func)
             , m_originalPath(std::move(original))
             , m_tokens(std::move(tokens))
@@ -89,7 +90,7 @@ private:
     // -----------------------------------------------------------------
     json_query::json_path::FunctionType               m_func    {json_query::json_path::FunctionType::None};
     QString                    m_originalPath;
-    QVector<json_query::json_path::Token>             m_tokens;
+    std::vector<json_query::json_path::Token>             m_tokens;
     // Legacy filter storage removed - now using embedded filters only
 
 }; // end class JSONPath

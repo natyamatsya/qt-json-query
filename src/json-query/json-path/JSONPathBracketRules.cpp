@@ -23,7 +23,7 @@ std::expected<void, Error> BracketSink::key(QString key, bool allow)
         return std::unexpected(Error::BlankInKey);
     Token t{Token::Kind::Key, 0, {}, qt_hash(key), key};
     t.bracketGroupId = currentBracketGroupId;
-    tk.append(std::move(t));
+    tk.emplace_back(std::move(t));
     return {};
 }
 
@@ -43,21 +43,21 @@ void BracketSink::keyList(const QVector<QString>& keys)
         list.append(k);
 
     t.key = list.join(u"\n");
-    tk.append(std::move(t));
+    tk.emplace_back(std::move(t));
 }
 
 void BracketSink::wild()
 {
     Token t{Token::Kind::Wildcard};
     t.bracketGroupId = currentBracketGroupId;
-    tk.append(t);
+    tk.emplace_back(t);
 }
 
 void BracketSink::slice(const Slice& s)
 {
     Token t{Token::Kind::Slice, 0, s, 0u};
     t.bracketGroupId = currentBracketGroupId;
-    tk.append(t);
+    tk.emplace_back(t);
 }
 
 void BracketSink::index(int i)
@@ -65,14 +65,14 @@ void BracketSink::index(int i)
     qCDebug(jsonPathLog) << "BracketSink::index emit" << i;
     Token t{Token::Kind::Index, i};
     t.bracketGroupId = currentBracketGroupId;
-    tk.append(t);
+    tk.emplace_back(t);
 }
 
 void BracketSink::pushFilter(const Token& t)
 {
     Token token = t;  // Copy the token
     token.bracketGroupId = currentBracketGroupId; // Set bracket group ID
-    tk.append(std::move(token));
+    tk.emplace_back(std::move(token));
 }
 
 // ──────────────────────────────────────────────────────────────────────
@@ -86,7 +86,7 @@ std::expected<void, Error> EmbeddedBracketSink::key(QString key, bool allow)
         return std::unexpected(Error::BlankInKey);
     Token t{Token::Kind::Key, 0, {}, qt_hash(key), key};
     t.bracketGroupId = currentBracketGroupId;
-    tk.append(std::move(t));
+    tk.emplace_back(std::move(t));
     return {};
 }
 
@@ -106,35 +106,35 @@ void EmbeddedBracketSink::keyList(const QVector<QString>& keys)
         list.append(k);
 
     t.key = list.join(u"\n");
-    tk.append(std::move(t));
+    tk.emplace_back(std::move(t));
 }
 
 void EmbeddedBracketSink::wild()
 {
     Token t{Token::Kind::Wildcard};
     t.bracketGroupId = currentBracketGroupId; // Set bracket group ID
-    tk.append(std::move(t));
+    tk.emplace_back(t);
 }
 
 void EmbeddedBracketSink::slice(const Slice& s)
 {
     Token t{Token::Kind::Slice, 0, s};
     t.bracketGroupId = currentBracketGroupId; // Set bracket group ID
-    tk.append(std::move(t));
+    tk.emplace_back(t);
 }
 
 void EmbeddedBracketSink::index(int i)
 {
     Token t{Token::Kind::Index, i};
     t.bracketGroupId = currentBracketGroupId; // Set bracket group ID
-    tk.append(std::move(t));
+    tk.emplace_back(t);
 }
 
 void EmbeddedBracketSink::pushFilter(const Token& t)
 {
     Token token = t;  // Copy the token
     token.bracketGroupId = currentBracketGroupId; // Set bracket group ID
-    tk.append(std::move(token));
+    tk.emplace_back(std::move(token));
 }
 
 // ──────────────────────────────────────────────────────────────────────

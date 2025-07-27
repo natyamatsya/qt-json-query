@@ -13,7 +13,7 @@ namespace json_query::json_path::detail
 //  Dot-Segment Parser Implementation
 // ──────────────────────────────────────────────────────────────────────
 
-std::expected<qsizetype, Error> parseDot(qsizetype pos, QStringView sv, KeyBuilder& kb, QVector<Token>& tokens)
+std::expected<qsizetype, Error> parseDot(qsizetype pos, QStringView sv, KeyBuilder& kb, std::vector<Token>& tokens)
 {
     qCDebug(jsonPathLog) << "parseDot pos=" << pos;
     const qsizetype n = sv.size();
@@ -24,16 +24,13 @@ std::expected<qsizetype, Error> parseDot(qsizetype pos, QStringView sv, KeyBuild
     
     if (nxt == u'.') {
         qCDebug(jsonPathLog) << "parseDot: found recursive segment (..)";
-        tokens.append(Token{Token::Kind::Recursive});
-        ++pos;
-        if (pos >= n) return std::unexpected(Error::TrailingDot);
-        return pos;
+        tokens.emplace_back(Token{Token::Kind::Recursive});
+        return pos + 2;
     }
-    if (nxt == u'*') { 
+    if (sv[pos + 1] == u'*') { 
         qCDebug(jsonPathLog) << "parseDot: found wildcard (*)";
-        tokens.append(Token{Token::Kind::Wildcard }); 
-        ++pos; 
-        return pos; 
+        tokens.emplace_back(Token{Token::Kind::Wildcard }); 
+        return pos + 2; 
     }
     qsizetype start = pos;
     while (pos < n && sv[pos] != u'.' && sv[pos] != u'[') ++pos;
@@ -72,7 +69,7 @@ std::expected<qsizetype, Error> parseDot(qsizetype pos, QStringView sv, KeyBuild
 //  Bare Identifier Parser Implementation
 // ──────────────────────────────────────────────────────────────────────
 
-std::expected<qsizetype, Error> parseBare(qsizetype pos, QStringView sv, KeyBuilder& kb)
+std::expected<qsizetype, Error> parseBare(qsizetype pos, QStringView sv, KeyBuilder& kb, std::vector<Token>& tokens)
 {
     qsizetype start = pos;
     while (pos < sv.size() && sv[pos] != u'.' && sv[pos] != u'[') ++pos;
@@ -82,7 +79,7 @@ std::expected<qsizetype, Error> parseBare(qsizetype pos, QStringView sv, KeyBuil
     
     // Special case: if the identifier is exactly '*', create a Wildcard token
     if (identifier == u"*") {
-        kb.tgt.append(Token{Token::Kind::Wildcard});
+        kb.tgt.emplace_back(Token{Token::Kind::Wildcard});
         return pos;
     }
     
@@ -97,7 +94,7 @@ std::expected<qsizetype, Error> parseBare(qsizetype pos, QStringView sv, KeyBuil
 // ──────────────────────────────────────────────────────────────────────
 
 std::expected<qsizetype, Error> parseBracket(qsizetype pos, QStringView sv,
-                                            KeyBuilder& kb, QVector<Token>& tokens,
+                                            KeyBuilder& kb, std::vector<Token>& tokens,
                                             QVector<ContextFilterFn>& contextFilters,
                                             QVector<FilterFn>& filters)
 {
@@ -181,7 +178,8 @@ std::expected<qsizetype, Error> parseBracket(qsizetype pos, QStringView sv,
 // ──────────────────────────────────────────────────────────────────────
 
 std::expected<qsizetype, Error> parseEmbeddedBracket(qsizetype pos, QStringView sv,
-                                                    KeyBuilder& kb, QVector<Token>& tokens)
+                                                    KeyBuilder& kb, std::vector<Token>& tokens,
+                                                    QVector<FilterFn>& filterFns)
 {
     qCDebug(jsonPathLog) << "parseEmbeddedBracket: pos=" << pos << "sv.size()=" << sv.size();
     

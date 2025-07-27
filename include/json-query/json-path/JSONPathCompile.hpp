@@ -16,6 +16,7 @@
 #include <optional>
 #include <memory>
 #include <variant>
+#include <vector>
 
 namespace json_query::json_path
 {
@@ -650,7 +651,7 @@ toString(Error e) noexcept
 
 // Compiled result structure containing tokens and filters
 struct Compiled { 
-    QVector<Token> tokens; 
+    std::vector<Token> tokens; 
     QVector<FilterFn> filters; // Legacy filter storage
     QVector<ContextFilterFn> contextFilters; // Legacy context filter storage
 };

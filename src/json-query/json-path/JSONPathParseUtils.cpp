@@ -289,7 +289,7 @@ std::expected<void, Error> KeyBuilder::push(QString key, bool allowSpace)
 {
     if (!allowSpace && key.contains(u' '))
         return std::unexpected(Error::BlankInKey);
-    tgt.append(Token{Token::Kind::Key, 0, {}, qt_hash(key), key});
+    tgt.emplace_back(Token{Token::Kind::Key, 0, {}, qt_hash(key), key});
     return {};
 }
 

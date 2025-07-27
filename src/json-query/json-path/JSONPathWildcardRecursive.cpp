@@ -118,7 +118,28 @@ static std::expected<QJsonArray, EvalError> __evaluateRecursiveOptimized(
     // Estimate document complexity to choose optimization strategy
     size_t complexity = RecursivePatternDetector::estimateDocumentComplexity(value);
     
-    // Use early termination for simple patterns on complex documents
+    // Phase 3+: Direct recursive fast path for maximum performance on very complex documents
+    if (!targetField.isEmpty() && complexity > 500) {
+        // For now, fall back to Phase 3 until direct fast path is implemented
+        // return __evaluateRecursiveDirectFastPath(value, targetField);
+    }
+    
+    // Phase 3: Use advanced optimizations for simple patterns on complex documents
+    if (!targetField.isEmpty() && complexity > 200) {
+        auto pooledArray = acquirePooledArray();
+        internal::ResultCollector collector(pooledArray.get());
+        
+        auto result = IterativeRecursiveDescent::evaluateIterativePhase3Optimized(
+            value, targetField, collector);
+        
+        if (result) {
+            // Move result to avoid copying
+            QJsonArray finalResult = std::move(*pooledArray);
+            return finalResult;
+        }
+    }
+    
+    // Phase 2: Early termination for moderately complex documents
     if (!targetField.isEmpty() && complexity > 50) {
         auto pooledArray = acquirePooledArray();
         internal::ResultCollector collector(pooledArray.get());
@@ -137,6 +158,57 @@ static std::expected<QJsonArray, EvalError> __evaluateRecursiveOptimized(
     
     // Fallback to standard implementation
     return IterativeRecursiveDescent::evaluateIterativeArray(value);
+}
+
+/**
+ * @brief Phase 3+: Direct recursive fast path bypassing JSONPath evaluation overhead
+ * 
+ * For simple patterns like "$..fieldname", this bypasses the entire JSONPath
+ * evaluation machinery and implements a direct recursive traversal that matches
+ * the performance characteristics of plain recursive code.
+ */
+static std::expected<QJsonArray, EvalError> __evaluateRecursiveDirectFastPath(
+    const QJsonValue& root,
+    QStringView targetField) {
+    
+    // Use pooled array for results
+    auto pooledArray = acquirePooledArray();
+    QJsonArray& results = *pooledArray;
+    
+    // Direct recursive lambda - matches plain recursive performance
+    std::function<void(const QJsonValue&)> directTraverse = [&](const QJsonValue& value) {
+        if (value.isObject()) {
+            const QJsonObject obj = value.toObject();
+            
+            // Direct key lookup - fastest possible path
+            if (auto it = obj.find(QString(targetField)); it != obj.end()) {
+                results.append(it.value());
+            }
+            
+            // Traverse nested objects/arrays
+            for (auto it = obj.begin(); it != obj.end(); ++it) {
+                const QJsonValue& nested = it.value();
+                if (nested.isObject() || nested.isArray()) {
+                    directTraverse(nested);
+                }
+            }
+        }
+        else if (value.isArray()) {
+            const QJsonArray arr = value.toArray();
+            for (const QJsonValue& element : arr) {
+                if (element.isObject() || element.isArray()) {
+                    directTraverse(element);
+                }
+            }
+        }
+    };
+    
+    // Execute direct traversal
+    directTraverse(root);
+    
+    // Move result to avoid copying
+    QJsonArray finalResult = std::move(results);
+    return finalResult;
 }
 
 // ---------------------------------------------------------------------------

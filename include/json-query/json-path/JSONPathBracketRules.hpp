@@ -28,13 +28,13 @@ namespace json_query::json_path
          */
         class BracketSink {
         public:
-            QVector<Token>&   tk;
+            std::vector<Token>&   tk;
             KeyBuilder&       kb;
             QVector<std::function<bool (const QJsonValue&, const QJsonValue&)>>& contextFilters;
             QVector<std::function<bool (const QJsonValue&)>>& filters;
             int               currentBracketGroupId;
 
-            BracketSink(QVector<Token>& tokens, KeyBuilder& keyBuilder, 
+            BracketSink(std::vector<Token>& tokens, KeyBuilder& keyBuilder, 
                        QVector<std::function<bool (const QJsonValue&, const QJsonValue&)>>& ctxFilters, QVector<std::function<bool (const QJsonValue&)>>& filterFns, 
                        int bracketGroupId)
                 : tk(tokens), kb(keyBuilder), contextFilters(ctxFilters), 
@@ -51,11 +51,11 @@ namespace json_query::json_path
 
         class EmbeddedBracketSink {
         public:
-            QVector<Token>&   tk;
+            std::vector<Token>&   tk;
             KeyBuilder&       kb;
             int               currentBracketGroupId;
 
-            EmbeddedBracketSink(QVector<Token>& tokens, KeyBuilder& keyBuilder, int bracketGroupId)
+            EmbeddedBracketSink(std::vector<Token>& tokens, KeyBuilder& keyBuilder, int bracketGroupId)
                 : tk(tokens), kb(keyBuilder), currentBracketGroupId(bracketGroupId) {}
 
             // Token emission methods

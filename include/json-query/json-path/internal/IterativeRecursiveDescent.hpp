@@ -308,6 +308,84 @@ public:
     }
     
     /**
+     * @brief Phase 3: Memory-optimized recursive descent with zero-copy access
+     * 
+     * Advanced optimizations:
+     * - Zero-copy object traversal using iterators
+     * - Branch prediction optimization
+     * - Cache-friendly memory access patterns
+     * - Specialized fast paths for single-field access
+     */
+    template<typename ResultCollector>
+    static std::expected<void, EvalError> evaluateIterativePhase3Optimized(
+        const QJsonValue& root,
+        QStringView targetField,
+        ResultCollector& collector) {
+        
+        // Phase 3: Use thread-local stack with optimized allocation
+        thread_local static QVector<StackFrame> optimizedStack;
+        optimizedStack.clear();
+        
+        // Reserve based on estimated depth for better memory locality
+        size_t estimatedDepth = estimateStackDepth(root);
+        optimizedStack.reserve(static_cast<qsizetype>(estimatedDepth));
+        
+        // Initialize with root
+        optimizedStack.append(StackFrame{root});
+        
+        // Phase 3: Optimized traversal loop with branch prediction hints
+        while (!optimizedStack.isEmpty()) {
+            StackFrame current = optimizedStack.takeLast();
+            
+            // Branch prediction: Most common case is Object traversal
+            if (Q_LIKELY(current.value.isObject())) {
+                const QJsonObject obj = current.value.toObject();
+                
+                // Phase 3: Direct key lookup for target field (fastest path)
+                if (Q_LIKELY(!targetField.isEmpty())) {
+                    auto it = obj.find(QString(targetField));
+                    if (Q_LIKELY(it != obj.end())) {
+                        collector.collect(it.value());
+                    }
+                }
+                
+                // Phase 3: Zero-copy iterator traversal for nested objects
+                for (auto it = obj.begin(); it != obj.end(); ++it) {
+                    const QJsonValue& value = it.value();
+                    if (Q_LIKELY(value.isObject() || value.isArray())) {
+                        optimizedStack.append(StackFrame{value});
+                    }
+                }
+            }
+            else if (Q_UNLIKELY(current.value.isArray())) {
+                const QJsonArray arr = current.value.toArray();
+                
+                // Phase 3: Reverse iteration for better cache locality
+                for (qsizetype i = arr.size() - 1; i >= 0; --i) {
+                    const QJsonValue& value = arr[i];
+                    if (Q_LIKELY(value.isObject() || value.isArray())) {
+                        optimizedStack.append(StackFrame{value});
+                    }
+                }
+            }
+        }
+        
+        return {};
+    }
+    
+    /**
+     * @brief Estimate stack depth for memory allocation optimization
+     */
+    static QT_QUERY_JSON_ALWAYS_INLINE size_t estimateStackDepth(const QJsonValue& root) {
+        if (root.isObject()) {
+            return std::min(size_t(128), size_t(root.toObject().size()) / 4 + 16);
+        } else if (root.isArray()) {
+            return std::min(size_t(128), size_t(root.toArray().size()) / 8 + 16);
+        }
+        return 16;
+    }
+    
+    /**
      * @brief Get statistics about stack usage for optimization
      */
     struct Stats {

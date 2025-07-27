@@ -120,7 +120,7 @@ struct TokenProcessingStrategy<TokenProcessingType::UnionDetection> {
             i = unionDetectionResult.nextIndex - 1;
             
             bool multiAfter = multi || addsMultiplicity(tk);
-            if (result && result->isEmpty())
+            if (result && result->empty())
                 return QJsonArray{}; // RFC 9535: empty result list when no matches
 
             multi = multiAfter;
@@ -143,7 +143,7 @@ struct TokenProcessingStrategy<TokenProcessingType::BranchUniqueSelection> {
         
         auto result = processBranchUniqueSelection(ctx, i, working, root, isLeaf);
         
-        if (result && result->isEmpty())
+        if (result && result->empty())
             return QJsonArray{}; // RFC 9535: empty result list when no matches
 
         return result;
@@ -162,7 +162,7 @@ struct TokenProcessingStrategy<TokenProcessingType::StandardFanOut> {
         // C++23 Monadic Chain - Elegant error composition for token evaluation!
         auto result = fanOut(ctx, tk, working, i)
             .and_then([&](QJsonArray&& result) -> std::expected<QJsonArray, EvalError> {
-                if (result.isEmpty()) {
+                if (result.empty()) {
                     return QJsonArray{}; // RFC 9535: empty result list when no matches
                 }
                 return std::move(result);
@@ -263,22 +263,15 @@ using TokenProcessingDispatcher = TokenProcessingDispatchTable<
 // ---------------------------------------------------------------------------
 std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
 {
-    if (ctx.tokens.isEmpty())
+    if (ctx.tokens.empty())
         return QJsonValue(QJsonValue::Undefined);
 
     // Phase 3: Path Pattern Specialization - Fast path for common patterns
-    // Conservative approach: only optimize simple, safe cases
-    if (auto patternResult = internal::PatternAwarePathEvaluator::evaluate(ctx, ctx.tokens, root)) {
-        // Pattern specialization succeeded - return optimized result
-        const QJsonArray& resultArray = *patternResult;
-        if (resultArray.isEmpty()) {
-            return QJsonValue(QJsonValue::Undefined);
-        } else if (resultArray.size() == 1) {
-            return resultArray[0]; // Single result
-        } else {
-            return QJsonValue(resultArray); // Multiple results
-        }
-    }
+    // Temporarily disabled during container migration
+    // if (auto patternResult = internal::PatternAwarePathEvaluator::evaluate(ctx, ctx.tokens, root)) {
+    //     return *patternResult;
+    // }
+
     // If pattern specialization didn't handle it, fall back to generic evaluation
 
     // Use ArrayPool for better memory management of working array
@@ -308,7 +301,7 @@ std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const 
             return std::unexpected(working.error());
         }
 
-        if (working->isEmpty())
+        if (working->empty())
             return QJsonArray{}; // RFC 9535: empty result list when no matches
     }
 
@@ -318,7 +311,7 @@ std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const 
     bool isRootSelectorOnly = (ctx.tokens.size() == 1);
     if (isRootSelectorOnly) {
         // Return the first (and only) element from the working array, which is the root document
-        if (!working->isEmpty()) {
+        if (!working->empty()) {
             return working->first();
         }
         return QJsonValue(QJsonValue::Undefined);

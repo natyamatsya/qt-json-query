@@ -2,7 +2,7 @@
 
 #include <QStringView>
 #include <QString>
-#include <QVector>
+#include <vector>
 #include <optional>
 #include <expected>
 
@@ -61,9 +61,9 @@ namespace json_query::json_path
          */
         class KeyBuilder {
         public:
-            QVector<Token>& tgt;
+            std::vector<Token>& tgt;
 
-            explicit KeyBuilder(QVector<Token>& target) : tgt(target) {}
+            explicit KeyBuilder(std::vector<Token>& target) : tgt(target) {}
 
             /**
              * Add a key token with optional space validation

@@ -114,7 +114,7 @@ template<CharacterParsingType Type>
 struct CharacterParsingStrategy {
     static std::expected<qsizetype, json_query::json_path::Error> parse(
         qsizetype pos, QStringView sv, json_query::json_path::detail::KeyBuilder& kb, 
-        QVector<json_query::json_path::Token>& tokens) = delete;
+        std::vector<json_query::json_path::Token>& tokens) = delete;
 };
 
 // Specialization for Descendant Segment parsing
@@ -122,10 +122,10 @@ template<>
 struct CharacterParsingStrategy<CharacterParsingType::DescendantSegment> {
     static std::expected<qsizetype, json_query::json_path::Error> parse(
         qsizetype pos, QStringView sv, json_query::json_path::detail::KeyBuilder& kb, 
-        QVector<json_query::json_path::Token>& tokens) {
+        std::vector<json_query::json_path::Token>& tokens) {
         
         qCDebug(json_query::json_path::jsonPathLog) << "compilePath: found descendant segment (..) at pos=" << pos;
-        tokens.append(json_query::json_path::Token{json_query::json_path::Token::Kind::Recursive});
+        tokens.emplace_back(json_query::json_path::Token{json_query::json_path::Token::Kind::Recursive});
         qsizetype newPos = pos + 2;
         if (newPos >= sv.size()) {
             return std::unexpected(json_query::json_path::Error::TrailingRecursive);
@@ -139,10 +139,10 @@ template<>
 struct CharacterParsingStrategy<CharacterParsingType::WildcardCharacter> {
     static std::expected<qsizetype, json_query::json_path::Error> parse(
         qsizetype pos, QStringView sv, json_query::json_path::detail::KeyBuilder& kb, 
-        QVector<json_query::json_path::Token>& tokens) {
+        std::vector<json_query::json_path::Token>& tokens) {
         
         qCDebug(json_query::json_path::jsonPathLog) << "compilePath: found wildcard (*) at pos=" << pos;
-        tokens.append(json_query::json_path::Token{json_query::json_path::Token::Kind::Wildcard});
+        tokens.emplace_back(json_query::json_path::Token{json_query::json_path::Token::Kind::Wildcard});
         return pos + 1;
     }
 };
@@ -152,7 +152,7 @@ template<>
 struct CharacterParsingStrategy<CharacterParsingType::DotSegment> {
     static std::expected<qsizetype, json_query::json_path::Error> parse(
         qsizetype pos, QStringView sv, json_query::json_path::detail::KeyBuilder& kb, 
-        QVector<json_query::json_path::Token>& tokens) {
+        std::vector<json_query::json_path::Token>& tokens) {
         
         return json_query::json_path::detail::parseDot(pos, sv, kb, tokens);
     }
@@ -163,10 +163,10 @@ template<>
 struct CharacterParsingStrategy<CharacterParsingType::BracketSegment> {
     static std::expected<qsizetype, json_query::json_path::Error> parse(
         qsizetype pos, QStringView sv, json_query::json_path::detail::KeyBuilder& kb, 
-        QVector<json_query::json_path::Token>& tokens) {
+        std::vector<json_query::json_path::Token>& tokens) {
         
-        // Use embedded-only bracket parsing (zero-overhead)
-        return json_query::json_path::detail::parseEmbeddedBracket(pos, sv, kb, tokens);
+        QVector<FilterFn> filterFns; // Temporary for compatibility
+        return json_query::json_path::detail::parseEmbeddedBracket(pos, sv, kb, tokens, filterFns);
     }
 };
 
@@ -175,9 +175,9 @@ template<>
 struct CharacterParsingStrategy<CharacterParsingType::BareSegment> {
     static std::expected<qsizetype, json_query::json_path::Error> parse(
         qsizetype pos, QStringView sv, json_query::json_path::detail::KeyBuilder& kb, 
-        QVector<json_query::json_path::Token>& tokens) {
+        std::vector<json_query::json_path::Token>& tokens) {
         
-        return json_query::json_path::detail::parseBare(pos, sv, kb);
+        return json_query::json_path::detail::parseBare(pos, sv, kb, tokens);
     }
 };
 
@@ -189,7 +189,7 @@ template<CharacterParsingType FirstType, CharacterParsingType... RestTypes>
 struct CharacterParsingDispatchTable<FirstType, RestTypes...> {
     static std::expected<qsizetype, json_query::json_path::Error> dispatch(
         qsizetype pos, QStringView sv, json_query::json_path::detail::KeyBuilder& kb, 
-        QVector<json_query::json_path::Token>& tokens) {
+        std::vector<json_query::json_path::Token>& tokens) {
         
         if constexpr (CharacterParsingDef<FirstType>::enabled) {
             if (CharacterParsingDef<FirstType>::matches(sv, pos)) {
@@ -207,7 +207,7 @@ template<>
 struct CharacterParsingDispatchTable<> {
     static std::expected<qsizetype, json_query::json_path::Error> dispatch(
         qsizetype pos, QStringView sv, json_query::json_path::detail::KeyBuilder& kb, 
-        QVector<json_query::json_path::Token>& tokens) {
+        std::vector<json_query::json_path::Token>& tokens) {
         
         return std::unexpected(json_query::json_path::Error::UnsupportedFilter);
     }
@@ -229,12 +229,12 @@ std::expected<json_query::json_path::Compiled, json_query::json_path::Error> com
 {
     qCDebug(json_query::json_path::jsonPathLog) << "compilePath() sv=" << sv;
     using K = json_query::json_path::Token::Kind;
-    QVector<json_query::json_path::Token> tokens;
+    std::vector<json_query::json_path::Token> tokens;
     json_query::json_path::detail::KeyBuilder kb{tokens};
 
     if (sv.isEmpty() || sv[0] != u'$')
         return std::unexpected(json_query::json_path::Error::MissingRoot);
-    tokens.append(json_query::json_path::Token{ json_query::json_path::Token::Kind::Key, 0, {}, qt_hash(sv.first(1)),
+    tokens.emplace_back(json_query::json_path::Token{ json_query::json_path::Token::Kind::Key, 0, {}, qt_hash(sv.first(1)),
                                                 sv.first(1).toString() });
 
     if (sv.size() > 1 && sv[1] != u'.' && sv[1] != u'[')
