@@ -1,23 +1,20 @@
 #pragma once
 
-#include <QVector>
-
-#include "json-query/json-pointer/JSONPointerParsing.hpp" // for Token
+#include "json-query/json-pointer/JSONPointerParsing.hpp"
+#include <vector>
 
 namespace json_query::json_pointer::detail {
 
-// Lightweight immutable view over a JSON Pointer token stream, passed
-// to pure evaluation helpers to keep their signatures symmetrical with
-// JSONPath's evaluation layer (which uses PathEvalCtx).
-class PointerEvalCtx
-{
-public:
-    using Token = json_query::json_pointer::detail::Token;
+/**
+ * @brief Evaluation context for JSON Pointer operations
+ * 
+ * Contains the parsed tokens and provides access to them during evaluation.
+ */
+struct PointerEvalCtx {
+    explicit PointerEvalCtx(const std::vector<Token>& t) noexcept : tokens{t} {}
 
-    explicit PointerEvalCtx(const QVector<Token>& t) noexcept : tokens{t} {}
-
-    // Data member is a reference – context is just a view.
-    const QVector<Token>& tokens;
+    // Core data
+    const std::vector<Token>& tokens;
 };
 
 } // namespace json_query::json_pointer::detail

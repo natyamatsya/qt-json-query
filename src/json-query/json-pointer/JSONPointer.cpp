@@ -45,7 +45,7 @@ JSONPointer::EvalResult JSONPointer::evaluate(QJsonValue const& value) const
 
 QString JSONPointer::toString() const
 {
-    if (m_tokens.isEmpty())
+    if (m_tokens.empty())
         return {};
 
     // ───────────────────────────────── capacity ─────────────────────────────────

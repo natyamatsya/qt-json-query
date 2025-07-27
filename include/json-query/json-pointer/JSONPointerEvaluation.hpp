@@ -4,6 +4,7 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QVector>
+#include <vector>
 #include "json-query/json-pointer/JSONPointerParsing.hpp"
 #include "internal/PointerEvalCtx.hpp"
 #include <expected>
@@ -36,9 +37,9 @@ enum class EvalError : std::uint8_t {
 }
 
 [[nodiscard]] inline std::expected<QJsonValue, EvalError>
-evaluatePointer(const QVector<Token>& tokens, const QJsonValue& root) noexcept
+evaluatePointer(const std::vector<Token>& tokens, const QJsonValue& root) noexcept
 {
-    if (tokens.isEmpty()) return root; // success with root value
+    if (tokens.empty()) return root; // success with root value
     QJsonValue current{ root };
     for (const Token& tk : tokens)
     {

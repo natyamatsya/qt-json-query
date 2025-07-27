@@ -1,6 +1,5 @@
 #pragma once
 #include <QJsonValue>
-#include <QVector>
 #include <optional>
 #include <expected>
 
@@ -9,6 +8,8 @@
 #include <QJsonArray>
 #include "json-query/json-pointer/JSONPointerParsing.hpp"
 #include "json-query/json-pointer/JSONPointerEvaluation.hpp"
+
+#include <vector> // added include for std::vector
 
 namespace json_query
 {
@@ -36,7 +37,8 @@ private:
     JSONPointer() = default;  // internal default ctor for factory
 
     using Token = json_query::json_pointer::detail::Token;
-    QVector<Token>   m_tokens;
+    std::vector<Token>   m_tokens; // QVector replaced with std::vector
+
 };
 
 } // namespace json_query

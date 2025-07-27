@@ -6,6 +6,7 @@
 #include <expected>
 #include <limits>
 #include <cstring>
+#include <vector>
 
 namespace json_query::json_pointer::detail {
 
@@ -69,13 +70,13 @@ enum class ParseError : std::uint8_t {
 };
 
 [[nodiscard]] inline std::expected<void, ParseError>
-parsePointer(QStringView ptr, QVector<Token>& tokens) noexcept
+parsePointer(QStringView ptr, std::vector<Token>& tokens) noexcept
 {
     tokens.clear();
     constexpr char16_t Slash{u'/'};
     if (ptr.isEmpty()) return std::expected<void,ParseError>{}; // success
     if (ptr.front() != Slash) return std::unexpected(ParseError::MissingLeadingSlash);
-    if (ptr.size() == 1) { tokens.append(Token{Token::Kind::Key, 0, QString{}}); return std::expected<void,ParseError>{}; }
+    if (ptr.size() == 1) { tokens.push_back(Token{Token::Kind::Key, 0, QString{}}); return std::expected<void,ParseError>{}; }
 
     const qsizetype approx = ptr.count(Slash);
     tokens.reserve(approx);
@@ -91,12 +92,12 @@ parsePointer(QStringView ptr, QVector<Token>& tokens) noexcept
         }
         qsizetype idx{};
         if (parseArrayIndex(decoded, idx)) {
-            tokens.append(Token{Token::Kind::Index, idx, {}});
+            tokens.push_back(Token{Token::Kind::Index, idx, {}});
         } else {
             bool digits=true; for(QChar ch:decoded){ if(ch<u'0'||ch>u'9'){digits=false;break;}}
             if(digits) return std::unexpected(ParseError::ArrayIndexOverflow);
             if(decoded.isEmpty() && !raw.isEmpty()) return std::unexpected(ParseError::InvalidEscapeSequence);
-            tokens.append(Token{Token::Kind::Key, 0, decoded});
+            tokens.push_back(Token{Token::Kind::Key, 0, decoded});
         }
         if (atEnd) break;
         begin = end + 1;

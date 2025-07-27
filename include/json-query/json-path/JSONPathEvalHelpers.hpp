@@ -7,7 +7,8 @@
 #include <QJsonValue>
 #include <QJsonArray>
 #include <QJsonObject>
-#include <QStringList>
+#include <vector>
+#include <string>
 #include <expected>
 
 namespace json_query::json_path::detail {
@@ -32,7 +33,7 @@ QJsonValue applyTrailing(json_path::FunctionType fn, const QJsonValue& v);
 // ---------------------------------------------------------------------------
 
 struct UnionDetectionResult {
-    QVector<qsizetype> unionTokens;
+    std::vector<qsizetype> unionTokens;
     bool shouldUseUnion;
     qsizetype nextIndex;
 };
@@ -44,14 +45,14 @@ struct TokenProcessingResult {
 };
 
 struct KeyCollectionResult {
-    QStringList keys;
+    std::vector<QString> keys;
     qsizetype nextIndex;
 };
 
 // Union detection micro-helpers
 bool isSelectorToken(const Token& token);
-QVector<qsizetype> collectConsecutiveSelectorTokens(const PathEvalCtx& ctx, qsizetype startIndex);
-bool areTokensFromSameBracketGroup(const PathEvalCtx& ctx, const QVector<qsizetype>& tokenIndices);
+std::vector<qsizetype> collectConsecutiveSelectorTokens(const PathEvalCtx& ctx, qsizetype startIndex);
+bool areTokensFromSameBracketGroup(const PathEvalCtx& ctx, const std::vector<qsizetype>& tokenIndices);
 UnionDetectionResult detectUnionTokens(const PathEvalCtx& ctx, qsizetype startIndex);
 
 // Union processing micro-helpers
@@ -61,19 +62,19 @@ TokenProcessingResult processSingleUnionToken(
     const QJsonArray& working, 
     const QJsonValue& root);
 
-QJsonArray mergeTokenResults(const QVector<QJsonArray>& resultArrays, const QJsonValue& root);
+QJsonArray mergeTokenResults(const std::vector<QJsonArray>& resultArrays, const QJsonValue& root);
 
 std::expected<QJsonArray, EvalError> processUnionTokens(
     const PathEvalCtx& ctx, 
-    const QVector<qsizetype>& unionTokens, 
+    const std::vector<qsizetype>& unionTokens, 
     const QJsonArray& working, 
     const QJsonValue& root);
 
 // Branch selection micro-helpers
 KeyCollectionResult collectKeysFromTokens(const PathEvalCtx& ctx, qsizetype startIndex);
-bool objectContainsAllKeys(const QJsonObject& obj, const QStringList& keys);
-void processObjectForLeafSelection(const QJsonObject& obj, const QStringList& keys, const QJsonValue& v, QJsonArray* results);
-void processObjectForNonLeafSelection(const QJsonObject& obj, const QStringList& keys, const QJsonValue& v, QJsonArray* results);
+bool objectContainsAllKeys(const QJsonObject& obj, const std::vector<QString>& keys);
+void processObjectForLeafSelection(const QJsonObject& obj, const std::vector<QString>& keys, const QJsonValue& v, QJsonArray* results);
+void processObjectForNonLeafSelection(const QJsonObject& obj, const std::vector<QString>& keys, const QJsonValue& v, QJsonArray* results);
 QJsonArray deduplicateJsonValues(const QJsonArray& input, const QJsonValue& root);
 
 std::expected<QJsonArray, EvalError> processBranchUniqueSelection(

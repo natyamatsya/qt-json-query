@@ -201,26 +201,17 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::KeyList>(const PathEvalCt
     
     const QJsonObject obj = v.toObject();
     const QStringList keys = tk.key.split(u'\n');
-    
-    // Use stack-allocated selection object to minimize heap allocations
-    QJsonObject selection;
-    // Note: QJsonObject doesn't support reserve() - capacity management is internal
+    auto pooledArray = acquirePooledArray();
+    QJsonArray& results = *pooledArray;
     
     for (const QString& key : keys) {
         if (obj.contains(key)) {
-            selection.insert(key, obj[key]);
+            results.append(obj.value(key));
         }
     }
     
-    if (selection.isEmpty()) {
-        return QJsonArray{}; // Empty result if no keys found
-    }
-    
-    // Use ArrayPool for result construction
-    auto pooledArray = acquirePooledArray();
-    QJsonArray& result = *pooledArray;
-    result.append(selection);
-    return QJsonArray(result);
+    // Return copy since pooled array will be returned to pool
+    return QJsonArray(results);
 }
 
 } // namespace json_query::json_path::detail

@@ -9,7 +9,7 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QJsonValue>
-#include <QStringList>
+#include <vector>
 #include <QSet>
 #include <QDebug>
 #include <algorithm>
@@ -340,8 +340,8 @@ template<>
 struct UnionProcessingDef<UnionProcessingType::EmptyUnion> {
     static constexpr bool enabled = true;
     
-    static bool matches(const QVector<qsizetype>& unionTokens) {
-        return unionTokens.isEmpty();
+    static bool matches(const std::vector<qsizetype>& unionTokens) {
+        return unionTokens.empty();
     }
 };
 
@@ -350,7 +350,7 @@ template<>
 struct UnionProcessingDef<UnionProcessingType::SingleToken> {
     static constexpr bool enabled = true;
     
-    static bool matches(const QVector<qsizetype>& unionTokens) {
+    static bool matches(const std::vector<qsizetype>& unionTokens) {
         return unionTokens.size() == 1;
     }
 };
@@ -360,7 +360,7 @@ template<>
 struct UnionProcessingDef<UnionProcessingType::MultipleTokens> {
     static constexpr bool enabled = true;
     
-    static bool matches(const QVector<qsizetype>& unionTokens) {
+    static bool matches(const std::vector<qsizetype>& unionTokens) {
         return unionTokens.size() > 1;
     }
 };
@@ -375,7 +375,7 @@ template<UnionProcessingType Type>
 struct UnionProcessingStrategy {
     static std::expected<QJsonArray, EvalError> process(
         const PathEvalCtx& ctx, 
-        const QVector<qsizetype>& unionTokens, 
+        const std::vector<qsizetype>& unionTokens, 
         const QJsonArray& working, 
         const QJsonValue& root)
     {
@@ -389,7 +389,7 @@ template<>
 struct UnionProcessingStrategy<UnionProcessingType::EmptyUnion> {
     static std::expected<QJsonArray, EvalError> process(
         const PathEvalCtx& ctx, 
-        const QVector<qsizetype>& unionTokens, 
+        const std::vector<qsizetype>& unionTokens, 
         const QJsonArray& working, 
         const QJsonValue& root)
     {
@@ -404,7 +404,7 @@ template<>
 struct UnionProcessingStrategy<UnionProcessingType::SingleToken> {
     static std::expected<QJsonArray, EvalError> process(
         const PathEvalCtx& ctx, 
-        const QVector<qsizetype>& unionTokens, 
+        const std::vector<qsizetype>& unionTokens, 
         const QJsonArray& working, 
         const QJsonValue& root)
     {
@@ -429,7 +429,7 @@ template<>
 struct UnionProcessingStrategy<UnionProcessingType::MultipleTokens> {
     static std::expected<QJsonArray, EvalError> process(
         const PathEvalCtx& ctx, 
-        const QVector<qsizetype>& unionTokens, 
+        const std::vector<qsizetype>& unionTokens, 
         const QJsonArray& working, 
         const QJsonValue& root)
     {
@@ -437,7 +437,7 @@ struct UnionProcessingStrategy<UnionProcessingType::MultipleTokens> {
         qCDebug(jsonPathLog) << "[UnionProcessing::MultipleTokens] Processing" << unionTokens.size() << "tokens";
         
         // Monadic approach: Transform union tokens into results using monadic chaining
-        QVector<QJsonArray> resultArrays;
+        std::vector<QJsonArray> resultArrays;
         resultArrays.reserve(unionTokens.size());
         
         // Use monadic pattern to process each token and collect successful results
@@ -458,7 +458,7 @@ struct UnionProcessingStrategy<UnionProcessingType::MultipleTokens> {
         EvalError lastError = EvalError::TypeMismatchObject;
         for (qsizetype tokenIdx : unionTokens) {
             if (auto result = processToken(tokenIdx)) {
-                resultArrays.append(*result);
+                resultArrays.push_back(*result);
             } else {
                 // Track last error for potential failure case
                 auto tokenResult = processSingleUnionToken(ctx, tokenIdx, working, root);
@@ -469,7 +469,7 @@ struct UnionProcessingStrategy<UnionProcessingType::MultipleTokens> {
         }
         
         // Monadic error handling: Only fail if ALL tokens failed
-        if (resultArrays.isEmpty()) {
+        if (resultArrays.empty()) {
             qCDebug(jsonPathLog) << "[UnionProcessing::MultipleTokens] All tokens failed, returning last error" << static_cast<int>(lastError);
             return std::unexpected(lastError);
         }
@@ -491,7 +491,7 @@ template<UnionProcessingType FirstType, UnionProcessingType... RestTypes>
 struct UnionProcessingDispatchTable {
     static std::expected<QJsonArray, EvalError> dispatch(
         const PathEvalCtx& ctx, 
-        const QVector<qsizetype>& unionTokens, 
+        const std::vector<qsizetype>& unionTokens, 
         const QJsonArray& working, 
         const QJsonValue& root) {
         
@@ -517,7 +517,7 @@ template<UnionProcessingType FirstType>
 struct UnionProcessingDispatchTable<FirstType> {
     static std::expected<QJsonArray, EvalError> dispatch(
         const PathEvalCtx& ctx, 
-        const QVector<qsizetype>& unionTokens, 
+        const std::vector<qsizetype>& unionTokens, 
         const QJsonArray& working, 
         const QJsonValue& root) {
         
@@ -553,7 +553,7 @@ using UnionProcessingDispatcher = UnionProcessingDispatchTable<
  */
 std::expected<QJsonArray, EvalError> processUnionTokens(
     const PathEvalCtx& ctx, 
-    const QVector<qsizetype>& unionTokens, 
+    const std::vector<qsizetype>& unionTokens, 
     const QJsonArray& working, 
     const QJsonValue& root)
 {
@@ -575,15 +575,15 @@ bool isSelectorToken(const Token& token) {
 }
 
 // Helper: Collect consecutive selector tokens starting from a given index
-QVector<qsizetype> collectConsecutiveSelectorTokens(const PathEvalCtx& ctx, qsizetype startIndex) {
-    QVector<qsizetype> unionTokens;
-    unionTokens.append(startIndex);
+std::vector<qsizetype> collectConsecutiveSelectorTokens(const PathEvalCtx& ctx, qsizetype startIndex) {
+    std::vector<qsizetype> unionTokens;
+    unionTokens.push_back(startIndex);
     
     qsizetype j = startIndex + 1;
     while (j < ctx.tokens.size()) {
         const Token& nextTk = ctx.tokens[j];
         if (isSelectorToken(nextTk)) {
-            unionTokens.append(j);
+            unionTokens.push_back(j);
             ++j;
         } else {
             break; // Stop at non-selector tokens (e.g., Recursive)
@@ -594,7 +594,7 @@ QVector<qsizetype> collectConsecutiveSelectorTokens(const PathEvalCtx& ctx, qsiz
 }
 
 // Helper: Check if all tokens are from the same bracket group
-bool areTokensFromSameBracketGroup(const PathEvalCtx& ctx, const QVector<qsizetype>& tokenIndices) {
+bool areTokensFromSameBracketGroup(const PathEvalCtx& ctx, const std::vector<qsizetype>& tokenIndices) {
     if (tokenIndices.size() <= 1) return false;
     
     int firstBracketGroupId = ctx.tokens[tokenIndices[0]].bracketGroupId;
@@ -615,7 +615,7 @@ bool areTokensFromSameBracketGroup(const PathEvalCtx& ctx, const QVector<qsizety
 }
 
 UnionDetectionResult detectUnionTokens(const PathEvalCtx& ctx, qsizetype startIndex) {
-    QVector<qsizetype> unionTokens = collectConsecutiveSelectorTokens(ctx, startIndex);
+    std::vector<qsizetype> unionTokens = collectConsecutiveSelectorTokens(ctx, startIndex);
     bool shouldUseUnion = areTokensFromSameBracketGroup(ctx, unionTokens);
     qsizetype nextIndex = startIndex + unionTokens.size();
     
@@ -683,7 +683,7 @@ TokenProcessingResult processSingleUnionToken(
 }
 
 // Helper: Merge results from multiple tokens using simple concatenation
-QJsonArray mergeTokenResults(const QVector<QJsonArray>& resultArrays, const QJsonValue& root) {
+QJsonArray mergeTokenResults(const std::vector<QJsonArray>& resultArrays, const QJsonValue& root) {
     QJsonArray collectedResults;
     
     // Simple concatenation approach - avoid complex cursor logic that may cause infinite loops
@@ -697,7 +697,7 @@ QJsonArray mergeTokenResults(const QVector<QJsonArray>& resultArrays, const QJso
 }
 
 // Helper: Check if an object contains all required keys
-bool objectContainsAllKeys(const QJsonObject& obj, const QStringList& keys)
+bool objectContainsAllKeys(const QJsonObject& obj, const std::vector<QString>& keys)
 {
     for (const QString& key : keys) {
         if (!obj.contains(key)) {
@@ -708,7 +708,7 @@ bool objectContainsAllKeys(const QJsonObject& obj, const QStringList& keys)
 }
 
 // Helper: Process object for leaf selection
-void processObjectForLeafSelection(const QJsonObject& obj, const QStringList& keys, const QJsonValue& v, QJsonArray* results)
+void processObjectForLeafSelection(const QJsonObject& obj, const std::vector<QString>& keys, const QJsonValue& v, QJsonArray* results)
 {
     if (!objectContainsAllKeys(obj, keys)) {
         return;
@@ -719,12 +719,12 @@ void processObjectForLeafSelection(const QJsonObject& obj, const QStringList& ke
         results->append(v);
     } else {
         // Single-property leaf: return only the value, not the parent
-        results->append(obj.value(keys.first()));
+        results->append(obj.value(keys[0]));
     }
 }
 
 // Helper: Process object for non-leaf selection
-void processObjectForNonLeafSelection(const QJsonObject& obj, const QStringList& keys, const QJsonValue& v, QJsonArray* results)
+void processObjectForNonLeafSelection(const QJsonObject& obj, const std::vector<QString>& keys, const QJsonValue& v, QJsonArray* results)
 {
     for (const QString& key : keys) {
         if (obj.contains(key)) {
@@ -763,10 +763,10 @@ std::expected<QJsonArray, EvalError> processBranchUniqueSelection(
     bool isLeaf)
 {
     auto keyResult = collectKeysFromTokens(ctx, i);
-    const QStringList& keys = keyResult.keys;
+    const std::vector<QString>& keys = keyResult.keys;
     i = keyResult.nextIndex;
     
-    if (keys.isEmpty()) {
+    if (keys.empty()) {
         return std::unexpected(EvalError::KeyNotFound);
     }
     
@@ -842,16 +842,19 @@ QJsonValue applyTrailing(json_path::FunctionType fn, const QJsonValue& v)
 // Helper: Collect keys from consecutive Key/KeyList tokens
 KeyCollectionResult collectKeysFromTokens(const PathEvalCtx& ctx, qsizetype startIndex)
 {
-    QStringList keys;
+    std::vector<QString> keys;
     qsizetype i = startIndex;
     
     while (i < ctx.tokens.size()) {
         const Token& token = ctx.tokens[i];
         if (token.kind == Token::Kind::Key) {
-            keys.append(token.key);
+            keys.push_back(token.key);
             ++i;
         } else if (token.kind == Token::Kind::KeyList) {
-            keys.append(token.key.split(u'\n'));
+            QStringList keyList = token.key.split(u'\n');
+            for (const QString& key : keyList) {
+                keys.push_back(key);
+            }
             ++i;
         } else {
             break;
