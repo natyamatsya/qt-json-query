@@ -39,7 +39,7 @@ QJsonObject createTestDocument() {
 }
 
 int main() {
-    QJsonObject testDoc = createTestDocument();
+    auto testDoc = createTestDocument();
     
     // Test cases that showed high overhead
     std::vector<std::pair<std::string, std::string>> testCases = {
@@ -50,7 +50,7 @@ int main() {
         {"Recursive", "$..name"}
     };
     
-    const int iterations = 10000;
+    const auto iterations = 10000;
     
     for (const auto& [name, path] : testCases) {
         std::cout << "\n=== Profiling: " << name << " (" << path << ") ===" << std::endl;

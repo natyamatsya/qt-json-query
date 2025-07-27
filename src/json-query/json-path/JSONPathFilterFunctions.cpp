@@ -17,8 +17,8 @@ QJsonValue evaluateFunction(const QString& funcCall, const QJsonValue& context)
 {
     // Refactored to use explicit error handling for JSONPath evaluation
     auto parseFunctionSyntax = [](const QString& expr) -> std::optional<std::pair<QString, QString>> {
-        int openParen = expr.indexOf('(');
-        int closeParen = expr.lastIndexOf(')');
+        auto openParen = expr.indexOf('(');
+        auto closeParen = expr.lastIndexOf(')');
         if (openParen == -1 || closeParen == -1) {
             return std::nullopt; // Invalid function syntax
         }
@@ -74,7 +74,7 @@ QJsonValue evaluateFunction(const QString& funcCall, const QJsonValue& context)
             return {}; // Return null for multiple results (RFC 9535 "nothing")
         } else if (args.startsWith("@.")) {
             const auto prop{args.mid(2)};
-            QJsonValue val = context.toObject().value(prop);
+            auto val = context.toObject().value(prop);
             return val.isUndefined() ? QJsonValue() : val;
         } else if (args == "@") {
             return context;
@@ -117,7 +117,7 @@ QJsonValue parseJsonLiteral(const QString& value)
     
     auto parseNumber = [](const QString& s) -> std::optional<QJsonValue> {
         bool ok;
-        double num = s.toDouble(&ok);
+        auto num = s.toDouble(&ok);
         return ok ? std::optional<QJsonValue>{QJsonValue{num}} : std::nullopt;
     };
     
@@ -147,8 +147,8 @@ int compareValues(const QJsonValue& left, const QJsonValue& right)
     
     // Handle numbers
     if (left.isDouble() && right.isDouble()) {
-        double l = left.toDouble();
-        double r = right.toDouble();
+        auto l = left.toDouble();
+        auto r = right.toDouble();
         if (l < r) return -1;
         if (l > r) return 1;
         return 0;
@@ -161,8 +161,8 @@ int compareValues(const QJsonValue& left, const QJsonValue& right)
     
     // Handle booleans
     if (left.isBool() && right.isBool()) {
-        bool l = left.toBool();
-        bool r = right.toBool();
+        auto l = left.toBool();
+        auto r = right.toBool();
         if (l == r) return 0;
         return l ? 1 : -1; // true > false
     }
@@ -185,15 +185,15 @@ std::optional<Token> parseFunction(const QString& s, std::vector<FilterFn>& out)
         const auto right{to_qstr(m.template get<3>().to_view()).trimmed()};
         
         // Check if either side contains a function call
-        bool leftHasFunc = left.contains("(") && left.contains(")");
-        bool rightHasFunc = right.contains("(") && right.contains(")");
+        auto leftHasFunc = left.contains("(") && left.contains(")");
+        auto rightHasFunc = right.contains("(") && right.contains(")");
         
         if (!leftHasFunc && !rightHasFunc) {
             return std::nullopt; // No function calls found
         }
         
         // Check if any function call needs root context (value($...))
-        bool needsRootContext = false;
+        auto needsRootContext = false;
         if (leftHasFunc && left.contains("value($")) needsRootContext = true;
         if (rightHasFunc && right.contains("value($")) needsRootContext = true;
         
@@ -212,7 +212,7 @@ std::optional<Token> parseFunction(const QString& s, std::vector<FilterFn>& out)
             } else if (left.startsWith("@.")) {
                 // Property access - RFC 9535 "nothing" semantics
                 const auto prop{left.mid(2)};
-                QJsonValue val = j.toObject().value(prop);
+                auto val = j.toObject().value(prop);
                 leftVal = val.isUndefined() ? QJsonValue{0} : val; // Undefined becomes 0
             } else {
                 leftVal = parseJsonLiteral(left);
@@ -224,7 +224,7 @@ std::optional<Token> parseFunction(const QString& s, std::vector<FilterFn>& out)
             } else if (right.startsWith("@.")) {
                 // Property access - RFC 9535 "nothing" semantics
                 const auto prop{right.mid(2)};
-                QJsonValue val = j.toObject().value(prop);
+                auto val = j.toObject().value(prop);
                 rightVal = val.isUndefined() ? QJsonValue{0} : val; // Undefined becomes 0
             } else {
                 rightVal = parseJsonLiteral(right);

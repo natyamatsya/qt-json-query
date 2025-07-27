@@ -72,9 +72,9 @@ bool ErrorHandlingDispatchTable<FirstStrategy, RestStrategies...>::processWithSt
     const Token& tk, qsizetype tokenPos, const detail::PathEvalCtx& ctx,
     const QJsonArray& src, const StreamerType& streamer) {
     
-    bool anySuccess = false;
+    auto anySuccess = false;
     EvalError lastError = EvalError::TypeMismatchObject; // Default error
-    bool shouldEarlyReturn = false;
+    auto shouldEarlyReturn = false;
     
     for (const auto& srcValue : src) {
         // Use compile-time dispatch to eliminate runtime switch overhead

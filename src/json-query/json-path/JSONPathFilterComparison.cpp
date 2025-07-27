@@ -18,7 +18,7 @@ bool compareValue<ComparisonType::Numeric>(const QJsonValue& v, const QString& o
         if (op == "!=") return true;
         return false;
     }
-    const double val = v.toDouble();
+    const auto val = v.toDouble();
     
     if (op == "==") return qFuzzyCompare(val, numVal);
     if (op == "!=") return !qFuzzyCompare(val, numVal);
@@ -38,7 +38,7 @@ bool compareValue<ComparisonType::Boolean>(const QJsonValue& v, const QString& o
         if (op == "!=") return true;
         return false;
     }
-    const bool val = v.toBool();
+    const auto val = v.toBool();
     
     if (op == "==") return val == boolVal;
     if (op == "!=") return val != boolVal;
@@ -76,7 +76,7 @@ bool compareValue<ComparisonType::String>(const QJsonValue& v, const QString& op
         if (op == "!=") return true;
         return false;
     }
-    const QString val = v.toString();
+    const auto val = v.toString();
     
     if (op == "==") return val == rhs;
     if (op == "!=") return val != rhs;
@@ -97,7 +97,7 @@ bool compareValue<ComparisonType::DeepEquality>(const QJsonValue& v, const QStri
         return false; // Invalid JSON
     }
     
-    const QJsonValue rhsValue = doc.isArray() ? QJsonValue{doc.array()} : QJsonValue{doc.object()};
+    const auto rhsValue = doc.isArray() ? QJsonValue{doc.array()} : QJsonValue{doc.object()};
     if (op == "==") return v == rhsValue;
     if (op == "!=") return v != rhsValue;
     return false; // Deep equality only supports == and !=
@@ -124,12 +124,12 @@ bool ComparisonContext::compare(const QJsonValue& v) const
 // Monadic helper to parse and classify RHS values, eliminating if-else cascades
 [[nodiscard]] std::optional<ComparisonContext> parseRhsValue(const QString& op, QString rhs)
 {
-    const bool isNum = isValidJsonNumber(rhs);
-    const bool isBool = (rhs == "true" || rhs == "false");
-    const bool isNull = (rhs == "null");
+    const auto isNum = isValidJsonNumber(rhs);
+    const auto isBool = (rhs == "true" || rhs == "false");
+    const auto isNull = (rhs == "null");
     
     // Check if RHS is quoted (for string vs deep equality distinction)
-    bool rhsQuoted = false;
+    auto rhsQuoted = false;
     if ((rhs.startsWith('"') && rhs.endsWith('"')) || 
         (rhs.startsWith('\'') && rhs.endsWith('\''))) {
         rhsQuoted = true;
@@ -152,7 +152,7 @@ bool ComparisonContext::compare(const QJsonValue& v) const
     };
     
     auto parseString = [&]() -> std::optional<ComparisonContext> {
-        QString processedRhs = rhs;
+        auto processedRhs = rhs;
         if (!isNum && !isBool && !isNull) {
             // Only accept quoted strings or valid unquoted literals
             if (!rhsQuoted) {

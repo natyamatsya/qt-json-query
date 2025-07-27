@@ -33,8 +33,8 @@ template<auto PAT>
 [[nodiscard]] std::optional<json_query::json_path::Token> parseSelfValue(QString s, std::vector<json_query::json_path::FilterFn>& out)
 {
     if (const auto match = ctre::match<PAT>(to_sv(s))) {
-        const QString op = to_qstr(match.template get<1>().to_view());
-        const QString value = to_qstr(match.template get<2>().to_view());
+        const auto op = to_qstr(match.template get<1>().to_view());
+        const auto value = to_qstr(match.template get<2>().to_view());
         
         return parseRhsValue(op, value)
             .and_then([&](const ComparisonContext& ctx) -> std::optional<json_query::json_path::Token> {
@@ -54,7 +54,7 @@ template<auto PAT>
                         
                     case ComparisonType::Null:
                         return b.add([op = ctx.op](const QJsonValue& j) {
-                            bool isJNull = j.isNull();
+                            auto isJNull = j.isNull();
                             // Null only supports equality comparisons
                             if (op == "==") return isJNull;
                             if (op == "!=") return !isJNull;
@@ -77,9 +77,9 @@ template<auto PAT>
 [[nodiscard]] std::optional<json_query::json_path::Token> parseCompare1(QString s, std::vector<json_query::json_path::FilterFn>& out)
 {
     if (const auto match = ctre::match<PAT>(to_sv(s))) {
-        const QString prop = to_qstr(match.template get<1>().to_view());
-        const QString op = to_qstr(match.template get<2>().to_view());
-        const QString rhs = to_qstr(match.template get<3>().to_view());
+        const auto prop = to_qstr(match.template get<1>().to_view());
+        const auto op = to_qstr(match.template get<2>().to_view());
+        const auto rhs = to_qstr(match.template get<3>().to_view());
         
         return parseRhsValue(op, rhs)
             .and_then([&](const ComparisonContext& ctx) -> std::optional<json_query::json_path::Token> {
@@ -98,9 +98,9 @@ template<auto PAT>
 [[nodiscard]] std::optional<json_query::json_path::Token> parseCompareIndex(QString s, std::vector<json_query::json_path::FilterFn>& out)
 {
     if (const auto match = ctre::match<PAT>(to_sv(s))) {
-        const QString prop = to_qstr(match.template get<1>().to_view());
-        const QString op = to_qstr(match.template get<2>().to_view());
-        const QString rhs = to_qstr(match.template get<3>().to_view());
+        const auto prop = to_qstr(match.template get<1>().to_view());
+        const auto op = to_qstr(match.template get<2>().to_view());
+        const auto rhs = to_qstr(match.template get<3>().to_view());
         
         return parseRhsValue(op, rhs)
             .and_then([&](const ComparisonContext& ctx) -> std::optional<json_query::json_path::Token> {
@@ -108,7 +108,7 @@ template<auto PAT>
                 return b.add([prop, ctx](const QJsonValue& j){
                     // Convert prop to integer for array index access
                     bool ok;
-                    int index = prop.toInt(&ok);
+                    auto index = prop.toInt(&ok);
                     if (!ok) return false; // Invalid index
                     
                     // Array index access: only works on arrays, not objects
@@ -137,8 +137,8 @@ template<auto PAT>
 [[nodiscard]] std::optional<json_query::json_path::Token> parseRegex1(QString s, std::vector<json_query::json_path::FilterFn>& out)
 {
     if (const auto match = ctre::match<PAT>(to_sv(s))) {
-        const QString prop = to_qstr(match.template get<1>().to_view());
-        QString pattern = to_qstr(match.template get<2>().to_view());
+        const auto prop = to_qstr(match.template get<1>().to_view());
+        auto pattern = to_qstr(match.template get<2>().to_view());
         
         if (!unquote(pattern)) return std::nullopt;
         
@@ -160,8 +160,8 @@ template<auto PAT>
 [[nodiscard]] std::optional<json_query::json_path::Token> parseSelfCompare(QString s, std::vector<json_query::json_path::FilterFn>& out)
 {
     if (const auto match = ctre::match<PAT>(to_sv(s))) {
-        const QString op = to_qstr(match.template get<1>().to_view());
-        const QString rhs = to_qstr(match.template get<2>().to_view());
+        const auto op = to_qstr(match.template get<1>().to_view());
+        const auto rhs = to_qstr(match.template get<2>().to_view());
         
         return parseRhsValue(op, rhs)
             .and_then([&](const ComparisonContext& ctx) -> std::optional<json_query::json_path::Token> {
@@ -181,7 +181,7 @@ template<auto PAT>
                         
                     case ComparisonType::Null:
                         return b.add([op = ctx.op](const QJsonValue& j) {
-                            bool isJNull = j.isNull();
+                            auto isJNull = j.isNull();
                             // Null only supports equality comparisons
                             if (op == "==") return isJNull;
                             if (op == "!=") return !isJNull;
@@ -204,8 +204,8 @@ template<auto PAT>
 [[nodiscard]] std::optional<json_query::json_path::Token> parseSelfCompareIndex(QString s, std::vector<json_query::json_path::FilterFn>& out)
 {
     if (const auto match = ctre::match<PAT>(to_sv(s))) {
-        const QString op = to_qstr(match.template get<1>().to_view());
-        const QString rhs = to_qstr(match.template get<2>().to_view());
+        const auto op = to_qstr(match.template get<1>().to_view());
+        const auto rhs = to_qstr(match.template get<2>().to_view());
         
         return parseRhsValue(op, rhs)
             .and_then([&](const ComparisonContext& ctx) -> std::optional<json_query::json_path::Token> {
@@ -225,7 +225,7 @@ template<auto PAT>
                         
                     case ComparisonType::Null:
                         return b.add([op = ctx.op](const QJsonValue& j) {
-                            bool isJNull = j.isNull();
+                            auto isJNull = j.isNull();
                             // Null only supports equality comparisons
                             if (op == "==") return isJNull;
                             if (op == "!=") return !isJNull;
@@ -248,8 +248,8 @@ template<auto PAT>
 [[nodiscard]] std::optional<json_query::json_path::Token> parseNullCompare(QString s, std::vector<json_query::json_path::FilterFn>& out)
 {
     if (const auto match = ctre::match<PAT>(to_sv(s))) {
-        const QString prop = to_qstr(match.template get<1>().to_view());
-        const QString op = to_qstr(match.template get<2>().to_view());
+        const auto prop = to_qstr(match.template get<1>().to_view());
+        const auto op = to_qstr(match.template get<2>().to_view());
         
         ComparisonContext ctx;
         ctx.op = op;
@@ -269,8 +269,8 @@ template<auto PAT>
 [[nodiscard]] std::optional<json_query::json_path::Token> parseNullCompareIndex(QString s, std::vector<json_query::json_path::FilterFn>& out)
 {
     if (const auto match = ctre::match<PAT>(to_sv(s))) {
-        const QString prop = to_qstr(match.template get<1>().to_view());
-        const QString op = to_qstr(match.template get<2>().to_view());
+        const auto prop = to_qstr(match.template get<1>().to_view());
+        const auto op = to_qstr(match.template get<2>().to_view());
         
         ComparisonContext ctx;
         ctx.op = op;
@@ -280,7 +280,7 @@ template<auto PAT>
         return Builder{out}.add([prop, ctx](const QJsonValue& j){
             // Convert prop to integer for array index access
             bool ok;
-            int index = prop.toInt(&ok);
+            auto index = prop.toInt(&ok);
             if (!ok) return false; // Invalid index
             
             // Array index access: only works on arrays, not objects
@@ -324,9 +324,9 @@ template<ctll::fixed_string Pattern>
 std::optional<Token> parseEmbeddedCompare1(const QString& s)
 {
     if (auto m = ctre::match<Pattern>(to_sv(s))) {
-        const QString prop = to_qstr(m.template get<1>().to_view());
-        const QString op = to_qstr(m.template get<2>().to_view());
-        const QString rhs = to_qstr(m.template get<3>().to_view());
+        const auto prop = to_qstr(m.template get<1>().to_view());
+        const auto op = to_qstr(m.template get<2>().to_view());
+        const auto rhs = to_qstr(m.template get<3>().to_view());
         
         // Parse RHS value using existing comparison context logic
         auto ctx{parseRhsValue(op, rhs)};
@@ -352,16 +352,16 @@ template<ctll::fixed_string Pattern>
 std::optional<Token> parseEmbeddedCompareIndex(const QString& s)
 {
     if (auto m = ctre::match<Pattern>(to_sv(s))) {
-        const QString indexStr = to_qstr(m.template get<1>().to_view());
-        const QString op = to_qstr(m.template get<2>().to_view());
-        const QString rhs = to_qstr(m.template get<3>().to_view());
+        const auto indexStr = to_qstr(m.template get<1>().to_view());
+        const auto op = to_qstr(m.template get<2>().to_view());
+        const auto rhs = to_qstr(m.template get<3>().to_view());
         
         // Parse RHS value using existing comparison context logic
         auto ctx{parseRhsValue(op, rhs)};
         if (!ctx) return std::nullopt;
         
         bool ok;
-        int index = indexStr.toInt(&ok);
+        auto index = indexStr.toInt(&ok);
         if (!ok) return std::nullopt;
         
         Token token;
@@ -386,8 +386,8 @@ template<ctll::fixed_string Pattern>
 std::optional<Token> parseEmbeddedSelfValue(const QString& s)
 {
     if (auto m = ctre::match<Pattern>(to_sv(s))) {
-        const QString op = to_qstr(m.template get<1>().to_view());
-        const QString rhs = to_qstr(m.template get<2>().to_view());
+        const auto op = to_qstr(m.template get<1>().to_view());
+        const auto rhs = to_qstr(m.template get<2>().to_view());
         
         // Parse RHS value using existing comparison context logic
         auto ctx{parseRhsValue(op, rhs)};
@@ -411,8 +411,8 @@ template<ctll::fixed_string Pattern>
 std::optional<Token> parseEmbeddedRegex1(const QString& s)
 {
     if (auto m = ctre::match<Pattern>(to_sv(s))) {
-        const QString prop = to_qstr(m.template get<1>().to_view());
-        const QString pattern = to_qstr(m.template get<2>().to_view());
+        const auto prop = to_qstr(m.template get<1>().to_view());
+        const auto pattern = to_qstr(m.template get<2>().to_view());
         
         // Create regex object
         QRegularExpression regex(pattern);

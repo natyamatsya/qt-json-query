@@ -24,7 +24,7 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::Key>(const PathEvalCtx& /
         return emptyResult(); // Empty result for non-objects
     }
     
-    const QJsonObject obj = v.toObject();
+    const auto obj = v.toObject();
     const auto it{obj.find(tk.key)};
     if (it == obj.end()) {
         return emptyResult(); // Key not found
@@ -51,7 +51,7 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::Index>(const PathEvalCtx&
     }
     
     const QJsonArray arr = v.toArray(); // Create copy to avoid iterator invalidation
-    const int idx = normalizeIndex(tk.index, arr.size());
+    const auto idx = normalizeIndex(tk.index, arr.size());
     
     // RFC 9535 compliance: "Nothing is selected, and it is not an error, if the index lies outside the range of the array"
     if (idx < 0 || idx >= arr.size()) {
@@ -107,10 +107,10 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::Recursive>(const PathEval
                                                                    const QJsonValue& v)
 {
     // Phase 2 optimization: Build path hint for pattern detection
-    QString pathHint = QStringLiteral("$..");
+    auto pathHint = QStringLiteral("$..");
     
     // Look ahead in token stream to detect common patterns like "$..title"
-    qsizetype currentPos = -1;
+    auto currentPos = -1;
     for (qsizetype i = 0; i < ctx.tokens.size(); ++i) {
         if (&ctx.tokens[i] == &tk) {
             currentPos = i;
@@ -154,10 +154,10 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::Filter>(const PathEvalCtx
     // Check for embedded filters (zero-overhead)
     if (tk.hasEmbeddedFilter()) {
         // Pre-compute context requirement check to avoid repeated string operations
-        const bool needsRootContext = tk.key.contains("value($");
+        const auto needsRootContext = tk.key.contains("value($");
         
         if (v.isArray()) {
-            const QJsonArray arr = v.toArray();
+            const auto arr = v.toArray();
             
             for (const auto& item : arr) {
                 const bool pass = needsRootContext ? 
@@ -168,7 +168,7 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::Filter>(const PathEvalCtx
                 }
             }
         } else if (v.isObject()) {
-            const QJsonObject obj = v.toObject();
+            const auto obj = v.toObject();
             
             auto cursor{ContainerCursor::object(obj)};
             for (const auto& val : cursor) {
@@ -200,7 +200,7 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::KeyList>(const PathEvalCt
         return emptyResult(); // Empty result for non-objects
     }
     
-    const QJsonObject obj = v.toObject();
+    const auto obj = v.toObject();
     const QStringList keys = tk.key.split(u'\n');
     auto pooledArray{acquirePooledArray()};
     QJsonArray& results = *pooledArray;

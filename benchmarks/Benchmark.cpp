@@ -104,7 +104,7 @@ static void BM_Plain_Simple(benchmark::State &state)
     QJsonDocument doc = prepareTestDocument();
     for (auto _ : state)
     {
-        const QJsonObject root = doc.object();
+        const auto root = doc.object();
         benchmark::DoNotOptimize(root.value("name").toString());
     }
 }
@@ -115,8 +115,8 @@ static void BM_Plain_Nested(benchmark::State &state)
     QJsonDocument doc = prepareTestDocument();
     for (auto _ : state)
     {
-        const QJsonObject root = doc.object();
-        const QString city = root.value("location").toObject().value("city").toString();
+        const auto root = doc.object();
+        const auto city = root.value("location").toObject().value("city").toString();
         benchmark::DoNotOptimize(city.constData());
     }
 }
@@ -127,8 +127,8 @@ static void BM_Plain_Array(benchmark::State &state)
     QJsonDocument doc = prepareTestDocument();
     for (auto _ : state)
     {
-        const QJsonArray inv = doc.object().value("inventory").toArray();
-        const QString title = inv.at(5).toObject().value("title").toString();
+        const auto inv = doc.object().value("inventory").toArray();
+        const auto title = inv.at(5).toObject().value("title").toString();
         benchmark::DoNotOptimize(title.constData());
     }
 }
@@ -140,10 +140,10 @@ static void BM_Plain_Filter(benchmark::State &state)
     for (auto _ : state)
     {
         QStringList titles;
-        const QJsonArray inv = doc.object().value("inventory").toArray();
+        const auto inv = doc.object().value("inventory").toArray();
         for (const QJsonValue &v : inv)
         {
-            const QJsonObject o = v.toObject();
+            const auto o = v.toObject();
             if (o.value("price").toDouble() > 20)
                 titles << o.value("title").toString();
         }
@@ -158,10 +158,10 @@ static void BM_Plain_Recursive(benchmark::State &state)
     for (auto _ : state)
     {
         QStringList titles;
-        const QJsonArray inv = doc.object().value("inventory").toArray();
+        const auto inv = doc.object().value("inventory").toArray();
         for (const QJsonValue &v : inv)
         {
-            const QString t = v.toObject().value("title").toString();
+            const auto t = v.toObject().value("title").toString();
             titles << t;
         }
         benchmark::DoNotOptimize(titles);
@@ -347,7 +347,7 @@ benchmarkJsonPointerComplexPath()
     
     {
         JSONPath path("$.name");
-        QJsonArray result = path.evaluate(doc);
+        auto result = path.evaluate(doc);
     }
 }
 
@@ -358,7 +358,7 @@ benchmarkJsonPathNestedPath()
     
     {
         JSONPath path("$.location.city");
-        QJsonArray result = path.evaluate(doc);
+        auto result = path.evaluate(doc);
     }
 }
 
@@ -369,7 +369,7 @@ benchmarkJsonPathArrayPath()
     
     {
         JSONPath path("$.inventory[5].title");
-        QJsonArray result = path.evaluate(doc);
+        auto result = path.evaluate(doc);
     }
 }
 
@@ -380,7 +380,7 @@ benchmarkJsonPathWildcard()
     
     {
         JSONPath path("$.inventory[*].title");
-        QJsonArray result = path.evaluate(doc);
+        auto result = path.evaluate(doc);
     }
 }
 
@@ -391,7 +391,7 @@ benchmarkJsonPathArraySlice()
     
     {
         JSONPath path("$.inventory[0:10].title");
-        QJsonArray result = path.evaluate(doc);
+        auto result = path.evaluate(doc);
     }
 }
 
@@ -402,7 +402,7 @@ benchmarkJsonPathFilter()
     
     {
         JSONPath path("$.inventory[?(@.price > 20)].title");
-        QJsonArray result = path.evaluate(doc);
+        auto result = path.evaluate(doc);
     }
 }
 
@@ -413,7 +413,7 @@ benchmarkJsonPathRecursive()
     
     {
         JSONPath path("$..title");
-        QJsonArray result = path.evaluate(doc);
+        auto result = path.evaluate(doc);
     }
 }
 

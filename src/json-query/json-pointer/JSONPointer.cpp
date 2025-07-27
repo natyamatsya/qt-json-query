@@ -49,7 +49,7 @@ QString JSONPointer::toString() const
         return {};
 
     // ───────────────────────────────── capacity ─────────────────────────────────
-    qsizetype cap = 0;
+    auto cap = 0;
     for (const Token& tk : m_tokens) {
         cap += 1;                         // the leading '/'
         if (tk.kind == Token::Kind::Key)
@@ -65,12 +65,12 @@ QString JSONPointer::toString() const
     // ─────────────────────────────── single allocation ──────────────────────────
     QString out(cap, Qt::Uninitialized);
     QChar*  dst = out.data();
-    qsizetype wr = 0;
+    auto wr = 0;
 
     auto writeIndex = [&](qsizetype value) {
         char buf[24];
         auto [ptr, ec] = std::to_chars(std::begin(buf), std::end(buf), value);
-        const qsizetype len = ptr - buf;
+        const auto len = ptr - buf;
         for (qsizetype i = 0; i < len; ++i)
             dst[wr++] = QLatin1Char(buf[i]);
     };
@@ -83,7 +83,7 @@ QString JSONPointer::toString() const
         if (tk.kind == Token::Kind::Key)
         {
             const QChar* src = tk.key.constData();
-            const qsizetype n = tk.key.size();
+            const auto n = tk.key.size();
 
             for (qsizetype i = 0; i < n; ++i) {
                 switch (src[i].unicode()) {

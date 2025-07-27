@@ -42,7 +42,7 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
     
-    QJsonArray authors = toArray(*evalResult);
+    auto authors = toArray(*evalResult);
     qDebug() << "Authors of expensive books:";
     for (const auto& author : authors) {
         qDebug() << "  -" << author.toString();

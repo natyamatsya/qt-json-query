@@ -15,20 +15,20 @@ using json_query::json_path::internal::makeSimpleContextCursor;
 // Helper function to evaluate function calls with root context
 // Now uses ContextAwareContainerCursor for efficient iteration with context access
 QJsonValue evaluateContextFunction(const QString& funcExpr, const QJsonValue& context, const QJsonValue& root) {
-    int openParen = funcExpr.indexOf('(');
-    int closeParen = funcExpr.lastIndexOf(')');
+    auto openParen = funcExpr.indexOf('(');
+    auto closeParen = funcExpr.lastIndexOf(')');
     if (openParen == -1 || closeParen == -1) {
         return {}; // Invalid function syntax
     }
     
-    QString funcName = funcExpr.mid(0, openParen).trimmed();
-    QString args = funcExpr.mid(openParen + 1, closeParen - openParen - 1).trimmed();
+    auto funcName = funcExpr.mid(0, openParen).trimmed();
+    auto args = funcExpr.mid(openParen + 1, closeParen - openParen - 1).trimmed();
     
     if (funcName == "length") {
         // Evaluate the argument (usually @.property) with context-aware iteration
         QJsonValue argValue;
         if (args.startsWith("@.")) {
-            QString prop = args.mid(2);
+            auto prop = args.mid(2);
             if (context.isObject()) {
                 // Use ContextAwareContainerCursor for efficient object property access
                 auto cursor{makeSimpleContextCursor(context.toObject(), root, context)};
@@ -93,7 +93,7 @@ QJsonValue evaluateContextFunction(const QString& funcExpr, const QJsonValue& co
                         }
                         
                         // Fallback if cursor iteration fails
-                        QJsonValue result = results->first();
+                        auto result = results->first();
                         return result;
                     }
                 }
@@ -101,13 +101,13 @@ QJsonValue evaluateContextFunction(const QString& funcExpr, const QJsonValue& co
             }
             return QJsonValue{0}; // Invalid JSONPath expression returns 0
         } else if (args.startsWith("@.")) {
-            QString prop = args.mid(2);
+            auto prop = args.mid(2);
             if (context.isObject()) {
                 // Use context-aware cursor for efficient property access
                 auto cursor{makeSimpleContextCursor(context.toObject(), root, context)};
                 
                 // Traditional property access (cursor doesn't expose keys in current interface)
-                QJsonValue val = context.toObject().value(prop);
+                auto val = context.toObject().value(prop);
                 return val.isUndefined() ? QJsonValue{0} : val; // Return 0 for undefined
             }
         } else if (args == "@") {
@@ -132,9 +132,9 @@ std::optional<Token> parseAbsolutePathContext(const QString& s, std::vector<Cont
     if (auto match = absComparisonPat(s.toStdString())) {
         qCDebug(jsonPathLog) << "parseAbsolutePathContext: matched simple absolute path comparison:" << s;
         
-        std::string leftPath = "$" + std::string(match.get<1>().to_view());
-        std::string op = std::string(match.get<2>().to_view());
-        std::string rightExpr = std::string(match.get<3>().to_view());
+        auto leftPath = "$" + std::string(match.get<1>().to_view());
+        auto op = std::string(match.get<2>().to_view());
+        auto rightExpr = std::string(match.get<3>().to_view());
         
         qCDebug(jsonPathLog) << "parseAbsolutePathContext: leftPath=" << QString::fromStdString(leftPath) 
                              << "op=" << QString::fromStdString(op) 
@@ -146,7 +146,7 @@ std::optional<Token> parseAbsolutePathContext(const QString& s, std::vector<Cont
             [[nodiscard]] Token add(ContextFilterFn fn, QString key = {})
             {
                 fns.push_back(std::move(fn));
-                const std::size_t id = fns.size() - 1;
+                const auto id = fns.size() - 1;
                 Token token{Token::Kind::Filter, 0, {}, 0u, std::move(key)};
                 token.contextFilterId = id;
                 return token;
@@ -191,7 +191,7 @@ std::optional<Token> parseAbsolutePathContext(const QString& s, std::vector<Cont
             
             // Evaluate right side with context-aware optimization
             QJsonValue rightValue;
-            QString rightExprStr = QString::fromStdString(rightExpr);
+            auto rightExprStr = QString::fromStdString(rightExpr);
             if (rightExprStr == "$") {
                 rightValue = root;
             } else if (rightExprStr.startsWith("@")) {
@@ -203,7 +203,7 @@ std::optional<Token> parseAbsolutePathContext(const QString& s, std::vector<Cont
                     QString relativePath = rightExprStr.mid(1); // Remove @
                     if (relativePath.startsWith(".")) {
                         // Property access like @.value - use context-aware cursor for efficient access
-                        QString propName = relativePath.mid(1);
+                        auto propName = relativePath.mid(1);
                         if (node.isObject()) {
                             // Use context-aware cursor for efficient property lookup
                             auto cursor{makeSimpleContextCursor(node.toObject(), root, node)};
@@ -226,7 +226,7 @@ std::optional<Token> parseAbsolutePathContext(const QString& s, std::vector<Cont
                 } else {
                     // Try as number or string
                     bool ok;
-                    double num = rightExprStr.toDouble(&ok);
+                    auto num = rightExprStr.toDouble(&ok);
                     if (ok) {
                         rightValue = QJsonValue(num);
                     } else {
@@ -242,7 +242,7 @@ std::optional<Token> parseAbsolutePathContext(const QString& s, std::vector<Cont
             }
             
             // Perform comparison
-            QString opStr = QString::fromStdString(op);
+            auto opStr = QString::fromStdString(op);
             if (opStr == "==") {
                 if (leftValue.isUndefined() && rightValue.isUndefined()) return true;
                 if (leftValue.isUndefined() && rightValue.toDouble() == 0) return true;
@@ -295,10 +295,10 @@ std::optional<Token> parseAbsolutePathContext(const QString& s, std::vector<Cont
         // Look for comparison operators in order of precedence (longest first)
         const QStringList operators = {"<=", ">=", "==", "!=", "<", ">"};
         QString op;
-        int opPos = -1;
+        auto opPos = -1;
         
         for (const QString& testOp : operators) {
-            int pos = s.indexOf(testOp);
+            auto pos = s.indexOf(testOp);
             if (pos != -1) {
                 op = testOp;
                 opPos = pos;
@@ -307,13 +307,13 @@ std::optional<Token> parseAbsolutePathContext(const QString& s, std::vector<Cont
         }
         
         if (opPos != -1) {
-            QString left = s.left(opPos).trimmed();
-            QString right = s.mid(opPos + op.length()).trimmed();
+            auto left = s.left(opPos).trimmed();
+            auto right = s.mid(opPos + op.length()).trimmed();
             
             qCDebug(jsonPathLog) << "parseAbsolutePathContext: function call parts - left:" << left << "op:" << op << "right:" << right;
             
             // Check if we need root context (value($...))
-            bool needsRootContext = left.contains("value($") || right.contains("value($");
+            auto needsRootContext = left.contains("value($") || right.contains("value($");
             
             if (needsRootContext) {
                 qCDebug(jsonPathLog) << "parseAbsolutePathContext: creating context-aware function filter";
@@ -324,7 +324,7 @@ std::optional<Token> parseAbsolutePathContext(const QString& s, std::vector<Cont
                     [[nodiscard]] Token add(ContextFilterFn fn, QString key = {})
                     {
                         fns.push_back(std::move(fn));
-                        const std::size_t id = fns.size() - 1;
+                        const auto id = fns.size() - 1;
                         Token token{Token::Kind::Filter, 0, {}, 0u, std::move(key)};
                         token.contextFilterId = id;
                         return token;
@@ -336,7 +336,7 @@ std::optional<Token> parseAbsolutePathContext(const QString& s, std::vector<Cont
                     qCDebug(jsonPathLog) << "Evaluating context function:" << left << op << right;
                     
                     QJsonValue leftVal, rightVal;
-                    bool leftIsNothing = false, rightIsNothing = false;
+                    auto leftIsNothing = false, rightIsNothing = false;
                     
                     // Evaluate left side with context-aware optimization
                     if (left.contains("(")) {
@@ -350,20 +350,20 @@ std::optional<Token> parseAbsolutePathContext(const QString& s, std::vector<Cont
                                 
                                 // Check property existence and null values using traditional access
                                 // (cursor doesn't expose keys in current interface)
-                                QJsonValue propValue = node.toObject().value(prop);
+                                auto propValue = node.toObject().value(prop);
                                 if (propValue.isUndefined() || propValue.isNull()) {
                                     leftIsNothing = true;
                                 }
                             }
                         }
                     } else if (left.startsWith("@.")) {
-                        QString prop = left.mid(2);
+                        auto prop = left.mid(2);
                         if (node.isObject()) {
                             // Use context-aware cursor for efficient property access
                             auto cursor{makeSimpleContextCursor(node.toObject(), root, node)};
                             
                             // Traditional property access (cursor doesn't expose keys)
-                            QJsonValue val = node.toObject().value(prop);
+                            auto val = node.toObject().value(prop);
                             if (val.isUndefined()) {
                                 leftIsNothing = true;
                                 leftVal = QJsonValue{0};
@@ -393,7 +393,7 @@ std::optional<Token> parseAbsolutePathContext(const QString& s, std::vector<Cont
                                         auto cursor{makeSimpleContextCursor(*results, root, node)};
                                         
                                         // Check if results are effectively empty using zero-copy iteration
-                                        bool hasValidResults = false;
+                                        auto hasValidResults = false;
                                         for (const auto& [result, ctx] : cursor) {
                                             if (!result.isUndefined() && !result.isNull()) {
                                                 hasValidResults = true;
@@ -409,13 +409,13 @@ std::optional<Token> parseAbsolutePathContext(const QString& s, std::vector<Cont
                             }
                         }
                     } else if (right.startsWith("@.")) {
-                        QString prop = right.mid(2);
+                        auto prop = right.mid(2);
                         if (node.isObject()) {
                             // Use context-aware cursor for efficient property access
                             auto cursor{makeSimpleContextCursor(node.toObject(), root, node)};
                             
                             // Traditional property access (cursor doesn't expose keys)
-                            QJsonValue val = node.toObject().value(prop);
+                            auto val = node.toObject().value(prop);
                             if (val.isUndefined()) {
                                 rightIsNothing = true;
                                 rightVal = QJsonValue{0};
@@ -471,7 +471,7 @@ std::optional<Token> parseAbsolutePathContext(const QString& s, std::vector<Cont
             [[nodiscard]] Token add(ContextFilterFn fn, QString key = {})
             {
                 fns.push_back(std::move(fn));
-                const std::size_t id = fns.size() - 1;
+                const auto id = fns.size() - 1;
                 Token token{Token::Kind::Filter, 0, {}, 0u, std::move(key)};
                 token.contextFilterId = id;
                 return token;

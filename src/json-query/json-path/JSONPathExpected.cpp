@@ -8,9 +8,9 @@ evaluateDefinite(const std::vector<Token>& tokens, const QJsonValue& root) noexc
 {
     using enum Token::Kind;
 
-    QJsonValue cur = root;
+    auto cur = root;
     // Skip leading root token ('$' or '@') if present
-    int startIdx = 0;
+    auto startIdx = 0;
     if (!tokens.empty() && tokens.front().kind == Token::Kind::Key) {
         const QString& k = tokens.front().key;
         if (k == u"$" || k == u"@") {
@@ -37,7 +37,7 @@ evaluateDefinite(const std::vector<Token>& tokens, const QJsonValue& root) noexc
             if (!cur.isArray())
                 return std::unexpected(EvalError::TypeMismatchArray);
             const auto arr{cur.toArray()};
-            int idx = normalizeIndex(tk.index, arr.size());
+            auto idx = normalizeIndex(tk.index, arr.size());
             if (idx < 0 || idx >= arr.size())
                 return std::unexpected(EvalError::IndexOutOfRange);
             cur = arr[idx];

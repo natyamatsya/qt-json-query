@@ -118,27 +118,27 @@ public:
         QJsonArray& out = *pooledArray;
         
         // Extract key from filter expression (remove @. prefix)
-        QString key = tk.key;
+        auto key = tk.key;
         if (key.startsWith("@.")) {
             key = key.mid(2);
         }
         
         if (v.isArray()) {
-            const QJsonArray arr = v.toArray();
+            const auto arr = v.toArray();
             for (const auto& item : arr) {
                 if (item.isObject()) {
-                    const QJsonObject obj = item.toObject();
+                    const auto obj = item.toObject();
                     if (obj.contains(key)) {
                         out.append(item);
                     }
                 }
             }
         } else if (v.isObject()) {
-            const QJsonObject obj = v.toObject();
+            const auto obj = v.toObject();
             for (auto it = obj.begin(); it != obj.end(); ++it) {
                 const QJsonValue& val = it.value();
                 if (val.isObject()) {
-                    const QJsonObject valObj = val.toObject();
+                    const auto valObj = val.toObject();
                     if (valObj.contains(key)) {
                         out.append(val);
                     }
@@ -166,14 +166,14 @@ public:
         QJsonArray& out = *pooledArray;
         
         // Parse key and value from expression like "@.key == 'value'"
-        const QString expr = tk.key;
-        const int eqPos = expr.indexOf("==");
+        const auto expr = tk.key;
+        const auto eqPos = expr.indexOf("==");
         if (eqPos == -1) {
             return QJsonArray(out); // Invalid expression
         }
         
-        QString key = expr.left(eqPos).trimmed();
-        QString value = expr.mid(eqPos + 2).trimmed();
+        auto key = expr.left(eqPos).trimmed();
+        auto value = expr.mid(eqPos + 2).trimmed();
         
         // Remove @. prefix from key
         if (key.startsWith("@.")) {
@@ -187,10 +187,10 @@ public:
         }
         
         if (v.isArray()) {
-            const QJsonArray arr = v.toArray();
+            const auto arr = v.toArray();
             for (const auto& item : arr) {
                 if (item.isObject()) {
-                    const QJsonObject obj = item.toObject();
+                    const auto obj = item.toObject();
                     const auto it{obj.find(key)};
                     if (it != obj.end() && it.value().toString() == value) {
                         out.append(item);
@@ -198,11 +198,11 @@ public:
                 }
             }
         } else if (v.isObject()) {
-            const QJsonObject obj = v.toObject();
+            const auto obj = v.toObject();
             for (auto it = obj.begin(); it != obj.end(); ++it) {
                 const QJsonValue& val = it.value();
                 if (val.isObject()) {
-                    const QJsonObject valObj = val.toObject();
+                    const auto valObj = val.toObject();
                     const auto keyIt{valObj.find(key)};
                     if (keyIt != valObj.end() && keyIt.value().toString() == value) {
                         out.append(val);
@@ -231,10 +231,10 @@ public:
         QJsonArray& out = *pooledArray;
         
         // Parse numeric comparison expression
-        const QString expr = tk.key;
+        const auto expr = tk.key;
         QString key;
         QString op;
-        double compareValue = 0.0;
+        auto compareValue = 0.0;
         
         // Simple parsing for common operators
         if (expr.contains(" > ")) {
@@ -277,14 +277,14 @@ public:
         }
         
         if (v.isArray()) {
-            const QJsonArray arr = v.toArray();
+            const auto arr = v.toArray();
             for (const auto& item : arr) {
                 if (item.isObject()) {
-                    const QJsonObject obj = item.toObject();
+                    const auto obj = item.toObject();
                     const auto it{obj.find(key)};
                     if (it != obj.end()) {
-                        const double itemValue = it.value().toDouble();
-                        bool matches = false;
+                        const auto itemValue = it.value().toDouble();
+                        auto matches = false;
                         
                         if (op == ">") matches = itemValue > compareValue;
                         else if (op == "<") matches = itemValue < compareValue;
@@ -319,13 +319,13 @@ public:
         QJsonArray& out = *pooledArray;
         
         // Parse length comparison expression
-        const QString expr = tk.key;
-        const int lengthPos = expr.indexOf(".length()");
+        const auto expr = tk.key;
+        const auto lengthPos = expr.indexOf(".length()");
         if (lengthPos == -1) {
             return QJsonArray(out); // Invalid expression
         }
         
-        QString key = expr.left(lengthPos).trimmed();
+        auto key = expr.left(lengthPos).trimmed();
         QString remainder = expr.mid(lengthPos + 9).trimmed(); // Skip ".length()"
         
         // Remove @. prefix from key
@@ -335,7 +335,7 @@ public:
         
         // Parse comparison operator and value
         QString op;
-        int compareValue = 0;
+        auto compareValue = 0;
         
         if (remainder.startsWith(" > ")) {
             op = ">";
@@ -359,14 +359,14 @@ public:
         }
         
         if (v.isArray()) {
-            const QJsonArray arr = v.toArray();
+            const auto arr = v.toArray();
             for (const auto& item : arr) {
                 if (item.isObject()) {
-                    const QJsonObject obj = item.toObject();
+                    const auto obj = item.toObject();
                     const auto it{obj.find(key)};
                     if (it != obj.end() && it.value().isArray()) {
-                        const int arrayLength = it.value().toArray().size();
-                        bool matches = false;
+                        const auto arrayLength = it.value().toArray().size();
+                        auto matches = false;
                         
                         if (op == ">") matches = arrayLength > compareValue;
                         else if (op == "<") matches = arrayLength < compareValue;

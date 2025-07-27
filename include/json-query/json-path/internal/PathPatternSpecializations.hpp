@@ -68,7 +68,7 @@ public:
         
         // Nested keys: $.key1.key2.key3... (only for simple keys)
         if (tokens.size() >= 2 && tokens.size() <= 3) { // Reduced from 4 to 3 for safety
-            bool allSimpleKeys = true;
+            auto allSimpleKeys = true;
             for (const auto& token : tokens) {
                 if (token.kind != Token::Kind::Key || !isSimpleKey(token.key)) {
                     allSimpleKeys = false;
@@ -130,7 +130,7 @@ private:
         // Additional fast checks for problematic characters using direct comparison
         // This avoids the costly QString::contains calls that were failing to inline
         const QChar* data = key.constData();
-        const int len = key.length();
+        const auto len = key.length();
         for (int i = 0; i < len; ++i) {
             const ushort unicode = data[i].unicode();
             if (unicode == '\\' || unicode == '"' || unicode == '\'' || 
@@ -177,7 +177,7 @@ struct PathPatternEvaluator<PathPattern::SimpleKey> {
             return QJsonArray{}; // Empty result for non-objects
         }
         
-        const QJsonObject obj = root.toObject();
+        const auto obj = root.toObject();
         const QString& key = tokens[0].key;
         const auto it{obj.find(key)};
         
@@ -205,14 +205,14 @@ struct PathPatternEvaluator<PathPattern::NestedKeys> {
         const QJsonValue& root) noexcept 
     {
         // Fast path: chained object navigation without intermediate arrays
-        QJsonValue current = root;
+        auto current = root;
         
         for (const auto& token : tokens) {
             if (!current.isObject()) {
                 return QJsonArray{}; // Navigation failed
             }
             
-            const QJsonObject obj = current.toObject();
+            const auto obj = current.toObject();
             const auto it{obj.find(token.key)};
             
             if (it == obj.end()) {
@@ -246,11 +246,11 @@ struct PathPatternEvaluator<PathPattern::ArrayIndex> {
             return QJsonArray{}; // Empty result for non-arrays
         }
         
-        const QJsonArray arr = root.toArray();
-        const int len = arr.size();
+        const auto arr = root.toArray();
+        const auto len = arr.size();
         
         // Normalize negative indices
-        int index = tokens[0].index;
+        auto index = tokens[0].index;
         if (index < 0) {
             index += len;
         }
@@ -282,7 +282,7 @@ struct PathPatternEvaluator<PathPattern::ArrayWildcard> {
         // Fast path: return all array elements or object values
         if (root.isArray()) {
             // For arrays, return all elements
-            const QJsonArray arr = root.toArray();
+            const auto arr = root.toArray();
             
             // Use ArrayPool for result optimization
             auto pooledArray{acquirePooledArray()};
@@ -295,7 +295,7 @@ struct PathPatternEvaluator<PathPattern::ArrayWildcard> {
             return QJsonArray(result);
         } else if (root.isObject()) {
             // For objects, return all values
-            const QJsonObject obj = root.toObject();
+            const auto obj = root.toObject();
             
             // Use ArrayPool for result optimization
             auto pooledArray{acquirePooledArray()};
@@ -327,7 +327,7 @@ struct PathPatternEvaluator<PathPattern::KeyThenIndex> {
             return QJsonArray{}; // Empty result for non-objects
         }
         
-        const QJsonObject obj = root.toObject();
+        const auto obj = root.toObject();
         const QString& key = tokens[0].key;
         const auto it{obj.find(key)};
         
@@ -340,11 +340,11 @@ struct PathPatternEvaluator<PathPattern::KeyThenIndex> {
             return QJsonArray{}; // Property is not an array
         }
         
-        const QJsonArray arr = arrayValue.toArray();
-        const int len = arr.size();
+        const auto arr = arrayValue.toArray();
+        const auto len = arr.size();
         
         // Normalize negative indices
-        int index = tokens[1].index;
+        auto index = tokens[1].index;
         if (index < 0) {
             index += len;
         }
@@ -378,11 +378,11 @@ struct PathPatternEvaluator<PathPattern::IndexThenKey> {
             return QJsonArray{}; // Empty result for non-arrays
         }
         
-        const QJsonArray arr = root.toArray();
-        const int len = arr.size();
+        const auto arr = root.toArray();
+        const auto len = arr.size();
         
         // Normalize negative indices
-        int index = tokens[0].index;
+        auto index = tokens[0].index;
         if (index < 0) {
             index += len;
         }
@@ -397,7 +397,7 @@ struct PathPatternEvaluator<PathPattern::IndexThenKey> {
             return QJsonArray{}; // Array element is not an object
         }
         
-        const QJsonObject obj = objValue.toObject();
+        const auto obj = objValue.toObject();
         const QString& key = tokens[1].key;
         const auto it{obj.find(key)};
         
@@ -432,10 +432,10 @@ struct PathPatternEvaluator<PathPattern::WildcardThenKey> {
         
         if (root.isArray()) {
             // For arrays, check each element for the key
-            const QJsonArray arr = root.toArray();
+            const auto arr = root.toArray();
             for (const auto& item : arr) {
                 if (item.isObject()) {
-                    const QJsonObject obj = item.toObject();
+                    const auto obj = item.toObject();
                     const auto it{obj.find(key)};
                     if (it != obj.end()) {
                         result.append(it.value());
@@ -444,11 +444,11 @@ struct PathPatternEvaluator<PathPattern::WildcardThenKey> {
             }
         } else if (root.isObject()) {
             // For objects, check each value for the key
-            const QJsonObject rootObj = root.toObject();
+            const auto rootObj = root.toObject();
             for (auto it = rootObj.begin(); it != rootObj.end(); ++it) {
                 const QJsonValue& value = it.value();
                 if (value.isObject()) {
-                    const QJsonObject obj = value.toObject();
+                    const auto obj = value.toObject();
                     const auto keyIt{obj.find(key)};
                     if (keyIt != obj.end()) {
                         result.append(keyIt.value());

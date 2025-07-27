@@ -41,7 +41,7 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
     
-    QJsonArray titles = toArray(*evalResult);
+    auto titles = toArray(*evalResult);
     qDebug() << "Book titles:";
     for (const auto& title : titles) {
         qDebug() << "  -" << title.toString();

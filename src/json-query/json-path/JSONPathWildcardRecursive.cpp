@@ -29,7 +29,7 @@ static std::expected<QJsonArray, EvalError> evaluateWildcardObjectImpl(const QJs
     }
     
     // Move result to avoid copying
-    QJsonArray finalResult = std::move(out);
+    auto finalResult = std::move(out);
     return finalResult;
 }
 
@@ -54,7 +54,7 @@ struct RecursivePatternDetector {
     static QStringView detectEarlyTerminationPattern(QStringView pathExpression) {
         // Look for patterns like "$..fieldname" 
         if (pathExpression.startsWith(u"$..") && pathExpression.size() > 3) {
-            QStringView fieldName = pathExpression.mid(3);
+            auto fieldName = pathExpression.mid(3);
             
             // Check if it's a simple field access (no additional operators)
             if (!fieldName.contains(u'[') && !fieldName.contains(u'.') && 
@@ -76,11 +76,11 @@ struct RecursivePatternDetector {
      */
     static size_t estimateDocumentComplexity(const QJsonValue& value) {
         if (value.isObject()) {
-            const QJsonObject obj = value.toObject();
-            size_t complexity = obj.size();
+            const auto obj = value.toObject();
+            auto complexity = obj.size();
             
             // Sample a few values to estimate nesting
-            int samples = 0;
+            auto samples = 0;
             for (auto it = obj.begin(); it != obj.end() && samples < 3; ++it, ++samples) {
                 if (it.value().isObject() || it.value().isArray()) {
                     complexity += estimateDocumentComplexity(it.value()) / 2;
@@ -88,8 +88,8 @@ struct RecursivePatternDetector {
             }
             return complexity;
         } else if (value.isArray()) {
-            const QJsonArray arr = value.toArray();
-            size_t complexity = arr.size();
+            const auto arr = value.toArray();
+            auto complexity = arr.size();
             
             // Sample first few elements
             for (qsizetype i = 0; i < std::min(arr.size(), qsizetype(3)); ++i) {
@@ -134,7 +134,7 @@ static std::expected<QJsonArray, EvalError> evaluateRecursiveDirectFastPath(
         
         void operator()(const QJsonValue& value) const {
             if (value.isObject()) {
-                const QJsonObject obj = value.toObject();
+                const auto obj = value.toObject();
                 
                 // Direct key lookup - fastest possible path
                 if (auto it = obj.find(QString(targetField)); it != obj.end()) {
@@ -150,7 +150,7 @@ static std::expected<QJsonArray, EvalError> evaluateRecursiveDirectFastPath(
                 }
             }
             else if (value.isArray()) {
-                const QJsonArray arr = value.toArray();
+                const auto arr = value.toArray();
                 for (const QJsonValue& element : arr) {
                     if (element.isObject() || element.isArray()) {
                         (*this)(element);  // Direct recursive call
@@ -165,7 +165,7 @@ static std::expected<QJsonArray, EvalError> evaluateRecursiveDirectFastPath(
     traverser(root);
     
     // Move result to avoid copying
-    QJsonArray finalResult = std::move(results);
+    auto finalResult = std::move(results);
     return finalResult;
 }
 
@@ -174,10 +174,10 @@ static std::expected<QJsonArray, EvalError> evaluateRecursiveOptimized(
     QStringView pathHint = QStringView()) {
     
     // Detect if we can use early termination optimization
-    QStringView targetField = RecursivePatternDetector::detectEarlyTerminationPattern(pathHint);
+    auto targetField = RecursivePatternDetector::detectEarlyTerminationPattern(pathHint);
     
     // Estimate document complexity to choose optimization strategy
-    size_t complexity = RecursivePatternDetector::estimateDocumentComplexity(value);
+    auto complexity = RecursivePatternDetector::estimateDocumentComplexity(value);
     
     // Phase 3+: Direct recursive fast path for maximum performance
     if (!targetField.isEmpty() && complexity > 50) {
@@ -194,7 +194,7 @@ static std::expected<QJsonArray, EvalError> evaluateRecursiveOptimized(
         
         if (result) {
             // Move result to avoid copying
-            QJsonArray finalResult = std::move(*pooledArray);
+            auto finalResult = std::move(*pooledArray);
             return finalResult;
         }
     }
@@ -212,7 +212,7 @@ static std::expected<QJsonArray, EvalError> evaluateRecursiveOptimized(
         }
         
         // Move result to avoid copying
-        QJsonArray finalResult = std::move(*pooledArray);
+        auto finalResult = std::move(*pooledArray);
         return finalResult;
     }
     
@@ -242,7 +242,7 @@ std::expected<QJsonArray, EvalError> wildcardArray(const QJsonArray& arr)
     }
     
     // Move result to avoid copying
-    QJsonArray finalResult = std::move(out);
+    auto finalResult = std::move(out);
     return finalResult;
 }
 

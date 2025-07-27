@@ -51,7 +51,7 @@ struct TypedTokenEvaluator<Token::Kind::Key, QJsonValue::Object> {
         const QJsonValue& v) noexcept 
     {
         // No type check needed - we know it's an object
-        const QJsonObject obj = v.toObject();
+        const auto obj = v.toObject();
         const auto it{obj.find(tk.key)};
         if (it == obj.end()) {
             return QJsonArray{}; // Key not found
@@ -97,11 +97,11 @@ struct TypedTokenEvaluator<Token::Kind::Index, QJsonValue::Array> {
         const QJsonValue& v) noexcept 
     {
         // No type check needed - we know it's an array
-        const QJsonArray arr = v.toArray();
-        const int len = arr.size();
+        const auto arr = v.toArray();
+        const auto len = arr.size();
         
         // Normalize negative indices
-        int normalizedIndex = tk.index;
+        auto normalizedIndex = tk.index;
         if (normalizedIndex < 0) {
             normalizedIndex += len;
         }
@@ -151,7 +151,7 @@ struct TypedTokenEvaluator<Token::Kind::Wildcard, QJsonValue::Object> {
         const QJsonValue& v) noexcept 
     {
         // No type check needed - we know it's an object
-        const QJsonObject obj = v.toObject();
+        const auto obj = v.toObject();
         
         // Use ArrayPool for result optimization
         auto pooledArray{acquirePooledArray()};
@@ -177,7 +177,7 @@ struct TypedTokenEvaluator<Token::Kind::Wildcard, QJsonValue::Array> {
         const QJsonValue& v) noexcept 
     {
         // No type check needed - we know it's an array
-        const QJsonArray arr = v.toArray();
+        const auto arr = v.toArray();
         
         // Use ArrayPool for result optimization
         auto pooledArray{acquirePooledArray()};

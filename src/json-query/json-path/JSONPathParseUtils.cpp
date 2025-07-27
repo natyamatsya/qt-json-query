@@ -38,7 +38,7 @@ std::optional<Slice> makeSlice(QStringView v)
         }
 
         // Fast path 64-bit conversion first.
-        bool ok = false;
+        auto ok = false;
         qlonglong v64 = part.toLongLong(&ok, 10);
 
         if (!ok) {
@@ -91,12 +91,12 @@ std::optional<Slice> makeSlice(QStringView v)
     // Zero-step slices are *valid* but yield an empty result (§4.2.3).
     // We pass them through to the evaluator unchanged.
 
-    qsizetype step = stepOpt.value_or(1);
+    auto step = stepOpt.value_or(1);
 
     // Out-of-range literals are clamped to ±∞ above; evaluation will handle them.
 
-    qsizetype start = startOpt.has_value() ? *startOpt : SENTINEL;
-    qsizetype end   = endOpt.has_value()   ? *endOpt   : SENTINEL;
+    auto start = startOpt.has_value() ? *startOpt : SENTINEL;
+    auto end = endOpt.has_value()   ? *endOpt   : SENTINEL;
 
     return Slice{start,end,step};
 }
@@ -129,7 +129,7 @@ QString unescapeQuotedKey(QStringView key)
                     // Unicode escape: \uXXXX
                     if (i + 5 < key.size()) {
                         bool ok;
-                        QString hexStr = key.mid(i + 2, 4).toString();
+                        auto hexStr = key.mid(i + 2, 4).toString();
                         uint codePoint = hexStr.toUInt(&ok, 16);
                         if (ok) {
                             result.append(QChar(codePoint));
@@ -165,7 +165,7 @@ bool isValidQuotedKey(QStringView key, QuoteStyle style)
     //  * escape sequences limited to JSON set
     //  * \uXXXX sequences must be valid and, if surrogate, appear in valid pairs
 
-    bool expectLowSurrogate = false;
+    auto expectLowSurrogate = false;
 
     const QChar quoteChar = (style == QuoteStyle::Single) ? QChar(u'\'') : QChar(u'"');
 
@@ -193,8 +193,8 @@ bool isValidQuotedKey(QStringView key, QuoteStyle style)
 
         // List of permitted single-char escapes per RFC 9535 (JSON set) – but
         // \" is only permitted inside double-quoted keys; \' only inside single-quoted keys.
-        const QStringView allowedCommon = QStringView{u"\\/bfnrtu"};
-        bool escOk = allowedCommon.contains(esc);
+        const auto allowedCommon = QStringView{u"\\/bfnrtu"};
+        auto escOk = allowedCommon.contains(esc);
         if (!escOk) {
             if (style == QuoteStyle::Double && esc == u'\"') escOk = true;
             else if (style == QuoteStyle::Single && esc == u'\'') escOk = true;
@@ -208,7 +208,7 @@ bool isValidQuotedKey(QStringView key, QuoteStyle style)
             ushort code = 0;
             for (int k = 1; k <= 4; ++k) {
                 QChar h = key[i + 1 + k];
-                int val = -1;
+                auto val = -1;
                 if (h.isDigit()) val = h.digitValue();
                 else if (h.toLower() >= u'a' && h.toLower() <= u'f') val = 10 + (h.toLower().unicode() - u'a');
                 if (val < 0) return false;
@@ -216,8 +216,8 @@ bool isValidQuotedKey(QStringView key, QuoteStyle style)
             }
 
             // Surrogate handling ------------------------------------
-            bool isHighSurrogate = (code >= 0xD800 && code <= 0xDBFF);
-            bool isLowSurrogate  = (code >= 0xDC00 && code <= 0xDFFF);
+            auto isHighSurrogate = (code >= 0xD800 && code <= 0xDBFF);
+            auto isLowSurrogate = (code >= 0xDC00 && code <= 0xDFFF);
 
             if (expectLowSurrogate) {
                 // We were waiting for a low surrogate
@@ -256,7 +256,7 @@ bool isValidIndexLiteral(QStringView content)
     // Plus sign is NOT allowed. Leading zeros forbidden unless value is exactly 0.
     static constexpr auto integer_literal_pattern = ctre::match<"^(?:0|-[1-9][0-9]*|[1-9][0-9]*)$">;
     
-    QStringView trimmed = content.trimmed();
+    auto trimmed = content.trimmed();
     if (trimmed.isEmpty()) {
         return false;
     }

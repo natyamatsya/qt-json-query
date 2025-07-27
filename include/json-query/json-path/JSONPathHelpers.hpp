@@ -27,8 +27,8 @@ inline QString stripOuterParens(QStringView sv)
 inline std::optional<std::pair<QString, QString>>
 splitTopLevel(QStringView sv, QLatin1StringView delim)
 {
-    const qsizetype nDelim = delim.size();
-    int parenDepth = 0;
+    const auto nDelim = delim.size();
+    auto parenDepth = 0;
     for (qsizetype i = 0, N = sv.size() - nDelim + 1; i < N; ++i)
     {
         const QChar c = sv[i];
@@ -49,11 +49,11 @@ splitTopLevel(QStringView sv, QLatin1StringView delim)
 inline std::optional<std::vector<QString>>
 splitTopLevelMultiple(QStringView sv, QLatin1StringView delim)
 {
-    const qsizetype nDelim = delim.size();
-    int parenDepth = 0;
+    const auto nDelim = delim.size();
+    auto parenDepth = 0;
     int bracketDepth = 0;  // Track square bracket depth
     std::vector<QString> parts;
-    qsizetype lastStart = 0;
+    auto lastStart = 0;
     
     for (qsizetype i = 0, N = sv.size() - nDelim + 1; i < N; ++i)
     {

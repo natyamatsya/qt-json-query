@@ -126,7 +126,7 @@ struct CharacterParsingStrategy<CharacterParsingType::DescendantSegment> {
         
         qCDebug(json_query::json_path::jsonPathLog) << "compilePath: found descendant segment (..) at pos=" << pos;
         tokens.emplace_back(json_query::json_path::Token{json_query::json_path::Token::Kind::Recursive});
-        qsizetype newPos = pos + 2;
+        auto newPos = pos + 2;
         if (newPos >= sv.size()) {
             return std::unexpected(json_query::json_path::Error::TrailingRecursive);
         }
@@ -241,7 +241,7 @@ std::expected<json_query::json_path::Compiled, json_query::json_path::Error> com
         return std::unexpected(json_query::json_path::Error::UnexpectedAfterRoot);
 
     // TableGen-inspired monadic parsing loop with compile-time dispatch
-    qsizetype pos = 1;
+    auto pos = 1;
     while (pos < sv.size()) {
         // Use compile-time character parsing dispatch
         auto nextPosResult{CharacterParsingDispatcher::dispatch(pos, sv, kb, tokens)};
@@ -266,7 +266,7 @@ std::expected<json_query::json_path::Compiled, json_query::json_path::Error> com
 std::expected<json_query::json_path::CompilationResult, json_query::json_path::Error> compile(QStringView rawPath)
 {
     qCDebug(json_query::json_path::jsonPathLog) << "compile() rawPath=" << rawPath;
-    QString path = rawPath.toString();
+    auto path = rawPath.toString();
     
     // Extract any trailing function → updates `path` and yields `func`
     json_query::json_path::FunctionType func = json_query::json_path::detectTrailingFunction(path);
@@ -308,7 +308,7 @@ namespace detail {
 
 std::optional<Token> compileEmbeddedFilter(const QString& expr)
 {
-    QString s = json_query::json_path::detail::stripOuterParens(expr);
+    auto s = json_query::json_path::detail::stripOuterParens(expr);
     qCDebug(jsonPathLog) << "compileEmbeddedFilter() expr=" << expr << "stripped=" << s;
     
     // Try embedded filter parsing functions in priority order (lowest precedence first)
