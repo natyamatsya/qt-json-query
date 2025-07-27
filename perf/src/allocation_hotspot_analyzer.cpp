@@ -113,10 +113,10 @@ private:
             }
             
             // Measure memory and performance
-            const auto iterations = 100;
+            const auto iterations{100};
             auto start{std::chrono::high_resolution_clock::now()};
             
-            auto totalResults = 0;
+            auto totalResults{0};
             for (int i = 0; i < iterations; ++i) {
                 auto result{path.evaluate(testData)};
                 if (result) {
@@ -132,12 +132,12 @@ private:
             auto duration{std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)};
             
             auto avgDuration = static_cast<double>(duration.count()) / iterations;
-            auto avgResults = totalResults / iterations;
+            auto avgResults{totalResults / iterations};
             auto memoryPerResult = avgResults > 0 ? (avgDuration / avgResults) : avgDuration;
             
             // Estimate peak memory (simplified heuristic based on operation type)
-            auto estimatedPeakMB = 0;
-            auto bottleneck = "Unknown";
+            auto estimatedPeakMB{0};
+            auto bottleneck{"Unknown"};
             
             if (jsonPath.contains("largeArray")) {
                 estimatedPeakMB = 5; // Large array operations

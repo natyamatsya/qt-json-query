@@ -177,7 +177,7 @@ BenchmarkResult benchmarkWithMemoryTracking(const std::string& jsonPath, const Q
     
     // Benchmark with memory tracking
     auto start{std::chrono::high_resolution_clock::now()};
-    size_t peakMemory = 0;
+    size_t peakMemory{0};
     
     for (int i = 0; i < iterations; ++i) {
         auto result{path.evaluate(testData)};

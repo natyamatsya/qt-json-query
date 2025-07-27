@@ -32,7 +32,7 @@ void testErrorScenario(const QString& description, const QString& jsonPath, cons
         return;
     }
     
-    auto evalResult = pathResult->evaluateAll(document);
+    auto evalResult{pathResult->evaluateAll(document)};
     if (!evalResult) {
         std::cout << "Evaluation Error: " << json_path::to_string(evalResult.error()).data() << " (code: " << static_cast<int>(evalResult.error()) << ")" << std::endl;
     } else {

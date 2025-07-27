@@ -26,7 +26,7 @@ int main(int argc, char *argv[])
     }
     
     const auto& path = *maybePath;
-    auto result = path.evaluate(doc);  // This is what CTS calls
+    auto result{path.evaluate(doc)};  // This is what CTS calls
     if (!result.has_value()) {
         qDebug() << "Failed to evaluate:" << static_cast<int>(result.error());
         return 1;

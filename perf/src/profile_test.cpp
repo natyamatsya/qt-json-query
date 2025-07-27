@@ -50,7 +50,7 @@ int main() {
         {"Recursive", "$..name"}
     };
     
-    const auto iterations = 10000;
+    const auto iterations{10000};
     
     for (const auto& [name, path] : testCases) {
         std::cout << "\n=== Profiling: " << name << " (" << path << ") ===" << std::endl;

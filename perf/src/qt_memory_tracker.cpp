@@ -42,8 +42,8 @@ public:
         
         // Benchmark with Qt memory tracking
         auto start{std::chrono::high_resolution_clock::now()};
-        size_t totalResultSize = 0;
-        size_t maxResultSize = 0;
+        size_t totalResultSize{0};
+        size_t maxResultSize{0};
         
         for (int i = 0; i < iterations; ++i) {
             auto result{path.evaluate(testData)};
@@ -55,7 +55,7 @@ public:
                     // Single result - treat as array of size 1
                     resultArray.append(*result);
                 }
-                size_t resultSize = resultArray.size();
+                size_t resultSize{static_cast<size_t>(resultArray.size())};
                 totalResultSize += resultSize;
                 if (resultSize > maxResultSize) {
                     maxResultSize = resultSize;
@@ -193,9 +193,9 @@ private:
         auto avgResultSize{std::accumulate(resultSizes.begin(), resultSizes.end(), 0UL) / resultSizes.size()};
         
         // Calculate variance to check consistency
-        double variance = 0.0;
+        double variance{0.0};
         for (const auto& duration : durations) {
-            double diff = duration.count() - avgDuration.count();
+            double diff{static_cast<double>(duration.count() - avgDuration.count())};
             variance += diff * diff;
         }
         variance /= durations.size();

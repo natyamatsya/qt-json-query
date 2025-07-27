@@ -49,13 +49,13 @@ static QStringList titlesAbovePrice_plain(const QJsonDocument &doc, double thres
 {
     QStringList result;
 
-    const auto root = doc.object();
-    const auto inventory = root.value("inventory").toArray();
+    const auto root{doc.object()};
+    const auto inventory{root.value("inventory").toArray()};
 
     for (const QJsonValue &v : inventory)
     {
-        const auto obj = v.toObject();
-        const auto price = obj.value("price").toDouble();
+        const auto obj{v.toObject()};
+        const auto price{obj.value("price").toDouble()};
         if (price > threshold)
             result << obj.value("title").toString();
     }
@@ -68,13 +68,13 @@ static QStringList titlesAbovePrice_plain(const QJsonDocument &doc, double thres
 // -----------------------------------------------------------------------------
 static QString editionIsbn_plain(const QJsonDocument &doc, int index)
 {
-    const auto root = doc.object();
-    const auto inventory = root.value("inventory").toArray();
+    const auto root{doc.object()};
+    const auto inventory{root.value("inventory").toArray()};
     if (index < 0 || index >= inventory.size())
         return {};
-    const auto book = inventory.at(index).toObject();
-    const auto details = book.value("details").toObject();
-    const auto edition = details.value("edition").toObject();
+    const auto book{inventory.at(index).toObject()};
+    const auto details{book.value("details").toObject()};
+    const auto edition{details.value("edition").toObject()};
     return edition.value("isbn").toString();
 }
 
@@ -93,7 +93,7 @@ static QString editionIsbn_path(const QJsonDocument &doc, int index)
     if (!result) {
         return QString{}; // Return empty string on error
     }
-    auto r = *result;
+    auto r{*result};
     if (r.isArray()) {
         const auto arr{r.toArray()};
         return arr.isEmpty() ? QString{} : arr.first().toString();
@@ -113,7 +113,7 @@ static QStringList titlesAbovePrice_jsonquery(const QJsonDocument &doc, double t
     if (!result) {
         return QStringList(); // Return empty list on error
     }
-    auto r = *result;
+    auto r{*result};
     QStringList result_list;
     if (r.isArray()) {
         for (const QJsonValue &v : r.toArray())
@@ -138,7 +138,7 @@ int main(int argc, char **argv)
     qDebug() << "json-query path:" << viaQuery;
 
         // Deep nested ISBN retrieval demo
-    const auto bookIndex = 7;
+    const auto bookIndex{7};
     qDebug() << "ISBN plain      :" << editionIsbn_plain(doc, bookIndex);
     qDebug() << "ISBN via pointer:" << editionIsbn_pointer(doc, bookIndex);
     qDebug() << "ISBN via path   :" << editionIsbn_path(doc, bookIndex);

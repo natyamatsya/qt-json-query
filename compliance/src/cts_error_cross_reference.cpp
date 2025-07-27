@@ -13,7 +13,7 @@ using namespace json_query;
 struct TestCase {
     QString name;
     QString selector;
-    bool invalid_selector = false;
+    bool invalid_selector{false};
     QJsonValue document;
     QJsonArray expected_result;
 };
@@ -40,7 +40,7 @@ void analyzeTestCase(const TestCase& testCase) {
     
     // Test evaluation if we have a document
     if (!testCase.document.isNull()) {
-        auto evalResult = pathResult->evaluateAll(testCase.document);
+        auto evalResult{pathResult->evaluateAll(testCase.document)};
         if (!evalResult) {
             std::cout << "❌ EVALUATION ERROR: " << json_path::to_string(evalResult.error()).data() 
                       << " (code: " << static_cast<int>(evalResult.error()) << ")" << std::endl;

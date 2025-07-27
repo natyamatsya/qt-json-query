@@ -110,14 +110,14 @@ public:
         
         // Create nested test data
         QJsonObject deepData;
-        auto current = &deepData;
+        auto current{&deepData};
         for (int i = 0; i < 20; ++i) {
             QJsonObject next;
             next["value"] = i;
             next["name"] = QString("level_%1").arg(i);
             (*current)["child"] = next;
             // Store reference to avoid temporary object issue
-            auto childValue = (*current)["child"];
+            auto childValue{(*current)["child"]};
             if (childValue.isObject()) {
                 // We need to work around the temporary object issue
                 // by rebuilding the path each time
@@ -150,7 +150,7 @@ public:
         ArenaAllocator arena(4096); // 4KB arena
         
         // Allocate various objects
-        auto intArray = arena.constructArray<int>(100);
+        auto intArray{arena.constructArray<int>(100)};
         for (int i = 0; i < 100; ++i) {
             intArray[i] = i * i;
         }
@@ -161,7 +161,7 @@ public:
             TestStruct(int x, int y, int z) : a(x), b(y), c(z) {}
         };
         
-        TestStruct* structs = arena.constructArray<TestStruct>(50);
+        TestStruct* structs{arena.constructArray<TestStruct>(50)};
         for (int i = 0; i < 50; ++i) {
             new(&structs[i]) TestStruct(i, i*2, i*3);
         }
@@ -281,7 +281,7 @@ private:
             }
             
             // Baseline measurement (before optimization)
-            const auto iterations = 50;
+            const auto iterations{50};
             auto start{std::chrono::high_resolution_clock::now()};
             
             for (int i = 0; i < iterations; ++i) {
@@ -294,12 +294,12 @@ private:
             
             // Test RFC compliance
             auto testResult{path.evaluate(testData)};
-            auto rfcCompliant = testResult.has_value();
+            auto rfcCompliant{testResult.has_value()};
             
             // For this test, we assume optimized version has same performance characteristics
             // In a real scenario, you would measure before/after optimization
-            double avgOptimized = avgBaseline * 0.7; // Simulated 30% improvement
-            auto improvement = ((avgBaseline - avgOptimized) / avgBaseline) * 100.0;
+            double avgOptimized{avgBaseline * 0.7}; // Simulated 30% improvement
+            auto improvement{((avgBaseline - avgOptimized) / avgBaseline) * 100.0};
             
             return {
                 testName,
@@ -333,9 +333,9 @@ int main() {
     std::cout << "\n| Test Case | Baseline (ns) | Optimized (ns) | Improvement | Alloc Reduction | RFC Compliant |\n";
     std::cout << "|-----------|---------------|----------------|-------------|-----------------|---------------|\n";
     
-    auto totalImprovement = 0;
-    auto totalAllocReduction = 0;
-    auto compliantTests = 0;
+    auto totalImprovement{0};
+    auto totalAllocReduction{0};
+    auto compliantTests{0};
     
     for (const auto& result : results) {
         std::cout << "| " << result.testName

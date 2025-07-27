@@ -187,8 +187,8 @@ int main() {
         auto traditionalResult{processJsonPathTraditional(testCase.json, testCase.path)};
 
         // Verify both approaches give the same result
-        auto bothSucceeded = monadicResult.has_value() && traditionalResult.has_value();
-        auto bothFailed = !monadicResult.has_value() && !traditionalResult.has_value();
+        auto bothSucceeded{monadicResult.has_value() && traditionalResult.has_value()};
+        auto bothFailed{!monadicResult.has_value() && !traditionalResult.has_value()};
         
         std::cout << "\n" << std::string(35, '-') << " RESULTS " << std::string(35, '-') << "\n";
         
@@ -199,7 +199,7 @@ int main() {
                 std::cout << "   Sample results: ";
                 for (int j = 0; j < monadicResult->size(); ++j) {
                     if (j > 0) std::cout << ", ";
-                    auto val = monadicResult->at(j);
+                    auto val{monadicResult->at(j)};
                     if (val.isString()) {
                         std::cout << "\"" << val.toString().toStdString() << "\"";
                     } else if (val.isDouble()) {

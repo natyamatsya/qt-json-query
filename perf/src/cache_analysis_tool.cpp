@@ -47,11 +47,11 @@ using namespace json_query;
  */
 struct CacheMetrics {
     size_t memoryAccesses = 0;
-    size_t estimatedCacheMisses = 0;
-    size_t dataStructureAllocations = 0;
-    size_t stackFrameOperations = 0;
-    size_t containerResizes = 0;
-    double avgAccessDistance = 0.0;
+    size_t estimatedCacheMisses{0};
+    size_t dataStructureAllocations{0};
+    size_t stackFrameOperations{0};
+    size_t containerResizes{0};
+    double avgAccessDistance{0.0};
     std::vector<void*> accessedAddresses;
     std::chrono::nanoseconds totalTime{0};
     
@@ -64,8 +64,8 @@ struct CacheMetrics {
         if (accessedAddresses.size() < 2) return;
         
         // Estimate cache misses based on address distance
-        size_t totalDistance = 0;
-        size_t cacheMisses = 0;
+        size_t totalDistance{0};
+        size_t cacheMisses{0};
         constexpr size_t CACHE_LINE_SIZE = 64; // Typical L1 cache line size
         
         for (size_t i = 1; i < accessedAddresses.size(); ++i) {
@@ -112,7 +112,7 @@ public:
 #ifdef HAVE_GPERFTOOLS
         if (gperfToolsAvailable_) {
             // Start CPU profiling
-            std::string cpuProfileFile = profilePrefix_ + "_" + testName + "_cpu.prof";
+            std::string cpuProfileFile{profilePrefix_ + "_" + testName + "_cpu.prof"};
             ProfilerStart(cpuProfileFile.c_str());
             
             // Skip heap profiling for now due to Qt/TCMalloc conflicts
@@ -151,15 +151,15 @@ public:
 private:
     void generatePerftoolsReports(const std::string& testName) {
 #ifdef HAVE_GPERFTOOLS
-        std::string cpuProfileFile = profilePrefix_ + "_" + testName + "_cpu.prof";
+        std::string cpuProfileFile{profilePrefix_ + "_" + testName + "_cpu.prof"};
         
         // Generate CPU profile text report
-        std::string cpuTextReport = cpuProfileFile + ".txt";
-        std::string pprof_cmd = "pprof --text --cum " + cpuProfileFile + " > " + cpuTextReport;
+        std::string cpuTextReport{cpuProfileFile + ".txt"};
+        std::string pprof_cmd{"pprof --text --cum " + cpuProfileFile + " > " + cpuTextReport};
         system(pprof_cmd.c_str());
         
         // Generate CPU profile callgrind format for cache analysis
-        std::string cpuCallgrind = cpuProfileFile + ".callgrind";
+        std::string cpuCallgrind{cpuProfileFile + ".callgrind"};
         pprof_cmd = "pprof --callgrind " + cpuProfileFile + " > " + cpuCallgrind;
         system(pprof_cmd.c_str());
         

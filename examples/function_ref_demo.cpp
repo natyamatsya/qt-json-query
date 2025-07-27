@@ -23,7 +23,7 @@ template<typename Callable>
 void benchmark_calls(const std::string& name, Callable&& func, int iterations) {
     auto start{std::chrono::high_resolution_clock::now()};
     
-    auto sum = 0;
+    auto sum{0};
     for (int i = 0; i < iterations; ++i) {
         sum += func(i);
     }
@@ -67,13 +67,13 @@ int main() {
     
     // function_ref version
     auto func_ref_benchmark = [&](int x) {
-        auto ref = multiply_by_3;
+        auto ref{multiply_by_3};
         return ref(x);
     };
     
     // std::function version  
     auto std_func_benchmark = [&](int x) {
-        auto func = multiply_by_3;
+        auto func{multiply_by_3};
         return func(x);
     };
     
