@@ -56,19 +56,19 @@ int main() {
         std::cout << "\n=== Profiling: " << name << " (" << path << ") ===" << std::endl;
         
         // Compile once
-        auto jsonPath = JSONPath::create(QString::fromStdString(path));
+        auto jsonPath{JSONPath::create(QString::fromStdString(path))};
         if (!jsonPath) {
             std::cout << "Failed to compile path: " << path << std::endl;
             continue;
         }
         
         // Profile evaluation
-        auto start = high_resolution_clock::now();
+        auto start{high_resolution_clock::now()};
         
         ProfilerStart("profile.prof");
         
         for (int i = 0; i < iterations; ++i) {
-            auto result = jsonPath->evaluate(testDoc);
+            auto result{jsonPath->evaluate(testDoc)};
             // Prevent optimization
             volatile auto dummy = result.has_value();
             (void)dummy;
@@ -76,8 +76,8 @@ int main() {
         
         ProfilerStop();
         
-        auto end = high_resolution_clock::now();
-        auto duration = duration_cast<nanoseconds>(end - start).count();
+        auto end{high_resolution_clock::now()};
+        auto duration{duration_cast<nanoseconds>(end - start).count()};
         
         std::cout << "Total time: " << duration << " ns" << std::endl;
         std::cout << "Average per iteration: " << (duration / iterations) << " ns" << std::endl;

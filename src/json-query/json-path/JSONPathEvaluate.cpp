@@ -115,7 +115,7 @@ struct TokenProcessingStrategy<TokenProcessingType::UnionDetection> {
         if (unionDetectionResult.shouldUseUnion) {
             qDebug() << "[union] processing" << unionDetectionResult.unionTokens.size() << "consecutive selector tokens";
             
-            auto result = processUnionTokens(ctx, unionDetectionResult.unionTokens, working, root);
+            auto result{processUnionTokens(ctx, unionDetectionResult.unionTokens, working, root)};
             
             // Skip the tokens we just processed
             i = unionDetectionResult.nextIndex - 1;
@@ -142,7 +142,7 @@ struct TokenProcessingStrategy<TokenProcessingType::BranchUniqueSelection> {
         
         bool isLeaf = (i + 1 == ctx.tokens.size());
         
-        auto result = processBranchUniqueSelection(ctx, i, working, root, isLeaf);
+        auto result{processBranchUniqueSelection(ctx, i, working, root, isLeaf)};
         
         if (result && result->empty())
             return emptyResult(); // RFC 9535: empty result list when no matches
@@ -176,7 +176,7 @@ struct TokenProcessingStrategy<TokenProcessingType::StandardFanOut> {
                     seen.reserve(result.size()); // Reserve based on input size
                     
                     // Use ArrayPool for deduplication array
-                    auto pooledDedup = acquirePooledArray();
+                    auto pooledDedup{acquirePooledArray()};
                     QJsonArray& dedup = *pooledDedup;
                     
                     for (const auto& v : result) {
@@ -222,7 +222,7 @@ struct TokenProcessingDispatchTable<FirstType, RestTypes...> {
         
         if constexpr (TokenProcessingDef<FirstType>::enabled) {
             if (TokenProcessingDef<FirstType>::matches(ctx, i, tk, prevRecursive)) {
-                auto result = TokenProcessingStrategy<FirstType>::process(ctx, i, tk, working, root, multi, prevRecursive);
+                auto result{TokenProcessingStrategy<FirstType>::process(ctx, i, tk, working, root, multi, prevRecursive)};
                 
                 // Special handling for union detection fallback
                 if constexpr (FirstType == TokenProcessingType::UnionDetection) {
@@ -276,7 +276,7 @@ std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const 
     // If pattern specialization didn't handle it, fall back to generic evaluation
 
     // Use ArrayPool for better memory management of working array
-    auto pooledWorkingArray = acquirePooledArray();
+    auto pooledWorkingArray{acquirePooledArray()};
     QJsonArray& workingArray = *pooledWorkingArray;
     workingArray.append(root);
     

@@ -49,7 +49,7 @@ int main(int argc, char *argv[]) {
     try {
         // Test 1: Small lambda (inline storage)
         std::cout << "\n=== Test 1: Small Lambda (Inline Storage) ===\n";
-        auto smallLambda = createSmallLambda();
+        auto smallLambda{createSmallLambda()};
         std::cout << "Small lambda size: " << sizeof(smallLambda) << " bytes\n";
         
         CompactContextFilterStorage<32> smallStorage(std::move(smallLambda));
@@ -59,7 +59,7 @@ int main(int argc, char *argv[]) {
         
         // Test 2: Large lambda (heap storage) - this is where the crash would occur
         std::cout << "\n=== Test 2: Large Lambda (Heap Storage) ===\n";
-        auto largeLambda = createLargeLambda();
+        auto largeLambda{createLargeLambda()};
         std::cout << "Large lambda size: " << sizeof(largeLambda) << " bytes\n";
         std::cout << "Buffer size: 32 bytes\n";
         std::cout << "Should use heap allocation: " << (sizeof(largeLambda) > 32 ? "YES" : "NO") << "\n";
@@ -107,7 +107,7 @@ int main(int argc, char *argv[]) {
         
         // Test 7: Move constructor for large storage
         std::cout << "\n=== Test 7: Move Constructor (Large Storage) ===\n";
-        auto anotherLargeLambda = createLargeLambda();
+        auto anotherLargeLambda{createLargeLambda()};
         CompactContextFilterStorage<32> originalStorage(std::move(anotherLargeLambda));
         CompactContextFilterStorage<32> movedStorage(std::move(originalStorage));
         
@@ -121,7 +121,7 @@ int main(int argc, char *argv[]) {
         
         // Test 8: Assignment operators
         std::cout << "\n=== Test 8: Assignment Operators ===\n";
-        auto assignLambda = createLargeLambda();
+        auto assignLambda{createLargeLambda()};
         CompactContextFilterStorage<32> assignStorage(std::move(assignLambda));
         CompactContextFilterStorage<32> assignTarget;
         

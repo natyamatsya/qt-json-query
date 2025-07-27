@@ -97,7 +97,7 @@ TEST_F(ContextAwareContainerCursorTest, PathEvalContextProviderBasic) {
 }
 
 TEST_F(ContextAwareContainerCursorTest, PathEvalContextCursorArrayIteration) {
-    auto cursor = makeContextAwareCursor(testArray, *ctx, currentContext);
+    auto cursor{makeContextAwareCursor(testArray, *ctx, currentContext)};
     
     EXPECT_EQ(cursor.size(), 3);
     EXPECT_FALSE(cursor.empty());
@@ -118,7 +118,7 @@ TEST_F(ContextAwareContainerCursorTest, PathEvalContextCursorArrayIteration) {
 
 TEST_F(ContextAwareContainerCursorTest, PathEvalContextCursorObjectIteration) {
     QJsonObject testObj{{"a", 1}, {"b", 2}, {"c", 3}};
-    auto cursor = makeContextAwareCursor(testObj, *ctx, currentContext);
+    auto cursor{makeContextAwareCursor(testObj, *ctx, currentContext)};
     
     EXPECT_EQ(cursor.size(), 3);
     EXPECT_FALSE(cursor.empty());
@@ -142,9 +142,9 @@ TEST_F(ContextAwareContainerCursorTest, PathEvalContextCursorObjectIteration) {
 // ---------------------------------------------------------------------------
 
 TEST_F(ContextAwareContainerCursorTest, IteratorDirectAccess) {
-    auto cursor = makeContextAwareCursor(testArray, *ctx, currentContext);
+    auto cursor{makeContextAwareCursor(testArray, *ctx, currentContext)};
     
-    auto it = cursor.begin();
+    auto it{cursor.begin()};
     EXPECT_NE(it, cursor.end());
     
     // Test direct value access
@@ -165,17 +165,17 @@ TEST_F(ContextAwareContainerCursorTest, IteratorDirectAccess) {
     EXPECT_EQ(it.value().toObject()["id"].toInt(), 2);
     
     // Test post-increment
-    auto it2 = it++;
+    auto it2{it++};
     EXPECT_EQ(it2.value().toObject()["id"].toInt(), 2);
     EXPECT_EQ(it.value().toObject()["id"].toInt(), 3);
 }
 
 TEST_F(ContextAwareContainerCursorTest, IteratorComparison) {
-    auto cursor = makeContextAwareCursor(testArray, *ctx, currentContext);
+    auto cursor{makeContextAwareCursor(testArray, *ctx, currentContext)};
     
-    auto it1 = cursor.begin();
-    auto it2 = cursor.begin();
-    auto it3 = cursor.end();
+    auto it1{cursor.begin()};
+    auto it2{cursor.begin()};
+    auto it3{cursor.end()};
     
     EXPECT_EQ(it1, it2);
     EXPECT_NE(it1, it3);
@@ -190,7 +190,7 @@ TEST_F(ContextAwareContainerCursorTest, IteratorComparison) {
 // ---------------------------------------------------------------------------
 
 TEST_F(ContextAwareContainerCursorTest, STLAlgorithmCompatibility) {
-    auto cursor = makeContextAwareCursor(testArray, *ctx, currentContext);
+    auto cursor{makeContextAwareCursor(testArray, *ctx, currentContext)};
     
     // Test std::count_if
     auto activeCount = std::count_if(cursor.begin(), cursor.end(), 
@@ -220,7 +220,7 @@ TEST_F(ContextAwareContainerCursorTest, STLAlgorithmCompatibility) {
 }
 
 TEST_F(ContextAwareContainerCursorTest, RangeBasedForLoop) {
-    auto cursor = makeContextAwareCursor(testArray, *ctx, currentContext);
+    auto cursor{makeContextAwareCursor(testArray, *ctx, currentContext)};
     
     int iterationCount = 0;
     for (const auto& [value, context] : cursor) {
@@ -240,7 +240,7 @@ TEST_F(ContextAwareContainerCursorTest, SimpleContextProvider) {
     QJsonValue simpleRoot(QJsonObject{{"simple", "root"}});
     QJsonValue simpleCurrent(QJsonObject{{"current", "context"}});
     
-    auto cursor = makeSimpleContextCursor(testArray, simpleRoot, simpleCurrent);
+    auto cursor{makeSimpleContextCursor(testArray, simpleRoot, simpleCurrent)};
     
     EXPECT_EQ(cursor.size(), 3);
     EXPECT_EQ(cursor.rootDocument().toObject()["simple"].toString(), "root");
@@ -296,7 +296,7 @@ TEST_F(ContextAwareContainerCursorTest, LargeArrayPerformance) {
         largeArray.append(i);
     }
     
-    auto cursor = makeContextAwareCursor(largeArray, *ctx, currentContext);
+    auto cursor{makeContextAwareCursor(largeArray, *ctx, currentContext)};
     
     // Test zero-copy iteration performance
     long long sum = 0;
@@ -323,11 +323,11 @@ TEST_F(ContextAwareContainerCursorTest, LargeArrayPerformance) {
 
 TEST_F(ContextAwareContainerCursorTest, FactoryFunctions) {
     // Test PathEvalCtx factory
-    auto pathCursor = makeContextAwareCursor(testArray, *ctx, currentContext);
+    auto pathCursor{makeContextAwareCursor(testArray, *ctx, currentContext)};
     EXPECT_EQ(pathCursor.size(), 3);
     
     // Test simple context factory
-    auto simpleCursor = makeSimpleContextCursor(testArray, rootValue, currentContext);
+    auto simpleCursor{makeSimpleContextCursor(testArray, rootValue, currentContext)};
     EXPECT_EQ(simpleCursor.size(), 3);
     
     // Test generic factory
@@ -364,8 +364,8 @@ TEST_F(ContextAwareContainerCursorTest, EmptyContainers) {
     QJsonArray emptyArray;
     QJsonObject emptyObject;
     
-    auto arrayCursor = makeContextAwareCursor(emptyArray, *ctx, currentContext);
-    auto objectCursor = makeContextAwareCursor(emptyObject, *ctx, currentContext);
+    auto arrayCursor{makeContextAwareCursor(emptyArray, *ctx, currentContext)};
+    auto objectCursor{makeContextAwareCursor(emptyObject, *ctx, currentContext)};
     
     EXPECT_EQ(arrayCursor.size(), 0);
     EXPECT_TRUE(arrayCursor.empty());
@@ -414,7 +414,7 @@ TEST_F(ContextAwareContainerCursorTest, JSONPathIntegrationScenario) {
     QJsonValue usersContext = complexRoot["users"];
     
     PathEvalCtx complexCtx{tokens, complexRootValue, FunctionType::None};
-    auto cursor = makeContextAwareCursor(complexRoot["users"].toArray(), complexCtx, usersContext);
+    auto cursor{makeContextAwareCursor(complexRoot["users"].toArray(), complexCtx, usersContext)};
     
     // Simulate filtering users based on root config and user properties
     std::vector<QString> adminUsers;

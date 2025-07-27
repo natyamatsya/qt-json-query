@@ -45,7 +45,7 @@ TEST(RFC9535_JSONPath, InvalidPredicateSyntax)
 // The compiler should succeed, but evaluation on non-array branches yields expected values only from valid array paths.
 TEST(RFC9535_JSONPath, NonArraySubscriptionYieldsEmpty)
 {
-    auto path = JSONPath::create(u"$..[2][3]");
+    auto path{JSONPath::create(u"$..[2][3]")};
     ASSERT_TRUE(path);
 
     // Case 1: single branch with valid nested array → expect 3
@@ -90,7 +90,7 @@ TEST(RFC9535_JSONPath, UpstreamArrayIndexOOB)
                  << "Test needs to be rewritten to expect empty results instead of errors.";
     
     // Original test logic preserved for reference:
-    auto path = JSONPath::create(u"$.foo.bar[5]");
+    auto path{JSONPath::create(u"$.foo.bar[5]")};
     ASSERT_TRUE(path);
 
     {

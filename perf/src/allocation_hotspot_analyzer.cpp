@@ -48,7 +48,7 @@ public:
         };
         
         for (const auto& [testName, jsonPath, description] : testCases) {
-            auto result = analyzeOperation(testName, jsonPath, rootValue, description);
+            auto result{analyzeOperation(testName, jsonPath, rootValue, description)};
             results.push_back(result);
         }
         
@@ -100,25 +100,25 @@ private:
                                         const QJsonValue& testData, const std::string& description) {
         try {
             // Compile JSONPath
-            auto pathResult = JSONPath::create(jsonPath);
+            auto pathResult{JSONPath::create(jsonPath)};
             if (!pathResult) {
                 return {testName, 0, 0, 0, 0, "Compilation failed"};
             }
             
-            auto path = std::move(*pathResult);
+            auto path{std::move(*pathResult)};
             
             // Warm up
             for (int i = 0; i < 5; ++i) {
-                auto result = path.evaluate(testData);
+                auto result{path.evaluate(testData)};
             }
             
             // Measure memory and performance
             const int iterations = 100;
-            auto start = std::chrono::high_resolution_clock::now();
+            auto start{std::chrono::high_resolution_clock::now()};
             
             size_t totalResults = 0;
             for (int i = 0; i < iterations; ++i) {
-                auto result = path.evaluate(testData);
+                auto result{path.evaluate(testData)};
                 if (result) {
                     if (result->isArray()) {
                         totalResults += result->toArray().size();
@@ -128,8 +128,8 @@ private:
                 }
             }
             
-            auto end = std::chrono::high_resolution_clock::now();
-            auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+            auto end{std::chrono::high_resolution_clock::now()};
+            auto duration{std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)};
             
             double avgDuration = static_cast<double>(duration.count()) / iterations;
             size_t avgResults = totalResults / iterations;
@@ -167,7 +167,7 @@ private:
 int main() {
     std::cout << "=== JSONPath Memory Allocation Hotspot Analysis ===\n\n";
     
-    auto results = AllocationHotspotAnalyzer::analyzeAllocationHotspots();
+    auto results{AllocationHotspotAnalyzer::analyzeAllocationHotspots()};
     
     std::cout << "| Operation | Peak Memory (MB) | Avg Duration (ns) | Result Count | Memory/Result | Primary Bottleneck |\n";
     std::cout << "|-----------|------------------|-------------------|--------------|---------------|--------------------|\n";

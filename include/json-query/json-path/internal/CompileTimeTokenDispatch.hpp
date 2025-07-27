@@ -128,7 +128,7 @@ public:
             
             default:
                 // Fallback to original dispatch for other token types
-                const auto dispatch_fn = getDispatchFunction(tk.kind);
+                const auto dispatch_fn{getDispatchFunction(tk.kind)};
                 if (dispatch_fn == nullptr) [[unlikely]] {
                     return std::unexpected(EvalError::TypeMismatchObject);
                 }

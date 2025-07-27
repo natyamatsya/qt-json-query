@@ -31,7 +31,7 @@ QJsonValue evaluateContextFunction(const QString& funcExpr, const QJsonValue& co
             QString prop = args.mid(2);
             if (context.isObject()) {
                 // Use ContextAwareContainerCursor for efficient object property access
-                auto cursor = makeSimpleContextCursor(context.toObject(), root, context);
+                auto cursor{makeSimpleContextCursor(context.toObject(), root, context)};
                 
                 // Find the property using zero-copy iteration
                 for (const auto& [value, ctx] : cursor) {
@@ -58,11 +58,11 @@ QJsonValue evaluateContextFunction(const QString& funcExpr, const QJsonValue& co
         
         // Use ContextAwareContainerCursor for efficient length calculation
         if (argValue.isArray()) {
-            auto cursor = makeSimpleContextCursor(argValue.toArray(), root, context);
+            auto cursor{makeSimpleContextCursor(argValue.toArray(), root, context)};
             return QJsonValue{cursor.size()}; // Zero-copy size access
         }
         if (argValue.isObject()) {
-            auto cursor = makeSimpleContextCursor(argValue.toObject(), root, context);
+            auto cursor{makeSimpleContextCursor(argValue.toObject(), root, context)};
             return QJsonValue{cursor.size()}; // Zero-copy size access
         }
         
@@ -75,16 +75,16 @@ QJsonValue evaluateContextFunction(const QString& funcExpr, const QJsonValue& co
         if (args.startsWith("$")) {
             // This is a JSONPath expression that needs to be evaluated against the root
             using json_query::JSONPath;
-            auto path = JSONPath::create(args);
+            auto path{JSONPath::create(args)};
             if (path) {
                 // Evaluate against root document with context awareness
-                auto results = path->evaluateAll(root);
+                auto results{path->evaluateAll(root)};
                 if (results) {
                     if (results->isEmpty()) {
                         return QJsonValue{0}; // Return 0 for empty results (RFC 9535 "nothing" semantics)
                     } else {
                         // Use ContextAwareContainerCursor for efficient result processing
-                        auto cursor = makeSimpleContextCursor(*results, root, context);
+                        auto cursor{makeSimpleContextCursor(*results, root, context)};
                         
                         // Return the first result, with context-aware processing
                         for (const auto& [result, ctx] : cursor) {
@@ -104,7 +104,7 @@ QJsonValue evaluateContextFunction(const QString& funcExpr, const QJsonValue& co
             QString prop = args.mid(2);
             if (context.isObject()) {
                 // Use context-aware cursor for efficient property access
-                auto cursor = makeSimpleContextCursor(context.toObject(), root, context);
+                auto cursor{makeSimpleContextCursor(context.toObject(), root, context)};
                 
                 // Traditional property access (cursor doesn't expose keys in current interface)
                 QJsonValue val = context.toObject().value(prop);
@@ -128,7 +128,7 @@ std::optional<Token> parseAbsolutePathContext(const QString& s, std::vector<Cont
     // Only accept simple absolute path references in comparisons per RFC 9535
     // Valid: $==@, $.foo==@.bar, $.a.b==42
     // Invalid: $.*==42, $[*]==42, $..foo==42 (non-singular queries)
-    static const auto absComparisonPat = ctre::match<R"(\$(\.[a-zA-Z_][a-zA-Z0-9_]*)*\s*(==|!=|<=|>=|<|>)\s*(.+))">;
+    static const auto absComparisonPat{ctre::match<R"(\$(\.[a-zA-Z_][a-zA-Z0-9_]*)*\s*(==|!=|<=|>=|<|>)\s*(.+))">};
     if (auto match = absComparisonPat(s.toStdString())) {
         qCDebug(jsonPathLog) << "parseAbsolutePathContext: matched simple absolute path comparison:" << s;
         
@@ -164,12 +164,12 @@ std::optional<Token> parseAbsolutePathContext(const QString& s, std::vector<Cont
                 leftValue = root;
             } else {
                 try {
-                    auto absolutePath = json_query::JSONPath::create(QString::fromStdString(leftPath));
+                    auto absolutePath{json_query::JSONPath::create(QString::fromStdString(leftPath))};
                     if (absolutePath) {
-                        auto results = absolutePath->evaluateAll(root);
+                        auto results{absolutePath->evaluateAll(root)};
                         if (results && !results->isEmpty()) {
                             // Use ContextAwareContainerCursor for efficient result processing
-                            auto cursor = internal::makeSimpleContextCursor(*results, root, node);
+                            auto cursor{internal::makeSimpleContextCursor(*results, root, node)};
                             
                             // Get first result using zero-copy iteration
                             for (const auto& [result, ctx] : cursor) {
@@ -206,7 +206,7 @@ std::optional<Token> parseAbsolutePathContext(const QString& s, std::vector<Cont
                         QString propName = relativePath.mid(1);
                         if (node.isObject()) {
                             // Use context-aware cursor for efficient property lookup
-                            auto cursor = makeSimpleContextCursor(node.toObject(), root, node);
+                            auto cursor{makeSimpleContextCursor(node.toObject(), root, node)};
                             
                             // Traditional property access (cursor doesn't expose keys in current interface)
                             rightValue = node.toObject().value(propName);
@@ -346,7 +346,7 @@ std::optional<Token> parseAbsolutePathContext(const QString& s, std::vector<Cont
                             QString prop = left.mid(9, left.length() - 10); // Extract property name
                             if (node.isObject()) {
                                 // Use context-aware cursor for efficient property existence check
-                                auto cursor = internal::makeSimpleContextCursor(node.toObject(), root, node);
+                                auto cursor{internal::makeSimpleContextCursor(node.toObject(), root, node)};
                                 
                                 // Check property existence and null values using traditional access
                                 // (cursor doesn't expose keys in current interface)
@@ -360,7 +360,7 @@ std::optional<Token> parseAbsolutePathContext(const QString& s, std::vector<Cont
                         QString prop = left.mid(2);
                         if (node.isObject()) {
                             // Use context-aware cursor for efficient property access
-                            auto cursor = makeSimpleContextCursor(node.toObject(), root, node);
+                            auto cursor{makeSimpleContextCursor(node.toObject(), root, node)};
                             
                             // Traditional property access (cursor doesn't expose keys)
                             QJsonValue val = node.toObject().value(prop);
@@ -382,15 +382,15 @@ std::optional<Token> parseAbsolutePathContext(const QString& s, std::vector<Cont
                         if (right.startsWith("value($")) {
                             using json_query::JSONPath;
                             QString pathStr = right.mid(6, right.length() - 7); // Extract path
-                            auto path = JSONPath::create(pathStr);
+                            auto path{JSONPath::create(pathStr)};
                             if (path) {
-                                auto results = path->evaluateAll(root);
+                                auto results{path->evaluateAll(root)};
                                 if (results) {
                                     if (results->isEmpty()) {
                                         rightIsNothing = true;
                                     } else {
                                         // Use context-aware cursor for efficient result validation
-                                        auto cursor = makeSimpleContextCursor(*results, root, node);
+                                        auto cursor{makeSimpleContextCursor(*results, root, node)};
                                         
                                         // Check if results are effectively empty using zero-copy iteration
                                         bool hasValidResults = false;
@@ -412,7 +412,7 @@ std::optional<Token> parseAbsolutePathContext(const QString& s, std::vector<Cont
                         QString prop = right.mid(2);
                         if (node.isObject()) {
                             // Use context-aware cursor for efficient property access
-                            auto cursor = makeSimpleContextCursor(node.toObject(), root, node);
+                            auto cursor{makeSimpleContextCursor(node.toObject(), root, node)};
                             
                             // Traditional property access (cursor doesn't expose keys)
                             QJsonValue val = node.toObject().value(prop);
@@ -461,7 +461,7 @@ std::optional<Token> parseAbsolutePathContext(const QString& s, std::vector<Cont
     // Check for absolute path existence filters (allow wildcards and complex paths)
     // Valid: $, $.foo, $==@.value, $==$, etc.
     
-    static const auto absExistencePat = ctre::match<R"(\$(\.[a-zA-Z_*][a-zA-Z0-9_]*|\[\d+\]|\[.*\])*)">;
+    static const auto absExistencePat{ctre::match<R"(\$(\.[a-zA-Z_*][a-zA-Z0-9_]*|\[\d+\]|\[.*\])*)">};
     if (absExistencePat(s.toStdString())) {
         qCDebug(jsonPathLog) << "parseAbsolutePathContext: matched absolute path existence filter:" << s;
         
@@ -493,9 +493,9 @@ std::optional<Token> parseAbsolutePathContext(const QString& s, std::vector<Cont
                 // For patterns like "$.a", "$.*.a", etc., try to evaluate against root
                 try {
                     // Create a temporary JSONPath to evaluate the absolute path
-                    auto absolutePath = json_query::JSONPath::create(s);
+                    auto absolutePath{json_query::JSONPath::create(s)};
                     if (absolutePath) {
-                        auto results = absolutePath->evaluateAll(root);
+                        auto results{absolutePath->evaluateAll(root)};
                         if (results && !results->isEmpty()) {
                             return true;
                         }

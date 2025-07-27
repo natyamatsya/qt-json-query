@@ -77,7 +77,7 @@ std::optional<Slice> makeSlice(QStringView v)
     }
     if (!sliceFull(v.toString().toStdString()))
         return std::nullopt;
-    const auto parts = v.split(u':');
+    const auto parts{v.split(u':')};
     if (parts.size() > 3)
         return std::nullopt; // too many colons
     std::optional<qsizetype> startOpt, endOpt, stepOpt;

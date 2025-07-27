@@ -35,7 +35,7 @@ int main() {
     try {
         // Test 1: Create storage with large lambda
         std::cout << "1. Creating CompactContextFilterStorage with large lambda...\n";
-        auto largeLambda = createLargeLambda();
+        auto largeLambda{createLargeLambda()};
         
         // Verify the lambda is large enough to require heap allocation
         std::cout << "   Lambda size: " << sizeof(largeLambda) << " bytes\n";
@@ -77,7 +77,7 @@ int main() {
         
         // Test 5: Test move constructor
         std::cout << "\n5. Testing move constructor...\n";
-        auto anotherLargeLambda = createLargeLambda();
+        auto anotherLargeLambda{createLargeLambda()};
         CompactContextFilterStorage<32> originalStorage(std::move(anotherLargeLambda));
         CompactContextFilterStorage<32> movedStorage(std::move(originalStorage));
         

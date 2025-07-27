@@ -21,7 +21,7 @@ namespace jayway_parity
 // Jayway expects silent ignore; disabled for spec compliance.
 TEST(JaywayDeepScanParity, DISABLED_NonArraySubscriptionIgnored)
 {
-    auto path = JSONPath::create(u"$..[2][3]");
+    auto path{JSONPath::create(u"$..[2][3]")};
     ASSERT_TRUE(path);
 
     {
@@ -42,7 +42,7 @@ TEST(JaywayDeepScanParity, DISABLED_NonArraySubscriptionIgnored)
 // RFC 9535 defines this as an invalid subscription (should raise an error / yield empty).
 TEST(JaywayDeepScanParity, DISABLED_NullSubscriptionIgnored)
 {
-    auto path = JSONPath::create(u"$..[2][3]");
+    auto path{JSONPath::create(u"$..[2][3]")};
     ASSERT_TRUE(path);
 
     {
@@ -67,12 +67,12 @@ TEST(JaywayDeepScanParity, DISABLED_NullSubscriptionIgnored)
 // error (or empty result). Disabled until we decide to support Jayway behaviour.
 TEST(JaywayDeepScanParity, DISABLED_ArrayIndexOobIgnored)
 {
-    auto path1 = JSONPath::create(u"$..[4]");
+    auto path1{JSONPath::create(u"$..[4]")};
     ASSERT_TRUE(path1);
     QJsonArray r1 = evalArray(*path1, parseJson(R"({"x": [0,1,[0,1,2,3,10],null]})"));
     EXPECT_THAT(r1, ElementsAre(IsJsonInt(10)));
 
-    auto path2 = JSONPath::create(u"$..[2][3]");
+    auto path2{JSONPath::create(u"$..[2][3]")};
     ASSERT_TRUE(path2);
     QJsonArray r2 = evalArray(*path2, parseJson(R"({"x": [null,null,[0,1,2,3]], "y": [null,null,[0,1]]})"));
     EXPECT_THAT(r2, ElementsAre(IsJsonInt(3)));
@@ -86,7 +86,7 @@ TEST(JaywayDeepScanParity, DISABLED_ArrayIndexOobIgnored)
 TEST(JaywayDeepScanParity, DISABLED_DefiniteUpstreamIllegalArrayAccessThrows)
 {
     const char* doc = R"({"foo": {"bar": 4}})";
-    auto jp = JSONPath::create(u"$.foo.bar[5]");
+    auto jp{JSONPath::create(u"$.foo.bar[5]")};
     ASSERT_TRUE(jp);
 
     // Future behaviour: evaluating should return an unexpected<ErrorCode>.
@@ -139,7 +139,7 @@ TEST(JaywayDeepScanParity, LeafMultiPropsWork)
         {"a": "a-val"}
     ])";
 
-    auto path = JSONPath::create(u"$..['a','c']");
+    auto path{JSONPath::create(u"$..['a','c']")};
     ASSERT_TRUE(path);
     QJsonArray result = evalArray(*path, parseJson(jsonSrc));
     EXPECT_THAT(result, ElementsAre(JsonObjContains(kvlist(kv("a","a-val"), kv("b","b-val"), kv("c","c-val")))));
@@ -152,7 +152,7 @@ TEST(JaywayDeepScanParity, ScanForSingleProperty)
         {"b": "bb"},
         {"b": "bb", "ab": {"a": "aa", "b": "bb"}}
     ])";
-    auto path = JSONPath::create(u"$..['a']");
+    auto path{JSONPath::create(u"$..['a']")};
     ASSERT_TRUE(path);
     QJsonArray result = evalArray(*path, parseJson(jsonSrc));
     // Expect: "aa", {"a":"aa"}, "aa"
@@ -170,7 +170,7 @@ TEST(JaywayDeepScanParity, ScanForPropertyPath)
         {"a": {"x": "xx"}},
         {"z": {"a": {"x": "xx"}}}
     ])";
-    auto path = JSONPath::create(u"$..['a'].x");
+    auto path{JSONPath::create(u"$..['a'].x")};
     ASSERT_TRUE(path);
     QJsonArray result = evalArray(*path, parseJson(jsonSrc));
     EXPECT_THAT(result, ElementsAre(IsJsonString("xx"), IsJsonString("xx")));
@@ -203,7 +203,7 @@ TEST(JaywayDeepScanParity, DeepScanPathDefault)
         }
     })";
 
-    auto path = JSONPath::create(u"$..array[0]");
+    auto path{JSONPath::create(u"$..array[0]")};
     ASSERT_TRUE(path);
 
     QJsonArray result = evalArray(*path, parseJson(jsonSrc));

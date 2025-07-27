@@ -114,7 +114,7 @@ public:
         const Token& tk,
         const QJsonValue& v) noexcept {
         
-        auto pooledArray = acquirePooledArray();
+        auto pooledArray{acquirePooledArray()};
         QJsonArray& out = *pooledArray;
         
         // Extract key from filter expression (remove @. prefix)
@@ -162,7 +162,7 @@ public:
         const Token& tk,
         const QJsonValue& v) noexcept {
         
-        auto pooledArray = acquirePooledArray();
+        auto pooledArray{acquirePooledArray()};
         QJsonArray& out = *pooledArray;
         
         // Parse key and value from expression like "@.key == 'value'"
@@ -191,7 +191,7 @@ public:
             for (const auto& item : arr) {
                 if (item.isObject()) {
                     const QJsonObject obj = item.toObject();
-                    const auto it = obj.find(key);
+                    const auto it{obj.find(key)};
                     if (it != obj.end() && it.value().toString() == value) {
                         out.append(item);
                     }
@@ -203,7 +203,7 @@ public:
                 const QJsonValue& val = it.value();
                 if (val.isObject()) {
                     const QJsonObject valObj = val.toObject();
-                    const auto keyIt = valObj.find(key);
+                    const auto keyIt{valObj.find(key)};
                     if (keyIt != valObj.end() && keyIt.value().toString() == value) {
                         out.append(val);
                     }
@@ -227,7 +227,7 @@ public:
         const Token& tk,
         const QJsonValue& v) noexcept {
         
-        auto pooledArray = acquirePooledArray();
+        auto pooledArray{acquirePooledArray()};
         QJsonArray& out = *pooledArray;
         
         // Parse numeric comparison expression
@@ -281,7 +281,7 @@ public:
             for (const auto& item : arr) {
                 if (item.isObject()) {
                     const QJsonObject obj = item.toObject();
-                    const auto it = obj.find(key);
+                    const auto it{obj.find(key)};
                     if (it != obj.end()) {
                         const double itemValue = it.value().toDouble();
                         bool matches = false;
@@ -315,7 +315,7 @@ public:
         const Token& tk,
         const QJsonValue& v) noexcept {
         
-        auto pooledArray = acquirePooledArray();
+        auto pooledArray{acquirePooledArray()};
         QJsonArray& out = *pooledArray;
         
         // Parse length comparison expression
@@ -363,7 +363,7 @@ public:
             for (const auto& item : arr) {
                 if (item.isObject()) {
                     const QJsonObject obj = item.toObject();
-                    const auto it = obj.find(key);
+                    const auto it{obj.find(key)};
                     if (it != obj.end() && it.value().isArray()) {
                         const int arrayLength = it.value().toArray().size();
                         bool matches = false;

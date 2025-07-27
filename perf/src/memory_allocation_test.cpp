@@ -39,7 +39,7 @@ public:
 
     void recordDeallocation(void* ptr) {
         std::lock_guard<std::mutex> lock(mutex_);
-        auto it = allocations_.find(ptr);
+        auto it{allocations_.find(ptr)};
         if (it != allocations_.end()) {
             totalDeallocated_ += it->second.size;
             deallocationCount_++;
@@ -160,27 +160,27 @@ BenchmarkResult benchmarkWithMemoryTracking(const std::string& jsonPath, const Q
     MemoryTracker::instance().reset();
     
     // Compile JSONPath - convert std::string to QString for Qt API
-    auto pathResult = JSONPath::create(QString::fromStdString(jsonPath));
+    auto pathResult{JSONPath::create(QString::fromStdString(jsonPath))};
     if (!pathResult) {
         throw std::runtime_error("Failed to compile JSONPath: " + jsonPath);
     }
     
-    auto path = std::move(*pathResult);
+    auto path{std::move(*pathResult)};
     
     // Warm up
     for (int i = 0; i < 10; ++i) {
-        auto result = path.evaluate(testData);
+        auto result{path.evaluate(testData)};
     }
     
     // Reset tracker after warmup
     MemoryTracker::instance().reset();
     
     // Benchmark with memory tracking
-    auto start = std::chrono::high_resolution_clock::now();
+    auto start{std::chrono::high_resolution_clock::now()};
     size_t peakMemory = 0;
     
     for (int i = 0; i < iterations; ++i) {
-        auto result = path.evaluate(testData);
+        auto result{path.evaluate(testData)};
         
         // Track peak memory usage
         size_t currentMemory = MemoryTracker::instance().getTotalAllocated();
@@ -189,8 +189,8 @@ BenchmarkResult benchmarkWithMemoryTracking(const std::string& jsonPath, const Q
         }
     }
     
-    auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+    auto end{std::chrono::high_resolution_clock::now()};
+    auto duration{std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)};
     
     return {
         duration,
@@ -247,7 +247,7 @@ int main() {
     
     for (const auto& [testName, jsonPath] : testCases) {
         try {
-            auto result = benchmarkWithMemoryTracking(jsonPath, rootValue, 1000);
+            auto result{benchmarkWithMemoryTracking(jsonPath, rootValue, 1000)};
             
             double avgDuration = static_cast<double>(result.duration.count()) / 1000.0;
             double allocsPerIteration = static_cast<double>(result.allocationCount) / 1000.0;

@@ -43,8 +43,8 @@ static void compareJson(const QJsonValue &actual, const QJsonValue &expected)
 
 TEST(JSONPathConformance, ValidPaths)
 {
-    const auto root = sampleDoc().object();
-    const auto books = root["store"].toObject()["book"].toArray();
+    const auto root{sampleDoc().object()};
+    const auto books{root["store"].toObject()["book"].toArray()};
 
     struct Case { QString path; QJsonValue expected; };
     const std::vector<Case> cases = {

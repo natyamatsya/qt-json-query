@@ -80,22 +80,22 @@ static QString editionIsbn_plain(const QJsonDocument &doc, int index)
 
 static QString editionIsbn_pointer(const QJsonDocument &doc, int index)
 {
-    auto ptr = JSONPointer::create(QString("/inventory/%1/details/edition/isbn").arg(index));
+    auto ptr{JSONPointer::create(QString("/inventory/%1/details/edition/isbn").arg(index))};
     if (!ptr) return {};
-    auto res = ptr->evaluate(doc);
+    auto res{ptr->evaluate(doc)};
     return res ? res->toString() : QString{};
 }
 
 static QString editionIsbn_path(const QJsonDocument &doc, int index)
 {
     auto pathResult{JSONPath::create(QString(u"$.inventory[%1].details.edition.isbn").arg(index))};
-    auto result = pathResult->evaluate(doc);
+    auto result{pathResult->evaluate(doc)};
     if (!result) {
         return QString{}; // Return empty string on error
     }
     QJsonValue r = *result;
     if (r.isArray()) {
-        const auto arr = r.toArray();
+        const auto arr{r.toArray()};
         return arr.isEmpty() ? QString{} : arr.first().toString();
     }
     return r.toString();
@@ -109,7 +109,7 @@ static QStringList titlesAbovePrice_jsonquery(const QJsonDocument &doc, double t
     // Build a JSONPath expression with the price threshold.
     QStringView pathView = QString("$.inventory[?(@.price > %1)].title").arg(threshold);
     auto query{ JSONPath::create(pathView) };
-    auto result = query->evaluate(doc);
+    auto result{query->evaluate(doc)};
     if (!result) {
         return QStringList(); // Return empty list on error
     }

@@ -58,7 +58,7 @@ public:
         };
         
         for (const auto& [testName, jsonPath] : testCases) {
-            auto result = benchmarkOptimization(testName, jsonPath, rootValue);
+            auto result{benchmarkOptimization(testName, jsonPath, rootValue)};
             results.push_back(result);
         }
         
@@ -79,7 +79,7 @@ public:
             arrays.back()->append(QJsonValue(i));
         }
         
-        auto stats = pool.getStats();
+        auto stats{pool.getStats()};
         std::cout << "Pool stats after 10 acquisitions:\n";
         std::cout << "  Total created: " << stats.totalCreated << "\n";
         std::cout << "  Acquisitions: " << stats.acquisitions << "\n";
@@ -95,7 +95,7 @@ public:
         
         // Acquire again to test reuse
         for (int i = 0; i < 5; ++i) {
-            auto array = pool.acquire();
+            auto array{pool.acquire()};
             array->append(QJsonValue(i * 10));
         }
         
@@ -128,18 +128,18 @@ public:
         QJsonValue rootValue(deepData);
         
         // Test iterative implementation
-        auto start = std::chrono::high_resolution_clock::now();
-        auto result = IterativeRecursiveDescent::evaluateIterativeArray(rootValue);
-        auto end = std::chrono::high_resolution_clock::now();
+        auto start{std::chrono::high_resolution_clock::now()};
+        auto result{IterativeRecursiveDescent::evaluateIterativeArray(rootValue)};
+        auto end{std::chrono::high_resolution_clock::now()};
         
-        auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+        auto duration{std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)};
         
         std::cout << "Iterative recursive descent:\n";
         std::cout << "  Duration: " << duration.count() << " ns\n";
         std::cout << "  Results: " << (result ? result->size() : 0) << "\n";
         std::cout << "  Success: " << (result ? "Yes" : "No") << "\n";
         
-        auto stats = IterativeRecursiveDescent::getStats();
+        auto stats{IterativeRecursiveDescent::getStats()};
         std::cout << "  Max stack depth: " << stats.maxStackDepth << "\n";
         std::cout << "  Total frames: " << stats.totalFramesProcessed << "\n";
     }
@@ -166,7 +166,7 @@ public:
             new(&structs[i]) TestStruct(i, i*2, i*3);
         }
         
-        auto stats = arena.getStats();
+        auto stats{arena.getStats()};
         std::cout << "Arena stats:\n";
         std::cout << "  Total allocated: " << stats.totalAllocated << " bytes\n";
         std::cout << "  Block count: " << stats.blockCount << "\n";
@@ -268,32 +268,32 @@ private:
     static TestResult benchmarkOptimization(const std::string& testName, const QString& jsonPath, const QJsonValue& testData) {
         try {
             // Compile JSONPath
-            auto pathResult = JSONPath::create(jsonPath);
+            auto pathResult{JSONPath::create(jsonPath)};
             if (!pathResult) {
                 return {testName, 0, 0, 0, 0, 0, 0, false};
             }
             
-            auto path = std::move(*pathResult);
+            auto path{std::move(*pathResult)};
             
             // Warm up
             for (int i = 0; i < 3; ++i) {
-                auto result = path.evaluate(testData);
+                auto result{path.evaluate(testData)};
             }
             
             // Baseline measurement (before optimization)
             const int iterations = 50;
-            auto start = std::chrono::high_resolution_clock::now();
+            auto start{std::chrono::high_resolution_clock::now()};
             
             for (int i = 0; i < iterations; ++i) {
-                auto result = path.evaluate(testData);
+                auto result{path.evaluate(testData)};
             }
             
-            auto end = std::chrono::high_resolution_clock::now();
-            auto baselineDuration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+            auto end{std::chrono::high_resolution_clock::now()};
+            auto baselineDuration{std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)};
             double avgBaseline = static_cast<double>(baselineDuration.count()) / iterations;
             
             // Test RFC compliance
-            auto testResult = path.evaluate(testData);
+            auto testResult{path.evaluate(testData)};
             bool rfcCompliant = testResult.has_value();
             
             // For this test, we assume optimized version has same performance characteristics
@@ -328,7 +328,7 @@ int main() {
     
     // Run comprehensive benchmark
     std::cout << "\n=== Comprehensive Performance Benchmark ===\n";
-    auto results = MemoryOptimizationTest::runComprehensiveTest();
+    auto results{MemoryOptimizationTest::runComprehensiveTest()};
     
     std::cout << "\n| Test Case | Baseline (ns) | Optimized (ns) | Improvement | Alloc Reduction | RFC Compliant |\n";
     std::cout << "|-----------|---------------|----------------|-------------|-----------------|---------------|\n";

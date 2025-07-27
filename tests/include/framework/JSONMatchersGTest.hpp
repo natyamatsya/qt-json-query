@@ -49,7 +49,7 @@ inline QJsonDocument parseJson(const char* src)
 // Evaluate a compiled JSONPath against a document and return the raw value.
 inline QJsonValue eval(const JSONPath& path, const QJsonDocument& doc)
 {
-    auto result = path.evaluate(doc);
+    auto result{path.evaluate(doc)};
     if (!result) {
         // Return null value on evaluation error instead of throwing
         return QJsonValue{};
@@ -60,13 +60,13 @@ inline QJsonValue eval(const JSONPath& path, const QJsonDocument& doc)
 // Convenience overload that compiles the path each call (avoid in hot code).
 inline QJsonValue eval(QStringView path, const QJsonDocument& doc)
 {
-    auto p = JSONPath::create(path);
+    auto p{JSONPath::create(path)};
     if (!p) {
         // Return null value on compilation error instead of throwing
         return QJsonValue{};
     }
     
-    auto result = p->evaluate(doc);
+    auto result{p->evaluate(doc)};
     if (!result) {
         // Return null value on evaluation error instead of throwing
         return QJsonValue{};
@@ -79,7 +79,7 @@ inline QJsonValue eval(QStringView path, const QJsonDocument& doc)
 // so caller can treat uniformly.
 inline QJsonArray evalArray(const JSONPath& path, const QJsonDocument& doc)
 {
-    auto result = path.evaluateAll(doc);
+    auto result{path.evaluateAll(doc)};
     if (!result) {
         // Return empty array on evaluation error instead of throwing
         return QJsonArray{};
@@ -89,13 +89,13 @@ inline QJsonArray evalArray(const JSONPath& path, const QJsonDocument& doc)
 
 inline QJsonArray evalArray(QStringView path, const QJsonDocument& doc)
 {
-    auto p = JSONPath::create(path);
+    auto p{JSONPath::create(path)};
     if (!p) {
         // Return empty array on compilation error instead of throwing
         return QJsonArray{};
     }
     
-    auto result = p->evaluateAll(doc);
+    auto result{p->evaluateAll(doc)};
     if (!result) {
         // Return empty array on evaluation error instead of throwing
         return QJsonArray{};
@@ -117,11 +117,11 @@ using EvalResult = std::expected<QJsonValue, Error>;
 inline std::expected<QJsonValue, json_query::json_path::Error> evalExp(QStringView path,
                           const QJsonDocument& doc)
 {
-    auto compiled = JSONPath::create(path);
+    auto compiled{JSONPath::create(path)};
     if (!compiled)
         return std::unexpected(compiled.error());
     
-    auto result = compiled->evaluate(doc);
+    auto result{compiled->evaluate(doc)};
     if (!result) {
         // For now, we need to convert EvalError to Error since the return type expects Error
         // In the future, we might want to have a unified error type or return std::variant
@@ -206,7 +206,7 @@ MATCHER_P(IsJsonInt, expected, "JSON int equals")
 MATCHER_P(JsonObjContains, kvPairs, "object contains key/value pairs")
 {
     if (!arg.isObject()) return false;
-    const auto obj = arg.toObject();
+    const auto obj{arg.toObject()};
     for (const auto &pair : kvPairs)
     {
         const QString &key = pair.first;

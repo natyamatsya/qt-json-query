@@ -163,7 +163,7 @@ std::expected<qsizetype, Error> parseBracket(qsizetype pos, QStringView sv,
     BracketSink sink(tokens, kb, contextFilters, filters, currentBracketGroupId);
 
     // Use TableGen rule dispatcher to process the bracket content
-    auto result = BracketRuleDispatcher::dispatch(content, sink);
+    auto result{BracketRuleDispatcher::dispatch(content, sink)};
     if (!result) {
         qCDebug(jsonPathLog) << "parseBracket: BracketRuleDispatcher::dispatch failed";
         return std::unexpected(result.error());
@@ -246,7 +246,7 @@ std::expected<qsizetype, Error> parseEmbeddedBracket(qsizetype pos, QStringView 
     EmbeddedBracketSink sink(tokens, kb, currentBracketGroupId);
 
     // Use embedded rule dispatcher to process the bracket content
-    auto result = EmbeddedBracketRuleDispatcher::dispatch(content, sink);
+    auto result{EmbeddedBracketRuleDispatcher::dispatch(content, sink)};
     if (!result) {
         qCDebug(jsonPathLog) << "parseEmbeddedBracket: EmbeddedBracketRuleDispatcher::dispatch failed";
         return std::unexpected(result.error());

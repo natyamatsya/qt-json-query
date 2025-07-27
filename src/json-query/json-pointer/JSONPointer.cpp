@@ -37,7 +37,7 @@ JSONPointer::EvalResult JSONPointer::evaluate(QJsonDocument const& doc) const
 
 JSONPointer::EvalResult JSONPointer::evaluate(QJsonValue const& value) const
 {
-    auto res = json_pointer::detail::evaluatePointer(m_tokens, value);
+    auto res{json_pointer::detail::evaluatePointer(m_tokens, value)};
     if (res)
         return res.value();
     return std::unexpected(res.error());

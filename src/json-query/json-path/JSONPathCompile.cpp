@@ -244,7 +244,7 @@ std::expected<json_query::json_path::Compiled, json_query::json_path::Error> com
     qsizetype pos = 1;
     while (pos < sv.size()) {
         // Use compile-time character parsing dispatch
-        auto nextPosResult = CharacterParsingDispatcher::dispatch(pos, sv, kb, tokens);
+        auto nextPosResult{CharacterParsingDispatcher::dispatch(pos, sv, kb, tokens)};
         
         if (!nextPosResult) {
             qCDebug(json_query::json_path::jsonPathLog) << "compilePath: parser returned error" << static_cast<int>(nextPosResult.error());

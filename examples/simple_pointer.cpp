@@ -17,13 +17,13 @@ int main(int argc, char **argv)
     QJsonDocument doc(obj);
 
     // Create JSON Pointer via factory
-    auto pointer = JSONPointer::create(QStringLiteral("/foo"));
+    auto pointer{JSONPointer::create(QStringLiteral("/foo"))};
     if (!pointer) {
         qWarning() << "Invalid JSON Pointer.";
         return -1;
     }
 
-    auto res = pointer->evaluate(doc);
+    auto res{pointer->evaluate(doc)};
     qDebug() << (res ? res->toString() : QString("<err>"));
     return EXIT_SUCCESS;
 }

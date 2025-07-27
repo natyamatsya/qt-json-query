@@ -93,7 +93,7 @@ public:
         collector.clear();
         collector.reserve(32); // Pre-allocate reasonable capacity
         
-        auto result = evaluateIterative(rootValue, collector);
+        auto result{evaluateIterative(rootValue, collector)};
         if (!result) {
             return std::unexpected(result.error());
         }
@@ -345,7 +345,7 @@ public:
                 
                 // Phase 3: Direct key lookup for target field (fastest path)
                 if (Q_LIKELY(!targetField.isEmpty())) {
-                    auto it = obj.find(QString(targetField));
+                    auto it{obj.find(QString(targetField))};
                     if (Q_LIKELY(it != obj.end())) {
                         collector.collect(it.value());
                     }

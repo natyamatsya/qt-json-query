@@ -10,7 +10,7 @@ QJsonDocument parseJson(const char* json) {
 }
 
 int main() {
-    auto path = JSONPath::create(u"$.foo.bar[5]");
+    auto path{JSONPath::create(u"$.foo.bar[5]")};
     if (!path) {
         std::cout << "Failed to create path\n";
         return 1;

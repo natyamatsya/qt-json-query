@@ -126,7 +126,7 @@ public:
     }
     
     void endAnalysis(const std::string& testName = "") {
-        auto endTime = std::chrono::high_resolution_clock::now();
+        auto endTime{std::chrono::high_resolution_clock::now()};
         metrics_.totalTime = std::chrono::duration_cast<std::chrono::nanoseconds>(endTime - startTime_);
         metrics_.calculateCacheMetrics();
         
@@ -243,11 +243,11 @@ private:
         analyzer_.startAnalysis(testName.toStdString());
         
         // Perform the JSONPath query using the factory method
-        auto jsonPathResult = json_query::JSONPath::create(pattern);
+        auto jsonPathResult{json_query::JSONPath::create(pattern)};
         std::optional<QJsonArray> result;
         
         if (jsonPathResult) {
-            auto evalResult = jsonPathResult->evaluateAll(data);
+            auto evalResult{jsonPathResult->evaluateAll(data)};
             if (evalResult) {
                 result = *evalResult;
             }
@@ -255,7 +255,7 @@ private:
         
         analyzer_.endAnalysis(testName.toStdString());
         
-        const auto& metrics = analyzer_.getMetrics();
+        const auto& metrics{analyzer_.getMetrics()};
         
         std::cout << "Pattern: " << pattern.toStdString() << std::endl;
         std::cout << "Results: " << (result ? result->size() : 0) << " items" << std::endl;
@@ -288,15 +288,15 @@ public:
 #endif
         
         // Test 1: Deep recursive descent
-        auto deepData = TestDataGenerator::generateDeepNestedObject(8, 4);
+        auto deepData{TestDataGenerator::generateDeepNestedObject(8, 4)};
         analyzeRecursivePattern(deepData, "$..title", "Deep_Recursive_Descent");
         
         // Test 2: Wide array traversal  
-        auto arrayData = TestDataGenerator::generateLargeArray(1000);
+        auto arrayData{TestDataGenerator::generateLargeArray(1000)};
         analyzeRecursivePattern(arrayData, "$[*].title", "Wide_Array_Traversal");
         
         // Test 3: Mixed structure traversal
-        auto mixedData = TestDataGenerator::generateMixedStructure();
+        auto mixedData{TestDataGenerator::generateMixedStructure()};
         analyzeRecursivePattern(mixedData, "$.store..title", "Mixed_Structure_Traversal");
         
         // Test 4: Multiple field access

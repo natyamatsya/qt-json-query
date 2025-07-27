@@ -12,18 +12,18 @@ using namespace ::testing;
 
 static QJsonValue evalPtr(QStringView ptr, const QJsonDocument &doc)
 {
-    auto jp = JSONPointer::create(ptr);
+    auto jp{JSONPointer::create(ptr)};
     EXPECT_TRUE(jp) << qPrintable(QStringLiteral("Pointer invalid: %1").arg(QString(ptr)));
-    auto res = jp->evaluate(doc);
+    auto res{jp->evaluate(doc)};
     return res ? res.value() : QJsonValue{QJsonValue::Undefined};
 }
 
 TEST(JSONPointerBasic, EmptyPointer)
 {
     QJsonDocument doc(QJsonObject{{"foo","bar"}});
-    auto p = JSONPointer::create(QStringLiteral(""));
+    auto p{JSONPointer::create(QStringLiteral(""))};
     ASSERT_TRUE(p);
-    auto valRes = p->evaluate(doc);
+    auto valRes{p->evaluate(doc)};
     EXPECT_TRUE(valRes);
     EXPECT_THAT(valRes.value(), JsonObjContains(kvlist(kv("foo","bar"))));
 }
@@ -67,7 +67,7 @@ TEST(JSONPointerEscaping, SlashTilde)
 
 TEST(JSONPointerError, InvalidPointer)
 {
-    auto invalid = JSONPointer::create(QStringLiteral("foo/bar"));
+    auto invalid{JSONPointer::create(QStringLiteral("foo/bar"))};
     EXPECT_FALSE(invalid);
 }
 

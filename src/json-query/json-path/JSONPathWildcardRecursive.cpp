@@ -19,11 +19,11 @@ using internal::IterativeRecursiveDescent;
 static std::expected<QJsonArray, EvalError> evaluateWildcardObjectImpl(const QJsonObject& obj)
 {
     // Use pooled array to reduce allocations
-    auto pooledArray = acquirePooledArray();
+    auto pooledArray{acquirePooledArray()};
     QJsonArray& out = *pooledArray;
     
     // Use ContainerCursor for optimized, zero-copy iteration
-    auto cursor = ContainerCursor::object(obj);
+    auto cursor{ContainerCursor::object(obj)};
     for (const auto& value : cursor) {
         out.append(value);
     }
@@ -123,7 +123,7 @@ static std::expected<QJsonArray, EvalError> evaluateRecursiveDirectFastPath(
     QStringView targetField) {
     
     // Use pooled array for results
-    auto pooledArray = acquirePooledArray();
+    auto pooledArray{acquirePooledArray()};
     QJsonArray& results = *pooledArray;
     
     // Direct recursive traversal using function_ref - fixed approach
@@ -186,7 +186,7 @@ static std::expected<QJsonArray, EvalError> evaluateRecursiveOptimized(
     
     // Phase 3: Use advanced optimizations for simple patterns on complex documents
     if (!targetField.isEmpty() && complexity > 200) {
-        auto pooledArray = acquirePooledArray();
+        auto pooledArray{acquirePooledArray()};
         internal::ResultCollector collector(pooledArray.get());
         
         auto result = IterativeRecursiveDescent::evaluateIterativePhase3Optimized(
@@ -201,7 +201,7 @@ static std::expected<QJsonArray, EvalError> evaluateRecursiveOptimized(
     
     // Phase 2: Early termination for moderately complex documents
     if (!targetField.isEmpty() && complexity > 25) {
-        auto pooledArray = acquirePooledArray();
+        auto pooledArray{acquirePooledArray()};
         internal::ResultCollector collector(pooledArray.get());
         
         auto result = IterativeRecursiveDescent::evaluateIterativeWithEarlyTermination(
@@ -232,11 +232,11 @@ std::expected<QJsonArray, EvalError> wildcardObject(const QJsonObject& obj)
 std::expected<QJsonArray, EvalError> wildcardArray(const QJsonArray& arr)
 {
     // Use pooled array to reduce allocations
-    auto pooledArray = acquirePooledArray();
+    auto pooledArray{acquirePooledArray()};
     QJsonArray& out = *pooledArray;
     
     // Use ContainerCursor for optimized, zero-copy iteration
-    auto cursor = ContainerCursor::array(arr);
+    auto cursor{ContainerCursor::array(arr)};
     for (const auto& item : cursor) {
         out.append(item);
     }

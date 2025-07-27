@@ -19,7 +19,7 @@ int main(int argc, char *argv[])
     qDebug() << "Test document:" << doc.toJson(QJsonDocument::Compact);
     
     // Compile selector (exactly like CTS)
-    auto maybePath = JSONPath::create(QStringLiteral("$"));
+    auto maybePath{JSONPath::create(QStringLiteral("$"))};
     if (!maybePath.has_value()) {
         qDebug() << "Failed to compile:" << static_cast<int>(maybePath.error());
         return 1;

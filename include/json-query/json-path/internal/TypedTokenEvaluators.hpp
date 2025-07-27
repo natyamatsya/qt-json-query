@@ -52,13 +52,13 @@ struct TypedTokenEvaluator<Token::Kind::Key, QJsonValue::Object> {
     {
         // No type check needed - we know it's an object
         const QJsonObject obj = v.toObject();
-        const auto it = obj.find(tk.key);
+        const auto it{obj.find(tk.key)};
         if (it == obj.end()) {
             return QJsonArray{}; // Key not found
         }
         
         // Use ArrayPool for result optimization
-        auto pooledArray = acquirePooledArray();
+        auto pooledArray{acquirePooledArray()};
         QJsonArray& result = *pooledArray;
         result.append(it.value());
         
@@ -112,7 +112,7 @@ struct TypedTokenEvaluator<Token::Kind::Index, QJsonValue::Array> {
         }
         
         // Use ArrayPool for result optimization
-        auto pooledArray = acquirePooledArray();
+        auto pooledArray{acquirePooledArray()};
         QJsonArray& result = *pooledArray;
         result.append(arr[normalizedIndex]);
         
@@ -154,7 +154,7 @@ struct TypedTokenEvaluator<Token::Kind::Wildcard, QJsonValue::Object> {
         const QJsonObject obj = v.toObject();
         
         // Use ArrayPool for result optimization
-        auto pooledArray = acquirePooledArray();
+        auto pooledArray{acquirePooledArray()};
         QJsonArray& result = *pooledArray;
         
         // Collect all values from object
@@ -180,7 +180,7 @@ struct TypedTokenEvaluator<Token::Kind::Wildcard, QJsonValue::Array> {
         const QJsonArray arr = v.toArray();
         
         // Use ArrayPool for result optimization
-        auto pooledArray = acquirePooledArray();
+        auto pooledArray{acquirePooledArray()};
         QJsonArray& result = *pooledArray;
         
         // Collect all values from array

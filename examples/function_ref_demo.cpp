@@ -21,15 +21,15 @@ void process_with_std_function(std::function<int(int)> func, int value) {
 // Example 2: Performance comparison
 template<typename Callable>
 void benchmark_calls(const std::string& name, Callable&& func, int iterations) {
-    auto start = std::chrono::high_resolution_clock::now();
+    auto start{std::chrono::high_resolution_clock::now()};
     
     int sum = 0;
     for (int i = 0; i < iterations; ++i) {
         sum += func(i);
     }
     
-    auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    auto end{std::chrono::high_resolution_clock::now()};
+    auto duration{std::chrono::duration_cast<std::chrono::microseconds>(end - start)};
     
     std::cout << name << ": " << duration.count() << " μs (sum: " << sum << ")" << std::endl;
 }

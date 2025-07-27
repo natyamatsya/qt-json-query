@@ -82,7 +82,7 @@ int main(int argc, char *argv[]) {
         
         // Test small regular filter
         std::cout << "\n--- Small Regular Filter ---\n";
-        auto smallRegularFilter = createSmallRegularFilter();
+        auto smallRegularFilter{createSmallRegularFilter()};
         std::cout << "Small filter size: " << sizeof(smallRegularFilter) << " bytes\n";
         
         CompactFilterStorage<32> smallRegularStorage(std::move(smallRegularFilter));
@@ -95,7 +95,7 @@ int main(int argc, char *argv[]) {
         
         // Test large regular filter
         std::cout << "\n--- Large Regular Filter ---\n";
-        auto largeRegularFilter = createLargeRegularFilter();
+        auto largeRegularFilter{createLargeRegularFilter()};
         std::cout << "Large filter size: " << sizeof(largeRegularFilter) << " bytes\n";
         
         CompactFilterStorage<32> largeRegularStorage(std::move(largeRegularFilter));
@@ -110,7 +110,7 @@ int main(int argc, char *argv[]) {
         
         // Test small context filter
         std::cout << "\n--- Small Context Filter ---\n";
-        auto smallContextFilter = createSmallContextFilter();
+        auto smallContextFilter{createSmallContextFilter()};
         std::cout << "Small context filter size: " << sizeof(smallContextFilter) << " bytes\n";
         
         CompactContextFilterStorage<32> smallContextStorage(std::move(smallContextFilter));
@@ -123,7 +123,7 @@ int main(int argc, char *argv[]) {
         
         // Test large context filter
         std::cout << "\n--- Large Context Filter ---\n";
-        auto largeContextFilter = createLargeContextFilter();
+        auto largeContextFilter{createLargeContextFilter()};
         std::cout << "Large context filter size: " << sizeof(largeContextFilter) << " bytes\n";
         
         CompactContextFilterStorage<32> largeContextStorage(std::move(largeContextFilter));
@@ -148,7 +148,7 @@ int main(int argc, char *argv[]) {
         
         // Test move semantics
         std::cout << "\n--- Move Semantics ---\n";
-        auto anotherLargeFilter = createLargeContextFilter();
+        auto anotherLargeFilter{createLargeContextFilter()};
         CompactContextFilterStorage<32> originalForMove(std::move(anotherLargeFilter));
         CompactContextFilterStorage<32> movedStorage(std::move(originalForMove));
         

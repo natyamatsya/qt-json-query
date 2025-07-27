@@ -25,13 +25,13 @@ namespace jayway_parity
 TEST(JaywayPathCompilerParity, RootPathCanBeCompiled)
 {
     // "$" root
-    auto resDollar = compile(u"$");
+    auto resDollar{compile(u"$")};
     ASSERT_TRUE(resDollar.has_value()) << "Compilation of '$' failed";
     EXPECT_EQ(resDollar->compiled.tokens.size(), 1);
     EXPECT_EQ(resDollar->compiled.tokens.front().key, "$");
 
     // "@" root (current node)
-    auto resAt = compile(u"@");
+    auto resAt{compile(u"@")};
     ASSERT_TRUE(resAt.has_value()) << "Compilation of '@' failed";
     EXPECT_EQ(resAt->compiled.tokens.size(), 1);
     EXPECT_EQ(resAt->compiled.tokens.front().key, "@");
@@ -42,7 +42,7 @@ TEST(JaywayPathCompilerParity, RootPathCanBeCompiled)
 
 TEST(JaywayPathCompilerParity, CompileAtSymbol)
 {
-    auto resAt = compile(u"@");
+    auto resAt{compile(u"@")};
     ASSERT_TRUE(resAt.has_value()) << "Compilation of '@' failed";
     EXPECT_EQ(resAt->compiled.tokens.size(), 1);
     EXPECT_EQ(resAt->compiled.tokens.front().key, "@");
@@ -57,14 +57,14 @@ PATHCOMPILER_STUB(SquareBracketMayNotFollowPeriod, "Structural validator pending
 PATHCOMPILER_STUB(RootPathMustBeFollowedByPeriodOrBracket, "Validator pending");
 TEST(JaywayPathCompilerParity, PathMayNotEndWithPeriod)
 {
-    auto res = compile(u"$.");
+    auto res{compile(u"$.")};
     ASSERT_FALSE(res.has_value());
     EXPECT_EQ(res.error(), Error::TrailingDot);
 }
 
 TEST(JaywayPathCompilerParity, PathMayNotEndWithPeriod2)
 {
-    auto res = compile(u"$.prop.");
+    auto res{compile(u"$.prop.")};
     ASSERT_FALSE(res.has_value());
     EXPECT_EQ(res.error(), Error::TrailingDot);
 }
@@ -74,16 +74,16 @@ TEST(JaywayPathCompilerParity, PathMayNotEndWithPeriod2)
 
 TEST(JaywayPathCompilerParity, PropertyTokenCanBeCompiled)
 {
-    auto res1 = compile(u"$.prop");
+    auto res1{compile(u"$.prop")};
     ASSERT_TRUE(res1.has_value());
     ASSERT_EQ(res1->compiled.tokens.size(), 2);
     EXPECT_EQ(res1->compiled.tokens[1].key, "prop");
 
-    auto res2 = compile(u"$.1prop");
+    auto res2{compile(u"$.1prop")};
     ASSERT_TRUE(res2.has_value());
     EXPECT_EQ(res2->compiled.tokens[1].key, "1prop");
 
-    auto res3 = compile(u"$.@prop");
+    auto res3{compile(u"$.@prop")};
     ASSERT_TRUE(res3.has_value());
     EXPECT_EQ(res3->compiled.tokens[1].key, "@prop");
 }
@@ -91,7 +91,7 @@ TEST(JaywayPathCompilerParity, PropertyTokenCanBeCompiled)
 TEST(JaywayPathCompilerParity, BracketNotationPropertyTokenCanBeCompiled)
 {
     auto check = [](QStringView path, QStringView expect){
-        auto res = compile(path);
+        auto res{compile(path)};
         ASSERT_TRUE(res.has_value()) << "Compilation failed for " << path.toString().toStdString();
         ASSERT_EQ(res->compiled.tokens.size(), 2);
         EXPECT_EQ(res->compiled.tokens[1].key, expect);
@@ -106,13 +106,13 @@ TEST(JaywayPathCompilerParity, BracketNotationPropertyTokenCanBeCompiled)
 
 TEST(JaywayPathCompilerParity, MultiPropertyTokenCanBeCompiled)
 {
-    auto res1 = compile(u"$['prop0', 'prop1']");
+    auto res1{compile(u"$['prop0', 'prop1']")};
     ASSERT_TRUE(res1.has_value());
     ASSERT_EQ(res1->compiled.tokens.size(), 3);
     EXPECT_EQ(res1->compiled.tokens[1].key, "prop0");
     EXPECT_EQ(res1->compiled.tokens[2].key, "prop1");
 
-    auto res2 = compile(u"$[  'prop0'  , 'prop1'  ]");
+    auto res2{compile(u"$[  'prop0'  , 'prop1'  ]")};
     ASSERT_TRUE(res2.has_value());
     ASSERT_EQ(res2->compiled.tokens.size(), 3);
     EXPECT_EQ(res2->compiled.tokens[1].key, "prop0");
@@ -121,7 +121,7 @@ TEST(JaywayPathCompilerParity, MultiPropertyTokenCanBeCompiled)
 
 TEST(JaywayPathCompilerParity, PropertyMayNotContainBlanks)
 {
-    auto res = compile(u"$.foo bar");
+    auto res{compile(u"$.foo bar")};
     ASSERT_FALSE(res.has_value());
     EXPECT_EQ(res.error(), Error::BlankInKey);
 }
@@ -131,21 +131,21 @@ TEST(JaywayPathCompilerParity, PropertyMayNotContainBlanks)
 
 TEST(JaywayPathCompilerParity, PathMayNotEndWithScan)
 {
-    auto res = compile(u"$..");
+    auto res{compile(u"$..")};
     ASSERT_FALSE(res.has_value());
     EXPECT_EQ(res.error(), Error::TrailingRecursive);
 }
 
 TEST(JaywayPathCompilerParity, PathMayNotEndWithScan2)
 {
-    auto res = compile(u"$.prop..");
+    auto res{compile(u"$.prop..")};
     ASSERT_FALSE(res.has_value());
     EXPECT_EQ(res.error(), Error::TrailingRecursive);
 }
 
 TEST(JaywayPathCompilerParity, ScanTokenCanBeParsed)
 {
-    auto res = compile(u"$..['prop']..[*]");
+    auto res{compile(u"$..['prop']..[*]")};
     ASSERT_TRUE(res.has_value());
 
     bool hasRecursive = false;
@@ -174,7 +174,7 @@ PATHCOMPILER_STUB(PropertyMustBeSeparatedByCommas, "Property list validation");
 
 TEST(JaywayPathCompilerParity, PropertyChainCanBeCompiled)
 {
-    auto chain = compile(u"$.aaa.bbb.ccc");
+    auto chain{compile(u"$.aaa.bbb.ccc")};
     ASSERT_TRUE(chain.has_value());
     ASSERT_EQ(chain->compiled.tokens.size(), 4);
     EXPECT_EQ(chain->compiled.tokens[1].key, "aaa");
@@ -186,30 +186,30 @@ TEST(JaywayPathCompilerParity, PropertyChainCanBeCompiled)
 // Wildcard tests --------------------------------------------------------------
 TEST(JaywayPathCompilerParity, WildcardCanBeCompiled)
 {
-    auto res1 = compile(u"$.*");
+    auto res1{compile(u"$.*")};
     ASSERT_TRUE(res1.has_value());
     ASSERT_EQ(res1->compiled.tokens.size(), 2);
     EXPECT_EQ(res1->compiled.tokens[1].kind, Token::Kind::Wildcard);
 
-    auto res2 = compile(u"$[*]");
+    auto res2{compile(u"$[*]")};
     ASSERT_TRUE(res2.has_value());
     ASSERT_EQ(res2->compiled.tokens.size(), 2);
     EXPECT_EQ(res2->compiled.tokens[1].kind, Token::Kind::Wildcard);
 
-    auto res3 = compile(u"$[ * ]");
+    auto res3{compile(u"$[ * ]")};
     ASSERT_TRUE(res3.has_value());
     ASSERT_EQ(res3->compiled.tokens[1].kind, Token::Kind::Wildcard);
 }
 
 TEST(JaywayPathCompilerParity, WildcardCanFollowProperty)
 {
-    auto res1 = compile(u"$.prop[*]");
+    auto res1{compile(u"$.prop[*]")};
     ASSERT_TRUE(res1.has_value());
     ASSERT_EQ(res1->compiled.tokens.size(), 3);
     EXPECT_EQ(res1->compiled.tokens[1].key, "prop");
     EXPECT_EQ(res1->compiled.tokens[2].kind, Token::Kind::Wildcard);
 
-    auto res2 = compile(u"$['prop'][*]");
+    auto res2{compile(u"$['prop'][*]")};
     ASSERT_TRUE(res2.has_value());
     ASSERT_EQ(res2->compiled.tokens.size(), 3);
     EXPECT_EQ(res2->compiled.tokens[1].key, "prop");
@@ -220,20 +220,20 @@ TEST(JaywayPathCompilerParity, WildcardCanFollowProperty)
 // Array index path ------------------------------------------------------------
 TEST(JaywayPathCompilerParity, ArrayIndexPathCanBeCompiled)
 {
-    auto res1 = compile(u"$[1]");
+    auto res1{compile(u"$[1]")};
     ASSERT_TRUE(res1.has_value());
     ASSERT_EQ(res1->compiled.tokens.size(), 2);
     EXPECT_EQ(res1->compiled.tokens[1].kind, Token::Kind::Index);
     EXPECT_EQ(res1->compiled.tokens[1].index, 1);
 
-    auto res2 = compile(u"$[1,2,3]");
+    auto res2{compile(u"$[1,2,3]")};
     ASSERT_TRUE(res2.has_value());
     ASSERT_EQ(res2->compiled.tokens.size(), 4);
     EXPECT_EQ(res2->compiled.tokens[1].index, 1);
     EXPECT_EQ(res2->compiled.tokens[2].index, 2);
     EXPECT_EQ(res2->compiled.tokens[3].index, 3);
 
-    auto res3 = compile(u"$[ 1 , 2 , 3 ]");
+    auto res3{compile(u"$[ 1 , 2 , 3 ]")};
     ASSERT_TRUE(res3.has_value());
     ASSERT_EQ(res3->compiled.tokens.size(), 4);
     EXPECT_EQ(res3->compiled.tokens[1].index, 1);
@@ -245,15 +245,15 @@ TEST(JaywayPathCompilerParity, ArrayIndexPathCanBeCompiled)
 // Array slice path -------------------------------------------------------------
 TEST(JaywayPathCompilerParity, ArraySlicePathCanBeCompiled)
 {
-    auto slice1 = compile(u"$[-1:]");
+    auto slice1{compile(u"$[-1:]")};
     ASSERT_TRUE(slice1.has_value());
     EXPECT_EQ(slice1->compiled.tokens.back().kind, Token::Kind::Slice);
 
-    auto slice2 = compile(u"$[1:2]");
+    auto slice2{compile(u"$[1:2]")};
     ASSERT_TRUE(slice2.has_value());
     EXPECT_EQ(slice2->compiled.tokens.back().kind, Token::Kind::Slice);
 
-    auto slice3 = compile(u"$[:2]");
+    auto slice3{compile(u"$[:2]")};
     ASSERT_TRUE(slice3.has_value());
     EXPECT_EQ(slice3->compiled.tokens.back().kind, Token::Kind::Slice);
 }
@@ -291,14 +291,14 @@ TEST(JaywayPathCompilerParity, PlaceholderCriteriaCanBeParsed)
 
 TEST(JaywayPathCompilerParity, PathMustStartWithRootToken)
 {
-    auto res = compile(u"x");
+    auto res{compile(u"x")};
     ASSERT_FALSE(res.has_value());
     EXPECT_EQ(res.error(), Error::MissingRoot);
 }
 
 TEST(JaywayPathCompilerParity, SquareBracketMayNotFollowPeriod)
 {
-    auto res = compile(u"$.[");
+    auto res{compile(u"$.[")};
     ASSERT_FALSE(res.has_value());
     // Currently results in EmptySegment (unexpected blank key)
     EXPECT_EQ(res.error(), Error::EmptySegment);
@@ -306,14 +306,14 @@ TEST(JaywayPathCompilerParity, SquareBracketMayNotFollowPeriod)
 
 TEST(JaywayPathCompilerParity, RootPathMustBeFollowedByPeriodOrBracket)
 {
-    auto res = compile(u"$X");
+    auto res{compile(u"$X")};
     ASSERT_FALSE(res.has_value());
     EXPECT_EQ(res.error(), Error::UnexpectedAfterRoot);
 }
 
 TEST(JaywayPathCompilerParity, UnmatchedBracketIsError)
 {
-    auto res = compile(u"$[");
+    auto res{compile(u"$[")};
     ASSERT_FALSE(res.has_value());
     EXPECT_EQ(res.error(), Error::UnmatchedBracket);
 }
@@ -353,7 +353,7 @@ TEST(JaywayPathCompilerParity, IssuePredicateBracketInRegex)
     const char* json = R"({
         "logs": [ { "message": "(it", "id": 2 } ]
     })";
-    auto doc = parseJson(json);
+    auto doc{parseJson(json)};
     auto result = evalArray(u"$.logs[?(@.message =~ /\\(it/)].message", doc);
     EXPECT_TRUE(containsAll(result, { QJsonValue(QString::fromUtf8("(it")) }));
 }
@@ -363,7 +363,7 @@ TEST(JaywayPathCompilerParity, IssuePredicateAndInRegex)
     const char* json = R"({
         "logs": [ { "message": "it", "id": 2 } ]
     })";
-    auto doc = parseJson(json);
+    auto doc{parseJson(json)};
     auto result = evalArray(u"$.logs[?(@.message =~ /&&|it/)].message", doc);
     EXPECT_TRUE(containsAll(result, { QJsonValue(QString::fromUtf8("it")) }));
 }
@@ -373,7 +373,7 @@ TEST(JaywayPathCompilerParity, IssuePredicateAndInProp)
     const char* json = R"({
         "logs": [ { "message": "&& it", "id": 2 } ]
     })";
-    auto doc = parseJson(json);
+    auto doc{parseJson(json)};
     auto result = evalArray(u"$.logs[?(@.message == '&& it')].message", doc);
     EXPECT_TRUE(containsAll(result, { QJsonValue(QString::fromUtf8("&& it")) }));
 }
@@ -383,7 +383,7 @@ TEST(JaywayPathCompilerParity, IssuePredicateBracketsChangePrecedence)
     const char* json = R"({
         "logs": [ { "id": 2 } ]
     })";
-    auto doc = parseJson(json);
+    auto doc{parseJson(json)};
     auto result = evalArray(u"$.logs[?(@.message && (@.id == 1 || @.id == 2))].id", doc);
     EXPECT_TRUE(result.isEmpty());
 }

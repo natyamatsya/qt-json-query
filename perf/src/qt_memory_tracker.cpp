@@ -28,25 +28,25 @@ public:
 
     static OperationStats benchmarkOperation(const QString& jsonPath, const QJsonValue& testData, int iterations = 1000) {
         // Compile JSONPath
-        auto pathResult = JSONPath::create(jsonPath);
+        auto pathResult{JSONPath::create(jsonPath)};
         if (!pathResult) {
             throw std::runtime_error("Failed to compile JSONPath");
         }
         
-        auto path = std::move(*pathResult);
+        auto path{std::move(*pathResult)};
         
         // Warm up
         for (int i = 0; i < 10; ++i) {
-            auto result = path.evaluate(testData);
+            auto result{path.evaluate(testData)};
         }
         
         // Benchmark with Qt memory tracking
-        auto start = std::chrono::high_resolution_clock::now();
+        auto start{std::chrono::high_resolution_clock::now()};
         size_t totalResultSize = 0;
         size_t maxResultSize = 0;
         
         for (int i = 0; i < iterations; ++i) {
-            auto result = path.evaluate(testData);
+            auto result{path.evaluate(testData)};
             if (result) {
                 QJsonArray resultArray;
                 if (result->isArray()) {
@@ -63,8 +63,8 @@ public:
             }
         }
         
-        auto end = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+        auto end{std::chrono::high_resolution_clock::now()};
+        auto duration{std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)};
         
         return {
             duration,
@@ -126,7 +126,7 @@ public:
         
         for (const auto& [testName, jsonPath] : testCases) {
             try {
-                auto stats = QtMemoryTracker::benchmarkOperation(jsonPath, rootValue, 1000);
+                auto stats{QtMemoryTracker::benchmarkOperation(jsonPath, rootValue, 1000)};
                 
                 double avgDuration = static_cast<double>(stats.duration.count()) / 1000.0;
                 double memoryEfficiency = stats.resultArraySize > 0 ? 
@@ -158,22 +158,22 @@ private:
         std::cout << "Testing streaming vs non-streaming behavior patterns...\n";
         
         // Test recursive descent with large result sets
-        auto pathResult = JSONPath::create(QString("$..name"));
+        auto pathResult{JSONPath::create(QString("$..name"))};
         if (!pathResult) {
             std::cout << "Failed to compile test path\n";
             return;
         }
         
-        auto path = std::move(*pathResult);
+        auto path{std::move(*pathResult)};
         
         // Measure multiple iterations to see consistency
         std::vector<std::chrono::nanoseconds> durations;
         std::vector<size_t> resultSizes;
         
         for (int i = 0; i < 100; ++i) {
-            auto start = std::chrono::high_resolution_clock::now();
-            auto result = path.evaluate(testData);
-            auto end = std::chrono::high_resolution_clock::now();
+            auto start{std::chrono::high_resolution_clock::now()};
+            auto result{path.evaluate(testData)};
+            auto end{std::chrono::high_resolution_clock::now()};
             
             durations.push_back(std::chrono::duration_cast<std::chrono::nanoseconds>(end - start));
             if (result) {
@@ -189,8 +189,8 @@ private:
         }
         
         // Calculate statistics
-        auto avgDuration = std::accumulate(durations.begin(), durations.end(), std::chrono::nanoseconds(0)) / durations.size();
-        auto avgResultSize = std::accumulate(resultSizes.begin(), resultSizes.end(), 0UL) / resultSizes.size();
+        auto avgDuration{std::accumulate(durations.begin(), durations.end(), std::chrono::nanoseconds(0)) / durations.size()};
+        auto avgResultSize{std::accumulate(resultSizes.begin(), resultSizes.end(), 0UL) / resultSizes.size()};
         
         // Calculate variance to check consistency
         double variance = 0.0;

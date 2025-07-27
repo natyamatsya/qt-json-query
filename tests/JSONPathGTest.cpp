@@ -41,7 +41,7 @@ TEST(JSONPathPointerInterop, CompareWithJSONPointer)
 {
     QJsonObject obj{{"items", QJsonArray{ QJsonObject{{"id", 1}, {"name", "Item1"}} }}};
     QJsonDocument doc(obj);
-    auto ptr = JSONPointer::create(QStringLiteral("/items/0/name"));
+    auto ptr{JSONPointer::create(QStringLiteral("/items/0/name"))};
     ASSERT_TRUE(ptr);
     EXPECT_EQ(eval(u"$.items[0].name", doc), ptr->evaluate(doc));
 }

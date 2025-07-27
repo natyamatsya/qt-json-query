@@ -179,14 +179,14 @@ struct PathPatternEvaluator<PathPattern::SimpleKey> {
         
         const QJsonObject obj = root.toObject();
         const QString& key = tokens[0].key;
-        const auto it = obj.find(key);
+        const auto it{obj.find(key)};
         
         if (it == obj.end()) {
             return QJsonArray{}; // Key not found
         }
         
         // Use ArrayPool for result optimization
-        auto pooledArray = acquirePooledArray();
+        auto pooledArray{acquirePooledArray()};
         QJsonArray& result = *pooledArray;
         result.append(it.value());
         
@@ -213,7 +213,7 @@ struct PathPatternEvaluator<PathPattern::NestedKeys> {
             }
             
             const QJsonObject obj = current.toObject();
-            const auto it = obj.find(token.key);
+            const auto it{obj.find(token.key)};
             
             if (it == obj.end()) {
                 return QJsonArray{}; // Key not found
@@ -223,7 +223,7 @@ struct PathPatternEvaluator<PathPattern::NestedKeys> {
         }
         
         // Use ArrayPool for result optimization
-        auto pooledArray = acquirePooledArray();
+        auto pooledArray{acquirePooledArray()};
         QJsonArray& result = *pooledArray;
         result.append(current);
         
@@ -261,7 +261,7 @@ struct PathPatternEvaluator<PathPattern::ArrayIndex> {
         }
         
         // Use ArrayPool for result optimization
-        auto pooledArray = acquirePooledArray();
+        auto pooledArray{acquirePooledArray()};
         QJsonArray& result = *pooledArray;
         result.append(arr[index]);
         
@@ -285,7 +285,7 @@ struct PathPatternEvaluator<PathPattern::ArrayWildcard> {
             const QJsonArray arr = root.toArray();
             
             // Use ArrayPool for result optimization
-            auto pooledArray = acquirePooledArray();
+            auto pooledArray{acquirePooledArray()};
             QJsonArray& result = *pooledArray;
             
             for (const auto& item : arr) {
@@ -298,7 +298,7 @@ struct PathPatternEvaluator<PathPattern::ArrayWildcard> {
             const QJsonObject obj = root.toObject();
             
             // Use ArrayPool for result optimization
-            auto pooledArray = acquirePooledArray();
+            auto pooledArray{acquirePooledArray()};
             QJsonArray& result = *pooledArray;
             
             for (auto it = obj.begin(); it != obj.end(); ++it) {
@@ -329,7 +329,7 @@ struct PathPatternEvaluator<PathPattern::KeyThenIndex> {
         
         const QJsonObject obj = root.toObject();
         const QString& key = tokens[0].key;
-        const auto it = obj.find(key);
+        const auto it{obj.find(key)};
         
         if (it == obj.end()) {
             return QJsonArray{}; // Key not found
@@ -355,7 +355,7 @@ struct PathPatternEvaluator<PathPattern::KeyThenIndex> {
         }
         
         // Use ArrayPool for result optimization
-        auto pooledArray = acquirePooledArray();
+        auto pooledArray{acquirePooledArray()};
         QJsonArray& result = *pooledArray;
         result.append(arr[index]);
         
@@ -399,14 +399,14 @@ struct PathPatternEvaluator<PathPattern::IndexThenKey> {
         
         const QJsonObject obj = objValue.toObject();
         const QString& key = tokens[1].key;
-        const auto it = obj.find(key);
+        const auto it{obj.find(key)};
         
         if (it == obj.end()) {
             return QJsonArray{}; // Key not found
         }
         
         // Use ArrayPool for result optimization
-        auto pooledArray = acquirePooledArray();
+        auto pooledArray{acquirePooledArray()};
         QJsonArray& result = *pooledArray;
         result.append(it.value());
         
@@ -425,7 +425,7 @@ struct PathPatternEvaluator<PathPattern::WildcardThenKey> {
         const QJsonValue& root) noexcept 
     {
         // Fast path: wildcard expansion followed by key extraction
-        auto pooledArray = acquirePooledArray();
+        auto pooledArray{acquirePooledArray()};
         QJsonArray& result = *pooledArray;
         
         const QString& key = tokens[1].key;
@@ -436,7 +436,7 @@ struct PathPatternEvaluator<PathPattern::WildcardThenKey> {
             for (const auto& item : arr) {
                 if (item.isObject()) {
                     const QJsonObject obj = item.toObject();
-                    const auto it = obj.find(key);
+                    const auto it{obj.find(key)};
                     if (it != obj.end()) {
                         result.append(it.value());
                     }
@@ -449,7 +449,7 @@ struct PathPatternEvaluator<PathPattern::WildcardThenKey> {
                 const QJsonValue& value = it.value();
                 if (value.isObject()) {
                     const QJsonObject obj = value.toObject();
-                    const auto keyIt = obj.find(key);
+                    const auto keyIt{obj.find(key)};
                     if (keyIt != obj.end()) {
                         result.append(keyIt.value());
                     }

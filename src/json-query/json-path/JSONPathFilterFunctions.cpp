@@ -23,15 +23,15 @@ QJsonValue evaluateFunction(const QString& funcCall, const QJsonValue& context)
             return std::nullopt; // Invalid function syntax
         }
         
-        const auto funcName = expr.mid(0, openParen).trimmed();
-        const auto args = expr.mid(openParen + 1, closeParen - openParen - 1).trimmed();
+        const auto funcName{expr.mid(0, openParen).trimmed()};
+        const auto args{expr.mid(openParen + 1, closeParen - openParen - 1).trimmed()};
         return std::make_pair(QString(funcName), QString(args));
     };
     
     // Evaluate argument value
     auto evaluateArgument = [&context](const QString& args) -> QJsonValue {
         if (args.startsWith("@.")) {
-            const auto prop = args.mid(2);
+            const auto prop{args.mid(2)};
             return context.toObject().value(prop);
         } else if (args == "@") {
             return context;
@@ -52,12 +52,12 @@ QJsonValue evaluateFunction(const QString& funcCall, const QJsonValue& context)
     auto evaluateJsonPathValue = [&context](const QString& args) -> QJsonValue {
         if (args.startsWith("$")) {
             using json_query::JSONPath;
-            auto pathResult = JSONPath::create(args);
+            auto pathResult{JSONPath::create(args)};
             if (!pathResult) {
                 return {}; // Return null for invalid JSONPath
             }
             
-            auto evalResult = pathResult->evaluateAll(context);
+            auto evalResult{pathResult->evaluateAll(context)};
             if (!evalResult) {
                 return {}; // Return null for evaluation errors
             }
@@ -73,7 +73,7 @@ QJsonValue evaluateFunction(const QString& funcCall, const QJsonValue& context)
             
             return {}; // Return null for multiple results (RFC 9535 "nothing")
         } else if (args.startsWith("@.")) {
-            const auto prop = args.mid(2);
+            const auto prop{args.mid(2)};
             QJsonValue val = context.toObject().value(prop);
             return val.isUndefined() ? QJsonValue() : val;
         } else if (args == "@") {
@@ -83,7 +83,7 @@ QJsonValue evaluateFunction(const QString& funcCall, const QJsonValue& context)
     };
     
     // Main function evaluation
-    auto parsed = parseFunctionSyntax(funcCall);
+    auto parsed{parseFunctionSyntax(funcCall)};
     if (!parsed) {
         return {}; // Invalid function syntax
     }
@@ -102,7 +102,7 @@ QJsonValue evaluateFunction(const QString& funcCall, const QJsonValue& context)
 QJsonValue parseJsonLiteral(const QString& value)
 {
     // Refactored to use monadic error handling patterns
-    const auto trimmed = value.trimmed();
+    const auto trimmed{value.trimmed()};
     
     // Parse literal using monadic pattern with optional chaining
     auto parseNull = [](const QString& s) -> std::optional<QJsonValue> {
@@ -180,9 +180,9 @@ std::optional<Token> parseFunction(const QString& s, std::vector<FilterFn>& out)
     constexpr auto funcCompPat = ctll::fixed_string{R"(^(.*?)\s*(==|!=|<|>|<=|>=)\s*(.*?)$)"};
     
     if (auto m = ctre::match<funcCompPat>(to_sv(s))) {
-        const auto left = to_qstr(m.template get<1>().to_view()).trimmed();
-        const auto op = to_qstr(m.template get<2>().to_view());
-        const auto right = to_qstr(m.template get<3>().to_view()).trimmed();
+        const auto left{to_qstr(m.template get<1>().to_view()).trimmed()};
+        const auto op{to_qstr(m.template get<2>().to_view())};
+        const auto right{to_qstr(m.template get<3>().to_view()).trimmed()};
         
         // Check if either side contains a function call
         bool leftHasFunc = left.contains("(") && left.contains(")");
@@ -211,7 +211,7 @@ std::optional<Token> parseFunction(const QString& s, std::vector<FilterFn>& out)
                 leftVal = evaluateFunction(left, j);
             } else if (left.startsWith("@.")) {
                 // Property access - RFC 9535 "nothing" semantics
-                const auto prop = left.mid(2);
+                const auto prop{left.mid(2)};
                 QJsonValue val = j.toObject().value(prop);
                 leftVal = val.isUndefined() ? QJsonValue{0} : val; // Undefined becomes 0
             } else {
@@ -223,7 +223,7 @@ std::optional<Token> parseFunction(const QString& s, std::vector<FilterFn>& out)
                 rightVal = evaluateFunction(right, j);
             } else if (right.startsWith("@.")) {
                 // Property access - RFC 9535 "nothing" semantics
-                const auto prop = right.mid(2);
+                const auto prop{right.mid(2)};
                 QJsonValue val = j.toObject().value(prop);
                 rightVal = val.isUndefined() ? QJsonValue{0} : val; // Undefined becomes 0
             } else {

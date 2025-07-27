@@ -43,7 +43,7 @@ std::expected<QString, QString> validatePathSyntax(const QString& path) {
 std::expected<JSONPath, QString> createOptimizedPath(const QString& validPath) {
     std::cout << "  → Creating JSONPath\n";
     
-    auto result = JSONPath::create(validPath);
+    auto result{JSONPath::create(validPath)};
     if (!result) {
         return std::unexpected(QString("JSONPath creation failed: error code %1").arg(static_cast<int>(result.error())));
     }
@@ -55,7 +55,7 @@ std::expected<JSONPath, QString> createOptimizedPath(const QString& validPath) {
 std::expected<QJsonArray, QString> executeEvaluation(const JSONPath& path, const QJsonDocument& doc) {
     std::cout << "  → Executing JSONPath evaluation\n";
     
-    auto result = path.evaluateAll(doc);
+    auto result{path.evaluateAll(doc)};
     if (!result) {
         return std::unexpected(QString("Evaluation failed: error code %1").arg(static_cast<int>(result.error())));
     }
@@ -109,28 +109,28 @@ std::expected<QJsonArray, QString> processJsonPathTraditional(const QString& jso
     std::cout << "Path: " << pathStr.toStdString() << "\n";
     
     // Traditional manual error checking - verbose and error-prone
-    auto validatedDoc = validateJsonDocument(jsonStr);
+    auto validatedDoc{validateJsonDocument(jsonStr)};
     if (!validatedDoc) {
         std::cout << "  ❌ JSON validation failed: " << validatedDoc.error().toStdString() << "\n";
         return std::unexpected(validatedDoc.error());
     }
     std::cout << "  ✅ JSON document validated\n";
     
-    auto validatedPath = validatePathSyntax(pathStr);
+    auto validatedPath{validatePathSyntax(pathStr)};
     if (!validatedPath) {
         std::cout << "  ❌ Path validation failed: " << validatedPath.error().toStdString() << "\n";
         return std::unexpected(validatedPath.error());
     }
     std::cout << "  ✅ Path syntax validated\n";
     
-    auto createdPath = createOptimizedPath(*validatedPath);
+    auto createdPath{createOptimizedPath(*validatedPath)};
     if (!createdPath) {
         std::cout << "  ❌ JSONPath creation failed: " << createdPath.error().toStdString() << "\n";
         return std::unexpected(createdPath.error());
     }
     std::cout << "  ✅ JSONPath created\n";
     
-    auto results = executeEvaluation(*createdPath, *validatedDoc);
+    auto results{executeEvaluation(*createdPath, *validatedDoc)};
     if (!results) {
         std::cout << "  ❌ Evaluation failed: " << results.error().toStdString() << "\n";
         return std::unexpected(results.error());
@@ -176,15 +176,15 @@ int main() {
     };
 
     for (size_t i = 0; i < testCases.size(); ++i) {
-        const auto& testCase = testCases[i];
+        const auto& testCase{testCases[i]};
         
         std::cout << "\n" << std::string(70, '=') << "\n";
         std::cout << "Test Case " << (i + 1) << ": " << testCase.description.toStdString() << "\n";
         std::cout << std::string(70, '=') << "\n";
 
         // Test both approaches
-        auto monadicResult = processJsonPathMonadic(testCase.json, testCase.path);
-        auto traditionalResult = processJsonPathTraditional(testCase.json, testCase.path);
+        auto monadicResult{processJsonPathMonadic(testCase.json, testCase.path)};
+        auto traditionalResult{processJsonPathTraditional(testCase.json, testCase.path)};
 
         // Verify both approaches give the same result
         bool bothSucceeded = monadicResult.has_value() && traditionalResult.has_value();

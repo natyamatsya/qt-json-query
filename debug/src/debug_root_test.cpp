@@ -21,9 +21,9 @@ int main() {
     qDebug() << "Original root object:" << QJsonDocument(root).toJson(QJsonDocument::Compact);
     
     // Test root path evaluation
-    auto jp = JSONPath::create(QString("$"));
+    auto jp{JSONPath::create(QString("$"))};
     if (jp) {
-        auto result = jp->evaluate(doc);
+        auto result{jp->evaluate(doc)};
         if (result) {
             if (result->isObject()) {
                 qDebug() << "Root path result (object):" << QJsonDocument(result->toObject()).toJson(QJsonDocument::Compact);

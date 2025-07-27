@@ -19,14 +19,14 @@ int main(int argc, char *argv[])
     qDebug() << "Test document:" << doc.toJson(QJsonDocument::Compact);
     
     // Test root selector
-    auto jsonPath = JSONPath::create(QStringLiteral("$"));
+    auto jsonPath{JSONPath::create(QStringLiteral("$"))};
     if (!jsonPath) {
         qDebug() << "Failed to compile JSONPath:" << static_cast<int>(jsonPath.error());
         return 1;
     }
     
     // Test evaluate (single result)
-    auto singleResult = jsonPath->evaluate(testDoc);
+    auto singleResult{jsonPath->evaluate(testDoc)};
     if (!singleResult) {
         qDebug() << "Failed to evaluate:" << static_cast<int>(singleResult.error());
         return 1;
@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
     qDebug() << "Single result:" << QJsonDocument(QJsonArray{*singleResult}).toJson(QJsonDocument::Compact);
     
     // Test evaluateAll (multiple results)
-    auto allResults = jsonPath->evaluateAll(testDoc);
+    auto allResults{jsonPath->evaluateAll(testDoc)};
     if (!allResults) {
         qDebug() << "Failed to evaluateAll:" << static_cast<int>(allResults.error());
         return 1;

@@ -81,7 +81,7 @@ static QList<CtsTestCase> loadCtsFile(const QString &path)
 
     const QByteArray data = f.readAll();
     QJsonParseError  perr;
-    auto             doc  = QJsonDocument::fromJson(data, &perr);
+    auto doc{QJsonDocument::fromJson(data, &perr)};
     if (perr.error != QJsonParseError::NoError) {
         qWarning("JSON parse error in CTS file %s: %s", qPrintable(path), qPrintable(perr.errorString()));
     }
@@ -128,7 +128,7 @@ static QList<CtsTestCase> collectAllCtsCases()
     QDir dir(baseDir);
     const QStringList files = dir.entryList(QStringList{QStringLiteral("*.json")}, QDir::Files);
     for (const QString &fileName : files) {
-        auto vec = loadCtsFile(dir.filePath(fileName));
+        auto vec{loadCtsFile(dir.filePath(fileName))};
         all.append(vec);
     }
     return all;
@@ -144,7 +144,7 @@ TEST_P(CtsJsonPathTest, EvaluatesPerSpec)
     const CtsTestCase &tc = GetParam();
 
     if (tc.invalidSelector) {
-        auto path = JSONPath::create(tc.selector);
+        auto path{JSONPath::create(tc.selector)};
         EXPECT_FALSE(path.has_value()) << "Selector should be invalid: " << tc.selector.toStdString();
         return;
     }
@@ -160,11 +160,11 @@ TEST_P(CtsJsonPathTest, EvaluatesPerSpec)
     }
 
     // Compile selector
-    auto maybePath = JSONPath::create(tc.selector);
+    auto maybePath{JSONPath::create(tc.selector)};
     ASSERT_TRUE(maybePath.has_value()) << "Failed to compile: " << tc.selector.toStdString();
 
     const JSONPath& path = *maybePath;
-    auto result = path.evaluate(doc);
+    auto result{path.evaluate(doc)};
     if (!result.has_value()) {
         std::cout << "Evaluation error for " << tc.selector.toStdString() << ": " 
                   << static_cast<int>(result.error()) << " (" 

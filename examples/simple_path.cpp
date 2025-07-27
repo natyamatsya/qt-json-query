@@ -29,13 +29,13 @@ int main(int argc, char **argv)
         return {};
     };
 
-    auto pathResult = JSONPath::create(u"$.books[*].title");
+    auto pathResult{JSONPath::create(u"$.books[*].title")};
     if (!pathResult) {
         qDebug() << "Failed to compile JSONPath";
         return EXIT_FAILURE;
     }
     
-    auto evalResult = pathResult->evaluate(doc);
+    auto evalResult{pathResult->evaluate(doc)};
     if (!evalResult) {
         qDebug() << "Failed to evaluate JSONPath";
         return EXIT_FAILURE;

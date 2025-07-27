@@ -25,13 +25,13 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::Key>(const PathEvalCtx& /
     }
     
     const QJsonObject obj = v.toObject();
-    const auto it = obj.find(tk.key);
+    const auto it{obj.find(tk.key)};
     if (it == obj.end()) {
         return emptyResult(); // Key not found
     }
     
     // Use ArrayPool for result to optimize memory allocation
-    auto pooledArray = acquirePooledArray();
+    auto pooledArray{acquirePooledArray()};
     QJsonArray& result = *pooledArray;
     result.append(it.value());
     
@@ -148,7 +148,7 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::Filter>(const PathEvalCtx
     
     // Fall back to embedded filter evaluation for complex patterns
     // Use ArrayPool for result to optimize memory allocation
-    auto pooledArray = acquirePooledArray();
+    auto pooledArray{acquirePooledArray()};
     QJsonArray& out = *pooledArray;
     
     // Check for embedded filters (zero-overhead)
@@ -170,7 +170,7 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::Filter>(const PathEvalCtx
         } else if (v.isObject()) {
             const QJsonObject obj = v.toObject();
             
-            auto cursor = ContainerCursor::object(obj);
+            auto cursor{ContainerCursor::object(obj)};
             for (const auto& val : cursor) {
                 const bool pass = needsRootContext ? 
                     tk.evaluateEmbeddedContextFilter(val, ctx.rootDocument) : 
@@ -202,7 +202,7 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::KeyList>(const PathEvalCt
     
     const QJsonObject obj = v.toObject();
     const QStringList keys = tk.key.split(u'\n');
-    auto pooledArray = acquirePooledArray();
+    auto pooledArray{acquirePooledArray()};
     QJsonArray& results = *pooledArray;
     
     for (const QString& key : keys) {

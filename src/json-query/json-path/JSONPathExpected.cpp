@@ -26,8 +26,8 @@ evaluateDefinite(const std::vector<Token>& tokens, const QJsonValue& root) noexc
         case Key: {
             if (!cur.isObject())
                 return std::unexpected(EvalError::TypeMismatchObject);
-            const auto obj = cur.toObject();
-            auto it = obj.constFind(tk.key);
+            const auto obj{cur.toObject()};
+            auto it{obj.constFind(tk.key)};
             if (it == obj.constEnd())
                 return std::unexpected(EvalError::KeyNotFound);
             cur = *it;
@@ -36,7 +36,7 @@ evaluateDefinite(const std::vector<Token>& tokens, const QJsonValue& root) noexc
         case Index: {
             if (!cur.isArray())
                 return std::unexpected(EvalError::TypeMismatchArray);
-            const auto arr = cur.toArray();
+            const auto arr{cur.toArray()};
             int idx = normalizeIndex(tk.index, arr.size());
             if (idx < 0 || idx >= arr.size())
                 return std::unexpected(EvalError::IndexOutOfRange);

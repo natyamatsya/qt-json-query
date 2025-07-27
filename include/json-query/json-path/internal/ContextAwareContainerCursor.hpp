@@ -194,7 +194,7 @@ public:
         }
         
         constexpr iterator operator++(int) noexcept {
-            auto tmp = *this;
+            auto tmp{*this};
             ++base_;
             return tmp;
         }

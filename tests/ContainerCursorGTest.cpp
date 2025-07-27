@@ -68,22 +68,22 @@ protected:
 // ---------------------------------------------------------------------------
 
 TEST_F(ContainerCursorTest, ObjectConstruction) {
-    auto cursor = ContainerCursor::object(testObj);
+    auto cursor{ContainerCursor::object(testObj)};
     
     EXPECT_EQ(cursor.size(), 5);
     EXPECT_FALSE(cursor.empty());
 }
 
 TEST_F(ContainerCursorTest, ArrayConstruction) {
-    auto cursor = ContainerCursor::array(testArray);
+    auto cursor{ContainerCursor::array(testArray)};
     
     EXPECT_EQ(cursor.size(), 5);
     EXPECT_FALSE(cursor.empty());
 }
 
 TEST_F(ContainerCursorTest, EmptyContainers) {
-    auto objCursor = ContainerCursor::object(emptyObj);
-    auto arrayCursor = ContainerCursor::array(emptyArray);
+    auto objCursor{ContainerCursor::object(emptyObj)};
+    auto arrayCursor{ContainerCursor::array(emptyArray)};
     
     EXPECT_EQ(objCursor.size(), 0);
     EXPECT_TRUE(objCursor.empty());
@@ -99,9 +99,9 @@ TEST_F(ContainerCursorTest, EmptyContainers) {
 // ---------------------------------------------------------------------------
 
 TEST_F(ContainerCursorTest, BasicIteration) {
-    auto cursor = ContainerCursor::array(testArray);
+    auto cursor{ContainerCursor::array(testArray)};
     
-    auto it = cursor.begin();
+    auto it{cursor.begin()};
     EXPECT_NE(it, cursor.end());
     
     // Test first element
@@ -115,7 +115,7 @@ TEST_F(ContainerCursorTest, BasicIteration) {
     EXPECT_EQ((*it).toInt(), 123);
     
     // Test post-increment
-    auto it2 = it++;
+    auto it2{it++};
     EXPECT_TRUE((*it2).isDouble());
     EXPECT_EQ((*it2).toInt(), 123);
     EXPECT_TRUE((*it).isBool());
@@ -123,7 +123,7 @@ TEST_F(ContainerCursorTest, BasicIteration) {
 }
 
 TEST_F(ContainerCursorTest, ObjectIteration) {
-    auto cursor = ContainerCursor::object(testObj);
+    auto cursor{ContainerCursor::object(testObj)};
     
     std::vector<QJsonValue> values;
     
@@ -158,11 +158,11 @@ TEST_F(ContainerCursorTest, ObjectIteration) {
 }
 
 TEST_F(ContainerCursorTest, IteratorComparison) {
-    auto cursor = ContainerCursor::array(testArray);
+    auto cursor{ContainerCursor::array(testArray)};
     
-    auto it1 = cursor.begin();
-    auto it2 = cursor.begin();
-    auto it3 = cursor.end();
+    auto it1{cursor.begin()};
+    auto it2{cursor.begin()};
+    auto it3{cursor.end()};
     
     EXPECT_EQ(it1, it2);
     EXPECT_NE(it1, it3);
@@ -196,7 +196,7 @@ TEST_F(ContainerCursorTest, IteratorTraits) {
 // ---------------------------------------------------------------------------
 
 TEST_F(ContainerCursorTest, RangeBasedForLoop) {
-    auto cursor = ContainerCursor::array(testArray);
+    auto cursor{ContainerCursor::array(testArray)};
     
     std::vector<QJsonValue> collected;
     for (const auto& value : cursor) {
@@ -210,7 +210,7 @@ TEST_F(ContainerCursorTest, RangeBasedForLoop) {
 }
 
 TEST_F(ContainerCursorTest, STLAlgorithms) {
-    auto cursor = ContainerCursor::array(testArray);
+    auto cursor{ContainerCursor::array(testArray)};
     
     // Test std::count_if
     auto stringCount = std::count_if(cursor.begin(), cursor.end(), 
@@ -229,7 +229,7 @@ TEST_F(ContainerCursorTest, STLAlgorithms) {
     EXPECT_TRUE(allValid);
     
     // Test std::distance
-    auto distance = std::distance(cursor.begin(), cursor.end());
+    auto distance{std::distance(cursor.begin(), cursor.end())};
     EXPECT_EQ(distance, 5);
 }
 
@@ -240,7 +240,7 @@ TEST_F(ContainerCursorTest, STLAccumulate) {
         numArray.append(i);
     }
     
-    auto cursor = ContainerCursor::array(numArray);
+    auto cursor{ContainerCursor::array(numArray)};
     
     // Test std::accumulate
     auto sum = std::accumulate(cursor.begin(), cursor.end(), 0,
@@ -257,11 +257,11 @@ TEST_F(ContainerCursorTest, STLAccumulate) {
 
 #ifdef JSON_QUERY_ENABLE_RANGES
 TEST_F(ContainerCursorTest, RangesSupport) {
-    auto cursor = ContainerCursor::array(testArray);
+    auto cursor{ContainerCursor::array(testArray)};
     
     // Test ranges::begin/end
-    auto rangeBegin = std::ranges::begin(cursor);
-    auto rangeEnd = std::ranges::end(cursor);
+    auto rangeBegin{std::ranges::begin(cursor)};
+    auto rangeEnd{std::ranges::end(cursor)};
     
     EXPECT_EQ(rangeBegin, cursor.begin());
     EXPECT_EQ(rangeEnd, cursor.end());
@@ -275,7 +275,7 @@ TEST_F(ContainerCursorTest, RangesSupport) {
     auto validValues = cursor 
         | std::views::filter([](const QJsonValue& v) { return !v.isUndefined(); });
     
-    auto validCount = std::ranges::distance(validValues);
+    auto validCount{std::ranges::distance(validValues)};
     EXPECT_EQ(validCount, 5);
 }
 #endif
@@ -294,7 +294,7 @@ TEST_F(ContainerCursorTest, MemoryCharacteristics) {
 }
 
 TEST_F(ContainerCursorTest, LargeArrayPerformance) {
-    auto cursor = ContainerCursor::array(largeArray);
+    auto cursor{ContainerCursor::array(largeArray)};
     
     EXPECT_EQ(cursor.size(), 1000);
     EXPECT_FALSE(cursor.empty());
@@ -309,7 +309,7 @@ TEST_F(ContainerCursorTest, LargeArrayPerformance) {
     EXPECT_EQ(sum, 499500);
     
     // Test iterator advancement performance
-    auto it = cursor.begin();
+    auto it{cursor.begin()};
     int advanceCount = 0;
     while (it != cursor.end()) {
         ++it;
@@ -320,8 +320,8 @@ TEST_F(ContainerCursorTest, LargeArrayPerformance) {
 
 TEST_F(ContainerCursorTest, ZeroCopySemantics) {
     // Verify that cursor construction doesn't copy the container
-    auto cursor1 = ContainerCursor::object(testObj);
-    auto cursor2 = ContainerCursor::object(testObj);
+    auto cursor1{ContainerCursor::object(testObj)};
+    auto cursor2{ContainerCursor::object(testObj)};
     
     // Both cursors should reference the same underlying data
     EXPECT_EQ(cursor1.size(), cursor2.size());
@@ -341,8 +341,8 @@ TEST_F(ContainerCursorTest, ZeroCopySemantics) {
 // ---------------------------------------------------------------------------
 
 TEST_F(ContainerCursorTest, EmptyContainerIteration) {
-    auto objCursor = ContainerCursor::object(emptyObj);
-    auto arrayCursor = ContainerCursor::array(emptyArray);
+    auto objCursor{ContainerCursor::object(emptyObj)};
+    auto arrayCursor{ContainerCursor::array(emptyArray)};
     
     // Range-based for should handle empty containers gracefully
     int objIterations = 0;
@@ -369,20 +369,20 @@ TEST_F(ContainerCursorTest, SingleElementContainers) {
     QJsonObject singleObj{{"key", "value"}};
     QJsonArray singleArray{"element"};
     
-    auto objCursor = ContainerCursor::object(singleObj);
-    auto arrayCursor = ContainerCursor::array(singleArray);
+    auto objCursor{ContainerCursor::object(singleObj)};
+    auto arrayCursor{ContainerCursor::array(singleArray)};
     
     EXPECT_EQ(objCursor.size(), 1);
     EXPECT_EQ(arrayCursor.size(), 1);
     
     // Test iteration
-    auto objIt = objCursor.begin();
+    auto objIt{objCursor.begin()};
     EXPECT_NE(objIt, objCursor.end());
     EXPECT_EQ((*objIt).toString(), "value");
     ++objIt;
     EXPECT_EQ(objIt, objCursor.end());
     
-    auto arrayIt = arrayCursor.begin();
+    auto arrayIt{arrayCursor.begin()};
     EXPECT_NE(arrayIt, arrayCursor.end());
     EXPECT_EQ((*arrayIt).toString(), "element");
     ++arrayIt;
@@ -394,11 +394,11 @@ TEST_F(ContainerCursorTest, SingleElementContainers) {
 // ---------------------------------------------------------------------------
 
 TEST_F(ContainerCursorTest, TypeSafety) {
-    auto cursor = ContainerCursor::array(testArray);
+    auto cursor{ContainerCursor::array(testArray)};
     
     // Verify const-correctness
-    const auto& constCursor = cursor;
-    auto constIt = constCursor.begin();
+    const auto& constCursor{cursor};
+    auto constIt{constCursor.begin()};
     
     // Should return QJsonValue by value, not reference
     static_assert(std::is_same_v<decltype(*constIt), QJsonValue>);
@@ -430,7 +430,7 @@ TEST_F(ContainerCursorTest, ConstexprCapabilities) {
 // ---------------------------------------------------------------------------
 
 TEST_F(ContainerCursorTest, ObjectValueAccess) {
-    auto cursor = ContainerCursor::object(testObj);
+    auto cursor{ContainerCursor::object(testObj)};
     
     std::vector<QJsonValue> collected;
     for (auto it = cursor.begin(); it != cursor.end(); ++it) {
@@ -458,10 +458,10 @@ TEST_F(ContainerCursorTest, ObjectValueAccess) {
 }
 
 TEST_F(ContainerCursorTest, ArrayValueAccess) {
-    auto cursor = ContainerCursor::array(testArray);
+    auto cursor{ContainerCursor::array(testArray)};
     
     // Array iterators provide values in order
-    auto it = cursor.begin();
+    auto it{cursor.begin()};
     
     // No key() method available for ContainerCursor iterator
     // Just verify we can access values
@@ -475,15 +475,15 @@ TEST_F(ContainerCursorTest, ArrayValueAccess) {
 // ---------------------------------------------------------------------------
 
 TEST_F(ContainerCursorTest, CopySemantics) {
-    auto cursor1 = ContainerCursor::array(testArray);
+    auto cursor1{ContainerCursor::array(testArray)};
     auto cursor2 = cursor1; // Copy construction
     
     EXPECT_EQ(cursor1.size(), cursor2.size());
     EXPECT_EQ(cursor1.empty(), cursor2.empty());
     
     // Both should iterate over the same data
-    auto it1 = cursor1.begin();
-    auto it2 = cursor2.begin();
+    auto it1{cursor1.begin()};
+    auto it2{cursor2.begin()};
     
     while (it1 != cursor1.end() && it2 != cursor2.end()) {
         EXPECT_EQ(*it1, *it2);
@@ -496,8 +496,8 @@ TEST_F(ContainerCursorTest, CopySemantics) {
 }
 
 TEST_F(ContainerCursorTest, MoveSemantics) {
-    auto cursor1 = ContainerCursor::array(testArray);
-    auto originalSize = cursor1.size();
+    auto cursor1{ContainerCursor::array(testArray)};
+    auto originalSize{cursor1.size()};
     
     auto cursor2 = std::move(cursor1); // Move construction
     
@@ -521,7 +521,7 @@ TEST_F(ContainerCursorTest, ComplexNestedStructure) {
     };
     complex["config"] = QJsonObject{{"version", "2.0"}, {"debug", true}};
     
-    auto cursor = ContainerCursor::object(complex);
+    auto cursor{ContainerCursor::object(complex)};
     
     EXPECT_EQ(cursor.size(), 2);
     
@@ -532,8 +532,8 @@ TEST_F(ContainerCursorTest, ComplexNestedStructure) {
     EXPECT_NE(usersIt, cursor.end());
     
     // Iterate over users
-    auto usersArray = (*usersIt).toArray();
-    auto usersCursor = ContainerCursor::array(usersArray);
+    auto usersArray{(*usersIt).toArray()};
+    auto usersCursor{ContainerCursor::array(usersArray)};
     
     std::vector<QString> userNames;
     for (const auto& user : usersCursor) {
@@ -557,7 +557,7 @@ TEST_F(ContainerCursorTest, PerformanceBenchmark) {
         });
     }
     
-    auto cursor = ContainerCursor::array(veryLargeArray);
+    auto cursor{ContainerCursor::array(veryLargeArray)};
     
     // Test iteration performance
     int count = 0;
@@ -565,7 +565,7 @@ TEST_F(ContainerCursorTest, PerformanceBenchmark) {
     
     for (const auto& item : cursor) {
         if (item.isObject()) {
-            auto obj = item.toObject();
+            auto obj{item.toObject()};
             idSum += obj["id"].toInt();
             ++count;
         }
@@ -590,11 +590,11 @@ TEST_F(ContainerCursorTest, QtJsonTypeCompatibility) {
     mixedArray.append(QJsonValue(QJsonObject{{"nested", "object"}})); // Object
     mixedArray.append(QJsonValue(QJsonArray{"nested", "array"})); // Array
     
-    auto cursor = ContainerCursor::array(mixedArray);
+    auto cursor{ContainerCursor::array(mixedArray)};
     
     EXPECT_EQ(cursor.size(), 7);
     
-    auto it = cursor.begin();
+    auto it{cursor.begin()};
     EXPECT_TRUE((*it).isNull()); ++it;
     EXPECT_TRUE((*it).isBool()); ++it;
     EXPECT_TRUE((*it).isDouble()); ++it;

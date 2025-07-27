@@ -180,7 +180,7 @@ struct ExistenceTokenFactory<ExistenceFilterType::ArraySlice> {
                 int end = endStr.isEmpty() ? -1 : endStr.toInt();
                 Builder b{out};
                 return b.add([start, end](const QJsonValue& j) -> bool {
-                    const auto arr = j.toArray();
+                    const auto arr{j.toArray()};
                     int actualStart = (start == -1) ? 0 : start;
                     int actualEnd = (end == -1) ? arr.size() : end;
                     return actualStart < arr.size() && actualEnd > actualStart;
@@ -202,7 +202,7 @@ struct ExistenceTokenFactory<ExistenceFilterType::NegArraySlice> {
                 int end = endStr.isEmpty() ? -1 : endStr.toInt();
                 Builder b{out};
                 return b.add([start, end](const QJsonValue& j) -> bool {
-                    const auto arr = j.toArray();
+                    const auto arr{j.toArray()};
                     int actualStart = (start == -1) ? 0 : start;
                     int actualEnd = (end == -1) ? arr.size() : end;
                     return actualStart >= arr.size() || actualEnd <= actualStart;
@@ -235,7 +235,7 @@ struct ExistenceTokenFactory<ExistenceFilterType::MultiSelector> {
                             bool ok;
                             int index = selector.toInt(&ok);
                             if (ok && j.isArray()) {
-                                const auto arr = j.toArray();
+                                const auto arr{j.toArray()};
                                 if (index >= 0 && index < arr.size()) {
                                     return true;
                                 }
@@ -272,7 +272,7 @@ struct ExistenceTokenFactory<ExistenceFilterType::NegMultiSelector> {
                             bool ok;
                             int index = selector.toInt(&ok);
                             if (ok && j.isArray()) {
-                                const auto arr = j.toArray();
+                                const auto arr{j.toArray()};
                                 if (index >= 0 && index < arr.size()) {
                                     return false; // Found one, so negation is false
                                 }
@@ -297,9 +297,9 @@ struct ExistenceTokenFactory<ExistenceFilterType::NestedFilter> {
                 return b.add([filterExpr](const QJsonValue& j) -> bool {
                     if (!j.isArray()) return false;
                     
-                    const auto arr = j.toArray();
+                    const auto arr{j.toArray()};
                     std::vector<json_query::json_path::FilterFn> innerFilterFns;
-                    auto innerToken = json_query::json_path::compileFilter(filterExpr, innerFilterFns);
+                    auto innerToken{json_query::json_path::compileFilter(filterExpr, innerFilterFns)};
                     if (!innerToken || innerFilterFns.empty()) return false;
                     
                     json_query::json_path::FilterFn innerFilterFn = innerFilterFns.back();
@@ -324,9 +324,9 @@ struct ExistenceTokenFactory<ExistenceFilterType::NegNestedFilter> {
                 return b.add([filterExpr](const QJsonValue& j) -> bool {
                     if (!j.isArray()) return true; // Non-arrays don't match, so negation is true
                     
-                    const auto arr = j.toArray();
+                    const auto arr{j.toArray()};
                     std::vector<json_query::json_path::FilterFn> innerFilterFns;
-                    auto innerToken = json_query::json_path::compileFilter(filterExpr, innerFilterFns);
+                    auto innerToken{json_query::json_path::compileFilter(filterExpr, innerFilterFns)};
                     if (!innerToken || innerFilterFns.empty()) return true;
                     
                     json_query::json_path::FilterFn innerFilterFn = innerFilterFns.back();
@@ -485,7 +485,7 @@ std::optional<json_query::json_path::Token> parseAbsolutePath(const QString& s, 
     using json_query::JSONPath;
     
     // Try to create the JSONPath - if it fails, the pattern is invalid
-    auto testPath = JSONPath::create(s);
+    auto testPath{JSONPath::create(s)};
     if (!testPath) {
         return std::nullopt; // Invalid absolute path pattern
     }
@@ -495,7 +495,7 @@ std::optional<json_query::json_path::Token> parseAbsolutePath(const QString& s, 
         // Create a temporary JSONPath to evaluate the absolute path
         // against the root document
         if (auto path = JSONPath::create(s)) {
-            auto results = path->evaluateAll(rootValue);
+            auto results{path->evaluateAll(rootValue)};
             if (results) {
                 return !results->isEmpty();
             }

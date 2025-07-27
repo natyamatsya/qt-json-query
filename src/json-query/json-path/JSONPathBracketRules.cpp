@@ -177,7 +177,7 @@ bool matchesIndexList(QStringView content)
 {
     if (!content.contains(u',')) return false;
     
-    const auto parts = content.split(u',');
+    const auto parts{content.split(u',')};
     return static_cast<bool>(parts.size() >= 2);
 }
 
@@ -203,7 +203,7 @@ bool matchesPlaceholder(QStringView content)
     if (trimmed == u"?") return true;
     
     // Check for multiple placeholders separated by commas
-    const auto parts = trimmed.split(u',');
+    const auto parts{trimmed.split(u',')};
     for (const auto& part : parts) {
         if (part.trimmed() != u"?") return false;
     }
@@ -267,7 +267,7 @@ std::expected<void, Error> handleIndexList(QStringView content, BracketSink& out
 {
     qCDebug(jsonPathLog) << "BR_RULE index-list raw" << content.toString();
     
-    const auto parts = content.split(u',');
+    const auto parts{content.split(u',')};
     for (QStringView p : parts) {
         QStringView t = p.trimmed();
         
@@ -292,7 +292,7 @@ std::expected<void, Error> handleIndexList(QStringView content, BracketSink& out
 
 std::expected<void, Error> handleSlice(QStringView content, BracketSink& out)
 {
-    auto slice = makeSlice(content);
+    auto slice{makeSlice(content)};
     if (!slice) {
         return std::unexpected(Error::InvalidSlice);
     }
@@ -365,7 +365,7 @@ std::expected<void, Error> handlePlaceholder(QStringView content, BracketSink& o
     }
     
     // Multiple placeholders - handle each one
-    const auto parts = trimmed.split(u',');
+    const auto parts{trimmed.split(u',')};
     for (const auto& part : parts) {
         if (part.trimmed() == u"?") {
             FilterFn alwaysTrue = [](const QJsonValue&) { return true; };
@@ -409,13 +409,13 @@ std::expected<void, Error> handleUnquotedKey(QStringView /*content*/, BracketSin
 // Forward declaration for union handler
 std::expected<void, Error> handleUnionComma(QStringView content, BracketSink& out)
 {
-    auto segmentsResult = splitTopLevelMultiple(content, QLatin1StringView(","));
+    auto segmentsResult{splitTopLevelMultiple(content, QLatin1StringView(","))};
     if (!segmentsResult) {
         qCDebug(jsonPathLog) << "handleUnionComma: failed to split content";
         return std::unexpected(Error::UnsupportedFilter);
     }
     
-    const auto& segments = *segmentsResult;
+    const auto& segments{*segmentsResult};
     qCDebug(jsonPathLog) << "handleUnionComma: split into" << segments.size() << "segments";
     
     for (const QString& segment : segments) {
@@ -424,7 +424,7 @@ std::expected<void, Error> handleUnionComma(QStringView content, BracketSink& ou
         qCDebug(jsonPathLog) << "handleUnionComma: processing segment" << trimmedSegment.toString();
         
         // Use dispatcher to process each segment, but exclude union rule to prevent recursion
-        auto result = BracketRuleDispatcher::processSegmentExcludingUnion(trimmedSegment, out);
+        auto result{BracketRuleDispatcher::processSegmentExcludingUnion(trimmedSegment, out)};
         if (!result) {
             qCDebug(jsonPathLog) << "handleUnionComma: failed to process segment" << trimmedSegment.toString();
             return result;
@@ -480,7 +480,7 @@ std::expected<void, Error> handleSingleIndex(QStringView content, EmbeddedBracke
 std::expected<void, Error> handleIndexList(QStringView content, EmbeddedBracketSink& out)
 {
     QStringView trimmed = content.trimmed();
-    const auto parts = trimmed.split(u',');
+    const auto parts{trimmed.split(u',')};
     
     for (const auto& part : parts) {
         QStringView indexStr = part.trimmed();
@@ -501,7 +501,7 @@ std::expected<void, Error> handleIndexList(QStringView content, EmbeddedBracketS
 
 std::expected<void, Error> handleSlice(QStringView content, EmbeddedBracketSink& out)
 {
-    auto slice = makeSlice(content.toString());
+    auto slice{makeSlice(content.toString())};
     if (!slice) {
         return std::unexpected(Error::InvalidSlice);
     }
@@ -562,7 +562,7 @@ std::expected<void, Error> handlePlaceholder(QStringView content, EmbeddedBracke
     }
     
     // Multiple placeholders - handle each one
-    const auto parts = trimmed.split(u',');
+    const auto parts{trimmed.split(u',')};
     for (const auto& part : parts) {
         if (part.trimmed() == u"?") {
             Token filterToken;
@@ -607,7 +607,7 @@ std::expected<void, Error> handleUnquotedKey(QStringView /*content*/, EmbeddedBr
 std::vector<QString> splitUnionSegments(QStringView content)
 {
     // Use the existing splitTopLevelMultiple function for consistency
-    auto result = splitTopLevelMultiple(content, QLatin1StringView(","));
+    auto result{splitTopLevelMultiple(content, QLatin1StringView(","))};
     if (result) {
         // Convert QList<QString> to std::vector<QString>
         std::vector<QString> stringSegments;
@@ -618,7 +618,7 @@ std::vector<QString> splitUnionSegments(QStringView content)
         return stringSegments;
     }
     // Fallback: simple split if complex parsing fails
-    auto segments = content.split(u',');
+    auto segments{content.split(u',')};
     std::vector<QString> stringSegments;
     stringSegments.reserve(segments.size());
     for (const auto& segment : segments) {
@@ -630,12 +630,12 @@ std::vector<QString> splitUnionSegments(QStringView content)
 // Forward declaration for embedded union handler
 std::expected<void, Error> handleUnionComma(QStringView content, EmbeddedBracketSink& out)
 {
-    const auto segments = splitUnionSegments(content);
+    const auto segments{splitUnionSegments(content)};
     
     for (const auto& segment : segments) {
         // Trim each segment before processing (like legacy implementation)
-        auto trimmedSegment = QStringView(segment).trimmed();
-        auto result = EmbeddedBracketRuleDispatcher::processSegmentExcludingUnion(trimmedSegment, out);
+        auto trimmedSegment{QStringView(segment).trimmed()};
+        auto result{EmbeddedBracketRuleDispatcher::processSegmentExcludingUnion(trimmedSegment, out)};
         if (!result) {
             return result;
         }
@@ -727,7 +727,7 @@ std::vector<BracketRuleMetadata> BracketRuleDispatcher::createRules()
 
 const std::vector<BracketRuleMetadata>& BracketRuleDispatcher::getRules()
 {
-    static const auto rules = createRules();
+    static const auto rules{createRules()};
     return rules;
 }
 
@@ -741,7 +741,7 @@ std::expected<void, Error> BracketRuleDispatcher::dispatch(QStringView content, 
         
         if (rule.matcher(content)) {
             qCDebug(jsonPathLog) << "Rule" << rule.name << "matched, applying handler";
-            auto result = rule.handler(content, sink);
+            auto result{rule.handler(content, sink)};
             
             if (result) {
                 qCDebug(jsonPathLog) << "Rule" << rule.name << "succeeded";
@@ -868,7 +868,7 @@ std::vector<EmbeddedBracketRuleMetadata> EmbeddedBracketRuleDispatcher::createRu
 
 const std::vector<EmbeddedBracketRuleMetadata>& EmbeddedBracketRuleDispatcher::getRules()
 {
-    static const auto rules = createRules();
+    static const auto rules{createRules()};
     return rules;
 }
 
@@ -882,7 +882,7 @@ std::expected<void, Error> EmbeddedBracketRuleDispatcher::dispatch(QStringView c
         
         if (rule.matcher(content)) {
             qCDebug(jsonPathLog) << "Rule" << rule.name << "matched, applying handler";
-            auto result = rule.handler(content, sink);
+            auto result{rule.handler(content, sink)};
             
             if (result) {
                 qCDebug(jsonPathLog) << "Rule" << rule.name << "succeeded";

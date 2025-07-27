@@ -94,7 +94,7 @@ namespace json_query::json_path::internal {
                 return a->at(m_idx++);
             } else {
                 const auto* o = objPtr(m_tagged);
-                auto it = o->constBegin();
+                auto it{o->constBegin()};
                 std::advance(it, m_idx++);
                 return it.value();
             }
@@ -124,7 +124,7 @@ namespace json_query::json_path::internal {
                     return a->at(m_idx);
                 } else {
                     const auto* o = objPtr(m_tagged);
-                    auto it = o->constBegin();
+                    auto it{o->constBegin()};
                     std::advance(it, m_idx);
                     return it.value();
                 }

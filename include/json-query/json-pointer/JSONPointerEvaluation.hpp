@@ -22,7 +22,7 @@ enum class EvalError : std::uint8_t {
 [[nodiscard]] inline bool stepObject(QJsonValue& current, const QString& key) noexcept
 {
     const QJsonObject obj{ current.toObject() };
-    const auto it = obj.constFind(key);
+    const auto it{obj.constFind(key)};
     if (it == obj.constEnd()) return false;
     current = *it;
     return true;

@@ -135,7 +135,7 @@ struct SliceProcessingStrategy<SliceProcessingType::ZeroStep> {
 template<>
 struct SliceProcessingStrategy<SliceProcessingType::ForwardSlice> {
     static std::expected<QJsonArray, EvalError> process(const QJsonArray& array, const Slice& s) {
-        auto pooledArray = acquirePooledArray();
+        auto pooledArray{acquirePooledArray()};
         QJsonArray& out = *pooledArray;
 
         const int len = array.size();
@@ -177,7 +177,7 @@ struct SliceProcessingStrategy<SliceProcessingType::ForwardSlice> {
 template<>
 struct SliceProcessingStrategy<SliceProcessingType::BackwardSlice> {
     static std::expected<QJsonArray, EvalError> process(const QJsonArray& array, const Slice& s) {
-        auto pooledArray = acquirePooledArray();
+        auto pooledArray{acquirePooledArray()};
         QJsonArray& out = *pooledArray;
 
         const int len = array.size();
@@ -416,7 +416,7 @@ struct UnionProcessingStrategy<UnionProcessingType::SingleToken> {
         qCDebug(jsonPathLog) << "[UnionProcessing::SingleToken] Processing single token optimization";
         
         qsizetype tokenIdx = unionTokens[0];
-        auto tokenResult = processSingleUnionToken(ctx, tokenIdx, working, root);
+        auto tokenResult{processSingleUnionToken(ctx, tokenIdx, working, root)};
         
         if (tokenResult.success) {
             qCDebug(jsonPathLog) << "[UnionProcessing::SingleToken] Single token succeeded with" << tokenResult.results.size() << "results";
@@ -448,7 +448,7 @@ struct UnionProcessingStrategy<UnionProcessingType::MultipleTokens> {
         auto processToken = [&](qsizetype tokenIdx) -> std::optional<QJsonArray> {
             qCDebug(jsonPathLog) << "[UnionProcessing::MultipleTokens] Processing token" << tokenIdx;
             
-            auto tokenResult = processSingleUnionToken(ctx, tokenIdx, working, root);
+            auto tokenResult{processSingleUnionToken(ctx, tokenIdx, working, root)};
             if (tokenResult.success) {
                 qCDebug(jsonPathLog) << "[UnionProcessing::MultipleTokens] Token" << tokenIdx << "succeeded with" << tokenResult.results.size() << "results";
                 return tokenResult.results;
@@ -465,7 +465,7 @@ struct UnionProcessingStrategy<UnionProcessingType::MultipleTokens> {
                 resultArrays.push_back(*result);
             } else {
                 // Track last error for potential failure case
-                auto tokenResult = processSingleUnionToken(ctx, tokenIdx, working, root);
+                auto tokenResult{processSingleUnionToken(ctx, tokenIdx, working, root)};
                 if (!tokenResult.success) {
                     lastError = tokenResult.error;
                 }
@@ -479,7 +479,7 @@ struct UnionProcessingStrategy<UnionProcessingType::MultipleTokens> {
         }
         
         qCDebug(jsonPathLog) << "[UnionProcessing::MultipleTokens] Merging results from" << resultArrays.size() << "successful arrays";
-        auto mergedResults = mergeTokenResults(resultArrays, root);
+        auto mergedResults{mergeTokenResults(resultArrays, root)};
         qCDebug(jsonPathLog) << "[UnionProcessing::MultipleTokens] Merged to" << mergedResults.size() << "total results";
         return mergedResults;
     }
@@ -636,7 +636,7 @@ TokenProcessingResult processSingleUnionToken(
     qCDebug(jsonPathLog) << "[processSingleUnionToken] Processing token" << tokenIdx << "with" << working.size() << "working values";
     
     // Use pooled array for efficient result collection
-    auto pooledArray = acquirePooledArray();
+    auto pooledArray{acquirePooledArray()};
     QJsonArray& results = *pooledArray;
     
     // Process each working value using monadic pattern
@@ -647,11 +647,11 @@ TokenProcessingResult processSingleUnionToken(
     // Aggregate results using monadic error handling
     auto aggregateResults = [&]() -> std::expected<QJsonArray, EvalError> {
         for (qsizetype i = 0; i < working.size(); ++i) {
-            const auto& workingValue = working[i];
+            const auto& workingValue{working[i]};
             qCDebug(jsonPathLog) << "[processSingleUnionToken] Processing working value" << i << "of type" << static_cast<int>(workingValue.type());
             
             // Use monadic chaining for token evaluation
-            auto tokenResult = processWorkingValue(workingValue);
+            auto tokenResult{processWorkingValue(workingValue)};
             if (!tokenResult) {
                 qCDebug(jsonPathLog) << "[processSingleUnionToken] Token evaluation failed with error" << static_cast<int>(tokenResult.error());
                 return std::unexpected(tokenResult.error());
@@ -742,7 +742,7 @@ QJsonArray deduplicateJsonValues(const QJsonArray& input, const QJsonValue& root
     QSet<uint> seen;
     QJsonArray dedup;
     
-    auto workingDedupCursor = json_query::json_path::internal::makeSimpleContextCursor(input, root, root);
+    auto workingDedupCursor{json_query::json_path::internal::makeSimpleContextCursor(input, root, root)};
     for (const auto& [v2, context] : workingDedupCursor) {
         if (v2.isObject()) {
             uint h = qHash(QJsonDocument(v2.toObject()).toJson());
@@ -766,7 +766,7 @@ std::expected<QJsonArray, EvalError> processBranchUniqueSelection(
     const QJsonValue& root,
     bool isLeaf)
 {
-    auto keyResult = collectKeysFromTokens(ctx, i);
+    auto keyResult{collectKeysFromTokens(ctx, i)};
     const std::vector<QString>& keys = keyResult.keys;
     i = keyResult.nextIndex;
     
@@ -774,7 +774,7 @@ std::expected<QJsonArray, EvalError> processBranchUniqueSelection(
         return std::unexpected(EvalError::KeyNotFound);
     }
     
-    auto pooledArray = acquirePooledArray();
+    auto pooledArray{acquirePooledArray()};
     QJsonArray& results = *pooledArray;
     
     for (const auto& workingValue : working) {
@@ -828,7 +828,7 @@ QJsonValue applyTrailing(json_path::FunctionType fn, const QJsonValue& v)
     case Max:
         if (!v.isArray()) return {QJsonValue::Undefined};
         {
-            const auto arr = v.toArray();
+            const auto arr{v.toArray()};
             bool first=true; double best=0.0;
             for (const auto& e : arr) {
                 if (!e.isDouble()) continue;

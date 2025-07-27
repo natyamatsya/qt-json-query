@@ -85,8 +85,8 @@ template<auto PAT>
             .and_then([&](const ComparisonContext& ctx) -> std::optional<json_query::json_path::Token> {
                 Builder b{out};
                 return b.add([prop, ctx](const QJsonValue& j){
-                    const auto obj = j.toObject();
-                    const auto v = obj.value(prop);
+                    const auto obj{j.toObject()};
+                    const auto v{obj.value(prop)};
                     return ctx.compare(v);
                 }, prop);
             });
@@ -113,13 +113,13 @@ template<auto PAT>
                     
                     // Array index access: only works on arrays, not objects
                     if (j.isArray()) {
-                        const auto arr = j.toArray();
+                        const auto arr{j.toArray()};
                         if (index < 0 || index >= arr.size()) {
                             // Out of bounds: compare with undefined/null
                             QJsonValue undefined; // QJsonValue::Undefined
                             return ctx.compare(undefined);
                         } else {
-                            const auto v = arr[index];
+                            const auto v{arr[index]};
                             return ctx.compare(v);
                         }
                     } else {
@@ -147,8 +147,8 @@ template<auto PAT>
         if (!regex.isValid()) return std::nullopt;
         
         return Builder{out}.add([prop, regex](const QJsonValue& j){
-            const auto obj = j.toObject();
-            const auto v = obj.value(prop);
+            const auto obj{j.toObject()};
+            const auto v{obj.value(prop)};
             if (!v.isString()) return false;
             return regex.match(v.toString()).hasMatch();
         }, prop);
@@ -257,8 +257,8 @@ template<auto PAT>
         ctx.type = ComparisonType::Null;
         
         return Builder{out}.add([prop, ctx](const QJsonValue& j){
-            const auto obj = j.toObject();
-            const auto v = obj.value(prop);
+            const auto obj{j.toObject()};
+            const auto v{obj.value(prop)};
             return ctx.compare(v);
         }, prop);
     }
@@ -285,13 +285,13 @@ template<auto PAT>
             
             // Array index access: only works on arrays, not objects
             if (j.isArray()) {
-                const auto arr = j.toArray();
+                const auto arr{j.toArray()};
                 if (index < 0 || index >= arr.size()) {
                     // Out of bounds: compare with undefined/null
                     QJsonValue undefined; // QJsonValue::Undefined
                     return ctx.compare(undefined);
                 } else {
-                    const auto v = arr[index];
+                    const auto v{arr[index]};
                     return ctx.compare(v);
                 }
             } else {
@@ -329,7 +329,7 @@ std::optional<Token> parseEmbeddedCompare1(const QString& s)
         const QString rhs = to_qstr(m.template get<3>().to_view());
         
         // Parse RHS value using existing comparison context logic
-        auto ctx = parseRhsValue(op, rhs);
+        auto ctx{parseRhsValue(op, rhs)};
         if (!ctx) return std::nullopt;
         
         Token token;
@@ -338,8 +338,8 @@ std::optional<Token> parseEmbeddedCompare1(const QString& s)
         
         // Embed filter directly into token
         token.embedFilter([prop, ctx = *ctx](const QJsonValue& j) {
-            const auto obj = j.toObject();
-            const auto v = obj.value(prop);
+            const auto obj{j.toObject()};
+            const auto v{obj.value(prop)};
             return ctx.compare(v);
         });
         
@@ -357,7 +357,7 @@ std::optional<Token> parseEmbeddedCompareIndex(const QString& s)
         const QString rhs = to_qstr(m.template get<3>().to_view());
         
         // Parse RHS value using existing comparison context logic
-        auto ctx = parseRhsValue(op, rhs);
+        auto ctx{parseRhsValue(op, rhs)};
         if (!ctx) return std::nullopt;
         
         bool ok;
@@ -371,9 +371,9 @@ std::optional<Token> parseEmbeddedCompareIndex(const QString& s)
         // Embed filter directly into token
         token.embedFilter([index, ctx = *ctx](const QJsonValue& j) {
             if (!j.isArray()) return false;
-            const auto arr = j.toArray();
+            const auto arr{j.toArray()};
             if (index < 0 || index >= arr.size()) return false;
-            const auto v = arr[index];
+            const auto v{arr[index]};
             return ctx.compare(v);
         });
         
@@ -390,7 +390,7 @@ std::optional<Token> parseEmbeddedSelfValue(const QString& s)
         const QString rhs = to_qstr(m.template get<2>().to_view());
         
         // Parse RHS value using existing comparison context logic
-        auto ctx = parseRhsValue(op, rhs);
+        auto ctx{parseRhsValue(op, rhs)};
         if (!ctx) return std::nullopt;
         
         Token token;
@@ -424,8 +424,8 @@ std::optional<Token> parseEmbeddedRegex1(const QString& s)
         
         // Embed regex filter directly into token
         token.embedFilter([prop, regex](const QJsonValue& j) {
-            const auto obj = j.toObject();
-            const auto v = obj.value(prop);
+            const auto obj{j.toObject()};
+            const auto v{obj.value(prop)};
             if (!v.isString()) return false;
             return regex.match(v.toString()).hasMatch();
         });
