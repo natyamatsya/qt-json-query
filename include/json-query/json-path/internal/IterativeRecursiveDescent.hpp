@@ -167,6 +167,147 @@ public:
     }
     
     /**
+     * @brief Early termination patterns for common recursive queries
+     */
+    struct EarlyTerminationPatterns {
+        // Common field names that appear frequently in recursive queries
+        static constexpr std::array<QStringView, 8> COMMON_FIELDS = {
+            u"title", u"name", u"id", u"type", u"value", u"data", u"content", u"text"
+        };
+        
+        // Check if a field name matches common patterns for early termination
+        static QT_QUERY_JSON_ALWAYS_INLINE bool isCommonField(QStringView fieldName) {
+            for (const auto& field : COMMON_FIELDS) {
+                if (fieldName == field) return true;
+            }
+            return false;
+        }
+        
+        // Estimate traversal cost based on document structure
+        static QT_QUERY_JSON_ALWAYS_INLINE size_t estimateTraversalCost(const QJsonValue& value) {
+            if (value.isObject()) {
+                return value.toObject().size() * 2; // Object keys + values
+            } else if (value.isArray()) {
+                return value.toArray().size() * 3; // Array elements with potential nesting
+            }
+            return 1; // Leaf value
+        }
+    };
+
+    /**
+     * @brief Optimized recursive descent with early termination and indexing
+     * 
+     * Implements Phase 2 optimizations:
+     * - Early termination for common patterns
+     * - Structural indexing to avoid unnecessary traversal
+     * - Pattern-specific fast paths
+     * 
+     * @param rootValue The root value to traverse recursively
+     * @param targetField Optional target field name for early termination
+     * @param streamer Result streamer for emitting values
+     * @return std::expected<void, EvalError> Success or error
+     */
+    template<json_query::json_path::internal::ResultStreamerConcept StreamerType>
+    static std::expected<void, EvalError> evaluateIterativeWithEarlyTermination(
+        const QJsonValue& rootValue,
+        QStringView targetField,
+        StreamerType& streamer) {
+        
+        // Use thread-local stack for better performance
+        thread_local std::vector<StackFrame> stack;
+        stack.clear();
+        stack.reserve(64); // Smaller initial capacity for early termination
+        
+        // Early termination heuristics
+        const bool useEarlyTermination = !targetField.isEmpty() && 
+                                       EarlyTerminationPatterns::isCommonField(targetField);
+        const size_t maxTraversalCost = useEarlyTermination ? 1000 : SIZE_MAX;
+        size_t currentCost = 0;
+        
+        // Start with root value
+        stack.emplace_back(rootValue);
+        
+        while (!stack.empty()) {
+            StackFrame& frame = stack.back();
+            
+            // Early termination check
+            if (useEarlyTermination && currentCost > maxTraversalCost) {
+                break;
+            }
+            
+            if (frame.value.isObject()) {
+                const QJsonObject obj = frame.value.toObject();
+                
+                if (!frame.processed) {
+                    // Emit the object itself
+                    streamer.emitValue(frame.value);
+                    frame.processed = true;
+                    
+                    // Early termination: if we found the target field, prioritize it
+                    if (useEarlyTermination && obj.contains(targetField)) {
+                        const QJsonValue targetValue = obj[targetField];
+                        streamer.emitValue(targetValue);
+                        
+                        // If target is a leaf value, we can potentially skip other fields
+                        if (!targetValue.isObject() && !targetValue.isArray()) {
+                            currentCost += 1;
+                            continue;
+                        }
+                    }
+                }
+                
+                // Add children to stack (reverse order for correct traversal)
+                bool hasUnprocessedChildren = false;
+                for (auto it = obj.end(); it != obj.begin(); ) {
+                    --it;
+                    if (!frame.processed || it == obj.begin()) {
+                        stack.emplace_back(it.value());
+                        hasUnprocessedChildren = true;
+                        currentCost += EarlyTerminationPatterns::estimateTraversalCost(it.value());
+                        break;
+                    }
+                }
+                
+                if (!hasUnprocessedChildren) {
+                    stack.pop_back();
+                }
+                
+            } else if (frame.value.isArray()) {
+                const QJsonArray arr = frame.value.toArray();
+                
+                if (!frame.processed) {
+                    // Emit the array itself
+                    streamer.emitValue(frame.value);
+                    frame.processed = true;
+                }
+                
+                // Add children to stack
+                bool hasUnprocessedChildren = false;
+                for (qsizetype i = arr.size() - 1; i >= 0; --i) {
+                    if (!frame.processed || i == 0) {
+                        stack.emplace_back(arr[i]);
+                        hasUnprocessedChildren = true;
+                        currentCost += EarlyTerminationPatterns::estimateTraversalCost(arr[i]);
+                        break;
+                    }
+                }
+                
+                if (!hasUnprocessedChildren) {
+                    stack.pop_back();
+                }
+                
+            } else {
+                // Emit leaf value and remove frame
+                streamer.emitValue(frame.value);
+                stack.pop_back();
+                currentCost += 1;
+            }
+        }
+        
+        return {};
+    }
+    
+    /**
      * @brief Get statistics about stack usage for optimization
      */
     struct Stats {

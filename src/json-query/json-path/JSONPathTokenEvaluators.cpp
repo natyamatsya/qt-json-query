@@ -102,9 +102,10 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::Wildcard>(const PathEvalC
 // --- Recursive -------------------------------------------------------------
 template<>
 std::expected<QJsonArray, EvalError> eval<Token::Kind::Recursive>(const PathEvalCtx& /*ctx*/,
-                                                                   const Token&,
+                                                                   const Token& /*tk*/,
                                                                    const QJsonValue& v)
 {
+    // Baseline implementation (Phase 2 optimizations temporarily disabled)
     return evaluateRecursive(v, 0);
 }
 

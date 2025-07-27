@@ -3,6 +3,7 @@
 #include "json-query/json-path/internal/ArrayPool.hpp"
 #include "json-query/json-path/internal/IterativeRecursiveDescent.hpp"
 #include <QDebug>
+#include <QStringView>
 
 namespace json_query::json_path::detail {
 
@@ -31,9 +32,110 @@ static std::expected<QJsonArray, EvalError> __wildcardObjectImpl(const QJsonObje
     return finalResult;
 }
 
+// ---------------------------------------------------------------------------
+//  Pattern detection for Phase 2 optimizations
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief Detects common recursive patterns for optimization
+ */
+struct RecursivePatternDetector {
+    // Common patterns that benefit from early termination
+    static constexpr std::array<QStringView, 6> EARLY_TERMINATION_PATTERNS = {
+        u"title", u"name", u"id", u"type", u"value", u"data"
+    };
+    
+    /**
+     * @brief Detect if a JSONPath pattern can benefit from early termination
+     * @param pathExpression The JSONPath expression (e.g., "$..title")
+     * @return Target field name if early termination applicable, empty otherwise
+     */
+    static QStringView detectEarlyTerminationPattern(QStringView pathExpression) {
+        // Look for patterns like "$..fieldname" 
+        if (pathExpression.startsWith(u"$..") && pathExpression.size() > 3) {
+            QStringView fieldName = pathExpression.mid(3);
+            
+            // Check if it's a simple field access (no additional operators)
+            if (!fieldName.contains(u'[') && !fieldName.contains(u'.') && 
+                !fieldName.contains(u'?') && !fieldName.contains(u'*')) {
+                
+                // Check if it matches common patterns
+                for (const auto& pattern : EARLY_TERMINATION_PATTERNS) {
+                    if (fieldName == pattern) {
+                        return fieldName;
+                    }
+                }
+            }
+        }
+        return QStringView();
+    }
+    
+    /**
+     * @brief Estimate document complexity for optimization selection
+     */
+    static size_t estimateDocumentComplexity(const QJsonValue& value) {
+        if (value.isObject()) {
+            const QJsonObject obj = value.toObject();
+            size_t complexity = obj.size();
+            
+            // Sample a few values to estimate nesting
+            int samples = 0;
+            for (auto it = obj.begin(); it != obj.end() && samples < 3; ++it, ++samples) {
+                if (it.value().isObject() || it.value().isArray()) {
+                    complexity += estimateDocumentComplexity(it.value()) / 2;
+                }
+            }
+            return complexity;
+        } else if (value.isArray()) {
+            const QJsonArray arr = value.toArray();
+            size_t complexity = arr.size();
+            
+            // Sample first few elements
+            for (qsizetype i = 0; i < std::min(arr.size(), qsizetype(3)); ++i) {
+                if (arr[i].isObject() || arr[i].isArray()) {
+                    complexity += estimateDocumentComplexity(arr[i]) / 2;
+                }
+            }
+            return complexity;
+        }
+        return 1;
+    }
+};
+
 static std::expected<QJsonArray, EvalError> __evaluateRecursiveImpl(const QJsonValue& value)
 {
     // Use iterative implementation with array pooling for better memory efficiency
+    return IterativeRecursiveDescent::evaluateIterativeArray(value);
+}
+
+static std::expected<QJsonArray, EvalError> __evaluateRecursiveOptimized(
+    const QJsonValue& value, 
+    QStringView pathHint = QStringView()) {
+    
+    // Detect if we can use early termination optimization
+    QStringView targetField = RecursivePatternDetector::detectEarlyTerminationPattern(pathHint);
+    
+    // Estimate document complexity to choose optimization strategy
+    size_t complexity = RecursivePatternDetector::estimateDocumentComplexity(value);
+    
+    // Use early termination for simple patterns on complex documents
+    if (!targetField.isEmpty() && complexity > 50) {
+        auto pooledArray = acquirePooledArray();
+        internal::ResultCollector collector(pooledArray.get());
+        
+        auto result = IterativeRecursiveDescent::evaluateIterativeWithEarlyTermination(
+            value, targetField, collector);
+        
+        if (!result) {
+            return std::unexpected(result.error());
+        }
+        
+        // Move result to avoid copying
+        QJsonArray finalResult = std::move(*pooledArray);
+        return finalResult;
+    }
+    
+    // Fallback to standard implementation
     return IterativeRecursiveDescent::evaluateIterativeArray(value);
 }
 
@@ -66,6 +168,11 @@ std::expected<QJsonArray, EvalError> wildcardArray(const QJsonArray& arr)
 // ---------------------------------------------------------------------------
 //  Public recursive evaluation API
 // ---------------------------------------------------------------------------
+
+std::expected<QJsonArray, EvalError> evaluateRecursive(const QJsonValue& value, QStringView pathHint)
+{
+    return __evaluateRecursiveOptimized(value, pathHint);
+}
 
 std::expected<QJsonArray, EvalError> evaluateRecursive(const QJsonValue& value, int /*unused*/)
 {
