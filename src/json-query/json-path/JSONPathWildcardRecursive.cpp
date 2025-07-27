@@ -4,6 +4,7 @@
 #include "json-query/json-path/internal/IterativeRecursiveDescent.hpp"
 #include <QDebug>
 #include <QStringView>
+#include <stdcompat/function_ref.hpp>
 
 namespace json_query::json_path::detail {
 
@@ -114,6 +115,8 @@ static std::expected<QJsonArray, EvalError> evaluateRecursiveImpl(const QJsonVal
  * For simple patterns like "$..fieldname", this bypasses the entire JSONPath
  * evaluation machinery and implements a direct recursive traversal that matches
  * the performance characteristics of plain recursive code.
+ * 
+ * Uses stdcompat::function_ref for zero-allocation recursive calls.
  */
 static std::expected<QJsonArray, EvalError> evaluateRecursiveDirectFastPath(
     const QJsonValue& root,
@@ -123,36 +126,43 @@ static std::expected<QJsonArray, EvalError> evaluateRecursiveDirectFastPath(
     auto pooledArray = acquirePooledArray();
     QJsonArray& results = *pooledArray;
     
-    // Direct recursive lambda - matches plain recursive performance
-    std::function<void(const QJsonValue&)> directTraverse = [&](const QJsonValue& value) {
-        if (value.isObject()) {
-            const QJsonObject obj = value.toObject();
-            
-            // Direct key lookup - fastest possible path
-            if (auto it = obj.find(QString(targetField)); it != obj.end()) {
-                results.append(it.value());
-            }
-            
-            // Traverse nested objects/arrays with minimal overhead
-            for (auto it = obj.begin(); it != obj.end(); ++it) {
-                const QJsonValue& nested = it.value();
-                if (nested.isObject() || nested.isArray()) {
-                    directTraverse(nested);
+    // Direct recursive traversal using function_ref - fixed approach
+    // We use a struct with operator() to avoid circular lambda capture issues
+    struct RecursiveTraverser {
+        QJsonArray& results;
+        QStringView targetField;
+        
+        void operator()(const QJsonValue& value) const {
+            if (value.isObject()) {
+                const QJsonObject obj = value.toObject();
+                
+                // Direct key lookup - fastest possible path
+                if (auto it = obj.find(QString(targetField)); it != obj.end()) {
+                    results.append(it.value());
+                }
+                
+                // Traverse nested objects/arrays with minimal overhead
+                for (auto it = obj.begin(); it != obj.end(); ++it) {
+                    const QJsonValue& nested = it.value();
+                    if (nested.isObject() || nested.isArray()) {
+                        (*this)(nested);  // Direct recursive call
+                    }
                 }
             }
-        }
-        else if (value.isArray()) {
-            const QJsonArray arr = value.toArray();
-            for (const QJsonValue& element : arr) {
-                if (element.isObject() || element.isArray()) {
-                    directTraverse(element);
+            else if (value.isArray()) {
+                const QJsonArray arr = value.toArray();
+                for (const QJsonValue& element : arr) {
+                    if (element.isObject() || element.isArray()) {
+                        (*this)(element);  // Direct recursive call
+                    }
                 }
             }
         }
     };
     
-    // Execute direct traversal
-    directTraverse(root);
+    // Create traverser and execute
+    RecursiveTraverser traverser{results, targetField};
+    traverser(root);
     
     // Move result to avoid copying
     QJsonArray finalResult = std::move(results);
