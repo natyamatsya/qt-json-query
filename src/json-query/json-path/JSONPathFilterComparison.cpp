@@ -97,7 +97,7 @@ bool compareValue<ComparisonType::DeepEquality>(const QJsonValue& v, const QStri
         return false; // Invalid JSON
     }
     
-    const QJsonValue rhsValue = doc.isArray() ? QJsonValue(doc.array()) : QJsonValue(doc.object());
+    const QJsonValue rhsValue = doc.isArray() ? QJsonValue{doc.array()} : QJsonValue{doc.object()};
     if (op == "==") return v == rhsValue;
     if (op == "!=") return v != rhsValue;
     return false; // Deep equality only supports == and !=

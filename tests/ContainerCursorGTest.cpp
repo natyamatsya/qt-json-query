@@ -583,7 +583,7 @@ TEST_F(ContainerCursorTest, QtJsonTypeCompatibility) {
     // Test with various Qt JSON value types
     QJsonArray mixedArray;
     mixedArray.append(QJsonValue()); // Null
-    mixedArray.append(QJsonValue(true)); // Bool
+    mixedArray.append(QJsonValue{true}); // Bool
     mixedArray.append(QJsonValue(42)); // Int
     mixedArray.append(QJsonValue(3.14)); // Double
     mixedArray.append(QJsonValue("string")); // String

@@ -50,7 +50,7 @@ TEST(JSONPointerConformance, ValidPointers)
     const QJsonObject root = testDoc().object();
     struct Case { QString ptr; QJsonValue expected; };
     const std::vector<Case> cases = {
-        {QString(), QJsonValue(root)},
+        {QString{}, QJsonValue(root)},
         {"/foo", root.value("foo")},
         {"/foo/0", root.value("foo").toArray().at(0)},
         {"/", root.value("")},

@@ -91,12 +91,12 @@ static QString editionIsbn_path(const QJsonDocument &doc, int index)
     auto pathResult{JSONPath::create(QString(u"$.inventory[%1].details.edition.isbn").arg(index))};
     auto result = pathResult->evaluate(doc);
     if (!result) {
-        return QString(); // Return empty string on error
+        return QString{}; // Return empty string on error
     }
     QJsonValue r = *result;
     if (r.isArray()) {
         const auto arr = r.toArray();
-        return arr.isEmpty() ? QString() : arr.first().toString();
+        return arr.isEmpty() ? QString{} : arr.first().toString();
     }
     return r.toString();
 }
