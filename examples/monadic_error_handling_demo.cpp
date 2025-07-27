@@ -8,7 +8,6 @@
 #include <chrono>
 
 using json_query::JSONPath;
-using json_query::json_path::internal::PassManager;
 
 // Helper function to validate JSON document
 std::expected<QJsonDocument, QString> validateJsonDocument(const QString& jsonStr) {
@@ -40,11 +39,11 @@ std::expected<QString, QString> validatePathSyntax(const QString& path) {
     return path;
 }
 
-// Helper function to create JSONPath with optimization
-std::expected<JSONPath, QString> createOptimizedPath(const QString& validPath, PassManager::OptimizationLevel optLevel) {
-    std::cout << "  → Creating JSONPath with optimization level O" << static_cast<int>(optLevel) << "\n";
+// Helper function to create JSONPath
+std::expected<JSONPath, QString> createOptimizedPath(const QString& validPath) {
+    std::cout << "  → Creating JSONPath\n";
     
-    auto result = JSONPath::create(validPath, optLevel);
+    auto result = JSONPath::create(validPath);
     if (!result) {
         return std::unexpected(QString("JSONPath creation failed: error code %1").arg(static_cast<int>(result.error())));
     }
@@ -66,8 +65,7 @@ std::expected<QJsonArray, QString> executeEvaluation(const JSONPath& path, const
 
 // C++23 Monadic JSONPath Pipeline - Elegant error composition!
 std::expected<QJsonArray, QString> processJsonPathMonadic(const QString& jsonStr, 
-                                                          const QString& pathStr,
-                                                          PassManager::OptimizationLevel optLevel = PassManager::OptimizationLevel::O2) {
+                                                          const QString& pathStr) {
     std::cout << "\n=== C++23 Monadic Pipeline ===\n";
     std::cout << "JSON: " << jsonStr.left(50).toStdString() << (jsonStr.length() > 50 ? "..." : "") << "\n";
     std::cout << "Path: " << pathStr.toStdString() << "\n";
@@ -85,11 +83,11 @@ std::expected<QJsonArray, QString> processJsonPathMonadic(const QString& jsonStr
                     return std::make_pair(doc, validPath);
                 });
         })
-        .and_then([optLevel](const std::pair<QJsonDocument, QString>& docAndPath) -> std::expected<std::pair<QJsonDocument, JSONPath>, QString> {
+        .and_then([](const std::pair<QJsonDocument, QString>& docAndPath) -> std::expected<std::pair<QJsonDocument, JSONPath>, QString> {
             const auto& [doc, path] = docAndPath;
-            return createOptimizedPath(path, optLevel)
+            return createOptimizedPath(path)
                 .transform([&doc](JSONPath&& jsonPath) {
-                    std::cout << "  ✅ JSONPath created with optimization\n";
+                    std::cout << "  ✅ JSONPath created\n";
                     return std::make_pair(doc, std::move(jsonPath));
                 });
         })
@@ -105,8 +103,7 @@ std::expected<QJsonArray, QString> processJsonPathMonadic(const QString& jsonStr
 
 // Traditional approach for comparison
 std::expected<QJsonArray, QString> processJsonPathTraditional(const QString& jsonStr, 
-                                                              const QString& pathStr,
-                                                              PassManager::OptimizationLevel optLevel = PassManager::OptimizationLevel::O2) {
+                                                              const QString& pathStr) {
     std::cout << "\n=== Traditional Pipeline ===\n";
     std::cout << "JSON: " << jsonStr.left(50).toStdString() << (jsonStr.length() > 50 ? "..." : "") << "\n";
     std::cout << "Path: " << pathStr.toStdString() << "\n";
@@ -126,12 +123,12 @@ std::expected<QJsonArray, QString> processJsonPathTraditional(const QString& jso
     }
     std::cout << "  ✅ Path syntax validated\n";
     
-    auto createdPath = createOptimizedPath(*validatedPath, optLevel);
+    auto createdPath = createOptimizedPath(*validatedPath);
     if (!createdPath) {
         std::cout << "  ❌ JSONPath creation failed: " << createdPath.error().toStdString() << "\n";
         return std::unexpected(createdPath.error());
     }
-    std::cout << "  ✅ JSONPath created with optimization\n";
+    std::cout << "  ✅ JSONPath created\n";
     
     auto results = executeEvaluation(*createdPath, *validatedDoc);
     if (!results) {
@@ -146,7 +143,7 @@ std::expected<QJsonArray, QString> processJsonPathTraditional(const QString& jso
 int main() {
     std::cout << "=== C++23 Monadic Error Handling Demo ===\n";
     std::cout << "Demonstrating elegant error composition with std::expected monadic operations\n";
-    std::cout << "Using the JSONPath evaluation engine with LLVM-inspired optimization passes\n";
+    std::cout << "Using the JSONPath evaluation engine\n";
 
     // Test data
     QString validJson = R"({
@@ -185,9 +182,9 @@ int main() {
         std::cout << "Test Case " << (i + 1) << ": " << testCase.description.toStdString() << "\n";
         std::cout << std::string(70, '=') << "\n";
 
-        // Test both approaches with O2 optimization
-        auto monadicResult = processJsonPathMonadic(testCase.json, testCase.path, PassManager::OptimizationLevel::O2);
-        auto traditionalResult = processJsonPathTraditional(testCase.json, testCase.path, PassManager::OptimizationLevel::O2);
+        // Test both approaches
+        auto monadicResult = processJsonPathMonadic(testCase.json, testCase.path);
+        auto traditionalResult = processJsonPathTraditional(testCase.json, testCase.path);
 
         // Verify both approaches give the same result
         bool bothSucceeded = monadicResult.has_value() && traditionalResult.has_value();
