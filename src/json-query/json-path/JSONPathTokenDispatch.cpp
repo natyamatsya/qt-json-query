@@ -2,6 +2,7 @@
 #include "json-query/json-path/JSONPathTokenEvaluators.hpp"
 #include "json-query/json-path/JSONPathWildcardRecursive.hpp"
 #include "json-query/json-path/internal/ResultStreamer.hpp"
+#include "json-query/json-path/internal/CompileTimeTokenDispatch.hpp"
 #include "json-query/json-path/internal/TokenDispatchTable.hpp"
 #include "json-query/json-path/internal/ArrayPool.hpp"
 #include "json-query/json-path/JSONPathLog.hpp"
@@ -108,35 +109,9 @@ bool ErrorHandlingDispatchTable<FirstStrategy, RestStrategies...>::processWithSt
     bool shouldEarlyReturn = false;
     
     for (const auto& srcValue : src) {
-        // Use the appropriate dispatch function based on token kind
-        std::expected<QJsonArray, EvalError> result;
-        
-        switch (tk.kind) {
-            case Token::Kind::Key:
-                result = dispatchKey(ctx, tk, srcValue);
-                break;
-            case Token::Kind::Index:
-                result = dispatchIndex(ctx, tk, srcValue);
-                break;
-            case Token::Kind::Slice:
-                result = dispatchSlice(ctx, tk, srcValue);
-                break;
-            case Token::Kind::Wildcard:
-                result = dispatchWildcard(ctx, tk, srcValue);
-                break;
-            case Token::Kind::Recursive:
-                result = dispatchRecursive(ctx, tk, srcValue);
-                break;
-            case Token::Kind::Filter:
-                result = dispatchFilter(ctx, tk, srcValue);
-                break;
-            case Token::Kind::KeyList:
-                result = dispatchKeyList(ctx, tk, srcValue);
-                break;
-            default:
-                result = std::unexpected(EvalError::TypeMismatchObject);
-                break;
-        }
+        // Use compile-time dispatch to eliminate runtime switch overhead
+        std::expected<QJsonArray, EvalError> result = 
+            internal::CompileTimeTokenDispatcher::dispatch(ctx, tk, srcValue);
         
         if (result) {
             // Success: stream results directly
