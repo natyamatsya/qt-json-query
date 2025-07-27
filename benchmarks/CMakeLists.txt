@@ -22,3 +22,8 @@ target_link_libraries(json_benchmark PRIVATE
     Qt6::Core
     benchmark::benchmark
 )
+
+# Link function_ref header-only interface when available
+if(TARGET function_ref_interface)
+    target_link_libraries(json_benchmark PRIVATE function_ref_interface)
+endif()
