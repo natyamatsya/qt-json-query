@@ -70,3 +70,43 @@ if(GPERFTOOLS_INCLUDE_DIR AND GPERFTOOLS_PROFILER_LIB)
     target_link_libraries(profile_test PRIVATE ${GPERFTOOLS_PROFILER_LIB})
     target_compile_definitions(profile_test PRIVATE HAVE_GPERFTOOLS)
 endif()
+
+# Cache analysis tool with Google perftools integration
+add_executable(cache_analysis_tool src/cache_analysis_tool.cpp)
+target_link_libraries(cache_analysis_tool PRIVATE json_query Qt6::Core)
+
+# Find and link Google perftools (gperftools) - improved detection
+set(GPERFTOOLS_ROOT_DIR "/opt/homebrew/Cellar/gperftools/2.16")
+
+# Try to find gperftools with explicit paths
+find_library(PROFILER_LIB 
+    NAMES profiler
+    PATHS ${GPERFTOOLS_ROOT_DIR}/lib /opt/homebrew/lib /usr/local/lib
+    NO_DEFAULT_PATH
+)
+
+# Skip TCMalloc to avoid Qt conflicts - use only CPU profiler
+find_path(GPERFTOOLS_INCLUDE_DIR 
+    NAMES gperftools/profiler.h
+    PATHS ${GPERFTOOLS_ROOT_DIR}/include /opt/homebrew/include /usr/local/include
+    NO_DEFAULT_PATH
+)
+
+if(PROFILER_LIB AND GPERFTOOLS_INCLUDE_DIR)
+    target_compile_definitions(cache_analysis_tool PRIVATE HAVE_GPERFTOOLS)
+    target_link_libraries(cache_analysis_tool PRIVATE ${PROFILER_LIB})
+    target_include_directories(cache_analysis_tool PRIVATE ${GPERFTOOLS_INCLUDE_DIR})
+    message(STATUS "Google perftools found (CPU profiler only):")
+    message(STATUS "  Profiler lib: ${PROFILER_LIB}")
+    message(STATUS "  Include dir: ${GPERFTOOLS_INCLUDE_DIR}")
+    message(STATUS "  Cache analysis tool will include CPU profiling (TCMalloc disabled)")
+else()
+    message(STATUS "Google perftools not found - cache analysis tool will use basic profiling only")
+    message(STATUS "  Profiler lib: ${PROFILER_LIB}")
+    message(STATUS "  Include dir: ${GPERFTOOLS_INCLUDE_DIR}")
+endif()
+
+# Link function_ref header-only interface when available
+if(TARGET function_ref_interface)
+    target_link_libraries(cache_analysis_tool PRIVATE function_ref_interface)
+endif()

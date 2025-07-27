@@ -8,6 +8,7 @@
 #include "json-query/json-path/JSONPathEvalError.hpp"
 #include "json-query/json-path/internal/ResultStreamer.hpp"
 #include "json-query/json-path/internal/ArrayPool.hpp"
+#include "json-query/json-path/internal/CacheOptimizedStructures.hpp"
 #include "json-query/json-path/JSONPathExpected.hpp"
 
 namespace json_query::json_path::internal {
@@ -24,15 +25,10 @@ public:
     /**
      * @brief Stack frame for iterative recursive descent
      */
-    struct StackFrame {
-        QJsonValue value;
-        bool processed = false; // Whether this frame has been processed
-        
-        explicit StackFrame(QJsonValue v) : value(std::move(v)) {}
-    };
+    using StackFrame = json_query::json_path::detail::CacheOptimizedStackFrame;
     
     /**
-     * @brief Iterative recursive descent with result streaming
+     * @brief Iterative recursive descent with result streaming and cache optimization
      * 
      * @param rootValue The root value to traverse recursively
      * @param streamer Result streamer for emitting found values
@@ -43,40 +39,40 @@ public:
         const QJsonValue& rootValue, 
         StreamerType& streamer) {
         
-        // Use a reusable stack to minimize allocations
-        thread_local std::vector<StackFrame> stack;
+        // Use cache-optimized stack for better memory locality
+        thread_local json_query::json_path::detail::CacheOptimizedStack stack;
         stack.clear();
         stack.reserve(64); // Pre-allocate reasonable capacity
         
         // Start with root value
-        stack.emplace_back(rootValue);
+        stack.push(rootValue);
         
         while (!stack.empty()) {
-            StackFrame& frame = stack.back();
+            StackFrame& frame = stack.top();
             
             if (!frame.processed) {
                 // First time processing this frame - emit the value
                 streamer.emitValue(frame.value);
                 frame.processed = true;
                 
-                // Add children to stack for traversal
+                // Add children to stack for traversal using cache-optimized approach
                 if (frame.value.isObject()) {
                     const QJsonObject obj = frame.value.toObject();
                     // Add in reverse order so we process in original order
                     for (auto it = obj.end(); it != obj.begin(); ) {
                         --it;
-                        stack.emplace_back(it.value());
+                        stack.push(it.value());
                     }
                 } else if (frame.value.isArray()) {
                     const QJsonArray arr = frame.value.toArray();
                     // Add in reverse order so we process in original order
                     for (qsizetype i = arr.size() - 1; i >= 0; --i) {
-                        stack.emplace_back(arr[i]);
+                        stack.push(arr[i]);
                     }
                 }
             } else {
                 // Frame already processed, remove it
-                stack.pop_back();
+                stack.pop();
             }
         }
         
@@ -92,23 +88,25 @@ public:
     static std::expected<QJsonArray, EvalError> evaluateIterativeArray(
         const QJsonValue& rootValue) {
         
-        auto pooledArray = acquirePooledArray();
-        ResultCollector collector(pooledArray.get());
+        // Use cache-optimized result collector for better memory layout
+        thread_local json_query::json_path::detail::CacheOptimizedResultCollector collector;
+        collector.clear();
+        collector.reserve(32); // Pre-allocate reasonable capacity
         
         auto result = evaluateIterative(rootValue, collector);
         if (!result) {
             return std::unexpected(result.error());
         }
         
-        // Move the result to avoid copying
-        QJsonArray finalResult = std::move(*pooledArray);
-        return finalResult;
+        // Convert to QJsonArray for compatibility
+        return collector.toQJsonArray();
     }
     
     /**
-     * @brief Memory-efficient depth-limited recursive descent
+     * @brief Memory-efficient depth-limited recursive descent with cache optimization
      * 
      * Prevents stack overflow and excessive memory usage by limiting traversal depth.
+     * Uses cache-optimized structures for better memory locality.
      * 
      * @param rootValue The root value to traverse
      * @param maxDepth Maximum traversal depth (0 = unlimited)
@@ -121,22 +119,24 @@ public:
         size_t maxDepth,
         StreamerType& streamer) {
         
-        struct DepthFrame {
+        // Use cache-optimized depth frame with better memory layout
+        struct CacheOptimizedDepthFrame {
             QJsonValue value;
             size_t depth;
             bool processed = false;
             
-            DepthFrame(QJsonValue v, size_t d) : value(std::move(v)), depth(d) {}
+            CacheOptimizedDepthFrame(QJsonValue v, size_t d) : value(std::move(v)), depth(d) {}
         };
         
-        thread_local std::vector<DepthFrame> stack;
+        // Use cache-conscious stack allocation
+        thread_local std::vector<CacheOptimizedDepthFrame> stack;
         stack.clear();
         stack.reserve(std::min(maxDepth * 8, size_t(256))); // Reasonable capacity
         
         stack.emplace_back(rootValue, 0);
         
         while (!stack.empty()) {
-            DepthFrame& frame = stack.back();
+            CacheOptimizedDepthFrame& frame = stack.back();
             
             if (!frame.processed) {
                 // Emit the value
