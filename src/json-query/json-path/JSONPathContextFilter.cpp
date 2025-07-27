@@ -120,7 +120,7 @@ QJsonValue evaluateContextFunction(const QString& funcExpr, const QJsonValue& co
 }
 
 // Parse context-aware function calls like length(@.a) == value($..c)
-std::optional<Token> parseAbsolutePathContext(QString s, QVector<ContextFilterFn>& out)
+std::optional<Token> parseAbsolutePathContext(QString s, std::vector<ContextFilterFn>& out)
 {
     qCDebug(jsonPathLog) << "parseAbsolutePathContext called with:" << s;
     
@@ -141,7 +141,7 @@ std::optional<Token> parseAbsolutePathContext(QString s, QVector<ContextFilterFn
                              << "rightExpr=" << QString::fromStdString(rightExpr);
         
         struct ContextBuilder {
-            QVector<ContextFilterFn>& fns;
+            std::vector<ContextFilterFn>& fns;
             
             [[nodiscard]] Token add(ContextFilterFn fn, QString key = {})
             {
@@ -319,7 +319,7 @@ std::optional<Token> parseAbsolutePathContext(QString s, QVector<ContextFilterFn
                 qCDebug(jsonPathLog) << "parseAbsolutePathContext: creating context-aware function filter";
                 
                 struct ContextBuilder {
-                    QVector<ContextFilterFn>& fns;
+                    std::vector<ContextFilterFn>& fns;
                     
                     [[nodiscard]] Token add(ContextFilterFn fn, QString key = {})
                     {
@@ -466,7 +466,7 @@ std::optional<Token> parseAbsolutePathContext(QString s, QVector<ContextFilterFn
         qCDebug(jsonPathLog) << "parseAbsolutePathContext: matched absolute path existence filter:" << s;
         
         struct ContextBuilder {
-            QVector<ContextFilterFn>& fns;
+            std::vector<ContextFilterFn>& fns;
             
             [[nodiscard]] Token add(ContextFilterFn fn, QString key = {})
             {
@@ -516,7 +516,7 @@ std::optional<Token> parseAbsolutePathContext(QString s, QVector<ContextFilterFn
 }
 
 // Context-aware filter compilation dispatcher
-std::optional<Token> compileContextFilter(const QString& expr, QVector<ContextFilterFn>& contextOut, QVector<FilterFn>& regularOut)
+std::optional<Token> compileContextFilter(const QString& expr, std::vector<ContextFilterFn>& contextOut, std::vector<FilterFn>& regularOut)
 {
     qCDebug(jsonPathLog) << "compileContextFilter called with expr:" << expr;
     

@@ -652,8 +652,8 @@ toString(Error e) noexcept
 // Compiled result structure containing tokens and filters
 struct Compiled { 
     std::vector<Token> tokens; 
-    QVector<FilterFn> filters; // Legacy filter storage
-    QVector<ContextFilterFn> contextFilters; // Legacy context filter storage
+    std::vector<FilterFn> filters; 
+    std::vector<ContextFilterFn> contextFilters; 
 };
 
 // ──────────────────────────────────────────────────────────────────────
@@ -677,7 +677,7 @@ detectTrailingFunction(QString& path);
 /// @param filters Output vector to store the compiled filter function (legacy)
 /// @return Token representing the filter, or nullopt if compilation failed
 [[nodiscard]] std::optional<Token> 
-compileFilter(const QString& expr, QVector<FilterFn>& filters);
+compileFilter(const QString& expr, std::vector<FilterFn>& filters);
 
 /// Context-aware filter compilation for absolute path references
 /// @param expr The filter expression string
@@ -685,14 +685,14 @@ compileFilter(const QString& expr, QVector<FilterFn>& filters);
 /// @param filters Output vector to store the compiled filter function (legacy)
 /// @return Token representing the filter, or nullopt if compilation failed
 [[nodiscard]] std::optional<Token> 
-compileContextFilter(const QString& expr, QVector<ContextFilterFn>& contextFilters, QVector<FilterFn>& filters);
+compileContextFilter(const QString& expr, std::vector<ContextFilterFn>& contextFilters, std::vector<FilterFn>& filters);
 
 /// Parse absolute path references in filter expressions (context-aware)
 /// @param s The absolute path reference string
 /// @param out Output vector to store the compiled context filter function (legacy)
 /// @return Token representing the filter, or nullopt if compilation failed
 [[nodiscard]] std::optional<Token>
-parseAbsolutePathContext(QString s, QVector<ContextFilterFn>& out);
+parseAbsolutePathContext(QString s, std::vector<ContextFilterFn>& out);
 
 // ──────────────────────────────────────────────────────────────────────
 //  Modern Embedded Filter Compilation API (Zero-Overhead)

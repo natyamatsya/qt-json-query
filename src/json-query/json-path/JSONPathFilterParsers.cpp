@@ -99,7 +99,7 @@ template<> struct ExistencePatternDef<ExistenceFilterType::NegNestedFilter> {
 // Token factory template specializations for each filter type
 template<ExistenceFilterType Type>
 struct ExistenceTokenFactory {
-    static std::optional<json_query::json_path::Token> create(const QString& input, QVector<json_query::json_path::FilterFn>& out) {
+    static std::optional<json_query::json_path::Token> create(const QString& input, std::vector<json_query::json_path::FilterFn>& out) {
         return std::nullopt; // Default: not implemented
     }
 };
@@ -107,7 +107,7 @@ struct ExistenceTokenFactory {
 // Property existence token factory
 template<>
 struct ExistenceTokenFactory<ExistenceFilterType::PropertyDot> {
-    static std::optional<json_query::json_path::Token> create(const QString& input, QVector<json_query::json_path::FilterFn>& out) {
+    static std::optional<json_query::json_path::Token> create(const QString& input, std::vector<json_query::json_path::FilterFn>& out) {
         if constexpr (ExistencePatternDef<ExistenceFilterType::PropertyDot>::enabled) {
             if (auto m = ctre::match<ExistencePatternDef<ExistenceFilterType::PropertyDot>::pattern>(to_sv(input))) {
                 QString prop = to_qstr(m.template get<1>().to_view());
@@ -123,7 +123,7 @@ struct ExistenceTokenFactory<ExistenceFilterType::PropertyDot> {
 
 template<>
 struct ExistenceTokenFactory<ExistenceFilterType::NegPropertyDot> {
-    static std::optional<json_query::json_path::Token> create(const QString& input, QVector<json_query::json_path::FilterFn>& out) {
+    static std::optional<json_query::json_path::Token> create(const QString& input, std::vector<json_query::json_path::FilterFn>& out) {
         if constexpr (ExistencePatternDef<ExistenceFilterType::NegPropertyDot>::enabled) {
             if (auto m = ctre::match<ExistencePatternDef<ExistenceFilterType::NegPropertyDot>::pattern>(to_sv(input))) {
                 QString prop = to_qstr(m.template get<1>().to_view());
@@ -139,7 +139,7 @@ struct ExistenceTokenFactory<ExistenceFilterType::NegPropertyDot> {
 
 template<>
 struct ExistenceTokenFactory<ExistenceFilterType::PropertyBracket> {
-    static std::optional<json_query::json_path::Token> create(const QString& input, QVector<json_query::json_path::FilterFn>& out) {
+    static std::optional<json_query::json_path::Token> create(const QString& input, std::vector<json_query::json_path::FilterFn>& out) {
         if constexpr (ExistencePatternDef<ExistenceFilterType::PropertyBracket>::enabled) {
             if (auto m = ctre::match<ExistencePatternDef<ExistenceFilterType::PropertyBracket>::pattern>(to_sv(input))) {
                 QString prop = to_qstr(m.template get<1>().to_view());
@@ -155,7 +155,7 @@ struct ExistenceTokenFactory<ExistenceFilterType::PropertyBracket> {
 
 template<>
 struct ExistenceTokenFactory<ExistenceFilterType::NegPropertyBracket> {
-    static std::optional<json_query::json_path::Token> create(const QString& input, QVector<json_query::json_path::FilterFn>& out) {
+    static std::optional<json_query::json_path::Token> create(const QString& input, std::vector<json_query::json_path::FilterFn>& out) {
         if constexpr (ExistencePatternDef<ExistenceFilterType::NegPropertyBracket>::enabled) {
             if (auto m = ctre::match<ExistencePatternDef<ExistenceFilterType::NegPropertyBracket>::pattern>(to_sv(input))) {
                 QString prop = to_qstr(m.template get<1>().to_view());
@@ -171,7 +171,7 @@ struct ExistenceTokenFactory<ExistenceFilterType::NegPropertyBracket> {
 
 template<>
 struct ExistenceTokenFactory<ExistenceFilterType::ArraySlice> {
-    static std::optional<json_query::json_path::Token> create(const QString& input, QVector<json_query::json_path::FilterFn>& out) {
+    static std::optional<json_query::json_path::Token> create(const QString& input, std::vector<json_query::json_path::FilterFn>& out) {
         if constexpr (ExistencePatternDef<ExistenceFilterType::ArraySlice>::enabled) {
             if (auto m = ctre::match<ExistencePatternDef<ExistenceFilterType::ArraySlice>::pattern>(to_sv(input))) {
                 QString startStr = to_qstr(m.template get<1>().to_view());
@@ -193,7 +193,7 @@ struct ExistenceTokenFactory<ExistenceFilterType::ArraySlice> {
 
 template<>
 struct ExistenceTokenFactory<ExistenceFilterType::NegArraySlice> {
-    static std::optional<json_query::json_path::Token> create(const QString& input, QVector<json_query::json_path::FilterFn>& out) {
+    static std::optional<json_query::json_path::Token> create(const QString& input, std::vector<json_query::json_path::FilterFn>& out) {
         if constexpr (ExistencePatternDef<ExistenceFilterType::NegArraySlice>::enabled) {
             if (auto m = ctre::match<ExistencePatternDef<ExistenceFilterType::NegArraySlice>::pattern>(to_sv(input))) {
                 QString startStr = to_qstr(m.template get<1>().to_view());
@@ -215,7 +215,7 @@ struct ExistenceTokenFactory<ExistenceFilterType::NegArraySlice> {
 
 template<>
 struct ExistenceTokenFactory<ExistenceFilterType::MultiSelector> {
-    static std::optional<json_query::json_path::Token> create(const QString& input, QVector<json_query::json_path::FilterFn>& out) {
+    static std::optional<json_query::json_path::Token> create(const QString& input, std::vector<json_query::json_path::FilterFn>& out) {
         if constexpr (ExistencePatternDef<ExistenceFilterType::MultiSelector>::enabled) {
             if (auto m = ctre::match<ExistencePatternDef<ExistenceFilterType::MultiSelector>::pattern>(to_sv(input))) {
                 QString selectorsStr = to_qstr(m.template get<1>().to_view());
@@ -252,7 +252,7 @@ struct ExistenceTokenFactory<ExistenceFilterType::MultiSelector> {
 
 template<>
 struct ExistenceTokenFactory<ExistenceFilterType::NegMultiSelector> {
-    static std::optional<json_query::json_path::Token> create(const QString& input, QVector<json_query::json_path::FilterFn>& out) {
+    static std::optional<json_query::json_path::Token> create(const QString& input, std::vector<json_query::json_path::FilterFn>& out) {
         if constexpr (ExistencePatternDef<ExistenceFilterType::NegMultiSelector>::enabled) {
             if (auto m = ctre::match<ExistencePatternDef<ExistenceFilterType::NegMultiSelector>::pattern>(to_sv(input))) {
                 QString selectorsStr = to_qstr(m.template get<1>().to_view());
@@ -289,7 +289,7 @@ struct ExistenceTokenFactory<ExistenceFilterType::NegMultiSelector> {
 
 template<>
 struct ExistenceTokenFactory<ExistenceFilterType::NestedFilter> {
-    static std::optional<json_query::json_path::Token> create(const QString& input, QVector<json_query::json_path::FilterFn>& out) {
+    static std::optional<json_query::json_path::Token> create(const QString& input, std::vector<json_query::json_path::FilterFn>& out) {
         if constexpr (ExistencePatternDef<ExistenceFilterType::NestedFilter>::enabled) {
             if (auto m = ctre::match<ExistencePatternDef<ExistenceFilterType::NestedFilter>::pattern>(to_sv(input))) {
                 QString filterExpr = to_qstr(m.template get<1>().to_view());
@@ -298,11 +298,11 @@ struct ExistenceTokenFactory<ExistenceFilterType::NestedFilter> {
                     if (!j.isArray()) return false;
                     
                     const auto arr = j.toArray();
-                    QVector<json_query::json_path::FilterFn> innerFilterFns;
+                    std::vector<json_query::json_path::FilterFn> innerFilterFns;
                     auto innerToken = json_query::json_path::compileFilter(filterExpr, innerFilterFns);
-                    if (!innerToken || innerFilterFns.isEmpty()) return false;
+                    if (!innerToken || innerFilterFns.empty()) return false;
                     
-                    json_query::json_path::FilterFn innerFilterFn = innerFilterFns.last();
+                    json_query::json_path::FilterFn innerFilterFn = innerFilterFns.back();
                     for (const auto& element : arr) {
                         if (innerFilterFn(element)) return true;
                     }
@@ -316,7 +316,7 @@ struct ExistenceTokenFactory<ExistenceFilterType::NestedFilter> {
 
 template<>
 struct ExistenceTokenFactory<ExistenceFilterType::NegNestedFilter> {
-    static std::optional<json_query::json_path::Token> create(const QString& input, QVector<json_query::json_path::FilterFn>& out) {
+    static std::optional<json_query::json_path::Token> create(const QString& input, std::vector<json_query::json_path::FilterFn>& out) {
         if constexpr (ExistencePatternDef<ExistenceFilterType::NegNestedFilter>::enabled) {
             if (auto m = ctre::match<ExistencePatternDef<ExistenceFilterType::NegNestedFilter>::pattern>(to_sv(input))) {
                 QString filterExpr = to_qstr(m.template get<1>().to_view());
@@ -325,11 +325,11 @@ struct ExistenceTokenFactory<ExistenceFilterType::NegNestedFilter> {
                     if (!j.isArray()) return true; // Non-arrays don't match, so negation is true
                     
                     const auto arr = j.toArray();
-                    QVector<json_query::json_path::FilterFn> innerFilterFns;
+                    std::vector<json_query::json_path::FilterFn> innerFilterFns;
                     auto innerToken = json_query::json_path::compileFilter(filterExpr, innerFilterFns);
-                    if (!innerToken || innerFilterFns.isEmpty()) return true;
+                    if (!innerToken || innerFilterFns.empty()) return true;
                     
-                    json_query::json_path::FilterFn innerFilterFn = innerFilterFns.last();
+                    json_query::json_path::FilterFn innerFilterFn = innerFilterFns.back();
                     for (const auto& element : arr) {
                         if (innerFilterFn(element)) return false; // Found match, so negation is false
                     }
@@ -344,7 +344,7 @@ struct ExistenceTokenFactory<ExistenceFilterType::NegNestedFilter> {
 // TableGen-inspired dispatch table with compile-time priority ordering
 template<ExistenceFilterType... Types>
 struct ExistenceDispatchTable {
-    static std::optional<json_query::json_path::Token> dispatch(const QString& input, QVector<json_query::json_path::FilterFn>& out) {
+    static std::optional<json_query::json_path::Token> dispatch(const QString& input, std::vector<json_query::json_path::FilterFn>& out) {
         std::optional<json_query::json_path::Token> result;
         ((result = ExistenceTokenFactory<Types>::create(input, out)) || ...);
         return result;
@@ -368,7 +368,7 @@ using ExistenceDispatcher = ExistenceDispatchTable<
 // Individual parser function implementations (non-template)
 // Note: parseOr, parseAnd, parseIn, parseCompare, parseRegex are implemented in JSONPathFilterCore.cpp
 
-std::optional<json_query::json_path::Token> parseExists(QString s, QVector<json_query::json_path::FilterFn>& out)
+std::optional<json_query::json_path::Token> parseExists(QString s, std::vector<json_query::json_path::FilterFn>& out)
 {
     // Execute TableGen-style dispatch
     if (auto result = ExistenceDispatcher::dispatch(s, out)) {
@@ -408,7 +408,7 @@ std::optional<json_query::json_path::Token> parseExists(QString s, QVector<json_
     return std::nullopt;
 }
 
-std::optional<json_query::json_path::Token> parseSelfCmp(QString s, QVector<json_query::json_path::FilterFn>& out)
+std::optional<json_query::json_path::Token> parseSelfCmp(QString s, std::vector<json_query::json_path::FilterFn>& out)
 {
     static constexpr auto pat = ctll::fixed_string{
         R"(^@\s*(==|!=|\>=|\<=|\>|\<)\s*@$)"};
@@ -430,12 +430,12 @@ std::optional<json_query::json_path::Token> parseSelfCmp(QString s, QVector<json
     return std::nullopt;
 }
 
-std::optional<json_query::json_path::Token> parseNot(QString s, QVector<json_query::json_path::FilterFn>& out)
+std::optional<json_query::json_path::Token> parseNot(QString s, std::vector<json_query::json_path::FilterFn>& out)
 {
     constexpr auto negParenPat = ctll::fixed_string{R"(^!\s*\(\s*(.*)\s*\)$)"};
     if (auto m = ctre::match<negParenPat>(to_sv(s))) {
         QString innerExpr = to_qstr(m.template get<1>().to_view()).trimmed();
-        QVector<json_query::json_path::FilterFn> innerFilters;
+        std::vector<json_query::json_path::FilterFn> innerFilters;
         if (auto innerToken = json_query::json_path::compileFilter(innerExpr, innerFilters)) {
             Builder b{out};
             return b.add([innerFilters, innerExpr](const QJsonValue& j) -> bool {
@@ -450,7 +450,7 @@ std::optional<json_query::json_path::Token> parseNot(QString s, QVector<json_que
     }
     if (s.startsWith('!') && s.length() > 1) {
         QString innerExpr = s.mid(1).trimmed();
-        QVector<json_query::json_path::FilterFn> innerFilters;
+        std::vector<json_query::json_path::FilterFn> innerFilters;
         if (auto innerToken = json_query::json_path::compileFilter(innerExpr, innerFilters)) {
             Builder b{out};
             return b.add([innerFilters, innerExpr](const QJsonValue& j) -> bool {
@@ -466,7 +466,7 @@ std::optional<json_query::json_path::Token> parseNot(QString s, QVector<json_que
     return std::nullopt;
 }
 
-std::optional<json_query::json_path::Token> parseAbsolutePath(QString s, QVector<json_query::json_path::FilterFn>& out)
+std::optional<json_query::json_path::Token> parseAbsolutePath(QString s, std::vector<json_query::json_path::FilterFn>& out)
 {
     // Check if expression starts with $ (absolute path reference)
     if (!s.startsWith('$')) {

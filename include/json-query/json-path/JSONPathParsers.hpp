@@ -57,8 +57,8 @@ namespace json_query::json_path
          */
         std::expected<qsizetype, Error> parseBracket(qsizetype pos, QStringView sv,
                                                     KeyBuilder& kb, std::vector<Token>& tokens,
-                                                    QVector<std::function<bool (const QJsonValue&, const QJsonValue&)>>& contextFilters,
-                                                    QVector<std::function<bool (const QJsonValue&)>>& filters);
+                                                    std::vector<std::function<bool (const QJsonValue&, const QJsonValue&)>>& contextFilters,
+                                                    std::vector<std::function<bool (const QJsonValue&)>>& filters);
 
         /**
          * Parse embedded bracket expression (e.g., [0], ['key'], [*])
@@ -70,7 +70,7 @@ namespace json_query::json_path
          */
         std::expected<qsizetype, Error> parseEmbeddedBracket(qsizetype pos, QStringView sv,
                                                             KeyBuilder& kb, std::vector<Token>& tokens,
-                                                            QVector<FilterFn>& filterFns);
+                                                            std::vector<FilterFn>& filterFns);
 
     } // namespace detail
 

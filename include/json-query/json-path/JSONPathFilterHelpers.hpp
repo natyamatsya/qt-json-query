@@ -2,9 +2,9 @@
 
 #include <QString>
 #include <QJsonValue>
-#include <QVector>
 #include <optional>
 #include <functional>
+#include <vector>
 
 namespace json_query::json_path {
     // Forward declarations
@@ -23,7 +23,7 @@ bool unquote(QString& s);
 // A tiny façade so every parser can push a predicate and immediately obtain the corresponding Token
 class Builder {
 public:
-    QVector<json_query::json_path::FilterFn>& fns;
+    std::vector<json_query::json_path::FilterFn>& fns;
     
     [[nodiscard]] json_query::json_path::Token add(json_query::json_path::FilterFn fn, QString key = {});
 };

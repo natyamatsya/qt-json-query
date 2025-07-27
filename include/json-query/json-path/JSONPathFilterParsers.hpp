@@ -8,6 +8,7 @@
 #include <QRegularExpression>
 #include <optional>
 #include <functional>
+#include <vector>
 #include "json-query/json-path/JSONPathFilterComparison.hpp"
 #include "json-query/json-path/JSONPathFilterHelpers.hpp"
 #include "json-query/json-path/JSONPathCompile.hpp"
@@ -29,7 +30,7 @@ class FilterParseContext;
 
 // Template implementations for comparison patterns - must be in header for templates
 template<auto PAT>
-[[nodiscard]] std::optional<json_query::json_path::Token> parseSelfValue(QString s, QVector<json_query::json_path::FilterFn>& out)
+[[nodiscard]] std::optional<json_query::json_path::Token> parseSelfValue(QString s, std::vector<json_query::json_path::FilterFn>& out)
 {
     if (const auto match = ctre::match<PAT>(to_sv(s))) {
         const QString op = to_qstr(match.template get<1>().to_view());
@@ -73,7 +74,7 @@ template<auto PAT>
 }
 
 template<auto PAT>
-[[nodiscard]] std::optional<json_query::json_path::Token> parseCompare1(QString s, QVector<json_query::json_path::FilterFn>& out)
+[[nodiscard]] std::optional<json_query::json_path::Token> parseCompare1(QString s, std::vector<json_query::json_path::FilterFn>& out)
 {
     if (const auto match = ctre::match<PAT>(to_sv(s))) {
         const QString prop = to_qstr(match.template get<1>().to_view());
@@ -94,7 +95,7 @@ template<auto PAT>
 }
 
 template<auto PAT>
-[[nodiscard]] std::optional<json_query::json_path::Token> parseCompareIndex(QString s, QVector<json_query::json_path::FilterFn>& out)
+[[nodiscard]] std::optional<json_query::json_path::Token> parseCompareIndex(QString s, std::vector<json_query::json_path::FilterFn>& out)
 {
     if (const auto match = ctre::match<PAT>(to_sv(s))) {
         const QString prop = to_qstr(match.template get<1>().to_view());
@@ -133,7 +134,7 @@ template<auto PAT>
 }
 
 template<auto PAT>
-[[nodiscard]] std::optional<json_query::json_path::Token> parseRegex1(QString s, QVector<json_query::json_path::FilterFn>& out)
+[[nodiscard]] std::optional<json_query::json_path::Token> parseRegex1(QString s, std::vector<json_query::json_path::FilterFn>& out)
 {
     if (const auto match = ctre::match<PAT>(to_sv(s))) {
         const QString prop = to_qstr(match.template get<1>().to_view());
@@ -156,7 +157,7 @@ template<auto PAT>
 }
 
 template<auto PAT>
-[[nodiscard]] std::optional<json_query::json_path::Token> parseSelfCompare(QString s, QVector<json_query::json_path::FilterFn>& out)
+[[nodiscard]] std::optional<json_query::json_path::Token> parseSelfCompare(QString s, std::vector<json_query::json_path::FilterFn>& out)
 {
     if (const auto match = ctre::match<PAT>(to_sv(s))) {
         const QString op = to_qstr(match.template get<1>().to_view());
@@ -200,7 +201,7 @@ template<auto PAT>
 }
 
 template<auto PAT>
-[[nodiscard]] std::optional<json_query::json_path::Token> parseSelfCompareIndex(QString s, QVector<json_query::json_path::FilterFn>& out)
+[[nodiscard]] std::optional<json_query::json_path::Token> parseSelfCompareIndex(QString s, std::vector<json_query::json_path::FilterFn>& out)
 {
     if (const auto match = ctre::match<PAT>(to_sv(s))) {
         const QString op = to_qstr(match.template get<1>().to_view());
@@ -244,7 +245,7 @@ template<auto PAT>
 }
 
 template<auto PAT>
-[[nodiscard]] std::optional<json_query::json_path::Token> parseNullCompare(QString s, QVector<json_query::json_path::FilterFn>& out)
+[[nodiscard]] std::optional<json_query::json_path::Token> parseNullCompare(QString s, std::vector<json_query::json_path::FilterFn>& out)
 {
     if (const auto match = ctre::match<PAT>(to_sv(s))) {
         const QString prop = to_qstr(match.template get<1>().to_view());
@@ -265,7 +266,7 @@ template<auto PAT>
 }
 
 template<auto PAT>
-[[nodiscard]] std::optional<json_query::json_path::Token> parseNullCompareIndex(QString s, QVector<json_query::json_path::FilterFn>& out)
+[[nodiscard]] std::optional<json_query::json_path::Token> parseNullCompareIndex(QString s, std::vector<json_query::json_path::FilterFn>& out)
 {
     if (const auto match = ctre::match<PAT>(to_sv(s))) {
         const QString prop = to_qstr(match.template get<1>().to_view());
@@ -304,15 +305,15 @@ template<auto PAT>
 }
 
 // Individual parser functions
-std::optional<json_query::json_path::Token> parseOr(QString s, QVector<json_query::json_path::FilterFn>& out);
-std::optional<json_query::json_path::Token> parseAnd(QString s, QVector<json_query::json_path::FilterFn>& out);
-std::optional<json_query::json_path::Token> parseIn(QString s, QVector<json_query::json_path::FilterFn>& out);
-std::optional<json_query::json_path::Token> parseCompare(QString s, QVector<json_query::json_path::FilterFn>& out);
-std::optional<json_query::json_path::Token> parseRegex(QString s, QVector<json_query::json_path::FilterFn>& out);
-std::optional<json_query::json_path::Token> parseExists(QString s, QVector<json_query::json_path::FilterFn>& out);
-std::optional<json_query::json_path::Token> parseSelfCmp(QString s, QVector<json_query::json_path::FilterFn>& out);
-std::optional<json_query::json_path::Token> parseNot(QString s, QVector<json_query::json_path::FilterFn>& out);
-std::optional<json_query::json_path::Token> parseAbsolutePath(QString s, QVector<json_query::json_path::FilterFn>& out);
+std::optional<json_query::json_path::Token> parseOr(QString s, std::vector<json_query::json_path::FilterFn>& out);
+std::optional<json_query::json_path::Token> parseAnd(QString s, std::vector<json_query::json_path::FilterFn>& out);
+std::optional<json_query::json_path::Token> parseIn(QString s, std::vector<json_query::json_path::FilterFn>& out);
+std::optional<json_query::json_path::Token> parseCompare(QString s, std::vector<json_query::json_path::FilterFn>& out);
+std::optional<json_query::json_path::Token> parseRegex(QString s, std::vector<json_query::json_path::FilterFn>& out);
+std::optional<json_query::json_path::Token> parseExists(QString s, std::vector<json_query::json_path::FilterFn>& out);
+std::optional<json_query::json_path::Token> parseSelfCmp(QString s, std::vector<json_query::json_path::FilterFn>& out);
+std::optional<json_query::json_path::Token> parseNot(QString s, std::vector<json_query::json_path::FilterFn>& out);
+std::optional<json_query::json_path::Token> parseAbsolutePath(QString s, std::vector<json_query::json_path::FilterFn>& out);
 
 // ──────────────────────────────────────────────────────────────────────
 //  Modern Embedded Filter Parser Functions (Zero-Overhead)

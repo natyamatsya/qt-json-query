@@ -174,7 +174,7 @@ int compareValues(const QJsonValue& left, const QJsonValue& right)
 }
 
 // Parse function calls like length() and value() in filter expressions
-std::optional<Token> parseFunction(QString s, QVector<FilterFn>& out)
+std::optional<Token> parseFunction(QString s, std::vector<FilterFn>& out)
 {
     // Pattern for function call comparisons: func(...) op value or value op func(...)
     constexpr auto funcCompPat = ctll::fixed_string{R"(^(.*?)\s*(==|!=|<|>|<=|>=)\s*(.*?)$)"};

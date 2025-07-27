@@ -165,7 +165,7 @@ struct CharacterParsingStrategy<CharacterParsingType::BracketSegment> {
         qsizetype pos, QStringView sv, json_query::json_path::detail::KeyBuilder& kb, 
         std::vector<json_query::json_path::Token>& tokens) {
         
-        QVector<FilterFn> filterFns; // Temporary for compatibility
+        std::vector<FilterFn> filterFns; // Temporary for compatibility
         return json_query::json_path::detail::parseEmbeddedBracket(pos, sv, kb, tokens, filterFns);
     }
 };

@@ -2,7 +2,7 @@
 
 #include <QString>
 #include <QJsonValue>
-#include <QVector>
+#include <vector>
 #include <optional>
 #include <functional>
 
@@ -25,6 +25,6 @@ QJsonValue parseJsonLiteral(const QString& literal);
 int compareValues(const QJsonValue& left, const QJsonValue& right);
 
 // Parse function calls like length() and value() in filter expressions
-std::optional<json_query::json_path::Token> parseFunction(QString s, QVector<json_query::json_path::FilterFn>& out);
+std::optional<json_query::json_path::Token> parseFunction(QString s, std::vector<json_query::json_path::FilterFn>& out);
 
 } // namespace json_query::json_path::detail

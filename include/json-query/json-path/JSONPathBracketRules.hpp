@@ -30,19 +30,18 @@ namespace json_query::json_path
         public:
             std::vector<Token>&   tk;
             KeyBuilder&       kb;
-            QVector<std::function<bool (const QJsonValue&, const QJsonValue&)>>& contextFilters;
-            QVector<std::function<bool (const QJsonValue&)>>& filters;
+            std::vector<std::function<bool (const QJsonValue&, const QJsonValue&)>>& contextFilters;
+            std::vector<std::function<bool (const QJsonValue&)>>& filters;
             int               currentBracketGroupId;
 
             BracketSink(std::vector<Token>& tokens, KeyBuilder& keyBuilder, 
-                       QVector<std::function<bool (const QJsonValue&, const QJsonValue&)>>& ctxFilters, QVector<std::function<bool (const QJsonValue&)>>& filterFns, 
-                       int bracketGroupId)
-                : tk(tokens), kb(keyBuilder), contextFilters(ctxFilters), 
-                  filters(filterFns), currentBracketGroupId(bracketGroupId) {}
+                       std::vector<std::function<bool (const QJsonValue&, const QJsonValue&)>>& ctxFilters, std::vector<std::function<bool (const QJsonValue&)>>& filterFns, 
+                       int bracketGroupId) noexcept
+                : tk(tokens), kb(keyBuilder), contextFilters(ctxFilters), filters(filterFns), currentBracketGroupId(bracketGroupId) {}
 
             // Token emission methods
             std::expected<void, Error> key(QString key, bool allow = false);
-            void keyList(const QVector<QString>& keys);
+            void keyList(const std::vector<QString>& keys);
             void wild();
             void slice(const Slice& s);
             void index(int i);
@@ -60,7 +59,7 @@ namespace json_query::json_path
 
             // Token emission methods
             std::expected<void, Error> key(QString key, bool allow = false);
-            void keyList(const QVector<QString>& keys);
+            void keyList(const std::vector<QString>& keys);
             void wild();
             void slice(const Slice& s);
             void index(int i);

@@ -9,12 +9,12 @@
 
 // ────────────────────────────── Qt
 #include <QString>
-#include <QVector>
 #include <QJsonValue>
 
 // ────────────────────────────── STL
 #include <optional>
 #include <functional>
+#include <vector>
 
 // ────────────────────────────── Project
 #include "json-query/json-path/JSONPathCompile.hpp"  // For json_query::json_path::Token / Error
@@ -31,10 +31,10 @@ namespace json_query::json_path::detail {
     // ---------------------------------------------------------------------
     //  Individual rule parsers
     // ---------------------------------------------------------------------
-    [[nodiscard]] std::optional<Token> parseOr      (QString expr, QVector<FilterFn>& out);
-    [[nodiscard]] std::optional<Token> parseAnd     (QString expr, QVector<FilterFn>& out);
-    [[nodiscard]] std::optional<Token> parseIn      (QString expr, QVector<FilterFn>& out);
-    [[nodiscard]] std::optional<Token> parseCompare (QString expr, QVector<FilterFn>& out);
-    [[nodiscard]] std::optional<Token> parseRegex   (QString expr, QVector<FilterFn>& out);
+    [[nodiscard]] std::optional<Token> parseOr      (QString expr, std::vector<FilterFn>& out);
+    [[nodiscard]] std::optional<Token> parseAnd     (QString expr, std::vector<FilterFn>& out);
+    [[nodiscard]] std::optional<Token> parseIn      (QString expr, std::vector<FilterFn>& out);
+    [[nodiscard]] std::optional<Token> parseCompare (QString expr, std::vector<FilterFn>& out);
+    [[nodiscard]] std::optional<Token> parseRegex   (QString expr, std::vector<FilterFn>& out);
 
 } // namespace json_query::json_path::detail

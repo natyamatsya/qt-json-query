@@ -27,9 +27,9 @@ std::expected<void, Error> BracketSink::key(QString key, bool allow)
     return {};
 }
 
-void BracketSink::keyList(const QVector<QString>& keys)
+void BracketSink::keyList(const std::vector<QString>& keys)
 {
-    if (keys.isEmpty()) return;
+    if (keys.empty()) return;
 
     Token t;
     t.kind = Token::Kind::KeyList;
@@ -90,9 +90,9 @@ std::expected<void, Error> EmbeddedBracketSink::key(QString key, bool allow)
     return {};
 }
 
-void EmbeddedBracketSink::keyList(const QVector<QString>& keys)
+void EmbeddedBracketSink::keyList(const std::vector<QString>& keys)
 {
-    if (keys.isEmpty()) return;
+    if (keys.empty()) return;
 
     Token t;
     t.kind = Token::Kind::KeyList;
@@ -360,7 +360,7 @@ std::expected<void, Error> handlePlaceholder(QStringView content, BracketSink& o
     if (trimmed == u"?") {
         // Single placeholder - create a filter that always returns true
         FilterFn alwaysTrue = [](const QJsonValue&) { return true; };
-        out.filters.append(alwaysTrue);
+        out.filters.push_back(alwaysTrue);
         
         Token filterToken;
         filterToken.kind = Token::Kind::Filter;
@@ -374,7 +374,7 @@ std::expected<void, Error> handlePlaceholder(QStringView content, BracketSink& o
     for (const auto& part : parts) {
         if (part.trimmed() == u"?") {
             FilterFn alwaysTrue = [](const QJsonValue&) { return true; };
-            out.filters.append(alwaysTrue);
+            out.filters.push_back(alwaysTrue);
             
             Token filterToken;
             filterToken.kind = Token::Kind::Filter;
@@ -609,19 +609,25 @@ std::expected<void, Error> handleUnquotedKey(QStringView /*content*/, EmbeddedBr
 }
 
 // Helper function to split union segments
-QVector<QString> splitUnionSegments(QStringView content)
+std::vector<QString> splitUnionSegments(QStringView content)
 {
     // Use the existing splitTopLevelMultiple function for consistency
     auto result = splitTopLevelMultiple(content, QLatin1StringView(","));
     if (result) {
-        return *result;
+        // Convert QList<QString> to std::vector<QString>
+        std::vector<QString> stringSegments;
+        stringSegments.reserve(result->size());
+        for (const auto& segment : *result) {
+            stringSegments.push_back(segment);
+        }
+        return stringSegments;
     }
     // Fallback: simple split if complex parsing fails
     auto segments = content.split(u',');
-    QVector<QString> stringSegments;
+    std::vector<QString> stringSegments;
     stringSegments.reserve(segments.size());
     for (const auto& segment : segments) {
-        stringSegments.append(segment.toString());
+        stringSegments.push_back(segment.toString());
     }
     return stringSegments;
 }

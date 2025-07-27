@@ -95,8 +95,8 @@ std::expected<qsizetype, Error> parseBare(qsizetype pos, QStringView sv, KeyBuil
 
 std::expected<qsizetype, Error> parseBracket(qsizetype pos, QStringView sv,
                                             KeyBuilder& kb, std::vector<Token>& tokens,
-                                            QVector<ContextFilterFn>& contextFilters,
-                                            QVector<FilterFn>& filters)
+                                            std::vector<ContextFilterFn>& contextFilters,
+                                            std::vector<FilterFn>& filters)
 {
     qCDebug(jsonPathLog) << "parseBracket: pos=" << pos << "sv.size()=" << sv.size();
     
@@ -179,7 +179,7 @@ std::expected<qsizetype, Error> parseBracket(qsizetype pos, QStringView sv,
 
 std::expected<qsizetype, Error> parseEmbeddedBracket(qsizetype pos, QStringView sv,
                                                     KeyBuilder& kb, std::vector<Token>& tokens,
-                                                    QVector<FilterFn>& filterFns)
+                                                    std::vector<FilterFn>& filterFns)
 {
     qCDebug(jsonPathLog) << "parseEmbeddedBracket: pos=" << pos << "sv.size()=" << sv.size();
     
