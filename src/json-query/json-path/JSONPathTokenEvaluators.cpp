@@ -101,11 +101,36 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::Wildcard>(const PathEvalC
 
 // --- Recursive -------------------------------------------------------------
 template<>
-std::expected<QJsonArray, EvalError> eval<Token::Kind::Recursive>(const PathEvalCtx& /*ctx*/,
-                                                                   const Token& /*tk*/,
+std::expected<QJsonArray, EvalError> eval<Token::Kind::Recursive>(const PathEvalCtx& ctx,
+                                                                   const Token& tk,
                                                                    const QJsonValue& v)
 {
-    // Baseline implementation (Phase 2 optimizations temporarily disabled)
+    // Phase 2 optimization: Build path hint for pattern detection
+    QString pathHint = QStringLiteral("$..");
+    
+    // Look ahead in token stream to detect common patterns like "$..title"
+    qsizetype currentPos = -1;
+    for (qsizetype i = 0; i < ctx.tokens.size(); ++i) {
+        if (&ctx.tokens[i] == &tk) {
+            currentPos = i;
+            break;
+        }
+    }
+    
+    // If we found the current token and there's a next token
+    if (currentPos >= 0 && currentPos + 1 < ctx.tokens.size()) {
+        const Token& nextToken = ctx.tokens[currentPos + 1];
+        
+        // Check if next token is a simple key (common pattern)
+        if (nextToken.kind == Token::Kind::Key) {
+            pathHint += nextToken.key;
+            
+            // Use optimized path with hint
+            return evaluateRecursive(v, QStringView(pathHint));
+        }
+    }
+    
+    // Fallback to standard implementation for complex patterns
     return evaluateRecursive(v, 0);
 }
 
