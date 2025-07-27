@@ -4,14 +4,14 @@
 namespace json_query::json_path::detail {
 
 std::expected<QJsonValue, EvalError>
-evaluateDefinite(const QVector<Token>& tokens, const QJsonValue& root) noexcept
+evaluateDefinite(const std::vector<Token>& tokens, const QJsonValue& root) noexcept
 {
     using enum Token::Kind;
 
     QJsonValue cur = root;
     // Skip leading root token ('$' or '@') if present
     int startIdx = 0;
-    if (!tokens.isEmpty() && tokens.front().kind == Token::Kind::Key) {
+    if (!tokens.empty() && tokens.front().kind == Token::Kind::Key) {
         const QString& k = tokens.front().key;
         if (k == u"$" || k == u"@") {
             startIdx = 1;

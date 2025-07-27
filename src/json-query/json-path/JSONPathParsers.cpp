@@ -27,10 +27,10 @@ std::expected<qsizetype, Error> parseDot(qsizetype pos, QStringView sv, KeyBuild
         tokens.emplace_back(Token{Token::Kind::Recursive});
         return pos + 2;
     }
-    if (sv[pos + 1] == u'*') { 
+    if (sv[pos] == u'*') { 
         qCDebug(jsonPathLog) << "parseDot: found wildcard (*)";
         tokens.emplace_back(Token{Token::Kind::Wildcard }); 
-        return pos + 2; 
+        return pos + 1; 
     }
     qsizetype start = pos;
     while (pos < n && sv[pos] != u'.' && sv[pos] != u'[') ++pos;

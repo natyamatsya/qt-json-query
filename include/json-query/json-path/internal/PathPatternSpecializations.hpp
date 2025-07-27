@@ -9,6 +9,7 @@
 #include <QtCore/QJsonValue>
 #include <QtCore/QJsonObject>
 #include <QtCore/QJsonArray>
+#include <vector>
 
 namespace json_query::json_path::internal {
 
@@ -48,8 +49,8 @@ public:
      * @param tokens The token sequence to analyze
      * @return The detected pattern type
      */
-    QT_QUERY_JSON_ALWAYS_INLINE static PathPattern detectPattern(const QVector<Token>& tokens) noexcept {
-        if (tokens.isEmpty()) {
+    QT_QUERY_JSON_ALWAYS_INLINE static PathPattern detectPattern(const std::vector<Token>& tokens) noexcept {
+        if (tokens.empty()) {
             return PathPattern::Generic;
         }
         
@@ -153,7 +154,7 @@ template<PathPattern Pattern>
 struct PathPatternEvaluator {
     static std::expected<QJsonArray, EvalError> eval(
         const detail::PathEvalCtx& ctx,
-        const QVector<Token>& tokens,
+        const std::vector<Token>& tokens,
         const QJsonValue& root) noexcept 
     {
         // Default implementation falls back to generic evaluation
@@ -168,7 +169,7 @@ template<>
 struct PathPatternEvaluator<PathPattern::SimpleKey> {
     static std::expected<QJsonArray, EvalError> eval(
         const detail::PathEvalCtx& /*ctx*/,
-        const QVector<Token>& tokens,
+        const std::vector<Token>& tokens,
         const QJsonValue& root) noexcept 
     {
         // Fast path: direct object property lookup
@@ -200,7 +201,7 @@ template<>
 struct PathPatternEvaluator<PathPattern::NestedKeys> {
     static std::expected<QJsonArray, EvalError> eval(
         const detail::PathEvalCtx& /*ctx*/,
-        const QVector<Token>& tokens,
+        const std::vector<Token>& tokens,
         const QJsonValue& root) noexcept 
     {
         // Fast path: chained object navigation without intermediate arrays
@@ -237,7 +238,7 @@ template<>
 struct PathPatternEvaluator<PathPattern::ArrayIndex> {
     static std::expected<QJsonArray, EvalError> eval(
         const detail::PathEvalCtx& /*ctx*/,
-        const QVector<Token>& tokens,
+        const std::vector<Token>& tokens,
         const QJsonValue& root) noexcept 
     {
         // Fast path: direct array element access
@@ -275,7 +276,7 @@ template<>
 struct PathPatternEvaluator<PathPattern::ArrayWildcard> {
     static std::expected<QJsonArray, EvalError> eval(
         const detail::PathEvalCtx& /*ctx*/,
-        const QVector<Token>& /*tokens*/,
+        const std::vector<Token>& /*tokens*/,
         const QJsonValue& root) noexcept 
     {
         // Fast path: return all array elements or object values
@@ -318,7 +319,7 @@ template<>
 struct PathPatternEvaluator<PathPattern::KeyThenIndex> {
     static std::expected<QJsonArray, EvalError> eval(
         const detail::PathEvalCtx& /*ctx*/,
-        const QVector<Token>& tokens,
+        const std::vector<Token>& tokens,
         const QJsonValue& root) noexcept 
     {
         // Fast path: object property access followed by array indexing
@@ -369,7 +370,7 @@ template<>
 struct PathPatternEvaluator<PathPattern::IndexThenKey> {
     static std::expected<QJsonArray, EvalError> eval(
         const detail::PathEvalCtx& /*ctx*/,
-        const QVector<Token>& tokens,
+        const std::vector<Token>& tokens,
         const QJsonValue& root) noexcept 
     {
         // Fast path: array indexing followed by object property access
@@ -420,7 +421,7 @@ template<>
 struct PathPatternEvaluator<PathPattern::WildcardThenKey> {
     static std::expected<QJsonArray, EvalError> eval(
         const detail::PathEvalCtx& /*ctx*/,
-        const QVector<Token>& tokens,
+        const std::vector<Token>& tokens,
         const QJsonValue& root) noexcept 
     {
         // Fast path: wildcard expansion followed by key extraction
@@ -478,7 +479,7 @@ public:
      */
     static std::expected<QJsonArray, EvalError> evaluate(
         const detail::PathEvalCtx& ctx,
-        const QVector<Token>& tokens,
+        const std::vector<Token>& tokens,
         const QJsonValue& root) noexcept 
     {
         // Detect the pattern type

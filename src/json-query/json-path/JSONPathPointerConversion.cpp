@@ -2,6 +2,7 @@
 
 #include <QStringList>
 #include <QtCore/QtCore>
+#include <vector> // added include for std::vector
 using namespace Qt::StringLiterals;
 
 namespace json_query::json_path::detail {
@@ -17,7 +18,7 @@ QString escapePointerSegment(const QString& seg)
     return out;
 }
 
-QString tokensToPointer(QStringList& segments, const QVector<Token>& tokens)
+QString tokensToPointer(QStringList& segments, const std::vector<Token>& tokens)
 {
     // assume tokens[0] is root ($)
     for (qsizetype i = 1; i < tokens.size(); ++i) {
