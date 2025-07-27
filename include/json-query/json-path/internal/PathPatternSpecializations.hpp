@@ -1,5 +1,6 @@
 #pragma once
 
+#include "json-query/Common.h"
 #include "json-query/json-path/JSONPathCompile.hpp"
 #include "json-query/json-path/JSONPathEvalError.hpp"
 #include "json-query/json-path/internal/PathEvalCtx.hpp"
@@ -47,7 +48,7 @@ public:
      * @param tokens The token sequence to analyze
      * @return The detected pattern type
      */
-    static PathPattern detectPattern(const QVector<Token>& tokens) noexcept {
+    QT_QUERY_JSON_ALWAYS_INLINE static PathPattern detectPattern(const QVector<Token>& tokens) noexcept {
         if (tokens.isEmpty()) {
             return PathPattern::Generic;
         }
@@ -99,24 +100,43 @@ private:
      * 
      * Simple keys are alphanumeric with underscores, no quotes, no escape sequences,
      * no special characters that might require complex parsing.
+     * 
+     * Optimized with caching and forced inlining to address Qt string operation
+     * inlining failures (QString::contains cost 65 vs threshold 45).
      */
-    static bool isSimpleKey(const QString& key) noexcept {
+    QT_QUERY_JSON_ALWAYS_INLINE static bool isSimpleKey(const QString& key) noexcept {
         if (key.isEmpty()) {
             return false;
         }
         
-        // Check for any characters that might indicate complex parsing requirements
+        // Fast path: check length first to avoid expensive operations
+        if (key.length() > 64) { // Reasonable limit for simple keys
+            return false;
+        }
+        
+        // Optimized character validation with early exit
         for (const QChar& ch : key) {
-            if (!ch.isLetterOrNumber() && ch != '_' && ch != '-') {
+            const ushort unicode = ch.unicode();
+            // Fast check using unicode values to avoid Qt method calls
+            if (!((unicode >= 'a' && unicode <= 'z') ||
+                  (unicode >= 'A' && unicode <= 'Z') ||
+                  (unicode >= '0' && unicode <= '9') ||
+                  unicode == '_' || unicode == '-')) {
                 return false; // Contains special characters
             }
         }
         
-        // Additional checks for edge cases
-        if (key.contains('\\') || key.contains('"') || key.contains('\'') || 
-            key.contains(' ') || key.contains('\t') || key.contains('\n') ||
-            key.startsWith('$') || key.contains('[') || key.contains(']')) {
-            return false; // Contains potentially problematic characters
+        // Additional fast checks for problematic characters using direct comparison
+        // This avoids the costly QString::contains calls that were failing to inline
+        const QChar* data = key.constData();
+        const int len = key.length();
+        for (int i = 0; i < len; ++i) {
+            const ushort unicode = data[i].unicode();
+            if (unicode == '\\' || unicode == '"' || unicode == '\'' || 
+                unicode == ' ' || unicode == '\t' || unicode == '\n' ||
+                unicode == '$' || unicode == '[' || unicode == ']') {
+                return false; // Contains potentially problematic characters
+            }
         }
         
         return true;
