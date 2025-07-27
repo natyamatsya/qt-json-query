@@ -1,11 +1,13 @@
 #include "json-query/json-path/JSONPathCompile.hpp"
 #include "json-query/json-path/JSONPathLog.hpp"
 #include "json-query/json-path/JSONPath.hpp"
+#include "json-query/json-path/JSONPathEvalError.hpp"
 #include "json-query/json-path/internal/ContextAwareContainerCursor.hpp"
 #include "json-query/json-path/internal/ContainerCursor.hpp"
 #include <QDebug>
 #include <iostream>
 #include <ctre.hpp>
+#include <expected>
 
 namespace json_query::json_path
 {
@@ -124,37 +126,53 @@ struct ContextBuilder
     }
 };
 
-// Helper: Evaluate absolute path against root
-QJsonValue evaluateAbsolutePath(const QString& path, const QJsonValue& root, const QJsonValue& node)
+// Helper: Evaluate absolute path against root with proper error handling
+std::expected<QJsonValue, EvalError>
+evaluateAbsolutePathSafe(const QString& path, const QJsonValue& root, const QJsonValue& node)
 {
     if (path == "$")
         return root;
 
-    try
+    // Use monadic error handling instead of try/catch
+    auto absolutePath{json_query::JSONPath::create(path)};
+    if (!absolutePath)
     {
-        auto absolutePath{json_query::JSONPath::create(path)};
-        if (absolutePath)
-        {
-            auto results{absolutePath->evaluateAll(root)};
-            if (results && !results->isEmpty())
-            {
-                // Use ContextAwareContainerCursor for efficient result processing
-                auto cursor{makeSimpleContextCursor(*results, root, node)};
-
-                // Get first result using zero-copy iteration
-                for (const auto& [result, ctx] : cursor)
-                    return result;
-
-                // Fallback if cursor iteration fails
-                return results->first();
-            }
-        }
+        qCDebug(jsonPathLog) << "Failed to create JSONPath for:" << path;
+        return std::unexpected(EvalError::KeyNotFound); // Path creation failed
     }
-    catch (...)
+
+    auto results{absolutePath->evaluateAll(root)};
+    if (!results)
     {
         qCDebug(jsonPathLog) << "Failed to evaluate absolute path:" << path;
+        return std::unexpected(results.error()); // Propagate the evaluation error
     }
 
+    if (results->isEmpty())
+    {
+        qCDebug(jsonPathLog) << "No results for absolute path:" << path;
+        return std::unexpected(EvalError::KeyNotFound); // No results found
+    }
+
+    // Use ContextAwareContainerCursor for efficient result processing
+    auto cursor{makeSimpleContextCursor(*results, root, node)};
+
+    // Get first result using zero-copy iteration
+    for (const auto& [result, ctx] : cursor)
+        return result;
+
+    // Fallback if cursor iteration fails - return first result directly
+    return results->first();
+}
+
+// Helper: Evaluate absolute path against root (legacy wrapper for compatibility)
+QJsonValue evaluateAbsolutePath(const QString& path, const QJsonValue& root, const QJsonValue& node)
+{
+    auto result{evaluateAbsolutePathSafe(path, root, node)};
+    if (result)
+        return *result;
+
+    qCDebug(jsonPathLog) << "Absolute path evaluation failed:" << path << "error:" << to_string(result.error());
     return QJsonValue{};
 }
 
