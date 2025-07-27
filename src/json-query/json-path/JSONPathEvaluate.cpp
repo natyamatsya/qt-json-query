@@ -171,7 +171,10 @@ struct TokenProcessingStrategy<TokenProcessingType::StandardFanOut> {
                 // Deduplicate containers after normal fan-out when preceded by Recursive
                 if (prevRecursive) {
                     QSet<uint> seen;
-                    QJsonArray dedup;
+                    // Use ArrayPool for deduplication array
+                    auto pooledDedup = acquirePooledArray();
+                    QJsonArray& dedup = *pooledDedup;
+                    
                     for (const auto& v : result) {
                         if (v.isObject()) {
                             uint h = qHash(QJsonDocument(v.toObject()).toJson());
@@ -184,7 +187,7 @@ struct TokenProcessingStrategy<TokenProcessingType::StandardFanOut> {
                         }
                         dedup.append(v);
                     }
-                    return std::move(dedup);
+                    return QJsonArray(dedup); // Return copy since pooled array will be returned to pool
                 }
                 return std::move(result);
             })
@@ -255,7 +258,12 @@ std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const 
     if (ctx.tokens.isEmpty())
         return QJsonValue(QJsonValue::Undefined);
 
-    std::expected<QJsonArray, EvalError> working = QJsonArray{root};
+    // Use ArrayPool for better memory management of working array
+    auto pooledWorkingArray = acquirePooledArray();
+    QJsonArray& workingArray = *pooledWorkingArray;
+    workingArray.append(root);
+    
+    std::expected<QJsonArray, EvalError> working = QJsonArray(workingArray);
     bool multi = false;
 
     using json_query::json_path::internal::qt_hash;
@@ -332,7 +340,10 @@ std::expected<QJsonArray, EvalError> evaluateAll(const PathEvalCtx& ctx, const Q
 // Direct array-based fan-out using TableGen dispatch
 std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src, qsizetype tokenPos)
 {
-    QJsonArray result;
+    // Use ArrayPool for better memory management
+    auto pooledArray = acquirePooledArray();
+    QJsonArray& result = *pooledArray;
+    
     ResultCollector collector(&result);
     auto streamer = collector.getStreamer();
     
@@ -344,7 +355,8 @@ std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token&
         return std::unexpected(collector.getLastError());
     }
     
-    return result;
+    // Return a copy since pooled array will be returned to pool
+    return QJsonArray(result);
 }
 
 } // namespace json_query::json_path::detail

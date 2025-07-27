@@ -42,6 +42,11 @@ endif()
 set(CMAKE_C_COMPILER ${LLVM_CLANG_C})
 set(CMAKE_CXX_COMPILER ${LLVM_CLANG_CXX})
 
+# Force use of system archiver and ranlib to avoid LLVM archiver compatibility issues on macOS
+set(CMAKE_AR /usr/bin/ar)
+set(CMAKE_RANLIB /usr/bin/ranlib)
+set(CMAKE_NM /usr/bin/nm)
+
 # Verify we're using LLVM Clang (not Apple Clang)
 execute_process(
     COMMAND ${CMAKE_CXX_COMPILER} --version
@@ -65,7 +70,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # LLVM-specific optimizations
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -flto")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g -fno-omit-frame-pointer")
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O2 -g -DNDEBUG")
 
