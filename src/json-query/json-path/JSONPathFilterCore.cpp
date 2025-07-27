@@ -89,11 +89,11 @@ std::optional<Token> parseIn(const QString& s, std::vector<FilterFn>& out)
         R"('\s*([^']+?)\s*'\s+in\s+@\[['\"]([^'"]+)['\"]\])"};
     if (auto m = ctre::match<pat>(to_sv(s)))
     {
-        const auto want  = to_qstr(m.template get<1>().to_view());
-        const auto array = to_qstr(m.template get<2>().to_view());
+        auto&& want  = to_qstr(m.template get<1>().to_view());
+        auto&& array = to_qstr(m.template get<2>().to_view());
 
         Builder b{out};
-        return b.add([want, array](const QJsonValue& j){
+        return b.add([want = std::move(want), array = std::move(array)](const QJsonValue& j){
             auto a = j[array];
             if (!a.isArray()) return false;
             
@@ -289,11 +289,11 @@ template<>
 struct ComparisonTokenFactory<ComparisonFilterType::NullPropertyDot> {
     static std::optional<Token> create(const QString& s, std::vector<FilterFn>& out) {
         if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::NullPropertyDot>::pattern>(to_sv(s))) {
-            const auto prop = to_qstr(m.template get<1>().to_view());
-            const auto op = to_qstr(m.template get<2>().to_view());
+            auto&& prop = to_qstr(m.template get<1>().to_view());
+            auto&& op = to_qstr(m.template get<2>().to_view());
             
             Builder b{out};
-            return b.add([prop, op](const QJsonValue& j){
+            return b.add([prop = std::move(prop), op = std::move(op)](const QJsonValue& j){
                 const auto obj = j.toObject();
                 const auto v = obj.value(prop);
                 return performComparison(v, op, QJsonValue(QJsonValue::Null));
@@ -307,11 +307,11 @@ template<>
 struct ComparisonTokenFactory<ComparisonFilterType::NullPropertyBracket> {
     static std::optional<Token> create(const QString& s, std::vector<FilterFn>& out) {
         if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::NullPropertyBracket>::pattern>(to_sv(s))) {
-            const auto prop = to_qstr(m.template get<1>().to_view());
-            const auto op = to_qstr(m.template get<2>().to_view());
+            auto&& prop = to_qstr(m.template get<1>().to_view());
+            auto&& op = to_qstr(m.template get<2>().to_view());
             
             Builder b{out};
-            return b.add([prop, op](const QJsonValue& j){
+            return b.add([prop = std::move(prop), op = std::move(op)](const QJsonValue& j){
                 const auto obj = j.toObject();
                 const auto v = obj.value(prop);
                 return performComparison(v, op, QJsonValue(QJsonValue::Null));
@@ -325,11 +325,11 @@ template<>
 struct ComparisonTokenFactory<ComparisonFilterType::NullArrayIndex> {
     static std::optional<Token> create(const QString& s, std::vector<FilterFn>& out) {
         if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::NullArrayIndex>::pattern>(to_sv(s))) {
-            const auto prop = to_qstr(m.template get<1>().to_view());
-            const auto op = to_qstr(m.template get<2>().to_view());
+            auto&& prop = to_qstr(m.template get<1>().to_view());
+            auto&& op = to_qstr(m.template get<2>().to_view());
             
             Builder b{out};
-            return b.add([prop, op](const QJsonValue& j){
+            return b.add([prop = std::move(prop), op = std::move(op)](const QJsonValue& j){
                 bool ok;
                 int index = prop.toInt(&ok);
                 if (!ok) return false; // Invalid index
@@ -360,10 +360,10 @@ template<>
 struct ComparisonTokenFactory<ComparisonFilterType::DirectSelf> {
     static std::optional<Token> create(const QString& s, std::vector<FilterFn>& out) {
         if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::DirectSelf>::pattern>(to_sv(s))) {
-            const auto op = to_qstr(m.template get<1>().to_view());
+            auto&& op = to_qstr(m.template get<1>().to_view());
             
             Builder b{out};
-            return b.add([op](const QJsonValue& j){
+            return b.add([op = std::move(op)](const QJsonValue& j){
                 // Direct self-comparison: @ == @ is always true, @ != @ is always false
                 // For ordering operators, self-comparison is always false
                 if (op == "==") return true;
@@ -379,11 +379,11 @@ template<>
 struct ComparisonTokenFactory<ComparisonFilterType::SelfPropertyDot> {
     static std::optional<Token> create(const QString& s, std::vector<FilterFn>& out) {
         if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::SelfPropertyDot>::pattern>(to_sv(s))) {
-            const auto prop = to_qstr(m.template get<1>().to_view());
-            const auto op = to_qstr(m.template get<2>().to_view());
+            auto&& prop = to_qstr(m.template get<1>().to_view());
+            auto&& op = to_qstr(m.template get<2>().to_view());
             
             Builder b{out};
-            return b.add([prop, op](const QJsonValue& j){
+            return b.add([prop = std::move(prop), op = std::move(op)](const QJsonValue& j){
                 const auto obj = j.toObject();
                 const auto v = obj.value(prop);
                 return performComparison(v, op, j);
@@ -397,11 +397,11 @@ template<>
 struct ComparisonTokenFactory<ComparisonFilterType::SelfPropertyBracket> {
     static std::optional<Token> create(const QString& s, std::vector<FilterFn>& out) {
         if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::SelfPropertyBracket>::pattern>(to_sv(s))) {
-            const auto prop = to_qstr(m.template get<1>().to_view());
-            const auto op = to_qstr(m.template get<2>().to_view());
+            auto&& prop = to_qstr(m.template get<1>().to_view());
+            auto&& op = to_qstr(m.template get<2>().to_view());
             
             Builder b{out};
-            return b.add([prop, op](const QJsonValue& j){
+            return b.add([prop = std::move(prop), op = std::move(op)](const QJsonValue& j){
                 const auto obj = j.toObject();
                 const auto v = obj.value(prop);
                 return performComparison(v, op, j);
@@ -415,11 +415,11 @@ template<>
 struct ComparisonTokenFactory<ComparisonFilterType::SelfArrayIndex> {
     static std::optional<Token> create(const QString& s, std::vector<FilterFn>& out) {
         if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::SelfArrayIndex>::pattern>(to_sv(s))) {
-            const auto prop = to_qstr(m.template get<1>().to_view());
-            const auto op = to_qstr(m.template get<2>().to_view());
+            auto&& prop = to_qstr(m.template get<1>().to_view());
+            auto&& op = to_qstr(m.template get<2>().to_view());
             
             Builder b{out};
-            return b.add([prop, op](const QJsonValue& j){
+            return b.add([prop = std::move(prop), op = std::move(op)](const QJsonValue& j){
                 bool ok;
                 int index = prop.toInt(&ok);
                 if (!ok) return false; // Invalid index
@@ -449,8 +449,8 @@ template<>
 struct ComparisonTokenFactory<ComparisonFilterType::SelfValue> {
     static std::optional<Token> create(const QString& s, std::vector<FilterFn>& out) {
         if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::SelfValue>::pattern>(to_sv(s))) {
-            const auto op = to_qstr(m.template get<1>().to_view());
-            const auto rhs = to_qstr(m.template get<2>().to_view());
+            auto&& op = to_qstr(m.template get<1>().to_view());
+            auto&& rhs = to_qstr(m.template get<2>().to_view());
             
             // Parse RHS value using existing comparison context logic
             auto ctx = parseRhsValue(op, rhs);
@@ -470,12 +470,12 @@ template<>
 struct ComparisonTokenFactory<ComparisonFilterType::PropertyToProperty> {
     static std::optional<Token> create(const QString& s, std::vector<FilterFn>& out) {
         if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::PropertyToProperty>::pattern>(to_sv(s))) {
-            const auto leftProp = to_qstr(m.template get<1>().to_view());
-            const auto op = to_qstr(m.template get<2>().to_view());
-            const auto rightProp = to_qstr(m.template get<3>().to_view());
+            auto&& leftProp = to_qstr(m.template get<1>().to_view());
+            auto&& op = to_qstr(m.template get<2>().to_view());
+            auto&& rightProp = to_qstr(m.template get<3>().to_view());
             
             Builder b{out};
-            return b.add([leftProp, op, rightProp](const QJsonValue& j){
+            return b.add([leftProp = std::move(leftProp), op = std::move(op), rightProp = std::move(rightProp)](const QJsonValue& j){
                 const auto obj = j.toObject();
                 const auto leftVal = obj.value(leftProp);
                 const auto rightVal = obj.value(rightProp);
@@ -490,13 +490,13 @@ template<>
 struct ComparisonTokenFactory<ComparisonFilterType::PropertyToArray> {
     static std::optional<Token> create(const QString& s, std::vector<FilterFn>& out) {
         if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::PropertyToArray>::pattern>(to_sv(s))) {
-            const auto leftProp = to_qstr(m.template get<1>().to_view());
-            const auto op = to_qstr(m.template get<2>().to_view());
-            const auto rightProp = to_qstr(m.template get<3>().to_view());
-            const auto rightIndex = to_qstr(m.template get<4>().to_view());
+            auto&& leftProp = to_qstr(m.template get<1>().to_view());
+            auto&& op = to_qstr(m.template get<2>().to_view());
+            auto&& rightProp = to_qstr(m.template get<3>().to_view());
+            auto&& rightIndex = to_qstr(m.template get<4>().to_view());
             
             Builder b{out};
-            return b.add([leftProp, op, rightProp, rightIndex](const QJsonValue& j){
+            return b.add([leftProp = std::move(leftProp), op = std::move(op), rightProp = std::move(rightProp), rightIndex = std::move(rightIndex)](const QJsonValue& j){
                 const auto obj = j.toObject();
                 const auto leftVal = obj.value(leftProp);
                 const auto rightArr = obj.value(rightProp).toArray();
@@ -523,13 +523,13 @@ template<>
 struct ComparisonTokenFactory<ComparisonFilterType::ArrayToProperty> {
     static std::optional<Token> create(const QString& s, std::vector<FilterFn>& out) {
         if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::ArrayToProperty>::pattern>(to_sv(s))) {
-            const auto leftProp = to_qstr(m.template get<1>().to_view());
-            const auto leftIndex = to_qstr(m.template get<2>().to_view());
-            const auto op = to_qstr(m.template get<3>().to_view());
-            const auto rightProp = to_qstr(m.template get<4>().to_view());
+            auto&& leftProp = to_qstr(m.template get<1>().to_view());
+            auto&& leftIndex = to_qstr(m.template get<2>().to_view());
+            auto&& op = to_qstr(m.template get<3>().to_view());
+            auto&& rightProp = to_qstr(m.template get<4>().to_view());
             
             Builder b{out};
-            return b.add([leftProp, leftIndex, op, rightProp](const QJsonValue& j){
+            return b.add([leftProp = std::move(leftProp), leftIndex = std::move(leftIndex), op = std::move(op), rightProp = std::move(rightProp)](const QJsonValue& j){
                 const auto obj = j.toObject();
                 const auto leftArr = obj.value(leftProp).toArray();
                 const auto rightVal = obj.value(rightProp);
@@ -557,16 +557,16 @@ template<>
 struct ComparisonTokenFactory<ComparisonFilterType::BasicPropertyDot> {
     static std::optional<Token> create(const QString& s, std::vector<FilterFn>& out) {
         if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::BasicPropertyDot>::pattern>(to_sv(s))) {
-            const auto prop = to_qstr(m.template get<1>().to_view());
-            const auto op = to_qstr(m.template get<2>().to_view());
-            const auto rhs = to_qstr(m.template get<3>().to_view());
+            auto&& prop = to_qstr(m.template get<1>().to_view());
+            auto&& op = to_qstr(m.template get<2>().to_view());
+            auto&& rhs = to_qstr(m.template get<3>().to_view());
             
             // Parse RHS value using existing comparison context logic
             auto ctx = parseRhsValue(op, rhs);
             if (!ctx) return std::nullopt;
             
             Builder b{out};
-            return b.add([prop, ctx = *ctx](const QJsonValue& j){
+            return b.add([prop = std::move(prop), ctx = *ctx](const QJsonValue& j){
                 const auto obj = j.toObject();
                 const auto v = obj.value(prop);
                 return ctx.compare(v);
@@ -580,16 +580,16 @@ template<>
 struct ComparisonTokenFactory<ComparisonFilterType::BasicPropertyBracket> {
     static std::optional<Token> create(const QString& s, std::vector<FilterFn>& out) {
         if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::BasicPropertyBracket>::pattern>(to_sv(s))) {
-            const auto prop = to_qstr(m.template get<1>().to_view());
-            const auto op = to_qstr(m.template get<2>().to_view());
-            const auto rhs = to_qstr(m.template get<3>().to_view());
+            auto&& prop = to_qstr(m.template get<1>().to_view());
+            auto&& op = to_qstr(m.template get<2>().to_view());
+            auto&& rhs = to_qstr(m.template get<3>().to_view());
             
             // Parse RHS value using existing comparison context logic
             auto ctx = parseRhsValue(op, rhs);
             if (!ctx) return std::nullopt;
             
             Builder b{out};
-            return b.add([prop, ctx = *ctx](const QJsonValue& j){
+            return b.add([prop = std::move(prop), ctx = *ctx](const QJsonValue& j){
                 const auto obj = j.toObject();
                 const auto v = obj.value(prop);
                 return ctx.compare(v);
@@ -603,16 +603,16 @@ template<>
 struct ComparisonTokenFactory<ComparisonFilterType::BasicArrayIndex> {
     static std::optional<Token> create(const QString& s, std::vector<FilterFn>& out) {
         if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::BasicArrayIndex>::pattern>(to_sv(s))) {
-            const auto prop = to_qstr(m.template get<1>().to_view());
-            const auto op = to_qstr(m.template get<2>().to_view());
-            const auto rhs = to_qstr(m.template get<3>().to_view());
+            auto&& prop = to_qstr(m.template get<1>().to_view());
+            auto&& op = to_qstr(m.template get<2>().to_view());
+            auto&& rhs = to_qstr(m.template get<3>().to_view());
             
             // Parse RHS value using existing comparison context logic
             auto ctx = parseRhsValue(op, rhs);
             if (!ctx) return std::nullopt;
             
             Builder b{out};
-            return b.add([prop, ctx = *ctx](const QJsonValue& j){
+            return b.add([prop = std::move(prop), ctx = *ctx](const QJsonValue& j){
                 bool ok;
                 int index = prop.toInt(&ok);
                 if (!ok) return false; // Invalid index
@@ -815,15 +815,15 @@ template<ctll::fixed_string Pattern>
 std::optional<Token> parseEmbeddedComparePropToProp(const QString& s)
 {
     if (auto m = ctre::match<Pattern>(to_sv(s))) {
-        const auto leftProp = to_qstr(m.template get<1>().to_view());
-        const auto op = to_qstr(m.template get<2>().to_view());
-        const auto rightProp = to_qstr(m.template get<3>().to_view());
+        auto&& leftProp = to_qstr(m.template get<1>().to_view());
+        auto&& op = to_qstr(m.template get<2>().to_view());
+        auto&& rightProp = to_qstr(m.template get<3>().to_view());
         
         Token token;
         token.kind = Token::Kind::Filter;
         token.key = s;
         
-        token.embedFilter([leftProp, op, rightProp](const QJsonValue& j) {
+        token.embedFilter([leftProp = std::move(leftProp), op = std::move(op), rightProp = std::move(rightProp)](const QJsonValue& j) {
             // Property-to-property comparison: @.a==@.b
             if (!j.isObject()) return false;
             
@@ -882,16 +882,16 @@ template<ctll::fixed_string Pattern>
 std::optional<Token> parseEmbeddedComparePropToArrayIdx(const QString& s)
 {
     if (auto m = ctre::match<Pattern>(to_sv(s))) {
-        const auto leftProp = to_qstr(m.template get<1>().to_view());
-        const auto op = to_qstr(m.template get<2>().to_view());
-        const auto rightProp = to_qstr(m.template get<3>().to_view());
-        const auto rightIndex = to_qstr(m.template get<4>().to_view());
+        auto&& leftProp = to_qstr(m.template get<1>().to_view());
+        auto&& op = to_qstr(m.template get<2>().to_view());
+        auto&& rightProp = to_qstr(m.template get<3>().to_view());
+        auto&& rightIndex = to_qstr(m.template get<4>().to_view());
         
         Token token;
         token.kind = Token::Kind::Filter;
         token.key = s;
         
-        token.embedFilter([leftProp, op, rightProp, rightIndex](const QJsonValue& j) {
+        token.embedFilter([leftProp = std::move(leftProp), op = std::move(op), rightProp = std::move(rightProp), rightIndex = std::move(rightIndex)](const QJsonValue& j) {
             // Property-to-array-index comparison: @.a==@.list[9]
             if (!j.isObject()) return false;
             
@@ -977,9 +977,9 @@ std::optional<Token> parseEmbeddedCompare(const QString& s)
 
     // Try self-comparison pattern first (more specific)
     if (auto m = ctre::match<selfSelfPat>(to_sv(localS))) {
-        const auto leftSide = to_qstr(m.template get<1>().to_view());
-        const auto op = to_qstr(m.template get<2>().to_view());
-        const auto rightSide = to_qstr(m.template get<3>().to_view());
+        auto&& leftSide = to_qstr(m.template get<1>().to_view());
+        auto&& op = to_qstr(m.template get<2>().to_view());
+        auto&& rightSide = to_qstr(m.template get<3>().to_view());
         
         // Only handle true self-comparison where both sides are the same
         if (leftSide == rightSide) {
@@ -987,7 +987,7 @@ std::optional<Token> parseEmbeddedCompare(const QString& s)
             token.kind = Token::Kind::Filter;
             token.key = localS;
             
-            token.embedFilter([op](const QJsonValue& j) {
+            token.embedFilter([op = std::move(op)](const QJsonValue& j) {
                 // Self-comparison: compare the value with itself
                 if (op == "==") return true;   // value always equals itself
                 if (op == "!=") return false;  // value never not-equals itself
@@ -1062,13 +1062,13 @@ std::optional<Token> parseEmbeddedExists(const QString& s)
 
     // Try nested filter pattern first (most specific)
     if (auto m = ctre::match<nestedFilterPat>(to_sv(localS))) {
-        const auto filterExpr = to_qstr(m.template get<1>().to_view());
+        auto&& filterExpr = to_qstr(m.template get<1>().to_view());
         
         Token token;
         token.kind = Token::Kind::Filter;
         token.key = localS;
         
-        token.embedFilter([filterExpr](const QJsonValue& j) {
+        token.embedFilter([filterExpr = std::move(filterExpr)](const QJsonValue& j) {
             // Nested filter existence: @[?@>1] - true if array has elements matching the filter
             if (j.isArray()) {
                 const auto arr = j.toArray();
@@ -1226,13 +1226,13 @@ std::optional<Token> parseEmbeddedExists(const QString& s)
     }
     
     if (auto m = ctre::match<absComplexPat>(to_sv(localS))) {
-        const auto prop = to_qstr(m.template get<1>().to_view());
+        auto&& prop = to_qstr(m.template get<1>().to_view());
         
         Token token;
         token.kind = Token::Kind::Filter;
         token.key = localS;
         
-        token.embedFilter([prop](const QJsonValue& j) {
+        token.embedFilter([prop = std::move(prop)](const QJsonValue& j) {
             // Complex absolute path: $.*.property 
             // This is an absolute path existence test that should evaluate against the root document
             // However, in the embedded filter system, we don't have direct access to the root
@@ -1256,13 +1256,13 @@ std::optional<Token> parseEmbeddedExists(const QString& s)
     }
     
     if (auto m = ctre::match<absDotExistsPat>(to_sv(localS))) {
-        const auto prop = to_qstr(m.template get<1>().to_view());
+        auto&& prop = to_qstr(m.template get<1>().to_view());
         
         Token token;
         token.kind = Token::Kind::Filter;
         token.key = localS;
         
-        token.embedFilter([prop](const QJsonValue& j) {
+        token.embedFilter([prop = std::move(prop)](const QJsonValue& j) {
             // Absolute property existence: $.property - check root for property
             return j.isObject() && j.toObject().contains(prop);
         });
@@ -1272,12 +1272,12 @@ std::optional<Token> parseEmbeddedExists(const QString& s)
     
     // Try basic property existence pattern: @.property
     if (auto m = ctre::match<dotExistsPat>(to_sv(localS))) {
-        const auto prop = to_qstr(m.template get<1>().to_view());
+        auto&& prop = to_qstr(m.template get<1>().to_view());
         Token token;
         token.kind = Token::Kind::Filter;
         token.key = localS;
         
-        token.embedFilter([prop](const QJsonValue& j) {
+        token.embedFilter([prop = std::move(prop)](const QJsonValue& j) {
             // Basic property existence: @.property - true if object contains property
             if (j.isObject()) {
                 return j.toObject().contains(prop);
@@ -1290,12 +1290,12 @@ std::optional<Token> parseEmbeddedExists(const QString& s)
     
     // Try bracket property existence pattern: @['property'] or @["property"]
     if (auto m = ctre::match<brkExistsPat>(to_sv(localS))) {
-        const auto prop = to_qstr(m.template get<1>().to_view());
+        auto&& prop = to_qstr(m.template get<1>().to_view());
         Token token;
         token.kind = Token::Kind::Filter;
         token.key = localS;
         
-        token.embedFilter([prop](const QJsonValue& j) {
+        token.embedFilter([prop = std::move(prop)](const QJsonValue& j) {
             // Bracket property existence: @['property'] - true if object contains property
             if (j.isObject()) {
                 return j.toObject().contains(prop);
@@ -1308,7 +1308,7 @@ std::optional<Token> parseEmbeddedExists(const QString& s)
     
     // Try index existence pattern: @[index]
     if (auto m = ctre::match<idxExistsPat>(to_sv(localS))) {
-        const auto indexStr = to_qstr(m.template get<1>().to_view());
+        auto&& indexStr = to_qstr(m.template get<1>().to_view());
         bool ok;
         const int index = indexStr.toInt(&ok);
         if (!ok) return std::nullopt;
@@ -1376,9 +1376,9 @@ std::optional<Token> parseEmbeddedFunction(const QString& s)
     constexpr auto funcCompPat = ctll::fixed_string{R"(^(.*?)\s*(==|!=|<|>|<=|>=)\s*(.*?)$)"};
     
     if (auto m = ctre::match<funcCompPat>(to_sv(s))) {
-        const auto left = to_qstr(m.template get<1>().to_view()).trimmed();
-        const auto op = to_qstr(m.template get<2>().to_view());
-        const auto right = to_qstr(m.template get<3>().to_view()).trimmed();
+        auto&& left = to_qstr(m.template get<1>().to_view()).trimmed();
+        auto&& op = to_qstr(m.template get<2>().to_view());
+        auto&& right = to_qstr(m.template get<3>().to_view()).trimmed();
         
         // Check if either side contains a function call
         bool leftHasFunc = left.contains("(") && left.contains(")");
