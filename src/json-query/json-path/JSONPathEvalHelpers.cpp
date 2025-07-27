@@ -696,28 +696,6 @@ QJsonArray mergeTokenResults(const QVector<QJsonArray>& resultArrays, const QJso
     return collectedResults;
 }
 
-// Helper: Collect keys from consecutive Key/KeyList tokens
-KeyCollectionResult collectKeysFromTokens(const PathEvalCtx& ctx, qsizetype startIndex)
-{
-    QStringList keys;
-    qsizetype i = startIndex;
-    
-    while (i < ctx.tokens.size()) {
-        const Token& token = ctx.tokens[i];
-        if (token.kind == Token::Kind::Key) {
-            keys.append(token.key);
-            ++i;
-        } else if (token.kind == Token::Kind::KeyList) {
-            keys.append(token.key.split(u'\n'));
-            ++i;
-        } else {
-            break;
-        }
-    }
-    
-    return {keys, i};
-}
-
 // Helper: Check if an object contains all required keys
 bool objectContainsAllKeys(const QJsonObject& obj, const QStringList& keys)
 {
@@ -859,6 +837,28 @@ QJsonValue applyTrailing(json_path::FunctionType fn, const QJsonValue& v)
         }
     }
     std::unreachable();
+}
+
+// Helper: Collect keys from consecutive Key/KeyList tokens
+KeyCollectionResult collectKeysFromTokens(const PathEvalCtx& ctx, qsizetype startIndex)
+{
+    QStringList keys;
+    qsizetype i = startIndex;
+    
+    while (i < ctx.tokens.size()) {
+        const Token& token = ctx.tokens[i];
+        if (token.kind == Token::Kind::Key) {
+            keys.append(token.key);
+            ++i;
+        } else if (token.kind == Token::Kind::KeyList) {
+            keys.append(token.key.split(u'\n'));
+            ++i;
+        } else {
+            break;
+        }
+    }
+    
+    return {keys, i};
 }
 
 } // namespace json_query::json_path::detail

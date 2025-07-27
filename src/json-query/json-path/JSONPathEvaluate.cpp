@@ -170,22 +170,30 @@ struct TokenProcessingStrategy<TokenProcessingType::StandardFanOut> {
             .and_then([&](QJsonArray&& result) -> std::expected<QJsonArray, EvalError> {
                 // Deduplicate containers after normal fan-out when preceded by Recursive
                 if (prevRecursive) {
+                    // Pre-allocate hash set with reasonable capacity to reduce rehashing
                     QSet<uint> seen;
+                    seen.reserve(result.size()); // Reserve based on input size
+                    
                     // Use ArrayPool for deduplication array
                     auto pooledDedup = acquirePooledArray();
                     QJsonArray& dedup = *pooledDedup;
                     
                     for (const auto& v : result) {
+                        uint h;
                         if (v.isObject()) {
-                            uint h = qHash(QJsonDocument(v.toObject()).toJson());
-                            if (seen.contains(h)) continue;
-                            seen.insert(h);
+                            h = qHash(QJsonDocument(v.toObject()).toJson());
                         } else if (v.isArray()) {
-                            uint h = qHash(QJsonDocument(v.toArray()).toJson());
-                            if (seen.contains(h)) continue;
-                            seen.insert(h);
+                            h = qHash(QJsonDocument(v.toArray()).toJson());
+                        } else {
+                            // For primitive values, add directly without hashing overhead
+                            dedup.append(v);
+                            continue;
                         }
-                        dedup.append(v);
+                        
+                        if (!seen.contains(h)) {
+                            seen.insert(h);
+                            dedup.append(v);
+                        }
                     }
                     return QJsonArray(dedup); // Return copy since pooled array will be returned to pool
                 }

@@ -161,33 +161,33 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::KeyList>(const PathEvalCt
                                                                 const Token& tk,
                                                                 const QJsonValue& v)
 {
-    // Monadic approach: extract keys from object if present, build result object
-    auto extractKeysFromObject = [&tk](const QJsonObject& obj) -> std::optional<QJsonArray> {
-        const QStringList keys = tk.key.split(u'\n');
-        QJsonObject selection;
-        
-        for (const QString& key : keys) {
-            if (obj.contains(key)) {
-                selection.insert(key, obj[key]);
-            }
+    // Direct type check and processing - avoid monadic overhead
+    if (!v.isObject()) {
+        return QJsonArray{}; // Empty result for non-objects
+    }
+    
+    const QJsonObject obj = v.toObject();
+    const QStringList keys = tk.key.split(u'\n');
+    
+    // Use stack-allocated selection object to minimize heap allocations
+    QJsonObject selection;
+    // Note: QJsonObject doesn't support reserve() - capacity management is internal
+    
+    for (const QString& key : keys) {
+        if (obj.contains(key)) {
+            selection.insert(key, obj[key]);
         }
-        
-        if (selection.isEmpty()) {
-            return std::nullopt;
-        }
-        
-        QJsonArray result;
-        result.append(selection);
-        return result;
-    };
-
-    auto asObject = [&v]() -> std::optional<QJsonObject> {
-        return v.isObject() ? std::make_optional(v.toObject()) : std::nullopt;
-    };
-
-    return asObject()
-        .and_then(extractKeysFromObject)
-        .value_or(QJsonArray{});
+    }
+    
+    if (selection.isEmpty()) {
+        return QJsonArray{}; // Empty result if no keys found
+    }
+    
+    // Use ArrayPool for result construction
+    auto pooledArray = acquirePooledArray();
+    QJsonArray& result = *pooledArray;
+    result.append(selection);
+    return QJsonArray(result);
 }
 
 } // namespace json_query::json_path::detail
