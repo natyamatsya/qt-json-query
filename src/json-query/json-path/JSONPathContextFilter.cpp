@@ -53,20 +53,20 @@ QJsonValue evaluateContextFunction(const QString& funcExpr, const QJsonValue& co
         }
         
         // Return length as QJsonValue - RFC 9535 "nothing" semantics
-        if (argValue.isUndefined() || argValue.isNull()) return {0}; // Nothing has length 0
-        if (argValue.isString()) return QJsonValue(argValue.toString().length());
+        if (argValue.isUndefined() || argValue.isNull()) return QJsonValue{0}; // Nothing has length 0
+        if (argValue.isString()) return QJsonValue{argValue.toString().length()};
         
         // Use ContextAwareContainerCursor for efficient length calculation
         if (argValue.isArray()) {
             auto cursor = makeSimpleContextCursor(argValue.toArray(), root, context);
-            return QJsonValue(cursor.size()); // Zero-copy size access
+            return QJsonValue{cursor.size()}; // Zero-copy size access
         }
         if (argValue.isObject()) {
             auto cursor = makeSimpleContextCursor(argValue.toObject(), root, context);
-            return QJsonValue(cursor.size()); // Zero-copy size access
+            return QJsonValue{cursor.size()}; // Zero-copy size access
         }
         
-        return {0}; // Other types have no length
+        return QJsonValue{0}; // Other types have no length
     }
     
     if (funcName == "value") {
@@ -81,7 +81,7 @@ QJsonValue evaluateContextFunction(const QString& funcExpr, const QJsonValue& co
                 auto results = path->evaluateAll(root);
                 if (results) {
                     if (results->isEmpty()) {
-                        return {0}; // Return 0 for empty results (RFC 9535 "nothing" semantics)
+                        return QJsonValue{0}; // Return 0 for empty results (RFC 9535 "nothing" semantics)
                     } else {
                         // Use ContextAwareContainerCursor for efficient result processing
                         auto cursor = makeSimpleContextCursor(*results, root, context);
@@ -97,9 +97,9 @@ QJsonValue evaluateContextFunction(const QString& funcExpr, const QJsonValue& co
                         return result;
                     }
                 }
-                return {0}; // Invalid JSONPath expression returns 0
+                return QJsonValue{0}; // Invalid JSONPath expression returns 0
             }
-            return {0}; // Invalid JSONPath expression returns 0
+            return QJsonValue{0}; // Invalid JSONPath expression returns 0
         } else if (args.startsWith("@.")) {
             QString prop = args.mid(2);
             if (context.isObject()) {
@@ -108,12 +108,12 @@ QJsonValue evaluateContextFunction(const QString& funcExpr, const QJsonValue& co
                 
                 // Traditional property access (cursor doesn't expose keys in current interface)
                 QJsonValue val = context.toObject().value(prop);
-                return val.isUndefined() ? QJsonValue(0) : val; // Return 0 for undefined
+                return val.isUndefined() ? QJsonValue{0} : val; // Return 0 for undefined
             }
         } else if (args == "@") {
             return context;
         }
-        return {0}; // Undefined for complex paths returns 0
+        return QJsonValue{0}; // Undefined for complex paths returns 0
     }
     
     return {}; // Unknown function
@@ -366,13 +366,13 @@ std::optional<Token> parseAbsolutePathContext(const QString& s, std::vector<Cont
                             QJsonValue val = node.toObject().value(prop);
                             if (val.isUndefined()) {
                                 leftIsNothing = true;
-                                leftVal = QJsonValue(0);
+                                leftVal = QJsonValue{0};
                             } else {
                                 leftVal = val;
                             }
                         }
                     } else {
-                        leftVal = QJsonValue(left);
+                        leftVal = QJsonValue{left};
                     }
                     
                     // Evaluate right side with context-aware optimization
@@ -418,13 +418,13 @@ std::optional<Token> parseAbsolutePathContext(const QString& s, std::vector<Cont
                             QJsonValue val = node.toObject().value(prop);
                             if (val.isUndefined()) {
                                 rightIsNothing = true;
-                                rightVal = QJsonValue(0);
+                                rightVal = QJsonValue{0};
                             } else {
                                 rightVal = val;
                             }
                         }
                     } else {
-                        rightVal = QJsonValue(right);
+                        rightVal = QJsonValue{right};
                     }
                     
                     qCDebug(jsonPathLog) << "Function comparison values:" << leftVal << op << rightVal 
