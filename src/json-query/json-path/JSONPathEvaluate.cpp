@@ -34,6 +34,7 @@ std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token&
 using json_query::json_path::internal::ContainerCursor;
 using json_query::json_path::internal::ResultCollector;
 using internal::acquirePooledArray;
+using internal::emptyResult;
 using internal::IterativeRecursiveDescent;
 
 // ---------------------------------------------------------------------------
@@ -121,7 +122,7 @@ struct TokenProcessingStrategy<TokenProcessingType::UnionDetection> {
             
             bool multiAfter = multi || addsMultiplicity(tk);
             if (result && result->empty())
-                return QJsonArray{}; // RFC 9535: empty result list when no matches
+                return emptyResult(); // RFC 9535: empty result list when no matches
 
             multi = multiAfter;
             return result;
@@ -144,7 +145,7 @@ struct TokenProcessingStrategy<TokenProcessingType::BranchUniqueSelection> {
         auto result = processBranchUniqueSelection(ctx, i, working, root, isLeaf);
         
         if (result && result->empty())
-            return QJsonArray{}; // RFC 9535: empty result list when no matches
+            return emptyResult(); // RFC 9535: empty result list when no matches
 
         return result;
     }
@@ -163,7 +164,7 @@ struct TokenProcessingStrategy<TokenProcessingType::StandardFanOut> {
         auto result = fanOut(ctx, tk, working, i)
             .and_then([&](QJsonArray&& result) -> std::expected<QJsonArray, EvalError> {
                 if (result.empty()) {
-                    return QJsonArray{}; // RFC 9535: empty result list when no matches
+                    return emptyResult(); // RFC 9535: empty result list when no matches
                 }
                 return std::move(result);
             })
@@ -302,7 +303,7 @@ std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const 
         }
 
         if (working->empty())
-            return QJsonArray{}; // RFC 9535: empty result list when no matches
+            return emptyResult(); // RFC 9535: empty result list when no matches
     }
 
     // Special case: for root selector ($), we should return the root document itself
@@ -319,7 +320,7 @@ std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const 
 
     QJsonValue collapsed = squash(*std::move(working), multi);
     if (collapsed.isUndefined())
-        return QJsonArray{}; // RFC 9535: no matches 
+        return emptyResult(); // RFC 9535: no matches 
 
     return applyTrailing(ctx.trailingFn, collapsed);
 }

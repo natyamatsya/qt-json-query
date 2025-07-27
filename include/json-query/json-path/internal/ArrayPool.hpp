@@ -178,8 +178,19 @@ private:
 /**
  * @brief Convenience function to acquire a pooled array
  */
-inline ArrayPool::PooledArray acquirePooledArray() {
+[[nodiscard]] inline ArrayPool::PooledArray acquirePooledArray() {
     return ArrayPool::instance().acquire();
+}
+
+/**
+ * @brief Returns an empty QJsonArray optimized for common empty result cases
+ * 
+ * Uses Qt's copy-on-write (COW) mechanism to efficiently share empty arrays.
+ * This is more efficient than using ArrayPool for results that will remain empty.
+ */
+[[nodiscard]] inline QJsonArray emptyResult() {
+    static const QJsonArray EMPTY_RESULT{};
+    return EMPTY_RESULT; // COW makes this copy very cheap
 }
 
 } // namespace json_query::json_path::internal

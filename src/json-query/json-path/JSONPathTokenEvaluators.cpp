@@ -3,7 +3,7 @@
 #include "json-query/json-path/JSONPathEvalError.hpp"  // EvalError
 #include "json-query/json-path/internal/ContainerCursor.hpp"  // ContainerCursor for optimized iteration
 #include "json-query/json-path/internal/ContextAwareContainerCursor.hpp"  // ContextAwareContainerCursor for context-aware iteration
-#include "json-query/json-path/internal/ArrayPool.hpp"  // ArrayPool for memory optimization
+#include "json-query/json-path/internal/ArrayPool.hpp"  // acquirePooledArray, emptyResult
 #include "json-query/json-path/internal/FilterSpecializations.hpp"
 #include <expected>
 
@@ -11,6 +11,7 @@ namespace json_query::json_path::detail {
 
 using json_query::json_path::internal::ContainerCursor;
 using internal::acquirePooledArray;
+using internal::emptyResult;
 
 // --- Key -------------------------------------------------------------------
 template<>
@@ -20,13 +21,13 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::Key>(const PathEvalCtx& /
 {
     // Fast path: direct object key lookup without unnecessary allocations
     if (!v.isObject()) {
-        return QJsonArray{}; // Empty result for non-objects
+        return emptyResult(); // Empty result for non-objects
     }
     
     const QJsonObject obj = v.toObject();
     const auto it = obj.find(tk.key);
     if (it == obj.end()) {
-        return QJsonArray{}; // Key not found
+        return emptyResult(); // Key not found
     }
     
     // Use ArrayPool for result to optimize memory allocation
@@ -46,7 +47,7 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::Index>(const PathEvalCtx&
 {
     // RFC 9535 compliance: "Nothing is selected from a value that is not an array"
     if (!v.isArray()) {
-        return QJsonArray{}; // Empty result for non-arrays (not an error per RFC 9535)
+        return emptyResult(); // Empty result for non-arrays (not an error per RFC 9535)
     }
     
     const QJsonArray arr = v.toArray(); // Create copy to avoid iterator invalidation
@@ -54,7 +55,7 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::Index>(const PathEvalCtx&
     
     // RFC 9535 compliance: "Nothing is selected, and it is not an error, if the index lies outside the range of the array"
     if (idx < 0 || idx >= arr.size()) {
-        return QJsonArray{}; // Empty result for out-of-range (not an error per RFC 9535)
+        return emptyResult(); // Empty result for out-of-range (not an error per RFC 9535)
     }
     
     QJsonArray out;
@@ -77,7 +78,7 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::Slice>(const PathEvalCtx&
         .and_then([&tk](const QJsonArray& arr) -> std::optional<std::expected<QJsonArray, EvalError>> {
             return std::make_optional(evalSlice(arr, tk.slice));
         })
-        .value_or(std::expected<QJsonArray, EvalError>{QJsonArray{}}); // Empty result for non-arrays (not an error in JSONPath)
+        .value_or(std::expected<QJsonArray, EvalError>{emptyResult()}); // Empty result for non-arrays (not an error in JSONPath)
 }
 
 // --- Wildcard --------------------------------------------------------------
@@ -96,7 +97,7 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::Wildcard>(const PathEvalC
     }
     
     // Empty result for primitives (not an error in JSONPath)
-    return QJsonArray{};
+    return emptyResult();
 }
 
 // --- Recursive -------------------------------------------------------------
@@ -184,7 +185,7 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::Filter>(const PathEvalCtx
         return QJsonArray(out);
     }
     
-    // No filters available - return empty result
+    // Return populated array
     return QJsonArray(out);
 }
 
@@ -196,7 +197,7 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::KeyList>(const PathEvalCt
 {
     // Direct type check and processing - avoid monadic overhead
     if (!v.isObject()) {
-        return QJsonArray{}; // Empty result for non-objects
+        return emptyResult(); // Empty result for non-objects
     }
     
     const QJsonObject obj = v.toObject();

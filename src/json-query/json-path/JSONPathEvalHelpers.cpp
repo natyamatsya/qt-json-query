@@ -1,8 +1,11 @@
 #include "json-query/json-path/JSONPathEvalHelpers.hpp"
+#include "json-query/json-path/JSONPathEvalError.hpp"
 #include "json-query/json-path/JSONPathTokenEvaluators.hpp"
-#include "json-query/json-path/JSONPathTokenDispatch.hpp"
+#include "json-query/json-path/JSONPathEvaluate.hpp"
+#include "json-query/json-path/JSONPathWildcardRecursive.hpp"
 #include "json-query/json-path/internal/ContextAwareContainerCursor.hpp"
 #include "json-query/json-path/internal/ArrayPool.hpp"
+#include "json-query/json-path/internal/ArrayPool.hpp"  // acquirePooledArray, emptyResult
 #include "json-query/json-path/JSONPathLog.hpp"
 
 #include <QJsonDocument>
@@ -19,6 +22,7 @@ namespace json_query::json_path::detail {
 
 using json_query::json_path::internal::ContainerCursor;
 using internal::acquirePooledArray;
+using internal::emptyResult;
 
 // ---------------------------------------------------------------------------
 //  Basic evaluation helpers
@@ -123,7 +127,7 @@ template<>
 struct SliceProcessingStrategy<SliceProcessingType::ZeroStep> {
     static std::expected<QJsonArray, EvalError> process(const QJsonArray& array, const Slice& s) {
         qCDebug(jsonPathLog) << "evalSlice: zero step, returning empty array";
-        return QJsonArray{};  // Empty result for zero step (RFC 9535 compliance)
+        return emptyResult();  // Empty result for zero step (RFC 9535 compliance)
     }
 };
 
@@ -223,7 +227,7 @@ struct SliceProcessingStrategy<SliceProcessingType::DefaultSlice> {
     static std::expected<QJsonArray, EvalError> process(const QJsonArray& array, const Slice& s) {
         qCDebug(jsonPathLog) << "evalSlice: using default strategy";
         // This should rarely be reached, but provides a safe fallback
-        return QJsonArray{};
+        return emptyResult();
     }
 };
 
