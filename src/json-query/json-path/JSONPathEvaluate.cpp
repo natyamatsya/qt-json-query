@@ -5,6 +5,7 @@
 #include "json-query/json-path/internal/ContainerCursor.hpp"
 #include "json-query/json-path/internal/ContextAwareContainerCursor.hpp"
 #include "json-query/json-path/internal/ResultStreamer.hpp"
+#include "json-query/json-path/internal/PathPatternSpecializations.hpp"
 #include <expected>
 #include "json-query/json-path/JSONPathEvalError.hpp"
 #include "json-query/json-path/JSONPathTokenEvaluators.hpp"
@@ -265,6 +266,21 @@ std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const 
 {
     if (ctx.tokens.isEmpty())
         return QJsonValue(QJsonValue::Undefined);
+
+    // Phase 3: Path Pattern Specialization - Fast path for common patterns
+    // Conservative approach: only optimize simple, safe cases
+    if (auto patternResult = internal::PatternAwarePathEvaluator::evaluate(ctx, ctx.tokens, root)) {
+        // Pattern specialization succeeded - return optimized result
+        const QJsonArray& resultArray = *patternResult;
+        if (resultArray.isEmpty()) {
+            return QJsonValue(QJsonValue::Undefined);
+        } else if (resultArray.size() == 1) {
+            return resultArray[0]; // Single result
+        } else {
+            return QJsonValue(resultArray); // Multiple results
+        }
+    }
+    // If pattern specialization didn't handle it, fall back to generic evaluation
 
     // Use ArrayPool for better memory management of working array
     auto pooledWorkingArray = acquirePooledArray();
