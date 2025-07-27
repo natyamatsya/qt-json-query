@@ -4,6 +4,7 @@
 #include "json-query/json-path/internal/ContainerCursor.hpp"  // ContainerCursor for optimized iteration
 #include "json-query/json-path/internal/ContextAwareContainerCursor.hpp"  // ContextAwareContainerCursor for context-aware iteration
 #include "json-query/json-path/internal/ArrayPool.hpp"  // ArrayPool for memory optimization
+#include "json-query/json-path/internal/FilterSpecializations.hpp"
 #include <expected>
 
 namespace json_query::json_path::detail {
@@ -113,11 +114,17 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::Filter>(const PathEvalCtx
                                                                 const Token& tk,
                                                                 const QJsonValue& v)
 {
+    // First try pattern-aware filter optimization
+    if (auto result = internal::PatternAwareFilterEvaluator::evaluate(ctx, tk, v)) {
+        return result;
+    }
+    
+    // Fall back to embedded filter evaluation for complex patterns
     // Use ArrayPool for result to optimize memory allocation
     auto pooledArray = acquirePooledArray();
     QJsonArray& out = *pooledArray;
     
-    // First priority: Check for embedded filters (zero-overhead)
+    // Check for embedded filters (zero-overhead)
     if (tk.hasEmbeddedFilter()) {
         // Pre-compute context requirement check to avoid repeated string operations
         const bool needsRootContext = tk.key.contains("value($");
