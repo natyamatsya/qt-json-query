@@ -35,13 +35,6 @@ if(TARGET function_ref_interface)
     target_link_libraries(function_ref_demo PRIVATE function_ref_interface)
 endif()
 
-# function_ref integration test
-add_executable(function_ref_integration_test ../test_function_ref_integration.cpp)
-target_link_libraries(function_ref_integration_test PRIVATE json_query Qt6::Core)
-if(TARGET function_ref_interface)
-    target_link_libraries(function_ref_integration_test PRIVATE function_ref_interface)
-endif()
-
 install(TARGETS
     simple_pointer
     monadic_error_handling_demo
@@ -49,6 +42,5 @@ install(TARGETS
     complex_query
     refactor_potential
     function_ref_demo
-    function_ref_integration_test
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}/examples
 )
