@@ -296,7 +296,7 @@ struct ComparisonTokenFactory<ComparisonFilterType::NullPropertyDot> {
             return b.add([prop = std::move(prop), op = std::move(op)](const QJsonValue& j){
                 const auto obj = j.toObject();
                 const auto v = obj.value(prop);
-                return performComparison(v, op, QJsonValue(QJsonValue::Null));
+                return performComparison(v, op, QJsonValue{QJsonValue::Null});
             }, prop);
         }
         return std::nullopt;
@@ -314,7 +314,7 @@ struct ComparisonTokenFactory<ComparisonFilterType::NullPropertyBracket> {
             return b.add([prop = std::move(prop), op = std::move(op)](const QJsonValue& j){
                 const auto obj = j.toObject();
                 const auto v = obj.value(prop);
-                return performComparison(v, op, QJsonValue(QJsonValue::Null));
+                return performComparison(v, op, QJsonValue{QJsonValue::Null});
             }, QString("@[\"%1\"]").arg(prop));
         }
         return std::nullopt;
@@ -339,15 +339,15 @@ struct ComparisonTokenFactory<ComparisonFilterType::NullArrayIndex> {
                     if (index < 0 || index >= arr.size()) {
                         // Out of bounds: compare with undefined/null
                         QJsonValue undefined; // QJsonValue::Undefined
-                        return performComparison(undefined, op, QJsonValue(QJsonValue::Null));
+                        return performComparison(undefined, op, QJsonValue{QJsonValue::Null});
                     } else {
                         const auto v = arr[index];
-                        return performComparison(v, op, QJsonValue(QJsonValue::Null));
+                        return performComparison(v, op, QJsonValue{QJsonValue::Null});
                     }
                 } else {
                     // Non-arrays don't have array indices: compare with undefined/null
                     QJsonValue undefined; // QJsonValue::Undefined
-                    return performComparison(undefined, op, QJsonValue(QJsonValue::Null));
+                    return performComparison(undefined, op, QJsonValue{QJsonValue::Null});
                 }
             }, QString("@[%1]").arg(prop));
         }
@@ -507,7 +507,7 @@ struct ComparisonTokenFactory<ComparisonFilterType::PropertyToArray> {
                 
                 // Handle out-of-bounds or invalid index as undefined
                 if (!ok || idx < 0 || idx >= rightArr.size()) {
-                    rightVal = QJsonValue(QJsonValue::Undefined);
+                    rightVal = QJsonValue{QJsonValue::Undefined};
                 } else {
                     rightVal = rightArr.at(idx);
                 }
@@ -540,7 +540,7 @@ struct ComparisonTokenFactory<ComparisonFilterType::ArrayToProperty> {
                 
                 // Handle out-of-bounds or invalid index as undefined
                 if (!ok || idx < 0 || idx >= leftArr.size()) {
-                    leftVal = QJsonValue(QJsonValue::Undefined);
+                    leftVal = QJsonValue{QJsonValue::Undefined};
                 } else {
                     leftVal = leftArr.at(idx);
                 }
@@ -905,7 +905,7 @@ std::optional<Token> parseEmbeddedComparePropToArrayIdx(const QString& s)
             
             // Handle out-of-bounds or invalid index as undefined
             if (!ok || idx < 0 || idx >= rightArr.size()) {
-                rightValue = QJsonValue(QJsonValue::Undefined);
+                rightValue = QJsonValue{QJsonValue::Undefined};
             } else {
                 rightValue = rightArr.at(idx);
             }

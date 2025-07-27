@@ -265,7 +265,7 @@ using TokenProcessingDispatcher = TokenProcessingDispatchTable<
 std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
 {
     if (ctx.tokens.empty())
-        return QJsonValue(QJsonValue::Undefined);
+        return QJsonValue{QJsonValue::Undefined};
 
     // Phase 3: Path Pattern Specialization - Fast path for common patterns
     // Temporarily disabled during container migration
@@ -315,7 +315,7 @@ std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const 
         if (!working->empty()) {
             return working->first();
         }
-        return QJsonValue(QJsonValue::Undefined);
+        return QJsonValue{QJsonValue::Undefined};
     }
 
     QJsonValue collapsed = squash(*std::move(working), multi);

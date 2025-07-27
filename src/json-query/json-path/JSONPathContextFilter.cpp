@@ -220,9 +220,9 @@ std::optional<Token> parseAbsolutePathContext(const QString& s, std::vector<Cont
                 if (rightExprStr == "null") {
                     rightValue = QJsonValue::Null;
                 } else if (rightExprStr == "true") {
-                    rightValue = QJsonValue(true);
+                    rightValue = QJsonValue{true};
                 } else if (rightExprStr == "false") {
-                    rightValue = QJsonValue(false);
+                    rightValue = QJsonValue{false};
                 } else {
                     // Try as number or string
                     bool ok;

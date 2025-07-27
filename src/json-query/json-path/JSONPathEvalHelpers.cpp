@@ -836,7 +836,7 @@ QJsonValue applyTrailing(json_path::FunctionType fn, const QJsonValue& v)
                 if (first || (fn==Min ? d<best : d>best))
                     best = d, first = false;
             }
-            return first ? QJsonValue(QJsonValue::Undefined)
+            return first ? QJsonValue{QJsonValue::Undefined}
                          : QJsonValue(best);
         }
     }
