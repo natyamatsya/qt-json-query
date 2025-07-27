@@ -18,7 +18,7 @@ using namespace json_query::json_path::detail;
 /**
  * @brief Inline dispatch function for Key tokens - critical hot path
  */
-QT_QUERY_JSON_ALWAYS_INLINE 
+QT_QUERY_JSON_ALWAYS_INLINE
 std::expected<QJsonArray, EvalError> dispatchKey(const detail::PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
 {
     return json_query::json_path::detail::eval<Token::Kind::Key>(ctx, tk, v);
@@ -27,7 +27,7 @@ std::expected<QJsonArray, EvalError> dispatchKey(const detail::PathEvalCtx& ctx,
 /**
  * @brief Inline dispatch function for Index tokens - critical hot path
  */
-QT_QUERY_JSON_ALWAYS_INLINE 
+QT_QUERY_JSON_ALWAYS_INLINE
 std::expected<QJsonArray, EvalError> dispatchIndex(const detail::PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
 {
     return json_query::json_path::detail::eval<Token::Kind::Index>(ctx, tk, v);
@@ -36,7 +36,7 @@ std::expected<QJsonArray, EvalError> dispatchIndex(const detail::PathEvalCtx& ct
 /**
  * @brief Inline dispatch function for Slice tokens - critical hot path
  */
-QT_QUERY_JSON_ALWAYS_INLINE 
+QT_QUERY_JSON_ALWAYS_INLINE
 std::expected<QJsonArray, EvalError> dispatchSlice(const detail::PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
 {
     return json_query::json_path::detail::eval<Token::Kind::Slice>(ctx, tk, v);
@@ -45,7 +45,7 @@ std::expected<QJsonArray, EvalError> dispatchSlice(const detail::PathEvalCtx& ct
 /**
  * @brief Inline dispatch function for Wildcard tokens - critical hot path
  */
-QT_QUERY_JSON_ALWAYS_INLINE 
+QT_QUERY_JSON_ALWAYS_INLINE
 std::expected<QJsonArray, EvalError> dispatchWildcard(const detail::PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
 {
     return json_query::json_path::detail::eval<Token::Kind::Wildcard>(ctx, tk, v);
@@ -54,7 +54,7 @@ std::expected<QJsonArray, EvalError> dispatchWildcard(const detail::PathEvalCtx&
 /**
  * @brief Inline dispatch function for Recursive tokens - critical hot path
  */
-QT_QUERY_JSON_ALWAYS_INLINE 
+QT_QUERY_JSON_ALWAYS_INLINE
 std::expected<QJsonArray, EvalError> dispatchRecursive(const detail::PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
 {
     return json_query::json_path::detail::eval<Token::Kind::Recursive>(ctx, tk, v);
@@ -63,7 +63,7 @@ std::expected<QJsonArray, EvalError> dispatchRecursive(const detail::PathEvalCtx
 /**
  * @brief Inline dispatch function for Filter tokens - critical hot path
  */
-QT_QUERY_JSON_ALWAYS_INLINE 
+QT_QUERY_JSON_ALWAYS_INLINE
 std::expected<QJsonArray, EvalError> dispatchFilter(const detail::PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
 {
     return json_query::json_path::detail::eval<Token::Kind::Filter>(ctx, tk, v);
@@ -72,7 +72,7 @@ std::expected<QJsonArray, EvalError> dispatchFilter(const detail::PathEvalCtx& c
 /**
  * @brief Inline dispatch function for KeyList tokens - critical hot path
  */
-QT_QUERY_JSON_ALWAYS_INLINE 
+QT_QUERY_JSON_ALWAYS_INLINE
 std::expected<QJsonArray, EvalError> dispatchKeyList(const detail::PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
 {
     return json_query::json_path::detail::eval<Token::Kind::KeyList>(ctx, tk, v);

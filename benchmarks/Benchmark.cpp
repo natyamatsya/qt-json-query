@@ -291,7 +291,7 @@ BENCHMARK_MAIN();
 {
     QJsonDocument doc = prepareTestDocument();
 
-    
+
     {
         JSONPointer pointer("/name");
         auto res{pointer.evaluate(doc)};
@@ -303,7 +303,7 @@ benchmarkJsonPointerNestedPath()
 {
     QJsonDocument doc = prepareTestDocument();
 
-    
+
     {
         JSONPointer pointer("/location/city");
         benchmark::DoNotOptimize(pointer.evaluate(doc));
@@ -314,7 +314,7 @@ benchmarkJsonPointerArrayPath()
 {
     QJsonDocument doc = prepareTestDocument();
 
-    
+
     {
         JSONPointer pointer("/inventory/5/title");
         benchmark::DoNotOptimize(pointer.evaluate(doc));
@@ -325,7 +325,7 @@ benchmarkJsonPointerComplexPath()
 {
     QJsonDocument doc = prepareTestDocument();
 
-    
+
     {
         JSONPointer pointer("/inventory/15/author/name");
         benchmark::DoNotOptimize(pointer.evaluate(doc));
@@ -338,7 +338,7 @@ benchmarkJsonPointerComplexPath()
 {
     QJsonDocument doc = prepareTestDocument();
 
-    
+
     {
         JSONPath path("$.name");
         auto result = path.evaluate(doc);
@@ -349,7 +349,7 @@ benchmarkJsonPathNestedPath()
 {
     QJsonDocument doc = prepareTestDocument();
 
-    
+
     {
         JSONPath path("$.location.city");
         auto result = path.evaluate(doc);
@@ -360,7 +360,7 @@ benchmarkJsonPathArrayPath()
 {
     QJsonDocument doc = prepareTestDocument();
 
-    
+
     {
         JSONPath path("$.inventory[5].title");
         auto result = path.evaluate(doc);
@@ -371,7 +371,7 @@ benchmarkJsonPathWildcard()
 {
     QJsonDocument doc = prepareTestDocument();
 
-    
+
     {
         JSONPath path("$.inventory[*].title");
         auto result = path.evaluate(doc);
@@ -382,7 +382,7 @@ benchmarkJsonPathArraySlice()
 {
     QJsonDocument doc = prepareTestDocument();
 
-    
+
     {
         JSONPath path("$.inventory[0:10].title");
         auto result = path.evaluate(doc);
@@ -393,7 +393,7 @@ benchmarkJsonPathFilter()
 {
     QJsonDocument doc = prepareTestDocument();
 
-    
+
     {
         JSONPath path("$.inventory[?(@.price > 20)].title");
         auto result = path.evaluate(doc);
@@ -404,7 +404,7 @@ benchmarkJsonPathRecursive()
 {
     QJsonDocument doc = prepareTestDocument();
 
-    
+
     {
         JSONPath path("$..title");
         auto result = path.evaluate(doc);
@@ -415,7 +415,7 @@ benchmarkJsonPathRecursive()
 
 ()
 {
-    
+
     {
         JSONPointer pointer("/inventory/25/categories/1");
     }
@@ -423,7 +423,7 @@ benchmarkJsonPathRecursive()
 
 benchmarkJsonPathCreation()
 {
-    
+
     {
         JSONPath path("$.inventory[25].categories[1]");
     }

@@ -30,23 +30,23 @@ git stash push -m "Pre-diagnostic-auto-modernization backup $(date)" || echo "No
 # Function to process a single file with diagnostic output
 process_file_with_diagnostics() {
     local file="$1"
-    
+
     echo "  📄 Processing: $file"
-    
+
     # Apply modernization
     local output
     output=$(./scripts/comprehensive_auto_modernizer "$file" 2>&1)
     local changes=$(echo "$output" | grep "Total changes applied:" | cut -d: -f2 | tr -d ' ' || echo "0")
-    
+
     if [[ "$changes" == "0" ]] || [[ -z "$changes" ]]; then
         echo "    ℹ️  No changes needed for $file"
         return 0
     fi
-    
+
     echo "    🔧 Applied $changes auto modernizations to $file"
     echo "    📋 Modernization details:"
     echo "$output" | grep -E "✅|❌" | sed 's/^/      /'
-    
+
     # Validate build after this file
     echo "    🧪 Validating build..."
     if cmake --build build-relwithdebinfo-apple-clang --parallel 2>&1; then
@@ -74,7 +74,7 @@ process_file_with_diagnostics() {
         echo "   git diff $file"
         echo ""
         echo "💡 Changes have NOT been reverted - you can fix them manually!"
-        
+
         return 1
     fi
 }
@@ -187,7 +187,7 @@ if [[ -n "$failed_file" ]]; then
     echo "📁 Files remaining to process:"
     echo "   Run: find src examples perf benchmarks include -name '*.cpp' -o -name '*.hpp' | wc -l"
     echo "   Processed: $total_files"
-    
+
     exit 1
 else
     echo "   ✅ All files processed successfully!"
@@ -199,12 +199,12 @@ else
         echo "❌ Tests failed - manual investigation required"
         exit 1
     fi
-    
+
     echo ""
     echo "🎉 Diagnostic Auto Modernization completed successfully!"
     echo "📈 Changes made:"
     git diff --stat
-    
+
     echo ""
     echo "🔍 Sample transformations:"
     git diff | head -30

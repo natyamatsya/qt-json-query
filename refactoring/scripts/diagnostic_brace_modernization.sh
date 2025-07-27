@@ -25,13 +25,13 @@ build_and_test() {
         echo "❌ Build failed!"
         return 1
     fi
-    
+
     echo "Running RFC 9535 compliance tests..."
     if ! "$BUILD_DIR/tests/rfc9535_tests" > /dev/null 2>&1; then
         echo "❌ RFC 9535 tests failed!"
         return 1
     fi
-    
+
     echo "✅ Build and tests successful"
     return 0
 }
@@ -41,12 +41,12 @@ process_batch() {
     local batch_name="$1"
     shift
     local files=("$@")
-    
+
     echo "=== Processing batch: $batch_name ==="
     echo "Files in batch: ${#files[@]}"
-    
+
     local modified_files=()
-    
+
     for file in "${files[@]}"; do
         if [[ -f "$file" ]]; then
             echo "Processing: $file"
@@ -60,17 +60,17 @@ process_batch() {
             echo "⚠️  File not found: $file"
         fi
     done
-    
+
     if [[ ${#modified_files[@]} -eq 0 ]]; then
         echo "ℹ️  No files modified in batch: $batch_name"
         return 0
     fi
-    
+
     echo
     echo "Modified files in batch $batch_name:"
     printf '  %s\n' "${modified_files[@]}"
     echo
-    
+
     echo "Validating build after batch: $batch_name"
     if build_and_test; then
         echo "✅ Batch $batch_name completed successfully"

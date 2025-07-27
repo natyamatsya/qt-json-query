@@ -1,5 +1,5 @@
-# Apple Clang Toolchain
-# This toolchain file configures CMake to use Apple's Clang compiler
+# Apple Clang Toolchain This toolchain file configures CMake to use Apple's
+# Clang compiler
 
 set(CMAKE_SYSTEM_NAME Darwin)
 set(CMAKE_SYSTEM_PROCESSOR x86_64)
@@ -10,14 +10,14 @@ set(CMAKE_CXX_COMPILER clang++)
 
 # Ensure we're using Apple Clang (not LLVM Clang)
 execute_process(
-    COMMAND ${CMAKE_CXX_COMPILER} --version
-    OUTPUT_VARIABLE CLANG_VERSION_OUTPUT
-    ERROR_QUIET
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-)
+  COMMAND ${CMAKE_CXX_COMPILER} --version
+  OUTPUT_VARIABLE CLANG_VERSION_OUTPUT
+  ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
 
 if(NOT CLANG_VERSION_OUTPUT MATCHES "Apple clang")
-    message(FATAL_ERROR "This toolchain requires Apple Clang, but found: ${CLANG_VERSION_OUTPUT}")
+  message(
+    FATAL_ERROR
+      "This toolchain requires Apple Clang, but found: ${CLANG_VERSION_OUTPUT}")
 endif()
 
 # Set compiler flags specific to Apple Clang

@@ -5,7 +5,7 @@
 Internet Engineering Task Force (IETF)                   S. Gössner, Ed.
 Request for Comments: 9535                       Fachhochschule Dortmund
 Category: Standards Track                             G. Normington, Ed.
-ISSN: 2070-1721                                                         
+ISSN: 2070-1721
                                                          C. Bormann, Ed.
                                                   Universität Bremen TZI
                                                            February 2024
@@ -690,17 +690,17 @@ Table of Contents
       |  to show the JSON value used as the query argument to the
       |  queries in the examples and then a table with the following
       |  columns:
-      |  
+      |
       |     *  Query: an example query to be applied to the query
       |        argument
-      |  
+      |
       |     *  Result: the query result as a list of JSON values that
       |        were located in the query argument
-      |  
+      |
       |     *  Result Path: the query result as a list of (normalized)
       |        paths into the query argument, giving locations of the
       |        JSON values in the previous column
-      |  
+      |
       |     *  Comment: descriptive information
 
    JSON:

@@ -21,7 +21,7 @@ using internal::ResultCollector;
 /**
  * @brief Inline convenience entry point for single value evaluation - critical hot path
  */
-QT_QUERY_JSON_ALWAYS_INLINE 
+QT_QUERY_JSON_ALWAYS_INLINE
 std::expected<QJsonValue, EvalError> evaluate(const PathEvalCtx& ctx, const QJsonValue& root)
 {
     return evalStandard(ctx, root);
@@ -29,28 +29,28 @@ std::expected<QJsonValue, EvalError> evaluate(const PathEvalCtx& ctx, const QJso
 
 /**
  * @brief Inline array-based fan-out using TableGen dispatch - critical hot path
- * 
+ *
  * This function is called frequently during token evaluation and is a prime
  * candidate for inlining to eliminate function call overhead.
  */
-QT_QUERY_JSON_ALWAYS_INLINE 
+QT_QUERY_JSON_ALWAYS_INLINE
 std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src, qsizetype tokenPos)
 {
     // Use ArrayPool for better memory management
     auto pooledArray = acquirePooledArray();
     QJsonArray& result = *pooledArray;
-    
+
     ResultCollector collector(&result);
     auto streamer = collector.getStreamer();
-    
+
     // Use TableGen-inspired error handling dispatch directly
     internal::ErrorHandlingDispatcher::dispatch(tk, tokenPos, ctx, src, streamer);
-    
+
     // Check if an error occurred during processing
     if (QT_QUERY_JSON_UNLIKELY(collector.hasError())) {
         return std::unexpected(collector.getLastError());
     }
-    
+
     // Return a copy since pooled array will be returned to pool
     return QJsonArray(result);
 }
@@ -58,7 +58,7 @@ std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token&
 /**
  * @brief Inline convenience entry point for array evaluation - critical hot path
  */
-QT_QUERY_JSON_ALWAYS_INLINE 
+QT_QUERY_JSON_ALWAYS_INLINE
 std::expected<QJsonArray, EvalError> evaluateAll(const PathEvalCtx& ctx, const QJsonValue& root)
 {
     // C++23 Monadic Chain - Elegant error composition without manual checks!
@@ -72,7 +72,7 @@ std::expected<QJsonArray, EvalError> evaluateAll(const PathEvalCtx& ctx, const Q
                 if (res.isUndefined() || res.isNull()) return {};
                 return QJsonArray{res};
             }
-            
+
             // For non-root selectors, expand arrays into individual results
             if (QT_QUERY_JSON_LIKELY(res.isArray())) return res.toArray();
             if (res.isUndefined() || res.isNull()) return {};

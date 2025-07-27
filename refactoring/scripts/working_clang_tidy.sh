@@ -45,9 +45,9 @@ echo "📁 Processing ${#TEST_FILES[@]} files with clang-tidy..."
     -isystem /opt/homebrew/Cellar/llvm/20.1.8/include/c++/v1 \
     -isystem /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include \
     2>/dev/null || {
-    
+
     echo "⚠️  clang-tidy failed, trying fallback approach..."
-    
+
     # Fallback: run without system includes
     "$CLANG_TIDY" \
         --checks="modernize-use-brace-initialization" \
@@ -57,7 +57,7 @@ echo "📁 Processing ${#TEST_FILES[@]} files with clang-tidy..."
         -p build-relwithdebinfo-llvm-clang \
         "${TEST_FILES[@]}" \
         2>/dev/null || {
-        
+
         echo "❌ clang-tidy failed completely, reverting..."
         git checkout -- src include
         git stash pop 2>/dev/null || true

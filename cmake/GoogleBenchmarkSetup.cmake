@@ -7,12 +7,14 @@
 include(FetchContent)
 
 # Disable building Benchmark's own tests to speed up configure
-set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "Disable benchmark's own tests" FORCE)
+set(BENCHMARK_ENABLE_TESTING
+    OFF
+    CACHE BOOL "Disable benchmark's own tests" FORCE)
 
 FetchContent_Declare(
-    googlebench
-    GIT_REPOSITORY https://github.com/google/benchmark.git
-    GIT_TAG v1.8.3  # Adjust as needed
+  googlebench
+  GIT_REPOSITORY https://github.com/google/benchmark.git
+  GIT_TAG v1.8.3 # Adjust as needed
 )
 
 FetchContent_MakeAvailable(googlebench)

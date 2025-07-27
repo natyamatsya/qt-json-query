@@ -25,22 +25,22 @@ cd "$BUILD_DIR"
 run_memory_analysis() {
     local test_name="$1"
     local executable="$2"
-    
+
     echo "--- Memory Analysis: $test_name ---"
-    
+
     # Method 1: Use time command to get memory usage
     echo "Method 1: System resource usage"
     /usr/bin/time -l "$executable" 2>&1 | grep -E "(maximum resident set size|peak memory footprint)"
-    
+
     # Method 2: Use leaks command (macOS specific)
     echo "Method 2: Memory leaks detection"
     leaks --atExit -- "$executable" 2>/dev/null | grep -E "(leaks for|total leaked bytes)" || echo "No leaks detected"
-    
+
     # Method 3: Use heap profiling with gperftools if available
     if command -v pprof >/dev/null 2>&1; then
         echo "Method 3: Heap profiling with gperftools"
         QT_LOGGING_RULES="*=false" HEAPPROFILE=/tmp/heap_profile_$test_name "$executable" >/dev/null 2>&1 || true
-        
+
         # Check if heap profile was created
         if ls /tmp/heap_profile_$test_name.* >/dev/null 2>&1; then
             echo "Heap profile created: /tmp/heap_profile_$test_name.*"
@@ -52,7 +52,7 @@ run_memory_analysis() {
             echo "Heap profiling not available (gperftools not linked)"
         fi
     fi
-    
+
     echo ""
 }
 
@@ -128,7 +128,7 @@ echo ""
 if [ -f "./profile_test" ]; then
     echo "=== Testing profile_test executable ==="
     run_memory_analysis "profile_test" "./profile_test"
-    
+
     if [ "$MALLOC_TRACKER_AVAILABLE" -eq 1 ]; then
         echo "--- Custom malloc tracking ---"
         DYLD_INSERT_LIBRARIES=/tmp/malloc_tracker.dylib QT_LOGGING_RULES="*=false" ./profile_test 2>&1 | tail -5
@@ -140,7 +140,7 @@ fi
 if [ -f "./tests/memory_allocation_test" ]; then
     echo "=== Testing memory_allocation_test executable ==="
     run_memory_analysis "memory_allocation_test" "./tests/memory_allocation_test"
-    
+
     if [ "$MALLOC_TRACKER_AVAILABLE" -eq 1 ]; then
         echo "--- Custom malloc tracking ---"
         DYLD_INSERT_LIBRARIES=/tmp/malloc_tracker.dylib QT_LOGGING_RULES="*=false" ./tests/memory_allocation_test 2>&1 | tail -10

@@ -1,0 +1,104 @@
+# Pre-commit hooks configuration for qt-json-query
+# Install with: pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  # C++ formatting with clang-format
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v18.1.8
+    hooks:
+      - id: clang-format
+        name: Format C++ code with clang-format
+        description: Automatically format C++ code using .clang-format configuration
+        types_or: [c++, c, cuda]
+        files: \.(cpp|hpp|cc|cxx|c|h|cu)$
+        exclude: |
+          (?x)^(
+            tests/references/.*|
+            compliance/rfc-9535-jsonpath-test-suite/.*|
+            tests/references/flitbit-json-ptr/.*|
+            build/.*|
+            cmake-build-.*/.*
+          )$
+        args: [--style=file, --fallback-style=none]
+
+  # General code quality hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      # Remove trailing whitespace
+      - id: trailing-whitespace
+        exclude: |
+          (?x)^(
+            tests/references/.*|
+            compliance/rfc-9535-jsonpath-test-suite/.*|
+            .*\.md$
+          )$
+
+      # Ensure files end with newline
+      - id: end-of-file-fixer
+        exclude: |
+          (?x)^(
+            tests/references/.*|
+            compliance/rfc-9535-jsonpath-test-suite/.*
+          )$
+
+      # Check for merge conflicts
+      - id: check-merge-conflict
+
+      # Check YAML syntax
+      - id: check-yaml
+        files: \.(yaml|yml)$
+        exclude: |
+          (?x)^(
+            tests/references/.*|
+            compliance/rfc-9535-jsonpath-test-suite/.*
+          )$
+
+      # Check JSON syntax
+      - id: check-json
+        exclude: |
+          (?x)^(
+            tests/references/.*|
+            compliance/rfc-9535-jsonpath-test-suite/.*
+          )$
+
+      # Prevent large files from being committed
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+
+      # Check for case conflicts
+      - id: check-case-conflict
+
+  # CMake formatting
+  - repo: https://github.com/cheshirekow/cmake-format-precommit
+    rev: v0.6.13
+    hooks:
+      - id: cmake-format
+        name: Format CMake files
+        files: (CMakeLists\.txt|\.cmake)$
+        exclude: |
+          (?x)^(
+            tests/references/.*|
+            compliance/rfc-9535-jsonpath-test-suite/.*|
+            build/.*|
+            cmake-build-.*/.*
+          )$
+
+# Configuration for specific hooks
+default_language_version:
+  python: python3
+
+# Global settings
+fail_fast: false
+default_stages: [pre-commit]
+
+# Exclude patterns that apply to all hooks by default
+exclude: |
+  (?x)^(
+    \.git/.*|
+    \.vscode/.*|
+    \.idea/.*|
+    build/.*|
+    cmake-build-.*/.*
+  )$

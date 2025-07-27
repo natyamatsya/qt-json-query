@@ -56,7 +56,7 @@ Status of This Memo
 
 
 Bray                         Standards Track                    [Page 1]
-
+
 RFC 8259                          JSON                     December 2017
 
 
@@ -112,7 +112,7 @@ Copyright Notice
 
 
 Bray                         Standards Track                    [Page 2]
-
+
 RFC 8259                          JSON                     December 2017
 
 
@@ -168,7 +168,7 @@ Table of Contents
 
 
 Bray                         Standards Track                    [Page 3]
-
+
 RFC 8259                          JSON                     December 2017
 
 
@@ -224,7 +224,7 @@ RFC 8259                          JSON                     December 2017
 
 
 Bray                         Standards Track                    [Page 4]
-
+
 RFC 8259                          JSON                     December 2017
 
 
@@ -280,7 +280,7 @@ RFC 8259                          JSON                     December 2017
 
 
 Bray                         Standards Track                    [Page 5]
-
+
 RFC 8259                          JSON                     December 2017
 
 
@@ -336,7 +336,7 @@ RFC 8259                          JSON                     December 2017
 
 
 Bray                         Standards Track                    [Page 6]
-
+
 RFC 8259                          JSON                     December 2017
 
 
@@ -392,7 +392,7 @@ RFC 8259                          JSON                     December 2017
 
 
 Bray                         Standards Track                    [Page 7]
-
+
 RFC 8259                          JSON                     December 2017
 
 
@@ -448,7 +448,7 @@ RFC 8259                          JSON                     December 2017
 
 
 Bray                         Standards Track                    [Page 8]
-
+
 RFC 8259                          JSON                     December 2017
 
 
@@ -504,7 +504,7 @@ RFC 8259                          JSON                     December 2017
 
 
 Bray                         Standards Track                    [Page 9]
-
+
 RFC 8259                          JSON                     December 2017
 
 
@@ -560,7 +560,7 @@ RFC 8259                          JSON                     December 2017
 
 
 Bray                         Standards Track                   [Page 10]
-
+
 RFC 8259                          JSON                     December 2017
 
 
@@ -616,7 +616,7 @@ RFC 8259                          JSON                     December 2017
 
 
 Bray                         Standards Track                   [Page 11]
-
+
 RFC 8259                          JSON                     December 2017
 
 
@@ -672,7 +672,7 @@ RFC 8259                          JSON                     December 2017
 
 
 Bray                         Standards Track                   [Page 12]
-
+
 RFC 8259                          JSON                     December 2017
 
 
@@ -728,7 +728,7 @@ RFC 8259                          JSON                     December 2017
 
 
 Bray                         Standards Track                   [Page 13]
-
+
 RFC 8259                          JSON                     December 2017
 
 
@@ -784,7 +784,7 @@ RFC 8259                          JSON                     December 2017
 
 
 Bray                         Standards Track                   [Page 14]
-
+
 RFC 8259                          JSON                     December 2017
 
 
@@ -840,7 +840,7 @@ RFC 8259                          JSON                     December 2017
 
 
 Bray                         Standards Track                   [Page 15]
-
+
 RFC 8259                          JSON                     December 2017
 
 
@@ -896,4 +896,3 @@ Author's Address
 
 
 Bray                         Standards Track                   [Page 16]
-
