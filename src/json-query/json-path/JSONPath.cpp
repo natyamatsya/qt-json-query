@@ -6,12 +6,13 @@
 #include <vector>
 #include <deque>
 
-namespace json_query {
+namespace json_query
+{
 
-using json_path::Slice;
-using json_path::Token;
 using json_path::Error;
 using json_path::FilterFn;
+using json_path::Slice;
+using json_path::Token;
 
 // ─────────────────────────────────────────────────────────────────────
 //  JSONPath implementation
@@ -23,22 +24,22 @@ using json_path::FilterFn;
 
 JSONPath::EvalResult JSONPath::evaluate(const QJsonDocument& doc) const
 {
-    const QJsonValue root = doc.isArray() ? QJsonValue{doc.array()}
-                                          : QJsonValue{doc.object()};
+    const QJsonValue root = doc.isArray() ? QJsonValue{doc.array()} : QJsonValue{doc.object()};
     return evaluate(root);
 }
 
 JSONPath::EvalResult JSONPath::evaluate(const QJsonValue& value) const
 {
-    try {
+    try
+    {
         json_path::detail::PathEvalCtx ctx{m_tokens, value, m_func};
-        
+
         // C++23 Monadic Chain - Elegant error propagation without manual checks!
         return json_path::detail::evaluate(ctx, value)
-            .or_else([](json_path::EvalError error) -> EvalResult {
-                return std::unexpected(error);
-            });
-    } catch (...) {
+            .or_else([](json_path::EvalError error) -> EvalResult { return std::unexpected(error); });
+    }
+    catch (...)
+    {
         return std::unexpected(json_path::EvalError::TypeMismatchObject);
     }
 }
@@ -49,22 +50,22 @@ JSONPath::EvalResult JSONPath::evaluate(const QJsonValue& value) const
 
 JSONPath::EvalArrayResult JSONPath::evaluateAll(const QJsonDocument& doc) const
 {
-    const QJsonValue root = doc.isArray() ? QJsonValue{doc.array()}
-                                          : QJsonValue{doc.object()};
+    const QJsonValue root = doc.isArray() ? QJsonValue{doc.array()} : QJsonValue{doc.object()};
     return evaluateAll(root);
 }
 
 JSONPath::EvalArrayResult JSONPath::evaluateAll(const QJsonValue& value) const
 {
-    try {
+    try
+    {
         json_path::detail::PathEvalCtx ctx{m_tokens, value, m_func};
-        
+
         // C++23 Monadic Chain - Elegant error propagation without manual checks!
         return json_path::detail::evaluateAll(ctx, value)
-            .or_else([](json_path::EvalError error) -> EvalArrayResult {
-                return std::unexpected(error);
-            });
-    } catch (...) {
+            .or_else([](json_path::EvalError error) -> EvalArrayResult { return std::unexpected(error); });
+    }
+    catch (...)
+    {
         return std::unexpected(json_path::EvalError::TypeMismatchObject);
     }
 }

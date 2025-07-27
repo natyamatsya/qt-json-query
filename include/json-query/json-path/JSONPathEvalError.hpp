@@ -3,7 +3,8 @@
 #include <cstdint>
 #include <string_view>
 
-namespace json_query::json_path {
+namespace json_query::json_path
+{
 
 // Evaluation-time error codes mirroring json_pointer::detail::EvalError.
 // These are produced at runtime when a definite JSONPath encounters
@@ -14,7 +15,8 @@ namespace json_query::json_path {
 // NOTE: Keep names and numeric values in sync with JSON Pointer to allow
 // potential generic handling utilities.
 
-enum class EvalError : std::uint8_t {
+enum class EvalError : std::uint8_t
+{
     TypeMismatchObject = 0, // expected object but found other when key access
     TypeMismatchArray  = 1, // expected array but found other when index/slice
     KeyNotFound        = 2, // object key missing (for definite access)
@@ -25,13 +27,20 @@ enum class EvalError : std::uint8_t {
 [[nodiscard]] inline constexpr std::string_view to_string(EvalError e) noexcept
 {
     using enum EvalError;
-    switch (e) {
-    case TypeMismatchObject: return "name-selector applied to non-object";
-    case TypeMismatchArray : return "index-selector or slice-selector applied to non-array";
-    case KeyNotFound       : return "member name not found";
-    case IndexOutOfRange   : return "array index outside range";
-    case InvalidSlice      : return "invalid slice-selector parameters";
-    default                : return "unknown evaluation error";
+    switch (e)
+    {
+    case TypeMismatchObject:
+        return "name-selector applied to non-object";
+    case TypeMismatchArray:
+        return "index-selector or slice-selector applied to non-array";
+    case KeyNotFound:
+        return "member name not found";
+    case IndexOutOfRange:
+        return "array index outside range";
+    case InvalidSlice:
+        return "invalid slice-selector parameters";
+    default:
+        return "unknown evaluation error";
     }
 }
 

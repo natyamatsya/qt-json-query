@@ -10,11 +10,11 @@
 #include "json-query/json-path/JSONPath.hpp"
 #include "framework/JSONMatchersGTest.hpp"
 
-namespace jayway_parity 
+namespace jayway_parity
 {
-    using namespace json_query::json_path;
-    using json_query::JSONPath;
-    using namespace ::testing;
+using namespace json_query::json_path;
+using json_query::JSONPath;
+using namespace ::testing;
 
 // Helper macro to create disabled parity stubs quickly
 #define PATHCOMPILER_STUB(name, reason) \
@@ -90,14 +90,15 @@ TEST(JaywayPathCompilerParity, PropertyTokenCanBeCompiled)
 
 TEST(JaywayPathCompilerParity, BracketNotationPropertyTokenCanBeCompiled)
 {
-    auto check = [](QStringView path, QStringView expect){
+    auto check = [](QStringView path, QStringView expect)
+    {
         auto res{compile(path)};
         ASSERT_TRUE(res.has_value()) << "Compilation failed for " << path.toString().toStdString();
         ASSERT_EQ(res->compiled.tokens.size(), 2);
         EXPECT_EQ(res->compiled.tokens[1].key, expect);
     };
 
-    check(u"$['prop']",  u"prop");
+    check(u"$['prop']", u"prop");
     check(u"$['1prop']", u"1prop");
     check(u"$['@prop']", u"@prop");
     check(u"$[  '@prop'  ]", u"@prop");
@@ -148,10 +149,14 @@ TEST(JaywayPathCompilerParity, ScanTokenCanBeParsed)
     auto res{compile(u"$..['prop']..[*]")};
     ASSERT_TRUE(res.has_value());
 
-    bool hasRecursive = false;
+    bool hasRecursive     = false;
     bool endsWithWildcard = (res->compiled.tokens.back().kind == Token::Kind::Wildcard);
     for (const auto& t : res->compiled.tokens)
-        if (t.kind == Token::Kind::Recursive) { hasRecursive = true; break; }
+        if (t.kind == Token::Kind::Recursive)
+        {
+            hasRecursive = true;
+            break;
+        }
 
     EXPECT_TRUE(hasRecursive);
     EXPECT_TRUE(endsWithWildcard);
@@ -345,7 +350,8 @@ TEST(JaywayPathCompilerParity, UnmatchedBracketIsError)
 //
 TEST(JaywayPathCompilerParity, DISABLED_IssuePredicateEscapedBackslashInProp)
 {
-    GTEST_SKIP() << "Disabled: path violates RFC 9535 string-literal grammar; our compiler correctly reports UnmatchedQuote.";
+    GTEST_SKIP()
+        << "Disabled: path violates RFC 9535 string-literal grammar; our compiler correctly reports UnmatchedQuote.";
 }
 
 TEST(JaywayPathCompilerParity, IssuePredicateBracketInRegex)
@@ -353,9 +359,9 @@ TEST(JaywayPathCompilerParity, IssuePredicateBracketInRegex)
     const char* json = R"({
         "logs": [ { "message": "(it", "id": 2 } ]
     })";
-    auto doc{parseJson(json)};
-    auto result = evalArray(u"$.logs[?(@.message =~ /\\(it/)].message", doc);
-    EXPECT_TRUE(containsAll(result, { QJsonValue(QString::fromUtf8("(it")) }));
+    auto        doc{parseJson(json)};
+    auto        result = evalArray(u"$.logs[?(@.message =~ /\\(it/)].message", doc);
+    EXPECT_TRUE(containsAll(result, {QJsonValue(QString::fromUtf8("(it"))}));
 }
 
 TEST(JaywayPathCompilerParity, IssuePredicateAndInRegex)
@@ -363,9 +369,9 @@ TEST(JaywayPathCompilerParity, IssuePredicateAndInRegex)
     const char* json = R"({
         "logs": [ { "message": "it", "id": 2 } ]
     })";
-    auto doc{parseJson(json)};
-    auto result = evalArray(u"$.logs[?(@.message =~ /&&|it/)].message", doc);
-    EXPECT_TRUE(containsAll(result, { QJsonValue(QString::fromUtf8("it")) }));
+    auto        doc{parseJson(json)};
+    auto        result = evalArray(u"$.logs[?(@.message =~ /&&|it/)].message", doc);
+    EXPECT_TRUE(containsAll(result, {QJsonValue(QString::fromUtf8("it"))}));
 }
 
 TEST(JaywayPathCompilerParity, IssuePredicateAndInProp)
@@ -373,9 +379,9 @@ TEST(JaywayPathCompilerParity, IssuePredicateAndInProp)
     const char* json = R"({
         "logs": [ { "message": "&& it", "id": 2 } ]
     })";
-    auto doc{parseJson(json)};
-    auto result = evalArray(u"$.logs[?(@.message == '&& it')].message", doc);
-    EXPECT_TRUE(containsAll(result, { QJsonValue(QString::fromUtf8("&& it")) }));
+    auto        doc{parseJson(json)};
+    auto        result = evalArray(u"$.logs[?(@.message == '&& it')].message", doc);
+    EXPECT_TRUE(containsAll(result, {QJsonValue(QString::fromUtf8("&& it"))}));
 }
 
 TEST(JaywayPathCompilerParity, IssuePredicateBracketsChangePrecedence)
@@ -383,8 +389,8 @@ TEST(JaywayPathCompilerParity, IssuePredicateBracketsChangePrecedence)
     const char* json = R"({
         "logs": [ { "id": 2 } ]
     })";
-    auto doc{parseJson(json)};
-    auto result = evalArray(u"$.logs[?(@.message && (@.id == 1 || @.id == 2))].id", doc);
+    auto        doc{parseJson(json)};
+    auto        result = evalArray(u"$.logs[?(@.message && (@.id == 1 || @.id == 2))].id", doc);
     EXPECT_TRUE(result.isEmpty());
 }
 

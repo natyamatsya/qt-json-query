@@ -5,25 +5,31 @@
 #include <vector> // added include for std::vector
 using namespace Qt::StringLiterals;
 
-namespace json_query::json_path::detail {
+namespace json_query::json_path::detail
+{
 
 QString escapePointerSegment(const QString& seg)
 {
-    QString out; out.reserve(seg.size());
-    for (QChar c : seg) {
-        if (c == u'~') out += QStringLiteral("~0");
-        else if (c == u'/') out += QStringLiteral("~1");
-        else out += c;
-    }
+    QString out;
+    out.reserve(seg.size());
+    for (QChar c : seg)
+        if (c == u'~')
+            out += QStringLiteral("~0");
+        else if (c == u'/')
+            out += QStringLiteral("~1");
+        else
+            out += c;
     return out;
 }
 
 QString tokensToPointer(QStringList& segments, const std::vector<Token>& tokens)
 {
     // assume tokens[0] is root ($)
-    for (qsizetype i = 1; i < tokens.size(); ++i) {
+    for (qsizetype i = 1; i < tokens.size(); ++i)
+    {
         const auto& tk = tokens[i];
-        switch (tk.kind) {
+        switch (tk.kind)
+        {
         case Token::Kind::Key:
             segments.append(escapePointerSegment(tk.key));
             break;

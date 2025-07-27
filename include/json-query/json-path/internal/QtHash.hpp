@@ -11,30 +11,34 @@
 #include <type_traits>
 #include <concepts>
 
-namespace json_query::json_path::internal {
+namespace json_query::json_path::internal
+{
 
-namespace detail {
+namespace detail
+{
 
-    //  Detect whether qHash(T, uint) exists  (newer overloads)
-    template<typename T>
-    concept HashWithSeed = requires (const T& v) {
-        { qHash(v, 0u) } -> std::convertible_to<qsizetype>;
-    };
+//  Detect whether qHash(T, uint) exists  (newer overloads)
+template <typename T>
+concept HashWithSeed = requires(const T& v) {
+    { qHash(v, 0u) } -> std::convertible_to<qsizetype>;
+};
 
-    //  Detect plain qHash(T)  (older overloads / fallback)
-    template<typename T>
-    concept HashPlain = requires (const T& v) {
-        { qHash(v) } -> std::convertible_to<qsizetype>;
-    };
+//  Detect plain qHash(T)  (older overloads / fallback)
+template <typename T>
+concept HashPlain = requires(const T& v) {
+    { qHash(v) } -> std::convertible_to<qsizetype>;
+};
 
 } // namespace detail
 
-template<typename T>
+template <typename T>
 [[nodiscard]] constexpr quint32 qt_hash(const T& v) noexcept
 {
     qsizetype raw;
-    if constexpr (detail::HashWithSeed<T>)   raw = qHash(v, 0u);
-    else                                     raw = qHash(v);
+    if constexpr (detail::HashWithSeed<T>)
+        raw = qHash(v, 0u);
+    else
+        raw = qHash(v);
 
     return static_cast<quint32>(static_cast<std::uint64_t>(raw) & 0xFFFF'FFFFu);
 }

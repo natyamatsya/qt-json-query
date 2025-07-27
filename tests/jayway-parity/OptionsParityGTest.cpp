@@ -10,7 +10,8 @@
 #include "json-query/json-path/JSONPath.hpp"
 #include "framework/JSONMatchersGTest.hpp"
 
-namespace jayway_parity {
+namespace jayway_parity
+{
 
 using namespace ::testing;
 using json_query::JSONPath;
@@ -23,7 +24,7 @@ using json_query::JSONPath;
 TEST(JaywayOptionsParity, PathEvaluationReturnedAsValueByDefault)
 {
     const char* json = R"({"foo" : "bar"})";
-    QJsonValue res = eval(u"$.foo", parseJson(json));
+    QJsonValue  res  = eval(u"$.foo", parseJson(json));
     EXPECT_THAT(res, IsJsonString("bar"));
 }
 

@@ -5,7 +5,8 @@
 #include <vector>
 #include "json-query/json-path/JSONPathCompile.hpp"
 
-namespace json_query::json_path::detail {
+namespace json_query::json_path::detail
+{
 
 // Escapes a JSON Pointer segment according to RFC 6901 (~ -> ~0, / -> ~1)
 QString escapePointerSegment(const QString& seg);

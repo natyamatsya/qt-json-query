@@ -13,7 +13,8 @@
 using json_query::JSONPath;
 using namespace ::testing;
 
-namespace jayway_parity {
+namespace jayway_parity
+{
 
 // Mirror of int_eq_evals: select root objects where int-key == 1
 

@@ -31,21 +31,25 @@
 using json_query::JSONPath;
 using json_query::json_path::Error;
 
-namespace {
+namespace
+{
 
 // ----------------------------------------------------------------------------
 // Helpers for unordered array equality ---------------------------------------
 // ----------------------------------------------------------------------------
-static bool arraysEqualUnordered(const QJsonArray &a, const QJsonArray &b)
+static bool arraysEqualUnordered(const QJsonArray& a, const QJsonArray& b)
 {
     if (a.size() != b.size())
         return false;
 
     QVector<bool> matched(b.size(), false);
-    for (const auto &vA : a) {
+    for (const auto& vA : a)
+    {
         bool found = false;
-        for (int i = 0; i < b.size(); ++i) {
-            if (!matched[i] && vA == b.at(i)) {
+        for (int i = 0; i < b.size(); ++i)
+        {
+            if (!matched[i] && vA == b.at(i))
+            {
                 matched[i] = true;
                 found      = true;
                 break;
@@ -60,32 +64,34 @@ static bool arraysEqualUnordered(const QJsonArray &a, const QJsonArray &b)
 // ----------------------------------------------------------------------------
 // Test-case representation ----------------------------------------------------
 // ----------------------------------------------------------------------------
-struct CtsTestCase {
-    QString                name;          // unique id / description
-    QString                selector;      // JSONPath expression
-    QJsonValue             document;      // input document (object or array)
-    QList<QJsonArray>      resultSets;    // one or many expected result arrays
-    bool                   invalidSelector {false};
+struct CtsTestCase
+{
+    QString           name;       // unique id / description
+    QString           selector;   // JSONPath expression
+    QJsonValue        document;   // input document (object or array)
+    QList<QJsonArray> resultSets; // one or many expected result arrays
+    bool              invalidSelector{false};
 };
 
 // ----------------------------------------------------------------------------
 // JSON loader utilities -------------------------------------------------------
 // ----------------------------------------------------------------------------
-static QList<CtsTestCase> loadCtsFile(const QString &path)
+static QList<CtsTestCase> loadCtsFile(const QString& path)
 {
     QFile f(path);
-    if (!f.open(QIODevice::ReadOnly)) {
+    if (!f.open(QIODevice::ReadOnly))
+    {
         qWarning("Failed to open CTS file %s", qPrintable(path));
         return {};
     }
 
     const QByteArray data = f.readAll();
     QJsonParseError  perr;
-    auto doc{QJsonDocument::fromJson(data, &perr)};
-    if (perr.error != QJsonParseError::NoError) {
+    auto             doc{QJsonDocument::fromJson(data, &perr)};
+    if (perr.error != QJsonParseError::NoError)
         qWarning("JSON parse error in CTS file %s: %s", qPrintable(path), qPrintable(perr.errorString()));
-    }
-    if (doc.isNull()) {
+    if (doc.isNull())
+    {
         qWarning("Invalid JSON in CTS file %s", qPrintable(path));
         return {};
     }
@@ -94,21 +100,26 @@ static QList<CtsTestCase> loadCtsFile(const QString &path)
     const QJsonArray  tests = root.value("tests").toArray();
 
     QList<CtsTestCase> out;
-    for (const QJsonValue &vCase : tests) {
+    for (const QJsonValue& vCase : tests)
+    {
         const QJsonObject tcObj = vCase.toObject();
         CtsTestCase       tc;
         tc.name            = tcObj.value("name").toString();
         tc.selector        = tcObj.value("selector").toString();
         tc.invalidSelector = tcObj.value("invalid_selector").toBool(false);
 
-        if (!tc.invalidSelector) {
+        if (!tc.invalidSelector)
+        {
             tc.document = tcObj.value("document");
 
-            if (tcObj.contains("result")) {
+            if (tcObj.contains("result"))
+            {
                 tc.resultSets.append(tcObj.value("result").toArray());
-            } else if (tcObj.contains("results")) {
+            }
+            else if (tcObj.contains("results"))
+            {
                 const QJsonArray resArr = tcObj.value("results").toArray();
-                for (const QJsonValue &v : resArr)
+                for (const QJsonValue& v : resArr)
                     tc.resultSets.append(v.toArray());
             }
         }
@@ -125,9 +136,10 @@ static QList<CtsTestCase> collectAllCtsCases()
 {
     const QString baseDir = QStringLiteral(JSON_QUERY_SOURCE_DIR "/compliance/rfc-9535-jsonpath-test-suite/tests");
     QList<CtsTestCase> all;
-    QDir dir(baseDir);
-    const QStringList files = dir.entryList(QStringList{QStringLiteral("*.json")}, QDir::Files);
-    for (const QString &fileName : files) {
+    QDir               dir(baseDir);
+    const QStringList  files = dir.entryList(QStringList{QStringLiteral("*.json")}, QDir::Files);
+    for (const QString& fileName : files)
+    {
         auto vec{loadCtsFile(dir.filePath(fileName))};
         all.append(vec);
     }
@@ -137,13 +149,16 @@ static QList<CtsTestCase> collectAllCtsCases()
 // ----------------------------------------------------------------------------
 // Google-Test fixture ---------------------------------------------------------
 // ----------------------------------------------------------------------------
-class CtsJsonPathTest : public ::testing::TestWithParam<CtsTestCase> { };
+class CtsJsonPathTest : public ::testing::TestWithParam<CtsTestCase>
+{
+};
 
 TEST_P(CtsJsonPathTest, EvaluatesPerSpec)
 {
-    const CtsTestCase &tc = GetParam();
+    const CtsTestCase& tc = GetParam();
 
-    if (tc.invalidSelector) {
+    if (tc.invalidSelector)
+    {
         auto path{JSONPath::create(tc.selector)};
         EXPECT_FALSE(path.has_value()) << "Selector should be invalid: " << tc.selector.toStdString();
         return;
@@ -155,36 +170,38 @@ TEST_P(CtsJsonPathTest, EvaluatesPerSpec)
         doc = QJsonDocument(tc.document.toArray());
     else if (tc.document.isObject())
         doc = QJsonDocument(tc.document.toObject());
-    else {
+    else
         FAIL() << "CTS document for test '" << tc.name.toStdString() << "' is not object/array";
-    }
 
     // Compile selector
     auto maybePath{JSONPath::create(tc.selector)};
     ASSERT_TRUE(maybePath.has_value()) << "Failed to compile: " << tc.selector.toStdString();
 
     const JSONPath& path = *maybePath;
-    auto result{path.evaluate(doc)};
-    if (!result.has_value()) {
-        std::cout << "Evaluation error for " << tc.selector.toStdString() << ": " 
-                  << static_cast<int>(result.error()) << " (" 
-                  << to_string(result.error()) << ")" << std::endl;
+    auto            result{path.evaluate(doc)};
+    if (!result.has_value())
+    {
+        std::cout << "Evaluation error for " << tc.selector.toStdString() << ": " << static_cast<int>(result.error())
+                  << " (" << to_string(result.error()) << ")" << std::endl;
     }
     ASSERT_TRUE(result.has_value()) << "Failed to evaluate: " << tc.selector.toStdString();
-    
+
     QJsonValue resVal = *result;
 
     // Evaluate - handle root selectors correctly
     QJsonArray actual;
-    
+
     // Special case: root selector should preserve array results as single items
     // The root selector "$" returns the document itself, even if it's an array
     bool isRootSelector = (tc.selector == "$");
-    
-    if (isRootSelector) {
+
+    if (isRootSelector)
+    {
         // Root selector: preserve the result as a single item, even if it's an array
         actual = QJsonArray{resVal};
-    } else {
+    }
+    else
+    {
         // Non-root selectors: expand arrays into individual results
         if (resVal.isArray())
             actual = resVal.toArray();
@@ -194,28 +211,33 @@ TEST_P(CtsJsonPathTest, EvaluatesPerSpec)
 
     // Compare against each allowed result set
     bool matched = false;
-    for (const QJsonArray &expected : tc.resultSets) {
-        if (arraysEqualUnordered(actual, expected)) {
+    for (const QJsonArray& expected : tc.resultSets)
+    {
+        if (arraysEqualUnordered(actual, expected))
+        {
             matched = true;
             break;
         }
     }
 
-    if (!matched) {
+    if (!matched)
+    {
         qDebug() << "=== TEST MISMATCH DEBUG ===";
         qDebug() << "Test name:" << tc.name;
         qDebug() << "Selector:" << tc.selector;
         qDebug() << "Document:" << QJsonDocument(tc.document.toObject()).toJson(QJsonDocument::Compact);
         qDebug() << "Actual result (" << actual.size() << " items):";
-        for (int i = 0; i < actual.size(); ++i) {
+        for (int i = 0; i < actual.size(); ++i)
             qDebug() << "  [" << i << "]" << QJsonDocument(QJsonArray{actual[i]}).toJson(QJsonDocument::Compact);
-        }
         qDebug() << "Expected result sets:";
-        for (int setIdx = 0; setIdx < tc.resultSets.size(); ++setIdx) {
+        for (int setIdx = 0; setIdx < tc.resultSets.size(); ++setIdx)
+        {
             const QJsonArray& expected = tc.resultSets[setIdx];
             qDebug() << "  Set" << setIdx << "(" << expected.size() << " items):";
-            for (int i = 0; i < expected.size(); ++i) {
-                qDebug() << "    [" << i << "]" << QJsonDocument(QJsonArray{expected[i]}).toJson(QJsonDocument::Compact);
+            for (int i = 0; i < expected.size(); ++i)
+            {
+                qDebug() << "    [" << i << "]"
+                         << QJsonDocument(QJsonArray{expected[i]}).toJson(QJsonDocument::Compact);
             }
         }
         qDebug() << "=========================";
@@ -227,20 +249,19 @@ TEST_P(CtsJsonPathTest, EvaluatesPerSpec)
 // Parameter instantiation -----------------------------------------------------
 static QList<CtsTestCase> g_allCases = collectAllCtsCases();
 
-INSTANTIATE_TEST_SUITE_P(
-    RFC9535_CTS,
-    CtsJsonPathTest,
-    ::testing::ValuesIn(g_allCases),
-    [](const ::testing::TestParamInfo<CtsTestCase> &info) {
-        QString n = info.param.name;
-        // Replace forbidden characters with underscore
-        for (auto &ch : n) {
-            if (!ch.isLetterOrNumber())
-                ch = QChar('_');
-        }
-        // Append index to guarantee uniqueness
-        n += QStringLiteral("_") + QString::number(info.index);
-        return n.toStdString();
-    });
+INSTANTIATE_TEST_SUITE_P(RFC9535_CTS,
+                         CtsJsonPathTest,
+                         ::testing::ValuesIn(g_allCases),
+                         [](const ::testing::TestParamInfo<CtsTestCase>& info)
+                         {
+                             QString n = info.param.name;
+                             // Replace forbidden characters with underscore
+                             for (auto& ch : n)
+                                 if (!ch.isLetterOrNumber())
+                                     ch = QChar('_');
+                             // Append index to guarantee uniqueness
+                             n += QStringLiteral("_") + QString::number(info.index);
+                             return n.toStdString();
+                         });
 
 } // anonymous namespace

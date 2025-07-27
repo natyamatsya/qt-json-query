@@ -13,7 +13,8 @@
 
 // (legacy JSONPath bridge removed)
 
-namespace json_query::json_path::detail {
+namespace json_query::json_path::detail
+{
 
 // ---------------------------------------------------------------------------
 //  Core evaluation API with std::expected error handling
@@ -27,7 +28,8 @@ std::expected<QJsonArray, EvalError> evaluateAll(const PathEvalCtx& ctx, const Q
 std::expected<QJsonValue, EvalError> evaluate(const PathEvalCtx& ctx, const QJsonValue& root);
 
 // Direct array-based fan-out using TableGen dispatch - critical hot path
-std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src, qsizetype tokenPos);
+std::expected<QJsonArray, EvalError>
+fanOut(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src, qsizetype tokenPos);
 
 } // namespace json_query::json_path::detail
 

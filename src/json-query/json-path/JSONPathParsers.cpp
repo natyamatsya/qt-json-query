@@ -17,49 +17,57 @@ std::expected<qsizetype, Error> parseDot(qsizetype pos, QStringView sv, KeyBuild
 {
     qCDebug(jsonPathLog) << "parseDot pos=" << pos;
     const auto n{sv.size()};
-    if (++pos >= n) return std::unexpected(Error::TrailingDot);
+    if (++pos >= n)
+        return std::unexpected(Error::TrailingDot);
 
     QChar nxt = sv[pos];
     qCDebug(jsonPathLog) << "parseDot: processing character '" << nxt << "' at pos=" << pos;
-    
-    if (nxt == u'.') {
+
+    if (nxt == u'.')
+    {
         qCDebug(jsonPathLog) << "parseDot: found recursive segment (..)";
         tokens.emplace_back(Token{Token::Kind::Recursive});
         return pos + 2;
     }
-    if (sv[pos] == u'*') { 
+    if (sv[pos] == u'*')
+    {
         qCDebug(jsonPathLog) << "parseDot: found wildcard (*)";
-        tokens.emplace_back(Token{Token::Kind::Wildcard }); 
-        return pos + 1; 
+        tokens.emplace_back(Token{Token::Kind::Wildcard});
+        return pos + 1;
     }
     auto start{pos};
-    while (pos < n && sv[pos] != u'.' && sv[pos] != u'[') ++pos;
-    
+    while (pos < n && sv[pos] != u'.' && sv[pos] != u'[')
+        ++pos;
+
     // RFC 9535 validation: member-name-shorthand must follow ABNF grammar
     // name-first = ALPHA / "_" / Unicode, not DIGIT
     // name-char = name-first / DIGIT
     auto identifier{sv.sliced(start, pos - start)};
-    
+
     // Check first character: must be ALPHA, underscore, or Unicode (not digit)
     QChar first = identifier[0];
-    if (first.isDigit()) {
+    if (first.isDigit())
+    {
         qCDebug(jsonPathLog) << "parseDot: rejecting numeric identifier" << identifier;
         return std::unexpected(Error::InvalidIdentifier);
     }
-    if (!first.isLetter() && first != u'_' && first.unicode() < 0x80) {
+    if (!first.isLetter() && first != u'_' && first.unicode() < 0x80)
+    {
         qCDebug(jsonPathLog) << "parseDot: rejecting invalid identifier" << identifier;
         return std::unexpected(Error::InvalidIdentifier);
     }
-    
+
     // Check remaining characters: must be name-first or DIGIT
-    for (qsizetype i = 1; i < identifier.size(); ++i) {
+    for (qsizetype i = 1; i < identifier.size(); ++i)
+    {
         QChar ch = identifier[i];
-        if (!ch.isLetterOrNumber() && ch != u'_') {
+        if (!ch.isLetterOrNumber() && ch != u'_')
+        {
             qCDebug(jsonPathLog) << "parseDot: rejecting identifier with invalid character" << identifier;
             return std::unexpected(Error::InvalidIdentifier);
         }
     }
-    
+
     if (auto r = kb.push(identifier.toString()); !r)
         return std::unexpected(r.error());
     return pos;
@@ -72,17 +80,20 @@ std::expected<qsizetype, Error> parseDot(qsizetype pos, QStringView sv, KeyBuild
 std::expected<qsizetype, Error> parseBare(qsizetype pos, QStringView sv, KeyBuilder& kb, std::vector<Token>& tokens)
 {
     auto start{pos};
-    while (pos < sv.size() && sv[pos] != u'.' && sv[pos] != u'[') ++pos;
-    if (pos == start) return std::unexpected(Error::EmptySegment);
-    
+    while (pos < sv.size() && sv[pos] != u'.' && sv[pos] != u'[')
+        ++pos;
+    if (pos == start)
+        return std::unexpected(Error::EmptySegment);
+
     auto identifier{sv.sliced(start, pos - start)};
-    
+
     // Special case: if the identifier is exactly '*', create a Wildcard token
-    if (identifier == u"*") {
+    if (identifier == u"*")
+    {
         kb.tgt.emplace_back(Token{Token::Kind::Wildcard});
         return pos;
     }
-    
+
     // Otherwise, create a regular Key token
     if (auto r = kb.push(identifier.toString()); !r)
         return std::unexpected(r.error());
@@ -93,14 +104,17 @@ std::expected<qsizetype, Error> parseBare(qsizetype pos, QStringView sv, KeyBuil
 //  Bracket Parser Implementation
 // ──────────────────────────────────────────────────────────────────────
 
-std::expected<qsizetype, Error> parseBracket(qsizetype pos, QStringView sv,
-                                            KeyBuilder& kb, std::vector<Token>& tokens,
-                                            std::vector<ContextFilterFn>& contextFilters,
-                                            std::vector<FilterFn>& filters)
+std::expected<qsizetype, Error> parseBracket(qsizetype                     pos,
+                                             QStringView                   sv,
+                                             KeyBuilder&                   kb,
+                                             std::vector<Token>&           tokens,
+                                             std::vector<ContextFilterFn>& contextFilters,
+                                             std::vector<FilterFn>&        filters)
 {
     qCDebug(jsonPathLog) << "parseBracket: pos=" << pos << "sv.size()=" << sv.size();
-    
-    if (pos >= sv.size() || sv[pos] != u'[') {
+
+    if (pos >= sv.size() || sv[pos] != u'[')
+    {
         qCDebug(jsonPathLog) << "parseBracket: not a bracket at pos=" << pos;
         return std::unexpected(Error::UnmatchedBracket);
     }
@@ -112,41 +126,58 @@ std::expected<qsizetype, Error> parseBracket(qsizetype pos, QStringView sv,
     auto inDoubleQuote{false};
     auto escaped{false};
 
-    for (qsizetype i = pos; i < sv.size(); ++i) {
+    for (qsizetype i = pos; i < sv.size(); ++i)
+    {
         QChar c = sv[i];
-        
-        if (escaped) {
+
+        if (escaped)
+        {
             escaped = false;
             continue;
         }
-        
-        if (c == u'\\') {
+
+        if (c == u'\\')
+        {
             escaped = true;
             continue;
         }
-        
-        if (!inSingleQuote && !inDoubleQuote) {
-            if (c == u'[') {
+
+        if (!inSingleQuote && !inDoubleQuote)
+        {
+            if (c == u'[')
+            {
                 level++;
-            } else if (c == u']') {
+            }
+            else if (c == u']')
+            {
                 level--;
-                if (level == 0) {
+                if (level == 0)
+                {
                     end = i;
                     break;
                 }
-            } else if (c == u'\'') {
+            }
+            else if (c == u'\'')
+            {
                 inSingleQuote = true;
-            } else if (c == u'"') {
+            }
+            else if (c == u'"')
+            {
                 inDoubleQuote = true;
             }
-        } else if (inSingleQuote && c == u'\'') {
+        }
+        else if (inSingleQuote && c == u'\'')
+        {
             inSingleQuote = false;
-        } else if (inDoubleQuote && c == u'"') {
+        }
+        else if (inDoubleQuote && c == u'"')
+        {
             inDoubleQuote = false;
         }
     }
 
-    if (level != 0) {
+    if (level != 0)
+    {
         qCDebug(jsonPathLog) << "parseBracket: unmatched bracket";
         return std::unexpected(Error::UnmatchedBracket);
     }
@@ -157,14 +188,15 @@ std::expected<qsizetype, Error> parseBracket(qsizetype pos, QStringView sv,
 
     // Generate unique bracket group ID for union tracking
     static int nextBracketGroupId = 1;
-    auto currentBracketGroupId{nextBracketGroupId++};
+    auto       currentBracketGroupId{nextBracketGroupId++};
 
     // Create BracketSink for token emission
     BracketSink sink(tokens, kb, contextFilters, filters, currentBracketGroupId);
 
     // Use TableGen rule dispatcher to process the bracket content
     auto result{BracketRuleDispatcher::dispatch(content, sink)};
-    if (!result) {
+    if (!result)
+    {
         qCDebug(jsonPathLog) << "parseBracket: BracketRuleDispatcher::dispatch failed";
         return std::unexpected(result.error());
     }
@@ -177,13 +209,13 @@ std::expected<qsizetype, Error> parseBracket(qsizetype pos, QStringView sv,
 //  Embedded-Only Bracket Parser Implementation (Zero-Overhead)
 // ──────────────────────────────────────────────────────────────────────
 
-std::expected<qsizetype, Error> parseEmbeddedBracket(qsizetype pos, QStringView sv,
-                                                    KeyBuilder& kb, std::vector<Token>& tokens,
-                                                    std::vector<FilterFn>& filterFns)
+std::expected<qsizetype, Error> parseEmbeddedBracket(
+    qsizetype pos, QStringView sv, KeyBuilder& kb, std::vector<Token>& tokens, std::vector<FilterFn>& filterFns)
 {
     qCDebug(jsonPathLog) << "parseEmbeddedBracket: pos=" << pos << "sv.size()=" << sv.size();
-    
-    if (pos >= sv.size() || sv[pos] != u'[') {
+
+    if (pos >= sv.size() || sv[pos] != u'[')
+    {
         qCDebug(jsonPathLog) << "parseEmbeddedBracket: not a bracket at pos=" << pos;
         return std::unexpected(Error::UnmatchedBracket);
     }
@@ -195,41 +227,58 @@ std::expected<qsizetype, Error> parseEmbeddedBracket(qsizetype pos, QStringView 
     auto inDoubleQuote{false};
     auto escaped{false};
 
-    for (qsizetype i = pos; i < sv.size(); ++i) {
+    for (qsizetype i = pos; i < sv.size(); ++i)
+    {
         QChar c = sv[i];
-        
-        if (escaped) {
+
+        if (escaped)
+        {
             escaped = false;
             continue;
         }
-        
-        if (c == u'\\') {
+
+        if (c == u'\\')
+        {
             escaped = true;
             continue;
         }
-        
-        if (!inSingleQuote && !inDoubleQuote) {
-            if (c == u'[') {
+
+        if (!inSingleQuote && !inDoubleQuote)
+        {
+            if (c == u'[')
+            {
                 level++;
-            } else if (c == u']') {
+            }
+            else if (c == u']')
+            {
                 level--;
-                if (level == 0) {
+                if (level == 0)
+                {
                     end = i;
                     break;
                 }
-            } else if (c == u'\'') {
+            }
+            else if (c == u'\'')
+            {
                 inSingleQuote = true;
-            } else if (c == u'"') {
+            }
+            else if (c == u'"')
+            {
                 inDoubleQuote = true;
             }
-        } else if (inSingleQuote && c == u'\'') {
+        }
+        else if (inSingleQuote && c == u'\'')
+        {
             inSingleQuote = false;
-        } else if (inDoubleQuote && c == u'"') {
+        }
+        else if (inDoubleQuote && c == u'"')
+        {
             inDoubleQuote = false;
         }
     }
 
-    if (level != 0) {
+    if (level != 0)
+    {
         qCDebug(jsonPathLog) << "parseEmbeddedBracket: unmatched bracket";
         return std::unexpected(Error::UnmatchedBracket);
     }
@@ -240,14 +289,15 @@ std::expected<qsizetype, Error> parseEmbeddedBracket(qsizetype pos, QStringView 
 
     // Generate unique bracket group ID for union tracking
     static int nextBracketGroupId = 1;
-    auto currentBracketGroupId{nextBracketGroupId++};
+    auto       currentBracketGroupId{nextBracketGroupId++};
 
     // Create EmbeddedBracketSink for token emission (zero-overhead)
     EmbeddedBracketSink sink(tokens, kb, currentBracketGroupId);
 
     // Use embedded rule dispatcher to process the bracket content
     auto result{EmbeddedBracketRuleDispatcher::dispatch(content, sink)};
-    if (!result) {
+    if (!result)
+    {
         qCDebug(jsonPathLog) << "parseEmbeddedBracket: EmbeddedBracketRuleDispatcher::dispatch failed";
         return std::unexpected(result.error());
     }

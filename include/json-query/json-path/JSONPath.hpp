@@ -30,29 +30,30 @@ using namespace Qt::StringLiterals;
 // ======================================================================
 //  JSONPath
 // ======================================================================
-namespace json_query {
+namespace json_query
+{
 
 class JSONPath
 {
-public:
+  public:
     // -----------------------------------------------------------------
     //  Factory (replaces throwing constructor)                    ★
     // -----------------------------------------------------------------
     using Result = std::expected<JSONPath, json_query::json_path::Error>;
     // ★
-    static Result create(QStringView path);                      // ★
+    static Result create(QStringView path); // ★
     // ★
     // -----------------------------------------------------------------
     //  Evaluation API with error reporting (std::expected)
     // -----------------------------------------------------------------
-    using EvalResult = std::expected<QJsonValue, json_query::json_path::EvalError>;
+    using EvalResult      = std::expected<QJsonValue, json_query::json_path::EvalError>;
     using EvalArrayResult = std::expected<QJsonArray, json_query::json_path::EvalError>;
 
     [[nodiscard]] EvalResult evaluate(const QJsonDocument& doc) const;
-    [[nodiscard]] EvalResult evaluate(const QJsonValue&    value) const;
-    
+    [[nodiscard]] EvalResult evaluate(const QJsonValue& value) const;
+
     [[nodiscard]] EvalArrayResult evaluateAll(const QJsonDocument& doc) const;
-    [[nodiscard]] EvalArrayResult evaluateAll(const QJsonValue&    value) const;
+    [[nodiscard]] EvalArrayResult evaluateAll(const QJsonValue& value) const;
 
     // -----------------------------------------------------------------
     //  Other
@@ -60,37 +61,36 @@ public:
     [[nodiscard]] QString toString() const { return m_originalPath; }
 
     //  Move / copy remain defaulted
-    JSONPath(JSONPath&&)            noexcept = default;
+    JSONPath(JSONPath&&) noexcept            = default;
     JSONPath(const JSONPath&)                = default;
     JSONPath& operator=(JSONPath&&) noexcept = default;
     JSONPath& operator=(const JSONPath&)     = default;
 
     //  Aliases exported for callers
-    using FunctionType = json_query::json_path::FunctionType;
-    using Slice        = json_query::json_path::Slice;
-    using Token        = json_query::json_path::Token;
-    using FilterFn     = json_query::json_path::FilterFn;
+    using FunctionType    = json_query::json_path::FunctionType;
+    using Slice           = json_query::json_path::Slice;
+    using Token           = json_query::json_path::Token;
+    using FilterFn        = json_query::json_path::FilterFn;
     using ContextFilterFn = json_query::json_path::ContextFilterFn;
-    using Error = json_query::json_path::Error;
+    using Error           = json_query::json_path::Error;
 
-private:
+  private:
     // -----------------------------------------------------------------
     //  Private "data" ctor – used only by factory                     ★
     // -----------------------------------------------------------------
-    JSONPath(json_query::json_path::FunctionType func,
-                  QString                                        original,
-                  std::vector<json_query::json_path::Token>              tokens ) noexcept
-            : m_func(func)
-            , m_originalPath(std::move(original))
-            , m_tokens(std::move(tokens))
-        {}
+    JSONPath(json_query::json_path::FunctionType       func,
+             QString                                   original,
+             std::vector<json_query::json_path::Token> tokens) noexcept
+        : m_func(func), m_originalPath(std::move(original)), m_tokens(std::move(tokens))
+    {
+    }
 
     // -----------------------------------------------------------------
     //  Data members
     // -----------------------------------------------------------------
-    json_query::json_path::FunctionType               m_func    {json_query::json_path::FunctionType::None};
-    QString                    m_originalPath;
-    std::vector<json_query::json_path::Token>             m_tokens;
+    json_query::json_path::FunctionType       m_func{json_query::json_path::FunctionType::None};
+    QString                                   m_originalPath;
+    std::vector<json_query::json_path::Token> m_tokens;
     // Legacy filter storage removed - now using embedded filters only
 
 }; // end class JSONPath

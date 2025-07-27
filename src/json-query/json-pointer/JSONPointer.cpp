@@ -2,11 +2,12 @@
 #include "../../../include/json-query/utils/JSONQueryUtils.hpp"
 #include "json-query/json-pointer/JSONPointerParsing.hpp"
 #include "json-query/json-pointer/JSONPointerEvaluation.hpp"
-#include <charconv>   // std::to_chars
-#include <cmath>      // std::log10 (for capacity guess)
+#include <charconv> // std::to_chars
+#include <cmath>    // std::log10 (for capacity guess)
 #include <expected>
 
-namespace json_query {
+namespace json_query
+{
 
 // ────────────────────────────────────────────────────────────────────
 //  Factory
@@ -23,19 +24,19 @@ JSONPointer::Result JSONPointer::create(QStringView pointer)
 //  Public evaluation with detailed error
 // ────────────────────────────────────────────────────────────
 
-JSONPointer::EvalResult JSONPointer::evaluate(QJsonDocument const& doc) const
+JSONPointer::EvalResult JSONPointer::evaluate(const QJsonDocument& doc) const
 {
     if (doc.isNull())
         return evaluate(QJsonValue{});
     if (doc.isObject())
-        return evaluate(QJsonValue{ doc.object() });
+        return evaluate(QJsonValue{doc.object()});
     if (doc.isArray())
-        return evaluate(QJsonValue{ doc.array() });
+        return evaluate(QJsonValue{doc.array()});
     // otherwise, treat as undefined
     return evaluate(QJsonValue{});
 }
 
-JSONPointer::EvalResult JSONPointer::evaluate(QJsonValue const& value) const
+JSONPointer::EvalResult JSONPointer::evaluate(const QJsonValue& value) const
 {
     auto res{json_pointer::detail::evaluatePointer(m_tokens, value)};
     if (res)
@@ -50,24 +51,25 @@ QString JSONPointer::toString() const
 
     // ───────────────────────────────── capacity ─────────────────────────────────
     auto cap{0};
-    for (const Token& tk : m_tokens) {
-        cap += 1;                         // the leading '/'
+    for (const Token& tk : m_tokens)
+    {
+        cap += 1; // the leading '/'
         if (tk.kind == Token::Kind::Key)
-            cap += tk.key.size() * 2;     // worst-case expansion
-        else {                            // digits in index
+            cap += tk.key.size() * 2; // worst-case expansion
+        else
+        { // digits in index
             cap += (tk.index == 0) ? 1
-                                   : static_cast<qsizetype>(
-                                         std::floor(std::log10(
-                                             static_cast<double>(tk.index))) + 1);
+                                   : static_cast<qsizetype>(std::floor(std::log10(static_cast<double>(tk.index))) + 1);
         }
     }
 
     // ─────────────────────────────── single allocation ──────────────────────────
     QString out(cap, Qt::Uninitialized);
     QChar*  dst{out.data()};
-    auto wr{0};
+    auto    wr{0};
 
-    auto writeIndex = [&](qsizetype value) {
+    auto writeIndex = [&](qsizetype value)
+    {
         char buf[24];
         auto [ptr, ec] = std::to_chars(std::begin(buf), std::end(buf), value);
         const auto len{ptr - buf};
@@ -83,13 +85,23 @@ QString JSONPointer::toString() const
         if (tk.kind == Token::Kind::Key)
         {
             const QChar* src{tk.key.constData()};
-            const auto n{tk.key.size()};
+            const auto   n{tk.key.size()};
 
-            for (qsizetype i = 0; i < n; ++i) {
-                switch (src[i].unicode()) {
-                case u'~': dst[wr++] = u'~'; dst[wr++] = u'0'; break;
-                case u'/': dst[wr++] = u'~'; dst[wr++] = u'1'; break;
-                default  : dst[wr++] = src[i];                 break;
+            for (qsizetype i = 0; i < n; ++i)
+            {
+                switch (src[i].unicode())
+                {
+                case u'~':
+                    dst[wr++] = u'~';
+                    dst[wr++] = u'0';
+                    break;
+                case u'/':
+                    dst[wr++] = u'~';
+                    dst[wr++] = u'1';
+                    break;
+                default:
+                    dst[wr++] = src[i];
+                    break;
                 }
             }
         }

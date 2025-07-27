@@ -14,7 +14,8 @@ using json_query::JSONPath;
 // semantics align.  This parity test verifies both the evaluated result and
 // the round-trip serialisation using our matcher helpers.
 
-namespace jayway_parity {
+namespace jayway_parity
+{
 using namespace ::testing;
 
 TEST(JaywayEscapeParity, UrlsAreNotEscaped)
@@ -27,9 +28,8 @@ TEST(JaywayEscapeParity, UrlsAreNotEscaped)
 
     // Identity path should yield the full array
     QJsonArray arr = evalArray(*JSONPath::create(u"$"), parseJson(json));
-    EXPECT_THAT(arr, ElementsAre(IsJsonString("https://a/b/1"),
-                                 IsJsonString("https://a/b/2"),
-                                 IsJsonString("https://a/b/3")));
+    EXPECT_THAT(
+        arr, ElementsAre(IsJsonString("https://a/b/1"), IsJsonString("https://a/b/2"), IsJsonString("https://a/b/3")));
 
     // Serialise array and confirm slashes stay unescaped
     QByteArray serialised = QJsonDocument(arr).toJson(QJsonDocument::Compact);

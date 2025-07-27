@@ -8,7 +8,8 @@
 #include <expected>
 #include <QStringView>
 
-namespace json_query::json_path::detail {
+namespace json_query::json_path::detail
+{
 
 // ---------------------------------------------------------------------------
 //  Wildcard evaluation

@@ -11,10 +11,11 @@
 
 #include <tl/function_ref.hpp>
 
-namespace stdcompat {
+namespace stdcompat
+{
 
 /// A lightweight, non-owning reference to a callable.
-/// 
+///
 /// This is a wrapper around tl::function_ref that provides a std::function_ref-like
 /// interface. Unlike std::function, function_ref does not own the callable and
 /// has no dynamic allocation overhead.
@@ -24,13 +25,13 @@ namespace stdcompat {
 /// void process_data(stdcompat::function_ref<int(int)> func) {
 ///     return func(42);
 /// }
-/// 
+///
 /// auto lambda = [](int x) { return x * 2; };
 /// process_data(lambda);  // No allocation, direct reference
 /// ```
 ///
 /// @tparam Signature Function signature (e.g., int(int, float))
-template<typename Signature>
+template <typename Signature>
 using function_ref = tl::function_ref<Signature>;
 
 } // namespace stdcompat

@@ -6,12 +6,14 @@
 #include <optional>
 #include <functional>
 
-namespace json_query::json_path {
-    using FilterFn = std::function<bool(const QJsonValue&)>;
-    struct Token;
-}
+namespace json_query::json_path
+{
+using FilterFn = std::function<bool(const QJsonValue&)>;
+struct Token;
+} // namespace json_query::json_path
 
-namespace json_query::json_path::detail {
+namespace json_query::json_path::detail
+{
 
 // Helper function to evaluate function calls like length(@.a) or value($..c)
 // Refactored to use explicit error handling for JSONPath evaluation
@@ -25,6 +27,7 @@ QJsonValue parseJsonLiteral(const QString& literal);
 int compareValues(const QJsonValue& left, const QJsonValue& right);
 
 // Parse function calls like length() and value() in filter expressions
-std::optional<json_query::json_path::Token> parseFunction(const QString& s, std::vector<json_query::json_path::FilterFn>& out);
+std::optional<json_query::json_path::Token> parseFunction(const QString&                                s,
+                                                          std::vector<json_query::json_path::FilterFn>& out);
 
 } // namespace json_query::json_path::detail

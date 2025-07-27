@@ -16,9 +16,9 @@ namespace json_query
 
 class JSONPointer
 {
-public:
-    using Error      = json_pointer::detail::ParseError; // alias internal
-    using EvalError  = json_pointer::detail::EvalError;  // alias internal
+  public:
+    using Error     = json_pointer::detail::ParseError; // alias internal
+    using EvalError = json_pointer::detail::EvalError;  // alias internal
 
     // Factory function mirroring JSONPath
     using Result     = std::expected<JSONPointer, Error>;
@@ -28,17 +28,16 @@ public:
     static Result create(QStringView pointer);
 
     // Detailed-error variants
-    [[nodiscard]] EvalResult evaluate(QJsonDocument const&) const;
-    [[nodiscard]] EvalResult evaluate(QJsonValue   const&) const;
+    [[nodiscard]] EvalResult evaluate(const QJsonDocument&) const;
+    [[nodiscard]] EvalResult evaluate(const QJsonValue&) const;
 
     [[nodiscard]] QString toString() const;
 
-private:
-    JSONPointer() = default;  // internal default ctor for factory
+  private:
+    JSONPointer() = default; // internal default ctor for factory
 
     using Token = json_query::json_pointer::detail::Token;
-    std::vector<Token>   m_tokens; // QVector replaced with std::vector
-
+    std::vector<Token> m_tokens; // QVector replaced with std::vector
 };
 
 } // namespace json_query

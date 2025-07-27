@@ -15,7 +15,8 @@ using json_query::JSONPath;
 
 using namespace ::testing;
 
-namespace jayway_parity {
+namespace jayway_parity
+{
 
 // -----------------------------------------------------------------------------
 // Implemented test – expected to pass with current library --------------------
@@ -27,7 +28,7 @@ TEST(JaywayMultiPropParity, MultiPropCanBeReadFromRoot)
         "b": "b-val",
         "c": "c-val"
     })";
-    QJsonValue v = eval(u"$['a','b']", parseJson(json));
+    QJsonValue  v    = eval(u"$['a','b']", parseJson(json));
     EXPECT_THAT(v, JsonObjContains(kvlist(kv("a", "a-val"), kv("b", "b-val"))));
 
     // Absent props skipped by default

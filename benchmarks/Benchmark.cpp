@@ -21,77 +21,74 @@ static QJsonDocument prepareTestDocument()
     QJsonArray books;
     for (int i = 0; i < 100; ++i)
     {
-        books.append(QJsonObject{{"id", QString("book%1").arg(i)},
-                                 {"title", QString("Book Title %1").arg(i)},
-                                 {"author", QJsonObject{{"name", QString("Author %1").arg(i % 10)}, {"year", 1900 + i % 100}}},
-                                 {"price", 9.99 + (i % 20) * 0.5},
-                                 {"categories", QJsonArray::fromStringList({QString("cat%1").arg(i % 5), QString("cat%1").arg((i + 1) % 5)})},
-                                 {"inStock", i % 3 == 0}});
+        books.append(
+            QJsonObject{{"id", QString("book%1").arg(i)},
+                        {"title", QString("Book Title %1").arg(i)},
+                        {"author", QJsonObject{{"name", QString("Author %1").arg(i % 10)}, {"year", 1900 + i % 100}}},
+                        {"price", 9.99 + (i % 20) * 0.5},
+                        {"categories",
+                         QJsonArray::fromStringList({QString("cat%1").arg(i % 5), QString("cat%1").arg((i + 1) % 5)})},
+                        {"inStock", i % 3 == 0}});
     }
 
-    QJsonObject store{{"name", "Test Bookstore"},
-                      {"location", QJsonObject{{"city", "Test City"}}},
-                      {"inventory", books}};
+    QJsonObject store{
+        {"name", "Test Bookstore"}, {"location", QJsonObject{{"city", "Test City"}}}, {"inventory", books}};
     return QJsonDocument(store);
 }
 
 // ----------------------------
 // JSONPointer benchmarks
 // ----------------------------
-static void BM_JSONPointer_Simple(benchmark::State &state)
+static void BM_JSONPointer_Simple(benchmark::State& state)
 {
     QJsonDocument doc = prepareTestDocument();
     for (auto _ : state)
     {
         auto ptr{JSONPointer::create(QStringLiteral("/name"))};
         auto res{ptr->evaluate(doc)};
-        if (!res) {
+        if (!res)
             benchmark::DoNotOptimize(QJsonValue{});
-        } else {
+        else
             benchmark::DoNotOptimize(*res);
-        }
     }
 }
 BENCHMARK(BM_JSONPointer_Simple);
 
-static void BM_JSONPointer_Nested(benchmark::State &state)
+static void BM_JSONPointer_Nested(benchmark::State& state)
 {
     QJsonDocument doc = prepareTestDocument();
     for (auto _ : state)
     {
         auto ptr{JSONPointer::create(QStringLiteral("/location/city"))};
         auto result{ptr->evaluate(doc)};
-        if (result) {
+        if (result)
             benchmark::DoNotOptimize(*result);
-        }
     }
 }
 BENCHMARK(BM_JSONPointer_Nested);
 
-static void BM_JSONPointer_Array(benchmark::State &state)
+static void BM_JSONPointer_Array(benchmark::State& state)
 {
     QJsonDocument doc = prepareTestDocument();
     for (auto _ : state)
     {
         auto ptr{JSONPointer::create(QStringLiteral("/inventory/5/title"))};
         auto result{ptr->evaluate(doc)};
-        if (result) {
+        if (result)
             benchmark::DoNotOptimize(*result);
-        }
     }
 }
 BENCHMARK(BM_JSONPointer_Array);
 
-static void BM_JSONPointer_Complex(benchmark::State &state)
+static void BM_JSONPointer_Complex(benchmark::State& state)
 {
     QJsonDocument doc = prepareTestDocument();
     for (auto _ : state)
     {
         auto ptr{JSONPointer::create(QStringLiteral("/inventory/15/author/name"))};
         auto result{ptr->evaluate(doc)};
-        if (result) {
+        if (result)
             benchmark::DoNotOptimize(*result);
-        }
     }
 }
 BENCHMARK(BM_JSONPointer_Complex);
@@ -99,7 +96,7 @@ BENCHMARK(BM_JSONPointer_Complex);
 // ----------------------------
 // Plain QJson benchmarks (manual traversal)
 // ----------------------------
-static void BM_Plain_Simple(benchmark::State &state)
+static void BM_Plain_Simple(benchmark::State& state)
 {
     QJsonDocument doc = prepareTestDocument();
     for (auto _ : state)
@@ -110,7 +107,7 @@ static void BM_Plain_Simple(benchmark::State &state)
 }
 BENCHMARK(BM_Plain_Simple);
 
-static void BM_Plain_Nested(benchmark::State &state)
+static void BM_Plain_Nested(benchmark::State& state)
 {
     QJsonDocument doc = prepareTestDocument();
     for (auto _ : state)
@@ -122,26 +119,26 @@ static void BM_Plain_Nested(benchmark::State &state)
 }
 BENCHMARK(BM_Plain_Nested);
 
-static void BM_Plain_Array(benchmark::State &state)
+static void BM_Plain_Array(benchmark::State& state)
 {
     QJsonDocument doc = prepareTestDocument();
     for (auto _ : state)
     {
-        const auto inv = doc.object().value("inventory").toArray();
+        const auto inv   = doc.object().value("inventory").toArray();
         const auto title = inv.at(5).toObject().value("title").toString();
         benchmark::DoNotOptimize(title.constData());
     }
 }
 BENCHMARK(BM_Plain_Array);
 
-static void BM_Plain_Filter(benchmark::State &state)
+static void BM_Plain_Filter(benchmark::State& state)
 {
     QJsonDocument doc = prepareTestDocument();
     for (auto _ : state)
     {
         QStringList titles;
-        const auto inv = doc.object().value("inventory").toArray();
-        for (const QJsonValue &v : inv)
+        const auto  inv = doc.object().value("inventory").toArray();
+        for (const QJsonValue& v : inv)
         {
             const auto o = v.toObject();
             if (o.value("price").toDouble() > 20)
@@ -152,14 +149,14 @@ static void BM_Plain_Filter(benchmark::State &state)
 }
 BENCHMARK(BM_Plain_Filter);
 
-static void BM_Plain_Recursive(benchmark::State &state)
+static void BM_Plain_Recursive(benchmark::State& state)
 {
     QJsonDocument doc = prepareTestDocument();
     for (auto _ : state)
     {
         QStringList titles;
-        const auto inv = doc.object().value("inventory").toArray();
-        for (const QJsonValue &v : inv)
+        const auto  inv = doc.object().value("inventory").toArray();
+        for (const QJsonValue& v : inv)
         {
             const auto t = v.toObject().value("title").toString();
             titles << t;
@@ -172,7 +169,7 @@ BENCHMARK(BM_Plain_Recursive);
 // ----------------------------
 // JSONPath benchmarks
 // ----------------------------
-static void BM_JSONPath_Simple(benchmark::State &state)
+static void BM_JSONPath_Simple(benchmark::State& state)
 {
     QJsonDocument doc = prepareTestDocument();
     for (auto _ : state)
@@ -181,75 +178,74 @@ static void BM_JSONPath_Simple(benchmark::State &state)
         if (!pathRes.has_value())
             state.SkipWithError("Failed to compile path");
         auto result{pathRes->evaluateAll(doc)};
-        if (result) {
+        if (result)
             benchmark::DoNotOptimize(*result);
-        }
     }
 }
 BENCHMARK(BM_JSONPath_Simple);
 
-static void BM_JSONPath_Nested(benchmark::State &state)
+static void BM_JSONPath_Nested(benchmark::State& state)
 {
     QJsonDocument doc = prepareTestDocument();
     for (auto _ : state)
     {
         auto p{JSONPath::create(u"$.location.city")};
-        if (!p) state.SkipWithError("compile fail");
+        if (!p)
+            state.SkipWithError("compile fail");
         auto result{p->evaluateAll(doc)};
-        if (result) {
+        if (result)
             benchmark::DoNotOptimize(*result);
-        }
     }
 }
 BENCHMARK(BM_JSONPath_Nested);
 
-static void BM_JSONPath_Array(benchmark::State &state)
+static void BM_JSONPath_Array(benchmark::State& state)
 {
     QJsonDocument doc = prepareTestDocument();
     for (auto _ : state)
     {
         auto p{JSONPath::create(u"$.inventory[5].title")};
-        if (!p) state.SkipWithError("compile fail");
+        if (!p)
+            state.SkipWithError("compile fail");
         auto result{p->evaluateAll(doc)};
-        if (result) {
+        if (result)
             benchmark::DoNotOptimize(*result);
-        }
     }
 }
 BENCHMARK(BM_JSONPath_Array);
 
-static void BM_JSONPath_Filter(benchmark::State &state)
+static void BM_JSONPath_Filter(benchmark::State& state)
 {
     QJsonDocument doc = prepareTestDocument();
     for (auto _ : state)
     {
         auto p = JSONPath::create(u"$.inventory[?(@.price > 20)].title");
-        if (!p) state.SkipWithError("compile fail");
+        if (!p)
+            state.SkipWithError("compile fail");
         auto result{p->evaluateAll(doc)};
-        if (result) {
+        if (result)
             benchmark::DoNotOptimize(*result);
-        }
     }
 }
 BENCHMARK(BM_JSONPath_Filter);
 
-static void BM_JSONPath_Recursive(benchmark::State &state)
+static void BM_JSONPath_Recursive(benchmark::State& state)
 {
     QJsonDocument doc = prepareTestDocument();
     for (auto _ : state)
     {
         auto p{JSONPath::create(u"$..title")};
-        if (!p) state.SkipWithError("compile fail");
+        if (!p)
+            state.SkipWithError("compile fail");
         auto result{p->evaluateAll(doc)};
-        if (result) {
+        if (result)
             benchmark::DoNotOptimize(*result);
-        }
     }
 }
 BENCHMARK(BM_JSONPath_Recursive);
 
 // Creation benchmarks
-static void BM_JSONPointer_Creation(benchmark::State &state)
+static void BM_JSONPointer_Creation(benchmark::State& state)
 {
     for (auto _ : state)
     {
@@ -259,12 +255,10 @@ static void BM_JSONPointer_Creation(benchmark::State &state)
 }
 BENCHMARK(BM_JSONPointer_Creation);
 
-static void BM_JSONPath_Creation(benchmark::State &state)
+static void BM_JSONPath_Creation(benchmark::State& state)
 {
     for (auto _ : state)
-    {
         benchmark::DoNotOptimize(JSONPath::create(u"$.inventory[25].categories[1]"));
-    }
 }
 BENCHMARK(BM_JSONPath_Creation);
 

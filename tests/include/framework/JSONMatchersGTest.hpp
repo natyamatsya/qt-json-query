@@ -50,7 +50,8 @@ inline QJsonDocument parseJson(const char* src)
 inline QJsonValue eval(const JSONPath& path, const QJsonDocument& doc)
 {
     auto result{path.evaluate(doc)};
-    if (!result) {
+    if (!result)
+    {
         // Return null value on evaluation error instead of throwing
         return QJsonValue{};
     }
@@ -61,17 +62,19 @@ inline QJsonValue eval(const JSONPath& path, const QJsonDocument& doc)
 inline QJsonValue eval(QStringView path, const QJsonDocument& doc)
 {
     auto p{JSONPath::create(path)};
-    if (!p) {
+    if (!p)
+    {
         // Return null value on compilation error instead of throwing
         return QJsonValue{};
     }
-    
+
     auto result{p->evaluate(doc)};
-    if (!result) {
+    if (!result)
+    {
         // Return null value on evaluation error instead of throwing
         return QJsonValue{};
     }
-    
+
     return *result;
 }
 
@@ -80,7 +83,8 @@ inline QJsonValue eval(QStringView path, const QJsonDocument& doc)
 inline QJsonArray evalArray(const JSONPath& path, const QJsonDocument& doc)
 {
     auto result{path.evaluateAll(doc)};
-    if (!result) {
+    if (!result)
+    {
         // Return empty array on evaluation error instead of throwing
         return QJsonArray{};
     }
@@ -90,17 +94,19 @@ inline QJsonArray evalArray(const JSONPath& path, const QJsonDocument& doc)
 inline QJsonArray evalArray(QStringView path, const QJsonDocument& doc)
 {
     auto p{JSONPath::create(path)};
-    if (!p) {
+    if (!p)
+    {
         // Return empty array on compilation error instead of throwing
         return QJsonArray{};
     }
-    
+
     auto result{p->evaluateAll(doc)};
-    if (!result) {
+    if (!result)
+    {
         // Return empty array on evaluation error instead of throwing
         return QJsonArray{};
     }
-    
+
     return *result;
 }
 
@@ -114,26 +120,27 @@ using EvalResult = std::expected<QJsonValue, Error>;
 
 // Evaluate path and propagate compile-time errors via std::expected.  Runtime
 // evaluation errors are also propagated via std::expected.
-inline std::expected<QJsonValue, json_query::json_path::Error> evalExp(QStringView path,
-                          const QJsonDocument& doc)
+inline std::expected<QJsonValue, json_query::json_path::Error> evalExp(QStringView path, const QJsonDocument& doc)
 {
     auto compiled{JSONPath::create(path)};
     if (!compiled)
         return std::unexpected(compiled.error());
-    
+
     auto result{compiled->evaluate(doc)};
-    if (!result) {
+    if (!result)
+    {
         // For now, we need to convert EvalError to Error since the return type expects Error
         // In the future, we might want to have a unified error type or return std::variant
         // For now, map evaluation errors to the closest compilation error equivalent
-        switch (result.error()) {
-            case json_query::json_path::EvalError::TypeMismatchObject:
-            case json_query::json_path::EvalError::TypeMismatchArray:
-            case json_query::json_path::EvalError::KeyNotFound:
-            case json_query::json_path::EvalError::IndexOutOfRange:
-                return std::unexpected(json_query::json_path::Error::UnsupportedFilter);
-            default:
-                return std::unexpected(json_query::json_path::Error::UnsupportedFilter);
+        switch (result.error())
+        {
+        case json_query::json_path::EvalError::TypeMismatchObject:
+        case json_query::json_path::EvalError::TypeMismatchArray:
+        case json_query::json_path::EvalError::KeyNotFound:
+        case json_query::json_path::EvalError::IndexOutOfRange:
+            return std::unexpected(json_query::json_path::Error::UnsupportedFilter);
+        default:
+            return std::unexpected(json_query::json_path::Error::UnsupportedFilter);
         }
     }
     return *result;
@@ -141,12 +148,12 @@ inline std::expected<QJsonValue, json_query::json_path::Error> evalExp(QStringVi
 
 // Macro to assert that a statement of type std::expected<> fails with a
 // specific json_query::Error code.
-#define EXPECT_PATH_ERROR(expr, errEnum)                        \
-    do {                                                        \
-        auto _res = (expr);                                     \
-        ASSERT_FALSE(_res.has_value())                          \
-            << "Expected error but got success";                \
-        EXPECT_EQ(_res.error(), (errEnum));                     \
+#define EXPECT_PATH_ERROR(expr, errEnum)                                    \
+    do                                                                      \
+    {                                                                       \
+        auto _res = (expr);                                                 \
+        ASSERT_FALSE(_res.has_value()) << "Expected error but got success"; \
+        EXPECT_EQ(_res.error(), (errEnum));                                 \
     } while (false)
 
 // ---------------------------------------------------------------------------
@@ -157,60 +164,51 @@ inline std::expected<QJsonValue, json_query::json_path::Error> evalExp(QStringVi
 MATCHER_P(IsJsonString, expected, "JSON string equals")
 {
     QString expectedStr;
-    if constexpr (std::is_same_v<std::decay_t<decltype(expected)>, const char*>) {
+    if constexpr (std::is_same_v<std::decay_t<decltype(expected)>, const char*>)
         expectedStr = QString::fromUtf8(expected);
-    } else {
+    else
         expectedStr = QString(expected);
-    }
     return arg.isString() && arg.toString() == expectedStr;
 }
 
 // Convenience helper to build key/value pairs for JsonObjContains without std::initializer_list verbosity.
 inline std::pair<QString, QJsonValue> kv(const char* key, const char* val)
 {
-    return { QString::fromUtf8(key), QJsonValue(QString::fromUtf8(val)) };
+    return {QString::fromUtf8(key), QJsonValue(QString::fromUtf8(val))};
 }
 
 inline std::pair<QString, QJsonValue> kv(QStringView key, QStringView val)
 {
-    return { QString(key), QJsonValue(QString(val)) };
+    return {QString(key), QJsonValue(QString(val))};
 }
 
 inline std::pair<QString, QJsonValue> kv(const char* key, int val)
 {
-    return { QString::fromUtf8(key), QJsonValue(val) };
+    return {QString::fromUtf8(key), QJsonValue(val)};
 }
 
-inline std::pair<QString, QJsonValue> kv(QStringView key, int val)
-{
-    return { QString(key), QJsonValue(val) };
-}
+inline std::pair<QString, QJsonValue> kv(QStringView key, int val) { return {QString(key), QJsonValue(val)}; }
 
 // Helper to assemble initializer_list without explicit type
-template<typename... Pairs>
+template <typename... Pairs>
 inline std::vector<std::pair<QString, QJsonValue>> kvlist(Pairs&&... pairs)
 {
-    return { std::forward<Pairs>(pairs)... };
+    return {std::forward<Pairs>(pairs)...};
 }
 
-MATCHER(IsJsonObject, "JSON object")
-{
-    return arg.isObject();
-}
+MATCHER(IsJsonObject, "JSON object") { return arg.isObject(); }
 
-MATCHER_P(IsJsonInt, expected, "JSON int equals")
-{
-    return arg.isDouble() && arg.toInt() == expected;
-}
+MATCHER_P(IsJsonInt, expected, "JSON int equals") { return arg.isDouble() && arg.toInt() == expected; }
 
 MATCHER_P(JsonObjContains, kvPairs, "object contains key/value pairs")
 {
-    if (!arg.isObject()) return false;
+    if (!arg.isObject())
+        return false;
     const auto obj{arg.toObject()};
-    for (const auto &pair : kvPairs)
+    for (const auto& pair : kvPairs)
     {
-        const QString &key = pair.first;
-        const QJsonValue &val = pair.second;
+        const QString&    key = pair.first;
+        const QJsonValue& val = pair.second;
         if (!obj.contains(key) || obj.value(key) != val)
             return false;
     }
@@ -218,10 +216,7 @@ MATCHER_P(JsonObjContains, kvPairs, "object contains key/value pairs")
 }
 
 // Matcher for undefined JSON value (Qt's isUndefined)
-MATCHER(IsJsonUndefined, "JSON value is undefined")
-{
-    return arg.isUndefined();
-}
+MATCHER(IsJsonUndefined, "JSON value is undefined") { return arg.isUndefined(); }
 
 // ---------------------------------------------------------------------------
 
@@ -231,8 +226,8 @@ inline ::testing::AssertionResult IsString(const QJsonValue& v, QStringView expe
     if (!v.isString())
         return ::testing::AssertionFailure() << "value is not a JSON string";
     if (v.toString() != expected)
-        return ::testing::AssertionFailure() << "expected '" << expected.toString().toStdString()
-                                            << "' but got '" << v.toString().toStdString() << "'";
+        return ::testing::AssertionFailure() << "expected '" << expected.toString().toStdString() << "' but got '"
+                                             << v.toString().toStdString() << "'";
     return ::testing::AssertionSuccess();
 }
 
@@ -241,17 +236,18 @@ inline ::testing::AssertionResult IsString(const QJsonValue& v, QStringView expe
 inline bool containsAll(const QJsonArray& arr, const std::vector<QJsonValue>& expected)
 {
     for (const auto& e : expected)
-        if (!arr.contains(e)) return false;
+        if (!arr.contains(e))
+            return false;
     return true;
 }
 
 template <typename... T>
 ::testing::AssertionResult ContainsOnly(const QJsonArray& arr, const T&... elems)
 {
-    std::vector<QJsonValue> expected{ QJsonValue(elems)... };
+    std::vector<QJsonValue> expected{QJsonValue(elems)...};
     if (arr.size() != int(expected.size()))
-        return ::testing::AssertionFailure() << "array size " << arr.size()
-                                            << " differs from expected " << expected.size();
+        return ::testing::AssertionFailure()
+               << "array size " << arr.size() << " differs from expected " << expected.size();
     if (!containsAll(arr, expected))
         return ::testing::AssertionFailure() << "array does not contain exactly the expected elements";
     return ::testing::AssertionSuccess();

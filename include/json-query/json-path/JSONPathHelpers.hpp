@@ -12,7 +12,8 @@
 #include <utility>
 #include <vector>
 
-namespace json_query::json_path::detail {
+namespace json_query::json_path::detail
+{
 
 // Remove exactly one balanced pair of outer parentheses, then trim.
 inline QString stripOuterParens(QStringView sv)
@@ -24,44 +25,44 @@ inline QString stripOuterParens(QStringView sv)
 
 // Split at the first occurrence of `delim` that is *not* inside parentheses.
 // Returns {left, right} if found; otherwise std::nullopt.
-inline std::optional<std::pair<QString, QString>>
-splitTopLevel(QStringView sv, QLatin1StringView delim)
+inline std::optional<std::pair<QString, QString>> splitTopLevel(QStringView sv, QLatin1StringView delim)
 {
     const auto nDelim{delim.size()};
-    auto parenDepth{0};
+    auto       parenDepth{0};
     for (qsizetype i = 0, N = sv.size() - nDelim + 1; i < N; ++i)
     {
         const QChar c = sv[i];
-        if      (c == u'(') ++parenDepth;
-        else if (c == u')') --parenDepth;
+        if (c == u'(')
+            ++parenDepth;
+        else if (c == u')')
+            --parenDepth;
         else if (parenDepth == 0 && sv.mid(i, nDelim) == delim)
-        {
-            return std::pair<QString, QString>{
-                QString(sv.left(i)),
-                QString(sv.mid(i + nDelim)) };
-        }
+            return std::pair<QString, QString>{QString(sv.left(i)), QString(sv.mid(i + nDelim))};
     }
     return std::nullopt;
 }
 
 // Split at all occurrences of `delim` that are *not* inside parentheses.
 // Returns vector of parts if any delimiters found; otherwise std::nullopt.
-inline std::optional<std::vector<QString>>
-splitTopLevelMultiple(QStringView sv, QLatin1StringView delim)
+inline std::optional<std::vector<QString>> splitTopLevelMultiple(QStringView sv, QLatin1StringView delim)
 {
-    const auto nDelim{delim.size()};
-    auto parenDepth{0};
-    int bracketDepth{0};  // Track square bracket depth
+    const auto           nDelim{delim.size()};
+    auto                 parenDepth{0};
+    int                  bracketDepth{0}; // Track square bracket depth
     std::vector<QString> parts;
-    auto lastStart{0};
-    
+    auto                 lastStart{0};
+
     for (qsizetype i = 0, N = sv.size() - nDelim + 1; i < N; ++i)
     {
         const QChar c = sv[i];
-        if      (c == u'(') ++parenDepth;
-        else if (c == u')') --parenDepth;
-        else if (c == u'[') ++bracketDepth;
-        else if (c == u']') --bracketDepth;
+        if (c == u'(')
+            ++parenDepth;
+        else if (c == u')')
+            --parenDepth;
+        else if (c == u'[')
+            ++bracketDepth;
+        else if (c == u']')
+            --bracketDepth;
         else if (parenDepth == 0 && bracketDepth == 0 && sv.mid(i, nDelim) == delim)
         {
             // Found delimiter at top level - add part
@@ -69,13 +70,14 @@ splitTopLevelMultiple(QStringView sv, QLatin1StringView delim)
             lastStart = i + nDelim;
         }
     }
-    
+
     // Add final part after last delimiter
-    if (!parts.empty()) {
+    if (!parts.empty())
+    {
         parts.push_back(QString(sv.mid(lastStart)));
         return parts;
     }
-    
+
     return std::nullopt;
 }
 

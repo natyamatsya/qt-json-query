@@ -12,9 +12,9 @@ using json_query::JSONPointer;
 
 TEST(JSONPathBasic, RootAccess)
 {
-    QJsonObject obj{{"foo", "bar"}};
+    QJsonObject   obj{{"foo", "bar"}};
     QJsonDocument doc(obj);
-    auto path{ JSONPath::create(u"$") };
+    auto          path{JSONPath::create(u"$")};
     ASSERT_TRUE(path);
     QJsonArray res = evalArray(*path, doc);
     ASSERT_EQ(res.size(), 1);
@@ -23,25 +23,25 @@ TEST(JSONPathBasic, RootAccess)
 
 TEST(JSONPathBasic, PropertyAccess)
 {
-    QJsonObject obj{{"foo", "bar"}, {"baz", 42}};
+    QJsonObject   obj{{"foo", "bar"}, {"baz", 42}};
     QJsonDocument doc(obj);
-    EXPECT_THAT( eval(u"$.foo", doc), IsJsonString(u"bar") );
-    EXPECT_THAT( eval(u"$['baz']", doc), IsJsonInt(42) );
+    EXPECT_THAT(eval(u"$.foo", doc), IsJsonString(u"bar"));
+    EXPECT_THAT(eval(u"$['baz']", doc), IsJsonInt(42));
 }
 
 TEST(JSONPathBasic, ArrayIndex)
 {
-    QJsonArray arr = QJsonArray::fromVariantList({"zero", "one", "two"});
+    QJsonArray    arr = QJsonArray::fromVariantList({"zero", "one", "two"});
     QJsonDocument doc(arr);
-    EXPECT_THAT( eval(u"$[1]", doc), IsJsonString(u"one") );
-    EXPECT_THAT( eval(u"$[-1]", doc), IsJsonString(u"two") );
+    EXPECT_THAT(eval(u"$[1]", doc), IsJsonString(u"one"));
+    EXPECT_THAT(eval(u"$[-1]", doc), IsJsonString(u"two"));
 }
 
 TEST(JSONPathPointerInterop, CompareWithJSONPointer)
 {
-    QJsonObject obj{{"items", QJsonArray{ QJsonObject{{"id", 1}, {"name", "Item1"}} }}};
+    QJsonObject   obj{{"items", QJsonArray{QJsonObject{{"id", 1}, {"name", "Item1"}}}}};
     QJsonDocument doc(obj);
-    auto ptr{JSONPointer::create(QStringLiteral("/items/0/name"))};
+    auto          ptr{JSONPointer::create(QStringLiteral("/items/0/name"))};
     ASSERT_TRUE(ptr);
     EXPECT_EQ(eval(u"$.items[0].name", doc), ptr->evaluate(doc));
 }

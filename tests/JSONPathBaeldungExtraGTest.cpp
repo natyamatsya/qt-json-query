@@ -29,9 +29,9 @@ TEST(JSONPathBaeldungExtra, LengthFunction)
 
     const QJsonDocument doc = QJsonDocument::fromJson(QByteArray(jsonSrc));
 
-    auto path{ JSONPath::create(u"$.book.length()") };
+    auto path{JSONPath::create(u"$.book.length()")};
     ASSERT_TRUE(path);
-    EXPECT_THAT( eval(*path, doc), IsJsonInt(3) );
+    EXPECT_THAT(eval(*path, doc), IsJsonInt(3));
 }
 
 //---------------------------------------------
@@ -48,9 +48,9 @@ TEST(JSONPathBaeldungExtra, MinFunction)
 
     const QJsonDocument doc = QJsonDocument::fromJson(QByteArray(jsonSrc));
 
-    auto path{ JSONPath::create(u"$[*]['box office'].min()") };
+    auto path{JSONPath::create(u"$[*]['box office'].min()")};
     ASSERT_TRUE(path);
-    EXPECT_THAT( eval(*path, doc), IsJsonInt(591692078) );
+    EXPECT_THAT(eval(*path, doc), IsJsonInt(591692078));
 }
 
 //---------------------------------------------
@@ -67,10 +67,10 @@ TEST(JSONPathBaeldungExtra, RegexAuthorFilter)
 
     const QJsonDocument doc = QJsonDocument::fromJson(QByteArray(jsonSrc));
 
-    auto path{ JSONPath::create(u"$['book'][?(@.author =~ /.*Smith/)]") };
+    auto path{JSONPath::create(u"$['book'][?(@.author =~ /.*Smith/)]")};
     ASSERT_TRUE(path);
-    EXPECT_THAT( evalArray(*path, doc),
-                 ElementsAre(JsonObjContains(kvlist(kv("title","Beginning JSON"), kv("author","Ben Smith")))) );
+    EXPECT_THAT(evalArray(*path, doc),
+                ElementsAre(JsonObjContains(kvlist(kv("title", "Beginning JSON"), kv("author", "Ben Smith")))));
 }
 
 // Test removed: AsPathListOption is not part of RFC 9535 specification
