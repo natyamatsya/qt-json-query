@@ -683,24 +683,27 @@ struct ContextFilterParsingStrategy<ContextFilterParsingType::ExistencePattern>
                     return !root.isUndefined();
                 }
 
-                // Handle absolute path patterns
-                if (expr.startsWith("$."))
+                // Check if this is an absolute path existence filter
+                if (expr.startsWith("$"))
                 {
-                    // For patterns like "$.a", "$.*.a", etc., try to evaluate against root
-                    try
+                    // Use proper monadic error handling instead of try/catch
+                    auto absolutePath{json_query::JSONPath::create(expr)};
+                    if (absolutePath)
                     {
-                        // Create a temporary JSONPath to evaluate the absolute path
-                        auto absolutePath{json_query::JSONPath::create(expr)};
-                        if (absolutePath)
+                        auto results{absolutePath->evaluateAll(root)};
+                        if (results && !results->isEmpty())
+                            return true;
+
+                        // Log specific error if evaluation failed
+                        if (!results)
                         {
-                            auto results{absolutePath->evaluateAll(root)};
-                            if (results && !results->isEmpty())
-                                return true;
+                            qCDebug(jsonPathLog) << "Failed to evaluate absolute path:" << expr
+                                                 << "error:" << to_string(results.error());
                         }
                     }
-                    catch (...)
+                    else
                     {
-                        qCDebug(jsonPathLog) << "Failed to evaluate absolute path:" << expr;
+                        qCDebug(jsonPathLog) << "Failed to create JSONPath for:" << expr;
                     }
                 }
 
