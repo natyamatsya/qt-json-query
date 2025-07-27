@@ -305,15 +305,15 @@ template<auto PAT>
 }
 
 // Individual parser functions
-std::optional<json_query::json_path::Token> parseOr(QString s, std::vector<json_query::json_path::FilterFn>& out);
-std::optional<json_query::json_path::Token> parseAnd(QString s, std::vector<json_query::json_path::FilterFn>& out);
-std::optional<json_query::json_path::Token> parseIn(QString s, std::vector<json_query::json_path::FilterFn>& out);
-std::optional<json_query::json_path::Token> parseCompare(QString s, std::vector<json_query::json_path::FilterFn>& out);
-std::optional<json_query::json_path::Token> parseRegex(QString s, std::vector<json_query::json_path::FilterFn>& out);
-std::optional<json_query::json_path::Token> parseExists(QString s, std::vector<json_query::json_path::FilterFn>& out);
-std::optional<json_query::json_path::Token> parseSelfCmp(QString s, std::vector<json_query::json_path::FilterFn>& out);
-std::optional<json_query::json_path::Token> parseNot(QString s, std::vector<json_query::json_path::FilterFn>& out);
-std::optional<json_query::json_path::Token> parseAbsolutePath(QString s, std::vector<json_query::json_path::FilterFn>& out);
+std::optional<json_query::json_path::Token> parseOr(const QString& s, std::vector<json_query::json_path::FilterFn>& out);
+std::optional<json_query::json_path::Token> parseAnd(const QString& s, std::vector<json_query::json_path::FilterFn>& out);
+std::optional<json_query::json_path::Token> parseIn(const QString& s, std::vector<json_query::json_path::FilterFn>& out);
+std::optional<json_query::json_path::Token> parseCompare(const QString& s, std::vector<json_query::json_path::FilterFn>& out);
+std::optional<json_query::json_path::Token> parseRegex(const QString& s, std::vector<json_query::json_path::FilterFn>& out);
+std::optional<json_query::json_path::Token> parseExists(const QString& s, std::vector<json_query::json_path::FilterFn>& out);
+std::optional<json_query::json_path::Token> parseSelfCmp(const QString& s, std::vector<json_query::json_path::FilterFn>& out);
+std::optional<json_query::json_path::Token> parseNot(const QString& s, std::vector<json_query::json_path::FilterFn>& out);
+std::optional<json_query::json_path::Token> parseAbsolutePath(const QString& s, std::vector<json_query::json_path::FilterFn>& out);
 
 // ──────────────────────────────────────────────────────────────────────
 //  Modern Embedded Filter Parser Functions (Zero-Overhead)
@@ -436,13 +436,13 @@ std::optional<Token> parseEmbeddedRegex1(const QString& s)
 }
 
 // Individual embedded filter parser functions
-std::optional<Token> parseEmbeddedOr(QString s);
-std::optional<Token> parseEmbeddedAnd(QString s);
-std::optional<Token> parseEmbeddedIn(QString s);
-std::optional<Token> parseEmbeddedCompare(QString s);
-std::optional<Token> parseEmbeddedRegex(QString s);
-std::optional<Token> parseEmbeddedExists(QString s);
-std::optional<Token> parseEmbeddedSelfCmp(QString s);
-std::optional<Token> parseEmbeddedNot(QString s);
+std::optional<Token> parseEmbeddedOr(const QString& s);
+std::optional<Token> parseEmbeddedAnd(const QString& s);
+std::optional<Token> parseEmbeddedIn(const QString& s);
+std::optional<Token> parseEmbeddedCompare(const QString& s);
+std::optional<Token> parseEmbeddedRegex(const QString& s);
+std::optional<Token> parseEmbeddedExists(const QString& s);
+std::optional<Token> parseEmbeddedSelfCmp(const QString& s);
+std::optional<Token> parseEmbeddedNot(const QString& s);
 
 } // namespace detail

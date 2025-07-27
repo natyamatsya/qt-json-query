@@ -368,7 +368,7 @@ using ExistenceDispatcher = ExistenceDispatchTable<
 // Individual parser function implementations (non-template)
 // Note: parseOr, parseAnd, parseIn, parseCompare, parseRegex are implemented in JSONPathFilterCore.cpp
 
-std::optional<json_query::json_path::Token> parseExists(QString s, std::vector<json_query::json_path::FilterFn>& out)
+std::optional<json_query::json_path::Token> parseExists(const QString& s, std::vector<json_query::json_path::FilterFn>& out)
 {
     // Execute TableGen-style dispatch
     if (auto result = ExistenceDispatcher::dispatch(s, out)) {
@@ -408,7 +408,7 @@ std::optional<json_query::json_path::Token> parseExists(QString s, std::vector<j
     return std::nullopt;
 }
 
-std::optional<json_query::json_path::Token> parseSelfCmp(QString s, std::vector<json_query::json_path::FilterFn>& out)
+std::optional<json_query::json_path::Token> parseSelfCmp(const QString& s, std::vector<json_query::json_path::FilterFn>& out)
 {
     static constexpr auto pat = ctll::fixed_string{
         R"(^@\s*(==|!=|\>=|\<=|\>|\<)\s*@$)"};
@@ -430,7 +430,7 @@ std::optional<json_query::json_path::Token> parseSelfCmp(QString s, std::vector<
     return std::nullopt;
 }
 
-std::optional<json_query::json_path::Token> parseNot(QString s, std::vector<json_query::json_path::FilterFn>& out)
+std::optional<json_query::json_path::Token> parseNot(const QString& s, std::vector<json_query::json_path::FilterFn>& out)
 {
     constexpr auto negParenPat = ctll::fixed_string{R"(^!\s*\(\s*(.*)\s*\)$)"};
     if (auto m = ctre::match<negParenPat>(to_sv(s))) {
@@ -466,7 +466,7 @@ std::optional<json_query::json_path::Token> parseNot(QString s, std::vector<json
     return std::nullopt;
 }
 
-std::optional<json_query::json_path::Token> parseAbsolutePath(QString s, std::vector<json_query::json_path::FilterFn>& out)
+std::optional<json_query::json_path::Token> parseAbsolutePath(const QString& s, std::vector<json_query::json_path::FilterFn>& out)
 {
     // Check if expression starts with $ (absolute path reference)
     if (!s.startsWith('$')) {

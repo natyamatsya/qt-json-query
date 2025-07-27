@@ -692,7 +692,7 @@ compileContextFilter(const QString& expr, std::vector<ContextFilterFn>& contextF
 /// @param out Output vector to store the compiled context filter function (legacy)
 /// @return Token representing the filter, or nullopt if compilation failed
 [[nodiscard]] std::optional<Token>
-parseAbsolutePathContext(QString s, std::vector<ContextFilterFn>& out);
+parseAbsolutePathContext(const QString& s, std::vector<ContextFilterFn>& out);
 
 // ──────────────────────────────────────────────────────────────────────
 //  Modern Embedded Filter Compilation API (Zero-Overhead)

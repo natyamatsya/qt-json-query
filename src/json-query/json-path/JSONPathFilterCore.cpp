@@ -45,7 +45,7 @@ QString stripOuterParens(QString s) {
 }
 
 // Remaining parser function implementations
-std::optional<Token> parseOr(QString s, std::vector<FilterFn>& out)
+std::optional<Token> parseOr(const QString& s, std::vector<FilterFn>& out)
 {
     if (auto split = splitTopLevel(s, "||"_L1); split)
     {
@@ -64,7 +64,7 @@ std::optional<Token> parseOr(QString s, std::vector<FilterFn>& out)
     return std::nullopt;
 }
 
-std::optional<Token> parseAnd(QString s, std::vector<FilterFn>& out)
+std::optional<Token> parseAnd(const QString& s, std::vector<FilterFn>& out)
 {
     if (auto split = splitTopLevel(s, "&&"_L1); split)
     {
@@ -83,7 +83,7 @@ std::optional<Token> parseAnd(QString s, std::vector<FilterFn>& out)
     return std::nullopt;
 }
 
-std::optional<Token> parseIn(QString s, std::vector<FilterFn>& out)
+std::optional<Token> parseIn(const QString& s, std::vector<FilterFn>& out)
 {
     constexpr auto pat = ctll::fixed_string{
         R"('\s*([^']+?)\s*'\s+in\s+@\[['\"]([^'"]+)['\"]\])"};
@@ -687,13 +687,13 @@ using ComparisonDispatcher = ComparisonDispatchTable<
 // Refactored parseCompare Function (TableGen-Inspired Architecture)
 // ============================================================================
 
-std::optional<Token> parseCompare(QString s, std::vector<FilterFn>& out)
+std::optional<Token> parseCompare(const QString& s, std::vector<FilterFn>& out)
 {
     // Use TableGen-inspired compile-time dispatch with priority ordering
     return ComparisonDispatcher::dispatch(s, out);
 }
 
-std::optional<Token> parseRegex(QString s, std::vector<FilterFn>& out)
+std::optional<Token> parseRegex(const QString& s, std::vector<FilterFn>& out)
 {
     constexpr auto dotPat = ctll::fixed_string{R"(@\.([\w$]+)\s*=~\s*/(.+)/)"};
     constexpr auto brkPat = ctll::fixed_string{R"(@\[['\"]([^'"]+)['\"]\]\s*=~\s*/(.+)/)"};
@@ -703,7 +703,7 @@ std::optional<Token> parseRegex(QString s, std::vector<FilterFn>& out)
 }
 
 // Forward-declare the individual parsers
-using RuleFn = std::optional<Token>(*)(QString, std::vector<FilterFn>&);
+using RuleFn = std::optional<Token>(*)(const QString&, std::vector<FilterFn>&);
 
 constexpr std::array<RuleFn, 10> rules = {
     &parseOr,      // lowest precedence first
@@ -747,7 +747,7 @@ std::optional<Token> compileFilter(const QString& expr, std::vector<FilterFn>& o
 
 namespace json_query::json_path::detail {
 
-std::optional<Token> parseEmbeddedOr(QString s)
+std::optional<Token> parseEmbeddedOr(const QString& s)
 {
     if (auto split = splitTopLevel(s, "||"_L1); split) {
         auto [lhs, rhs] = *split;
@@ -776,7 +776,7 @@ std::optional<Token> parseEmbeddedOr(QString s)
     return std::nullopt;
 }
 
-std::optional<Token> parseEmbeddedAnd(QString s)
+std::optional<Token> parseEmbeddedAnd(const QString& s)
 {
     if (auto split = splitTopLevel(s, "&&"_L1); split) {
         auto [lhs, rhs] = *split;
@@ -805,7 +805,7 @@ std::optional<Token> parseEmbeddedAnd(QString s)
     return std::nullopt;
 }
 
-std::optional<Token> parseEmbeddedIn(QString s)
+std::optional<Token> parseEmbeddedIn(const QString& s)
 {
     // Simplified implementation for now - can be enhanced later
     return std::nullopt;
@@ -957,12 +957,13 @@ std::optional<Token> parseEmbeddedComparePropToArrayIdx(const QString& s)
     return std::nullopt;
 }
 
-std::optional<Token> parseEmbeddedCompare(QString s)
+std::optional<Token> parseEmbeddedCompare(const QString& s)
 {
-    s = stripOuterParens(s);
+    QString localS = s;  // Create local copy for modification
+    localS = stripOuterParens(localS);
     
     // Trim whitespace from logical operator splitting
-    s = s.trimmed();
+    localS = localS.trimmed();
     
     // Try embedded comparison patterns using the template functions
     constexpr auto dotPat = ctll::fixed_string{R"(@\.([\w$]+)\s*(==|!=|>=|<=|>|<)\s*(.+))"};
@@ -975,7 +976,7 @@ std::optional<Token> parseEmbeddedCompare(QString s)
     constexpr auto nestedFilterPat = ctll::fixed_string{R"(@\[\?(.+)\])"};  // Nested filter: @[?@>1]
 
     // Try self-comparison pattern first (more specific)
-    if (auto m = ctre::match<selfSelfPat>(to_sv(s))) {
+    if (auto m = ctre::match<selfSelfPat>(to_sv(localS))) {
         const QString leftSide = to_qstr(m.template get<1>().to_view());
         const QString op = to_qstr(m.template get<2>().to_view());
         const QString rightSide = to_qstr(m.template get<3>().to_view());
@@ -984,7 +985,7 @@ std::optional<Token> parseEmbeddedCompare(QString s)
         if (leftSide == rightSide) {
             Token token;
             token.kind = Token::Kind::Filter;
-            token.key = s;
+            token.key = localS;
             
             token.embedFilter([op](const QJsonValue& j) {
                 // Self-comparison: compare the value with itself
@@ -1001,22 +1002,22 @@ std::optional<Token> parseEmbeddedCompare(QString s)
         }
     }
     
-    if (auto t = parseEmbeddedCompare1<dotPat>(s)) {
+    if (auto t = parseEmbeddedCompare1<dotPat>(localS)) {
         return t;
     }
-    if (auto t = parseEmbeddedCompare1<brkPat>(s)) {
+    if (auto t = parseEmbeddedCompare1<brkPat>(localS)) {
         return t;
     }
-    if (auto t = parseEmbeddedCompareIndex<idxPat>(s)) {
+    if (auto t = parseEmbeddedCompareIndex<idxPat>(localS)) {
         return t;
     }
-    if (auto t = parseEmbeddedComparePropToProp<propToPropPat>(s)) {
+    if (auto t = parseEmbeddedComparePropToProp<propToPropPat>(localS)) {
         return t;
     }
-    if (auto t = parseEmbeddedComparePropToArrayIdx<propToArrayIdxPat>(s)) {
+    if (auto t = parseEmbeddedComparePropToArrayIdx<propToArrayIdxPat>(localS)) {
         return t;
     }
-    if (auto t = parseEmbeddedSelfValue<selfPat>(s)) {
+    if (auto t = parseEmbeddedSelfValue<selfPat>(localS)) {
         return t;
     }
     
@@ -1026,7 +1027,7 @@ std::optional<Token> parseEmbeddedCompare(QString s)
 template<ctll::fixed_string Pattern>
 std::optional<Token> parseEmbeddedComparePropToArrayIdx(const QString& s);
 
-std::optional<Token> parseEmbeddedRegex(QString s)
+std::optional<Token> parseEmbeddedRegex(const QString& s)
 {
     constexpr auto dotPat = ctll::fixed_string{R"(@\.([\w$]+)\s*=~\s*/(.+)/)"};
     constexpr auto brkPat = ctll::fixed_string{R"(@\[['\"]([^'"]+)['\"]\]\s*=~\s*/(.+)/)"};
@@ -1037,12 +1038,13 @@ std::optional<Token> parseEmbeddedRegex(QString s)
     return std::nullopt;
 }
 
-std::optional<Token> parseEmbeddedExists(QString s)
+std::optional<Token> parseEmbeddedExists(const QString& s)
 {
-    s = stripOuterParens(s);
+    QString localS = s;  // Create local copy for modification
+    localS = stripOuterParens(localS);
     
     // Trim whitespace from logical operator splitting
-    s = s.trimmed();
+    localS = localS.trimmed();
     
     // Enhanced existence patterns for better coverage
     constexpr auto dotExistsPat = ctll::fixed_string{R"(@\.([\w$]+))"};
@@ -1059,12 +1061,12 @@ std::optional<Token> parseEmbeddedExists(QString s)
     constexpr auto relContextPat = ctll::fixed_string{R"(@)"};  // @ (simple context reference)
 
     // Try nested filter pattern first (most specific)
-    if (auto m = ctre::match<nestedFilterPat>(to_sv(s))) {
+    if (auto m = ctre::match<nestedFilterPat>(to_sv(localS))) {
         const QString filterExpr = to_qstr(m.template get<1>().to_view());
         
         Token token;
         token.kind = Token::Kind::Filter;
-        token.key = s;
+        token.key = localS;
         
         token.embedFilter([filterExpr](const QJsonValue& j) {
             // Nested filter existence: @[?@>1] - true if array has elements matching the filter
@@ -1087,10 +1089,10 @@ std::optional<Token> parseEmbeddedExists(QString s)
     }
     
     // Try simple relative context pattern first
-    if (ctre::match<relContextPat>(to_sv(s))) {
+    if (ctre::match<relContextPat>(to_sv(localS))) {
         Token token;
         token.kind = Token::Kind::Filter;
-        token.key = s;
+        token.key = localS;
         
         token.embedFilter([](const QJsonValue& j) {
             // Simple relative context existence: @ - true if value is not undefined
@@ -1102,10 +1104,10 @@ std::optional<Token> parseEmbeddedExists(QString s)
     }
     
     // Try simple absolute root pattern first
-    if (ctre::match<absRootPat>(to_sv(s))) {
+    if (ctre::match<absRootPat>(to_sv(localS))) {
         Token token;
         token.kind = Token::Kind::Filter;
-        token.key = s;
+        token.key = localS;
         
         token.embedFilter([](const QJsonValue& j) {
             // Simple absolute root existence: $ - always true (root always exists)
@@ -1116,10 +1118,10 @@ std::optional<Token> parseEmbeddedExists(QString s)
     }
     
     // Try wildcard existence pattern
-    if (ctre::match<wildcardPat>(to_sv(s))) {
+    if (ctre::match<wildcardPat>(to_sv(localS))) {
         Token token;
         token.kind = Token::Kind::Filter;
-        token.key = s;
+        token.key = localS;
         
         token.embedFilter([](const QJsonValue& j) {
             // Wildcard existence: true if object has any properties or array has any elements
@@ -1135,10 +1137,10 @@ std::optional<Token> parseEmbeddedExists(QString s)
     }
     
     // Try slice existence pattern
-    if (ctre::match<slicePat>(to_sv(s))) {
+    if (ctre::match<slicePat>(to_sv(localS))) {
         Token token;
         token.kind = Token::Kind::Filter;
-        token.key = s;
+        token.key = localS;
         
         token.embedFilter([](const QJsonValue& j) {
             // Slice existence: true if array and slice would return any elements
@@ -1153,15 +1155,15 @@ std::optional<Token> parseEmbeddedExists(QString s)
     }
     
     // Try multiple selector existence pattern
-    if (ctre::match<multiSelectorPat>(to_sv(s))) {
+    if (ctre::match<multiSelectorPat>(to_sv(localS))) {
         Token token;
         token.kind = Token::Kind::Filter;
-        token.key = s;
+        token.key = localS;
         
-        token.embedFilter([s](const QJsonValue& j) {
+        token.embedFilter([localS](const QJsonValue& j) {
             // Multiple selector existence: parse the selectors and check if ANY would return values
             // Extract the content between brackets: @[0, 0, 'a'] -> "0, 0, 'a'"
-            QString content = s;
+            QString content = localS;
             if (content.startsWith("@[") && content.endsWith("]")) {
                 content = content.mid(2, content.length() - 3);
             }
@@ -1210,10 +1212,10 @@ std::optional<Token> parseEmbeddedExists(QString s)
     }
     
     // Try absolute path patterns first
-    if (ctre::match<absWildcardPat>(to_sv(s))) {
+    if (ctre::match<absWildcardPat>(to_sv(localS))) {
         Token token;
         token.kind = Token::Kind::Filter;
-        token.key = s;
+        token.key = localS;
         
         token.embedFilter([](const QJsonValue& j) {
             // Absolute wildcard existence: always true for any value (root always exists)
@@ -1223,12 +1225,12 @@ std::optional<Token> parseEmbeddedExists(QString s)
         return token;
     }
     
-    if (auto m = ctre::match<absComplexPat>(to_sv(s))) {
+    if (auto m = ctre::match<absComplexPat>(to_sv(localS))) {
         const QString prop = to_qstr(m.template get<1>().to_view());
         
         Token token;
         token.kind = Token::Kind::Filter;
-        token.key = s;
+        token.key = localS;
         
         token.embedFilter([prop](const QJsonValue& j) {
             // Complex absolute path: $.*.property 
@@ -1253,12 +1255,12 @@ std::optional<Token> parseEmbeddedExists(QString s)
         return token;
     }
     
-    if (auto m = ctre::match<absDotExistsPat>(to_sv(s))) {
+    if (auto m = ctre::match<absDotExistsPat>(to_sv(localS))) {
         const QString prop = to_qstr(m.template get<1>().to_view());
         
         Token token;
         token.kind = Token::Kind::Filter;
-        token.key = s;
+        token.key = localS;
         
         token.embedFilter([prop](const QJsonValue& j) {
             // Absolute property existence: $.property - check root for property
@@ -1269,11 +1271,11 @@ std::optional<Token> parseEmbeddedExists(QString s)
     }
     
     // Try basic property existence pattern: @.property
-    if (auto m = ctre::match<dotExistsPat>(to_sv(s))) {
+    if (auto m = ctre::match<dotExistsPat>(to_sv(localS))) {
         const QString prop = to_qstr(m.template get<1>().to_view());
         Token token;
         token.kind = Token::Kind::Filter;
-        token.key = s;
+        token.key = localS;
         
         token.embedFilter([prop](const QJsonValue& j) {
             // Basic property existence: @.property - true if object contains property
@@ -1287,11 +1289,11 @@ std::optional<Token> parseEmbeddedExists(QString s)
     }
     
     // Try bracket property existence pattern: @['property'] or @["property"]
-    if (auto m = ctre::match<brkExistsPat>(to_sv(s))) {
+    if (auto m = ctre::match<brkExistsPat>(to_sv(localS))) {
         const QString prop = to_qstr(m.template get<1>().to_view());
         Token token;
         token.kind = Token::Kind::Filter;
-        token.key = s;
+        token.key = localS;
         
         token.embedFilter([prop](const QJsonValue& j) {
             // Bracket property existence: @['property'] - true if object contains property
@@ -1305,7 +1307,7 @@ std::optional<Token> parseEmbeddedExists(QString s)
     }
     
     // Try index existence pattern: @[index]
-    if (auto m = ctre::match<idxExistsPat>(to_sv(s))) {
+    if (auto m = ctre::match<idxExistsPat>(to_sv(localS))) {
         const QString indexStr = to_qstr(m.template get<1>().to_view());
         bool ok;
         const int index = indexStr.toInt(&ok);
@@ -1313,7 +1315,7 @@ std::optional<Token> parseEmbeddedExists(QString s)
         
         Token token;
         token.kind = Token::Kind::Filter;
-        token.key = s;
+        token.key = localS;
         
         token.embedFilter([index](const QJsonValue& j) {
             // Index existence: @[index] - true if array has element at index
@@ -1333,13 +1335,13 @@ std::optional<Token> parseEmbeddedExists(QString s)
     return std::nullopt;
 }
 
-std::optional<Token> parseEmbeddedSelfCmp(QString s)
+std::optional<Token> parseEmbeddedSelfCmp(const QString& s)
 {
     constexpr auto selfPat = ctll::fixed_string{R"(^@\s*(==|!=|>=|<=|>|<)\s*(.+)$)"};
     return parseEmbeddedSelfValue<selfPat>(s);
 }
 
-std::optional<Token> parseEmbeddedNot(QString s)
+std::optional<Token> parseEmbeddedNot(const QString& s)
 {
     // Check if the expression starts with '!' (negation)
     if (s.startsWith('!')) {
@@ -1368,7 +1370,7 @@ std::optional<Token> parseEmbeddedNot(QString s)
     return std::nullopt;
 }
 
-std::optional<Token> parseEmbeddedFunction(QString s)
+std::optional<Token> parseEmbeddedFunction(const QString& s)
 {
     // Pattern for function call comparisons: func(...) op value or value op func(...)
     constexpr auto funcCompPat = ctll::fixed_string{R"(^(.*?)\s*(==|!=|<|>|<=|>=)\s*(.*?)$)"};

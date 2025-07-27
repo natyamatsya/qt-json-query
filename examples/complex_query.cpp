@@ -24,7 +24,7 @@ int main(int argc, char **argv)
     QJsonDocument doc(store);
 
     // ─── helper: always give me an array ───────────────────────────────────────
-    auto toArray = [](QJsonValue v) -> QJsonArray {
+    auto toArray = [](const QJsonValue& v) -> QJsonArray {
         if (v.isArray())            return v.toArray();
         if (!v.isUndefined())       return QJsonArray{ v };
         return {};

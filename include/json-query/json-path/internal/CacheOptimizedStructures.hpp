@@ -13,6 +13,7 @@
 #include <cstddef>
 #include <array>
 #include <QJsonValue>
+#include <QJsonArray>
 #include <QStringView>
 #include "json-query/json-path/JSONPathEvalError.hpp"
 
@@ -34,6 +35,8 @@ struct alignas(32) CacheOptimizedStackFrame {
     // Total: 16 bytes + QJsonValue overhead, aligned to 32 bytes
     
     CacheOptimizedStackFrame() = default;
+    explicit CacheOptimizedStackFrame(QJsonValue&& val, bool proc = false, uint32_t d = 0, uint32_t f = 0)
+        : value(std::move(val)), processed(proc), depth(d), flags(f) {}
     explicit CacheOptimizedStackFrame(const QJsonValue& val, bool proc = false, uint32_t d = 0, uint32_t f = 0)
         : value(val), processed(proc), depth(d), flags(f) {}
 };
@@ -135,6 +138,12 @@ public:
     void push(const QJsonValue& value, uint32_t depth = 0, uint32_t flags = 0) {
         auto* frame = pool_.allocate();
         *frame = CacheOptimizedStackFrame(value, false, depth, flags);
+        frames_.push_back(frame);
+    }
+    
+    void push(QJsonValue&& value, uint32_t depth = 0, uint32_t flags = 0) {
+        auto* frame = pool_.allocate();
+        *frame = CacheOptimizedStackFrame(std::move(value), false, depth, flags);
         frames_.push_back(frame);
     }
     
@@ -315,8 +324,5 @@ public:
     
     size_t size() const { return cache_.size(); }
 };
-
-// Thread-local pool definition
-thread_local StackFramePool CacheOptimizedStack::pool_;
 
 } // namespace json_query::json_path::detail

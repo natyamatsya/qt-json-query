@@ -23,7 +23,7 @@ int main(int argc, char **argv)
     QJsonDocument doc(store);
 
     // Small utility: whatever comes back, give me a QJsonArray
-    const auto toArray = [](QJsonValue v) -> QJsonArray {
+    const auto toArray = [](const QJsonValue& v) -> QJsonArray {
         if (v.isArray())            return v.toArray();
         if (!v.isUndefined())       return QJsonArray{ v };
         return {};

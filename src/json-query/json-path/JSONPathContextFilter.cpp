@@ -120,7 +120,7 @@ QJsonValue evaluateContextFunction(const QString& funcExpr, const QJsonValue& co
 }
 
 // Parse context-aware function calls like length(@.a) == value($..c)
-std::optional<Token> parseAbsolutePathContext(QString s, std::vector<ContextFilterFn>& out)
+std::optional<Token> parseAbsolutePathContext(const QString& s, std::vector<ContextFilterFn>& out)
 {
     qCDebug(jsonPathLog) << "parseAbsolutePathContext called with:" << s;
     

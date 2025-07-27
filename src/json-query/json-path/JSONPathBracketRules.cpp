@@ -16,7 +16,7 @@ namespace json_query::json_path::detail
 //  BracketSink Implementation
 // ──────────────────────────────────────────────────────────────────────
 
-std::expected<void, Error> BracketSink::key(QString key, bool allow)
+std::expected<void, Error> BracketSink::key(const QString& key, bool allow)
 {
     // Create token with bracket group ID
     if (!allow && key.contains(u' '))
@@ -79,7 +79,7 @@ void BracketSink::pushFilter(const Token& t)
 //  EmbeddedBracketSink Implementation (Zero-Overhead)
 // ──────────────────────────────────────────────────────────────────────
 
-std::expected<void, Error> EmbeddedBracketSink::key(QString key, bool allow)
+std::expected<void, Error> EmbeddedBracketSink::key(const QString& key, bool allow)
 {
     // Create token with bracket group ID (same logic as legacy BracketSink)
     if (!allow && key.contains(u' '))

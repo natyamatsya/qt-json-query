@@ -21,6 +21,7 @@ set(JSON_QUERY_SOURCES
     json-path/JSONPathTokenEvaluators.cpp
     json-path/JSONPathPointerConversion.cpp
     json-path/internal/IterativeRecursiveDescent.cpp
+    json-path/internal/CacheOptimizedStructures.cpp
     json-path/JSONPathEvaluate.cpp
     json-path/JSONPathEvalHelpers.cpp
     json-path/JSONPathTokenDispatch.cpp

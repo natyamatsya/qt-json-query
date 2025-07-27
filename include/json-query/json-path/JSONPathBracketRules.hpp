@@ -40,7 +40,7 @@ namespace json_query::json_path
                 : tk(tokens), kb(keyBuilder), contextFilters(ctxFilters), filters(filterFns), currentBracketGroupId(bracketGroupId) {}
 
             // Token emission methods
-            std::expected<void, Error> key(QString key, bool allow = false);
+            std::expected<void, Error> key(const QString& key, bool allow = false);
             void keyList(const std::vector<QString>& keys);
             void wild();
             void slice(const Slice& s);
@@ -58,7 +58,7 @@ namespace json_query::json_path
                 : tk(tokens), kb(keyBuilder), currentBracketGroupId(bracketGroupId) {}
 
             // Token emission methods
-            std::expected<void, Error> key(QString key, bool allow = false);
+            std::expected<void, Error> key(const QString& key, bool allow = false);
             void keyList(const std::vector<QString>& keys);
             void wild();
             void slice(const Slice& s);

@@ -31,10 +31,10 @@ namespace json_query::json_path::detail {
     // ---------------------------------------------------------------------
     //  Individual rule parsers
     // ---------------------------------------------------------------------
-    [[nodiscard]] std::optional<Token> parseOr      (QString expr, std::vector<FilterFn>& out);
-    [[nodiscard]] std::optional<Token> parseAnd     (QString expr, std::vector<FilterFn>& out);
-    [[nodiscard]] std::optional<Token> parseIn      (QString expr, std::vector<FilterFn>& out);
-    [[nodiscard]] std::optional<Token> parseCompare (QString expr, std::vector<FilterFn>& out);
-    [[nodiscard]] std::optional<Token> parseRegex   (QString expr, std::vector<FilterFn>& out);
+    [[nodiscard]] std::optional<Token> parseOr      (const QString& expr, std::vector<FilterFn>& out);
+    [[nodiscard]] std::optional<Token> parseAnd     (const QString& expr, std::vector<FilterFn>& out);
+    [[nodiscard]] std::optional<Token> parseIn      (const QString& expr, std::vector<FilterFn>& out);
+    [[nodiscard]] std::optional<Token> parseCompare (const QString& expr, std::vector<FilterFn>& out);
+    [[nodiscard]] std::optional<Token> parseRegex   (const QString& expr, std::vector<FilterFn>& out);
 
 } // namespace json_query::json_path::detail

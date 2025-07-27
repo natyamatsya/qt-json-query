@@ -125,7 +125,8 @@ public:
             size_t depth;
             bool processed = false;
             
-            CacheOptimizedDepthFrame(QJsonValue v, size_t d) : value(std::move(v)), depth(d) {}
+            CacheOptimizedDepthFrame(const QJsonValue& v, size_t d) : value(v), depth(d) {}
+            CacheOptimizedDepthFrame(QJsonValue&& v, size_t d) : value(std::move(v)), depth(d) {}
         };
         
         // Use cache-conscious stack allocation

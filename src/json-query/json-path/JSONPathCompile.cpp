@@ -295,15 +295,15 @@ std::expected<json_query::json_path::CompilationResult, json_query::json_path::E
 
 // Forward declarations for embedded filter functions
 namespace detail {
-    std::optional<Token> parseEmbeddedOr(QString s);
-    std::optional<Token> parseEmbeddedAnd(QString s);
-    std::optional<Token> parseEmbeddedNot(QString s);
-    std::optional<Token> parseEmbeddedIn(QString s);
-    std::optional<Token> parseEmbeddedExists(QString s);
-    std::optional<Token> parseEmbeddedSelfCmp(QString s);
-    std::optional<Token> parseEmbeddedFunction(QString s);
-    std::optional<Token> parseEmbeddedCompare(QString s);
-    std::optional<Token> parseEmbeddedRegex(QString s);
+    std::optional<Token> parseEmbeddedOr(const QString& s);
+    std::optional<Token> parseEmbeddedAnd(const QString& s);
+    std::optional<Token> parseEmbeddedNot(const QString& s);
+    std::optional<Token> parseEmbeddedIn(const QString& s);
+    std::optional<Token> parseEmbeddedExists(const QString& s);
+    std::optional<Token> parseEmbeddedSelfCmp(const QString& s);
+    std::optional<Token> parseEmbeddedFunction(const QString& s);
+    std::optional<Token> parseEmbeddedCompare(const QString& s);
+    std::optional<Token> parseEmbeddedRegex(const QString& s);
 }
 
 std::optional<Token> compileEmbeddedFilter(const QString& expr)
