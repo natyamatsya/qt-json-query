@@ -15,8 +15,8 @@ using json_query::json_path::Token;
 {
     if (value.isEmpty()) return false;
     
-    auto pos = 0;
-    const auto len = value.length();
+    auto pos{0};
+    const auto len{value.length()};
     
     // Handle optional minus sign
     if (pos < len && value[pos] == '-') {
@@ -108,7 +108,7 @@ bool unquote(QString& s)
                         // Unicode escape sequence \uXXXX
                         if (i + 5 < s.length()) {
                             bool ok;
-                            const auto hex = s.mid(i + 2, 4);
+                            const auto hex{s.mid(i + 2, 4)};
                             const ushort code = hex.toUShort(&ok, 16);
                             if (ok) {
                                 result += QChar(code);
@@ -140,7 +140,7 @@ bool unquote(QString& s)
 Token Builder::add(FilterFn fn, QString key)
 {
     fns.push_back(std::move(fn));
-    const auto id = fns.size() - 1;
+    const auto id{fns.size() - 1};
     
     // Create token with proper field initialization
     Token token;

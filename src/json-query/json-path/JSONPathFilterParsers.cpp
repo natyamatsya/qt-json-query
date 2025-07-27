@@ -223,17 +223,17 @@ struct ExistenceTokenFactory<ExistenceFilterType::MultiSelector> {
                 return b.add([selectorsStr](const QJsonValue& j) -> bool {
                     QStringList selectors = selectorsStr.split(',');
                     for (const QString& selectorRaw : selectors) {
-                        auto selector = selectorRaw.trimmed();
+                        auto selector{selectorRaw.trimmed()};
                         
                         if ((selector.startsWith('"') && selector.endsWith('"')) ||
                             (selector.startsWith('\'') && selector.endsWith('\''))) {
-                            auto key = selector.mid(1, selector.size()-2);
+                            auto key{selector.mid(1, selector.size()-2)};
                             if (j.isObject() && j.toObject().contains(key)) {
                                 return true;
                             }
                         } else {
                             bool ok;
-                            auto index = selector.toInt(&ok);
+                            auto index{selector.toInt(&ok)};
                             if (ok && j.isArray()) {
                                 const auto arr{j.toArray()};
                                 if (index >= 0 && index < arr.size()) {
@@ -260,17 +260,17 @@ struct ExistenceTokenFactory<ExistenceFilterType::NegMultiSelector> {
                 return b.add([selectorsStr](const QJsonValue& j) -> bool {
                     QStringList selectors = selectorsStr.split(',');
                     for (const QString& selectorRaw : selectors) {
-                        auto selector = selectorRaw.trimmed();
+                        auto selector{selectorRaw.trimmed()};
                         
                         if ((selector.startsWith('"') && selector.endsWith('"')) ||
                             (selector.startsWith('\'') && selector.endsWith('\''))) {
-                            auto key = selector.mid(1, selector.size()-2);
+                            auto key{selector.mid(1, selector.size()-2)};
                             if (j.isObject() && j.toObject().contains(key)) {
                                 return false; // Found one, so negation is false
                             }
                         } else {
                             bool ok;
-                            auto index = selector.toInt(&ok);
+                            auto index{selector.toInt(&ok)};
                             if (ok && j.isArray()) {
                                 const auto arr{j.toArray()};
                                 if (index >= 0 && index < arr.size()) {
@@ -440,8 +440,8 @@ std::optional<json_query::json_path::Token> parseNot(const QString& s, std::vect
             Builder b{out};
             return b.add([innerFilters, innerExpr](const QJsonValue& j) -> bool {
                 if (!innerFilters.empty()) {
-                    auto innerResult = innerFilters[0](j);
-                    auto negatedResult = !innerResult;
+                    auto innerResult{innerFilters[0](j)};
+                    auto negatedResult{!innerResult};
                     return negatedResult;
                 }
                 return false;
@@ -449,14 +449,14 @@ std::optional<json_query::json_path::Token> parseNot(const QString& s, std::vect
         }
     }
     if (s.startsWith('!') && s.length() > 1) {
-        auto innerExpr = s.mid(1).trimmed();
+        auto innerExpr{s.mid(1).trimmed()};
         std::vector<json_query::json_path::FilterFn> innerFilters;
         if (auto innerToken = json_query::json_path::compileFilter(innerExpr, innerFilters)) {
             Builder b{out};
             return b.add([innerFilters, innerExpr](const QJsonValue& j) -> bool {
                 if (!innerFilters.empty()) {
-                    auto innerResult = innerFilters[0](j);
-                    auto negatedResult = !innerResult;
+                    auto innerResult{innerFilters[0](j)};
+                    auto negatedResult{!innerResult};
                     return negatedResult;
                 }
                 return false;

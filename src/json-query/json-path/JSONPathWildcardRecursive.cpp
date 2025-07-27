@@ -54,7 +54,7 @@ struct RecursivePatternDetector {
     static QStringView detectEarlyTerminationPattern(QStringView pathExpression) {
         // Look for patterns like "$..fieldname" 
         if (pathExpression.startsWith(u"$..") && pathExpression.size() > 3) {
-            auto fieldName = pathExpression.mid(3);
+            auto fieldName{pathExpression.mid(3)};
             
             // Check if it's a simple field access (no additional operators)
             if (!fieldName.contains(u'[') && !fieldName.contains(u'.') && 
@@ -76,11 +76,11 @@ struct RecursivePatternDetector {
      */
     static size_t estimateDocumentComplexity(const QJsonValue& value) {
         if (value.isObject()) {
-            const auto obj = value.toObject();
-            auto complexity = obj.size();
+            const auto obj{value.toObject()};
+            auto complexity{obj.size()};
             
             // Sample a few values to estimate nesting
-            auto samples = 0;
+            auto samples{0};
             for (auto it = obj.begin(); it != obj.end() && samples < 3; ++it, ++samples) {
                 if (it.value().isObject() || it.value().isArray()) {
                     complexity += estimateDocumentComplexity(it.value()) / 2;
@@ -88,8 +88,8 @@ struct RecursivePatternDetector {
             }
             return complexity;
         } else if (value.isArray()) {
-            const auto arr = value.toArray();
-            auto complexity = arr.size();
+            const auto arr{value.toArray()};
+            auto complexity{arr.size()};
             
             // Sample first few elements
             for (qsizetype i = 0; i < std::min(arr.size(), qsizetype(3)); ++i) {
@@ -134,7 +134,7 @@ static std::expected<QJsonArray, EvalError> evaluateRecursiveDirectFastPath(
         
         void operator()(const QJsonValue& value) const {
             if (value.isObject()) {
-                const auto obj = value.toObject();
+                const auto obj{value.toObject()};
                 
                 // Direct key lookup - fastest possible path
                 if (auto it = obj.find(QString(targetField)); it != obj.end()) {
@@ -150,7 +150,7 @@ static std::expected<QJsonArray, EvalError> evaluateRecursiveDirectFastPath(
                 }
             }
             else if (value.isArray()) {
-                const auto arr = value.toArray();
+                const auto arr{value.toArray()};
                 for (const QJsonValue& element : arr) {
                     if (element.isObject() || element.isArray()) {
                         (*this)(element);  // Direct recursive call

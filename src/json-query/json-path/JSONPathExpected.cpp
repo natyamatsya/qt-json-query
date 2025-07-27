@@ -8,9 +8,9 @@ evaluateDefinite(const std::vector<Token>& tokens, const QJsonValue& root) noexc
 {
     using enum Token::Kind;
 
-    auto cur = root;
+    auto cur{root};
     // Skip leading root token ('$' or '@') if present
-    auto startIdx = 0;
+    auto startIdx{0};
     if (!tokens.empty() && tokens.front().kind == Token::Kind::Key) {
         const auto& k = tokens.front().key;
         if (k == u"$" || k == u"@") {

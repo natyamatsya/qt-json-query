@@ -146,8 +146,8 @@ namespace matchers {
 bool matchesUnionComma(QStringView content)
 {
     // Only match if there are top-level commas (not inside parentheses or brackets)
-    auto parenDepth = 0;
-    auto bracketDepth = 0;
+    auto parenDepth{0};
+    auto bracketDepth{0};
     
     for (qsizetype i = 0; i < content.size(); ++i) {
         const QChar c = content[i];
@@ -199,7 +199,7 @@ bool matchesFilterWithoutParens(QStringView content)
 
 bool matchesPlaceholder(QStringView content)
 {
-    auto trimmed = content.trimmed();
+    auto trimmed{content.trimmed()};
     if (trimmed == u"?") return true;
     
     // Check for multiple placeholders separated by commas
@@ -212,7 +212,7 @@ bool matchesPlaceholder(QStringView content)
 
 bool matchesQuotedKey(QStringView content)
 {
-    auto trimmed = content.trimmed();
+    auto trimmed{content.trimmed()};
     return (trimmed.startsWith(u'\'') && trimmed.endsWith(u'\'')) ||
            (trimmed.startsWith(u'"') && trimmed.endsWith(u'"'));
 }
@@ -239,7 +239,7 @@ std::expected<void, Error> handleWildcard(QStringView /*content*/, BracketSink& 
 
 std::expected<void, Error> handleSingleIndex(QStringView content, BracketSink& out)
 {
-    auto trimmed = content.trimmed();
+    auto trimmed{content.trimmed()};
     qCDebug(jsonPathLog) << "BR_RULE index-single check" << trimmed.toString();
     
     if (!isValidIndexLiteral(trimmed)) {
@@ -247,7 +247,7 @@ std::expected<void, Error> handleSingleIndex(QStringView content, BracketSink& o
         return std::unexpected(Error::InvalidSlice);
     }
     
-    auto ok = false;
+    auto ok{false};
     qlonglong val = trimmed.toLongLong(&ok);
     if (!ok) {
         qCDebug(jsonPathLog) << "handleSingleIndex: failed to parse" << trimmed;
@@ -269,14 +269,14 @@ std::expected<void, Error> handleIndexList(QStringView content, BracketSink& out
     
     const auto parts{content.split(u',')};
     for (QStringView p : parts) {
-        auto t = p.trimmed();
+        auto t{p.trimmed()};
         
         if (!isValidIndexLiteral(t)) {
             qCDebug(jsonPathLog) << "handleIndexList: invalid index literal" << t;
             return std::unexpected(Error::InvalidSlice);
         }
         
-        auto ok = false;
+        auto ok{false};
         qlonglong val = t.toLongLong(&ok);
         if (!ok) return std::unexpected(Error::InvalidSlice);
         
@@ -302,9 +302,9 @@ std::expected<void, Error> handleSlice(QStringView content, BracketSink& out)
 
 std::expected<void, Error> handleFilterWithParens(QStringView content, BracketSink& out)
 {
-    auto trimmed = content.trimmed();
+    auto trimmed{content.trimmed()};
     // Extract the full expression after the '?' prefix
-    QString expr = trimmed.mid(1).toString(); // Remove '?' prefix
+    QString expr{trimmed.mid(1).toString()}; // Remove '?' prefix
     
     qCDebug(jsonPathLog) << "handleFilterWithParens: processing expression" << expr;
     
@@ -326,9 +326,9 @@ std::expected<void, Error> handleFilterWithParens(QStringView content, BracketSi
 
 std::expected<void, Error> handleFilterWithoutParens(QStringView content, BracketSink& out)
 {
-    auto trimmed = content.trimmed();
+    auto trimmed{content.trimmed()};
     // Extract the full expression after the '?' prefix
-    QString expr = trimmed.mid(1).toString(); // Remove '?' prefix
+    QString expr{trimmed.mid(1).toString()}; // Remove '?' prefix
     
     qCDebug(jsonPathLog) << "handleFilterWithoutParens: processing expression" << expr;
     
@@ -350,7 +350,7 @@ std::expected<void, Error> handleFilterWithoutParens(QStringView content, Bracke
 
 std::expected<void, Error> handlePlaceholder(QStringView content, BracketSink& out)
 {
-    auto trimmed = content.trimmed();
+    auto trimmed{content.trimmed()};
     
     if (trimmed == u"?") {
         // Single placeholder - create a filter that always returns true
@@ -382,14 +382,14 @@ std::expected<void, Error> handlePlaceholder(QStringView content, BracketSink& o
 
 std::expected<void, Error> handleQuotedKey(QStringView content, BracketSink& out)
 {
-    auto trimmed = content.trimmed();
+    auto trimmed{content.trimmed()};
     
     if (trimmed.size() < 2) {
         return std::unexpected(Error::InvalidSlice);
     }
     
     QChar quote = trimmed.front();
-    auto keyContent = trimmed.mid(1, trimmed.size() - 2);
+    auto keyContent{trimmed.mid(1, trimmed.size() - 2)};
     
     QuoteStyle style = (quote == u'\'') ? QuoteStyle::Single : QuoteStyle::Double;
     if (!isValidQuotedKey(keyContent, style)) {
@@ -451,14 +451,14 @@ std::expected<void, Error> handleWildcard(QStringView /*content*/, EmbeddedBrack
 
 std::expected<void, Error> handleSingleIndex(QStringView content, EmbeddedBracketSink& out)
 {
-    auto trimmed = content.trimmed();
+    auto trimmed{content.trimmed()};
     
     if (!isValidIndexLiteral(trimmed.toString())) {
         qCDebug(jsonPathLog) << "handleSingleIndex: invalid index literal" << trimmed;
         return std::unexpected(Error::InvalidIndex);
     }
     
-    auto ok = false;
+    auto ok{false};
     // Use toLongLong to handle large integers like ±9007199254740991 (JavaScript MIN/MAX_SAFE_INTEGER)
     qint64 index = trimmed.toString().toLongLong(&ok);
     if (!ok) {
@@ -479,17 +479,17 @@ std::expected<void, Error> handleSingleIndex(QStringView content, EmbeddedBracke
 
 std::expected<void, Error> handleIndexList(QStringView content, EmbeddedBracketSink& out)
 {
-    auto trimmed = content.trimmed();
+    auto trimmed{content.trimmed()};
     const auto parts{trimmed.split(u',')};
     
     for (const auto& part : parts) {
-        auto indexStr = part.trimmed();
+        auto indexStr{part.trimmed()};
         if (!isValidIndexLiteral(indexStr.toString())) {
             return std::unexpected(Error::InvalidIndex);
         }
         
-        auto ok = false;
-        auto index = indexStr.toString().toInt(&ok);
+        auto ok{false};
+        auto index{indexStr.toString().toInt(&ok)};
         if (!ok) {
             return std::unexpected(Error::InvalidIndex);
         }
@@ -511,9 +511,9 @@ std::expected<void, Error> handleSlice(QStringView content, EmbeddedBracketSink&
 
 std::expected<void, Error> handleFilterWithParens(QStringView content, EmbeddedBracketSink& out)
 {
-    auto trimmed = content.trimmed();
+    auto trimmed{content.trimmed()};
     // Extract the full expression after the '?' prefix
-    QString expr = trimmed.mid(1).toString(); // Remove '?' prefix
+    QString expr{trimmed.mid(1).toString()}; // Remove '?' prefix
     
     qCDebug(jsonPathLog) << "handleFilterWithParens: processing expression" << expr;
     
@@ -529,9 +529,9 @@ std::expected<void, Error> handleFilterWithParens(QStringView content, EmbeddedB
 
 std::expected<void, Error> handleFilterWithoutParens(QStringView content, EmbeddedBracketSink& out)
 {
-    auto trimmed = content.trimmed();
+    auto trimmed{content.trimmed()};
     // Extract the full expression after the '?' prefix
-    QString expr = trimmed.mid(1).toString(); // Remove '?' prefix
+    QString expr{trimmed.mid(1).toString()}; // Remove '?' prefix
     
     qCDebug(jsonPathLog) << "handleFilterWithoutParens: processing expression" << expr;
     
@@ -547,7 +547,7 @@ std::expected<void, Error> handleFilterWithoutParens(QStringView content, Embedd
 
 std::expected<void, Error> handlePlaceholder(QStringView content, EmbeddedBracketSink& out)
 {
-    auto trimmed = content.trimmed();
+    auto trimmed{content.trimmed()};
     
     if (trimmed == u"?") {
         // Single placeholder - create an embedded filter that always returns true
@@ -579,14 +579,14 @@ std::expected<void, Error> handlePlaceholder(QStringView content, EmbeddedBracke
 
 std::expected<void, Error> handleQuotedKey(QStringView content, EmbeddedBracketSink& out)
 {
-    auto trimmed = content.trimmed();
+    auto trimmed{content.trimmed()};
     
     if (trimmed.size() < 2) {
         return std::unexpected(Error::InvalidSlice);
     }
     
     QChar quote = trimmed.front();
-    auto keyContent = trimmed.mid(1, trimmed.size() - 2);
+    auto keyContent{trimmed.mid(1, trimmed.size() - 2)};
     
     QuoteStyle style = (quote == u'\'') ? QuoteStyle::Single : QuoteStyle::Double;
     if (!isValidQuotedKey(keyContent, style)) {

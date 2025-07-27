@@ -138,12 +138,12 @@ struct SliceProcessingStrategy<SliceProcessingType::ForwardSlice> {
         auto pooledArray{acquirePooledArray()};
         auto& out = *pooledArray;
 
-        const auto len = array.size();
+        const auto len{array.size()};
         constexpr qsizetype SENTINEL = std::numeric_limits<qsizetype>::max();
 
-        qsizetype start = s.start;
-        qsizetype stop = s.end;
-        qsizetype step = s.step;
+        qsizetype start{s.start};
+        qsizetype stop{s.end};
+        qsizetype step{s.step};
 
         // Default translation for forward iteration
         if (start == SENTINEL) start = 0;
@@ -180,12 +180,12 @@ struct SliceProcessingStrategy<SliceProcessingType::BackwardSlice> {
         auto pooledArray{acquirePooledArray()};
         auto& out = *pooledArray;
 
-        const auto len = array.size();
+        const auto len{array.size()};
         constexpr qsizetype SENTINEL = std::numeric_limits<qsizetype>::max();
 
-        qsizetype start = s.start;
-        qsizetype stop = s.end;
-        qsizetype step = s.step;
+        qsizetype start{s.start};
+        qsizetype stop{s.end};
+        qsizetype step{s.step};
 
         // Default translation for backward iteration
         if (start == SENTINEL) start = len - 1;
@@ -415,7 +415,7 @@ struct UnionProcessingStrategy<UnionProcessingType::SingleToken> {
         
         qCDebug(jsonPathLog) << "[UnionProcessing::SingleToken] Processing single token optimization";
         
-        qsizetype tokenIdx = unionTokens[0];
+        qsizetype tokenIdx{unionTokens[0]};
         auto tokenResult{processSingleUnionToken(ctx, tokenIdx, working, root)};
         
         if (tokenResult.success) {
@@ -583,7 +583,7 @@ std::vector<qsizetype> collectConsecutiveSelectorTokens(const PathEvalCtx& ctx, 
     std::vector<qsizetype> unionTokens;
     unionTokens.push_back(startIndex);
     
-    auto j = startIndex + 1;
+    auto j{startIndex + 1};
     while (j < ctx.tokens.size()) {
         const auto& nextTk = ctx.tokens[j];
         if (isSelectorToken(nextTk)) {
@@ -601,7 +601,7 @@ std::vector<qsizetype> collectConsecutiveSelectorTokens(const PathEvalCtx& ctx, 
 bool areTokensFromSameBracketGroup(const PathEvalCtx& ctx, const std::vector<qsizetype>& tokenIndices) {
     if (tokenIndices.size() <= 1) return false;
     
-    auto firstBracketGroupId = ctx.tokens[tokenIndices[0]].bracketGroupId;
+    auto firstBracketGroupId{ctx.tokens[tokenIndices[0]].bracketGroupId};
     
     // If first token is not from a bracket, this can't be a bracket union
     if (firstBracketGroupId <= 0) {
@@ -621,7 +621,7 @@ bool areTokensFromSameBracketGroup(const PathEvalCtx& ctx, const std::vector<qsi
 UnionDetectionResult detectUnionTokens(const PathEvalCtx& ctx, qsizetype startIndex) {
     auto unionTokens = collectConsecutiveSelectorTokens(ctx, startIndex);
     auto shouldUseUnion = areTokensFromSameBracketGroup(ctx, unionTokens);
-    auto nextIndex = startIndex + unionTokens.size();
+    auto nextIndex{startIndex + unionTokens.size()};
     
     return {unionTokens, shouldUseUnion, static_cast<qsizetype>(nextIndex)};
 }
@@ -780,7 +780,7 @@ std::expected<QJsonArray, EvalError> processBranchUniqueSelection(
     for (const auto& workingValue : working) {
         if (!workingValue.isObject()) continue;
         
-        const auto obj = workingValue.toObject();
+        const auto obj{workingValue.toObject()};
         
         if (isLeaf) {
             processObjectForLeafSelection(obj, keys, workingValue, &results);
@@ -829,10 +829,10 @@ QJsonValue applyTrailing(json_path::FunctionType fn, const QJsonValue& v)
         if (!v.isArray()) return {QJsonValue::Undefined};
         {
             const auto arr{v.toArray()};
-            bool first=true; double best=0.0;
+            bool first{true}; double best=0.0;
             for (const auto& e : arr) {
                 if (!e.isDouble()) continue;
-                const auto d = e.toDouble();
+                const auto d{e.toDouble()};
                 if (first || (fn==Min ? d<best : d>best))
                     best = d, first = false;
             }
@@ -846,7 +846,7 @@ QJsonValue applyTrailing(json_path::FunctionType fn, const QJsonValue& v)
 // Helper: Collect keys from consecutive Key/KeyList tokens
 KeyCollectionResult collectKeysFromTokens(const PathEvalCtx& ctx, qsizetype startIndex) {
     std::vector<QString> keys;
-    auto i = startIndex;
+    auto i{startIndex};
     
     while (i < ctx.tokens.size()) {
         const auto& token = ctx.tokens[i];

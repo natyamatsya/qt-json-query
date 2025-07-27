@@ -16,7 +16,7 @@ namespace json_query::json_path::detail
 std::expected<qsizetype, Error> parseDot(qsizetype pos, QStringView sv, KeyBuilder& kb, std::vector<Token>& tokens)
 {
     qCDebug(jsonPathLog) << "parseDot pos=" << pos;
-    const auto n = sv.size();
+    const auto n{sv.size()};
     if (++pos >= n) return std::unexpected(Error::TrailingDot);
 
     QChar nxt = sv[pos];
@@ -32,13 +32,13 @@ std::expected<qsizetype, Error> parseDot(qsizetype pos, QStringView sv, KeyBuild
         tokens.emplace_back(Token{Token::Kind::Wildcard }); 
         return pos + 1; 
     }
-    auto start = pos;
+    auto start{pos};
     while (pos < n && sv[pos] != u'.' && sv[pos] != u'[') ++pos;
     
     // RFC 9535 validation: member-name-shorthand must follow ABNF grammar
     // name-first = ALPHA / "_" / Unicode, not DIGIT
     // name-char = name-first / DIGIT
-    auto identifier = sv.sliced(start, pos - start);
+    auto identifier{sv.sliced(start, pos - start)};
     
     // Check first character: must be ALPHA, underscore, or Unicode (not digit)
     QChar first = identifier[0];
@@ -71,11 +71,11 @@ std::expected<qsizetype, Error> parseDot(qsizetype pos, QStringView sv, KeyBuild
 
 std::expected<qsizetype, Error> parseBare(qsizetype pos, QStringView sv, KeyBuilder& kb, std::vector<Token>& tokens)
 {
-    auto start = pos;
+    auto start{pos};
     while (pos < sv.size() && sv[pos] != u'.' && sv[pos] != u'[') ++pos;
     if (pos == start) return std::unexpected(Error::EmptySegment);
     
-    auto identifier = sv.sliced(start, pos - start);
+    auto identifier{sv.sliced(start, pos - start)};
     
     // Special case: if the identifier is exactly '*', create a Wildcard token
     if (identifier == u"*") {
@@ -106,11 +106,11 @@ std::expected<qsizetype, Error> parseBracket(qsizetype pos, QStringView sv,
     }
 
     // Find matching closing bracket, handling nested brackets and quotes
-    auto level = 0;
-    auto end = pos;
-    auto inSingleQuote = false;
-    auto inDoubleQuote = false;
-    auto escaped = false;
+    auto level{0};
+    auto end{pos};
+    auto inSingleQuote{false};
+    auto inDoubleQuote{false};
+    auto escaped{false};
 
     for (qsizetype i = pos; i < sv.size(); ++i) {
         QChar c = sv[i];
@@ -152,12 +152,12 @@ std::expected<qsizetype, Error> parseBracket(qsizetype pos, QStringView sv,
     }
 
     // Extract content between brackets
-    auto content = sv.mid(pos + 1, end - pos - 1);
+    auto content{sv.mid(pos + 1, end - pos - 1)};
     qCDebug(jsonPathLog) << "parseBracket: content=" << content.toString();
 
     // Generate unique bracket group ID for union tracking
     static int nextBracketGroupId = 1;
-    auto currentBracketGroupId = nextBracketGroupId++;
+    auto currentBracketGroupId{nextBracketGroupId++};
 
     // Create BracketSink for token emission
     BracketSink sink(tokens, kb, contextFilters, filters, currentBracketGroupId);
@@ -189,11 +189,11 @@ std::expected<qsizetype, Error> parseEmbeddedBracket(qsizetype pos, QStringView 
     }
 
     // Find matching closing bracket, handling nested brackets and quotes
-    auto level = 0;
-    auto end = pos;
-    auto inSingleQuote = false;
-    auto inDoubleQuote = false;
-    auto escaped = false;
+    auto level{0};
+    auto end{pos};
+    auto inSingleQuote{false};
+    auto inDoubleQuote{false};
+    auto escaped{false};
 
     for (qsizetype i = pos; i < sv.size(); ++i) {
         QChar c = sv[i];
@@ -235,12 +235,12 @@ std::expected<qsizetype, Error> parseEmbeddedBracket(qsizetype pos, QStringView 
     }
 
     // Extract content between brackets
-    auto content = sv.mid(pos + 1, end - pos - 1);
+    auto content{sv.mid(pos + 1, end - pos - 1)};
     qCDebug(jsonPathLog) << "parseEmbeddedBracket: content=" << content.toString();
 
     // Generate unique bracket group ID for union tracking
     static int nextBracketGroupId = 1;
-    auto currentBracketGroupId = nextBracketGroupId++;
+    auto currentBracketGroupId{nextBracketGroupId++};
 
     // Create EmbeddedBracketSink for token emission (zero-overhead)
     EmbeddedBracketSink sink(tokens, kb, currentBracketGroupId);

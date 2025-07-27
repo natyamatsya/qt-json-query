@@ -18,7 +18,7 @@ bool compareValue<ComparisonType::Numeric>(const QJsonValue& v, const QString& o
         if (op == "!=") return true;
         return false;
     }
-    const auto val = v.toDouble();
+    const auto val{v.toDouble()};
     
     if (op == "==") return qFuzzyCompare(val, numVal);
     if (op == "!=") return !qFuzzyCompare(val, numVal);
@@ -38,7 +38,7 @@ bool compareValue<ComparisonType::Boolean>(const QJsonValue& v, const QString& o
         if (op == "!=") return true;
         return false;
     }
-    const auto val = v.toBool();
+    const auto val{v.toBool()};
     
     if (op == "==") return val == boolVal;
     if (op == "!=") return val != boolVal;
@@ -76,7 +76,7 @@ bool compareValue<ComparisonType::String>(const QJsonValue& v, const QString& op
         if (op == "!=") return true;
         return false;
     }
-    const auto val = v.toString();
+    const auto val{v.toString()};
     
     if (op == "==") return val == rhs;
     if (op == "!=") return val != rhs;
@@ -125,11 +125,11 @@ bool ComparisonContext::compare(const QJsonValue& v) const
 [[nodiscard]] std::optional<ComparisonContext> parseRhsValue(const QString& op, QString rhs)
 {
     const auto isNum = isValidJsonNumber(rhs);
-    const auto isBool = (rhs == "true" || rhs == "false");
-    const auto isNull = (rhs == "null");
+    const auto isBool{(rhs == "true" || rhs == "false")};
+    const auto isNull{(rhs == "null")};
     
     // Check if RHS is quoted (for string vs deep equality distinction)
-    auto rhsQuoted = false;
+    auto rhsQuoted{false};
     if ((rhs.startsWith('"') && rhs.endsWith('"')) || 
         (rhs.startsWith('\'') && rhs.endsWith('\''))) {
         rhsQuoted = true;
@@ -152,7 +152,7 @@ bool ComparisonContext::compare(const QJsonValue& v) const
     };
     
     auto parseString = [&]() -> std::optional<ComparisonContext> {
-        auto processedRhs = rhs;
+        auto processedRhs{rhs};
         if (!isNum && !isBool && !isNull) {
             // Only accept quoted strings or valid unquoted literals
             if (!rhsQuoted) {

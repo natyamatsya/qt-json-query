@@ -23,8 +23,8 @@ QString stripOuterParens(QString s) {
     s = s.trimmed();
     while (s.startsWith('(') && s.endsWith(')')) {
         // Check if these are truly outer parentheses by counting
-        auto depth = 0;
-        auto isOuter = true;
+        auto depth{0};
+        auto isOuter{true};
         for (int i = 1; i < s.length() - 1; ++i) {
             if (s[i] == '(') depth++;
             else if (s[i] == ')') {
@@ -98,7 +98,7 @@ std::optional<Token> parseIn(const QString& s, std::vector<FilterFn>& out)
             if (!a.isArray()) return false;
             
             // Use ContainerCursor for optimized, zero-copy array iteration during 'in' evaluation
-            const auto arr = a.toArray();
+            const auto arr{a.toArray()};
             auto cursor{internal::ContainerCursor::array(arr)};
             for (const auto& v : cursor) {
                 if (v.isString() && v.toString() == want) return true;
@@ -259,22 +259,22 @@ inline bool performComparison(const QJsonValue& leftVal, const QString& op, cons
     
     // Handle ordering comparisons by type
     if (leftVal.isDouble() && rightVal.isDouble()) {
-        auto left = leftVal.toDouble();
-        auto right = rightVal.toDouble();
+        auto left{leftVal.toDouble()};
+        auto right{rightVal.toDouble()};
         if (op == "<") return left < right;
         if (op == ">") return left > right;
         if (op == "<=") return left <= right;
         if (op == ">=") return left >= right;
     } else if (leftVal.isBool() && rightVal.isBool()) {
-        auto left = leftVal.toBool();
-        auto right = rightVal.toBool();
+        auto left{leftVal.toBool()};
+        auto right{rightVal.toBool()};
         if (op == "<") return !left && right;  // false < true
         if (op == ">") return left && !right;  // true > false
         if (op == "<=") return !left || right; // false <= anything, true <= true
         if (op == ">=") return left || !right; // true >= anything, false >= false
     } else if (leftVal.isString() && rightVal.isString()) {
-        auto left = leftVal.toString();
-        auto right = rightVal.toString();
+        auto left{leftVal.toString()};
+        auto right{rightVal.toString()};
         if (op == "<") return left < right;
         if (op == ">") return left > right;
         if (op == "<=") return left <= right;
@@ -331,7 +331,7 @@ struct ComparisonTokenFactory<ComparisonFilterType::NullArrayIndex> {
             Builder b{out};
             return b.add([prop = std::move(prop), op = std::move(op)](const QJsonValue& j){
                 bool ok;
-                auto index = prop.toInt(&ok);
+                auto index{prop.toInt(&ok)};
                 if (!ok) return false; // Invalid index
                 
                 if (j.isArray()) {
@@ -421,7 +421,7 @@ struct ComparisonTokenFactory<ComparisonFilterType::SelfArrayIndex> {
             Builder b{out};
             return b.add([prop = std::move(prop), op = std::move(op)](const QJsonValue& j){
                 bool ok;
-                auto index = prop.toInt(&ok);
+                auto index{prop.toInt(&ok)};
                 if (!ok) return false; // Invalid index
                 
                 if (j.isArray()) {
@@ -502,7 +502,7 @@ struct ComparisonTokenFactory<ComparisonFilterType::PropertyToArray> {
                 const auto rightArr{obj.value(rightProp).toArray()};
                 
                 bool ok;
-                auto idx = rightIndex.toInt(&ok);
+                auto idx{rightIndex.toInt(&ok)};
                 QJsonValue rightVal;
                 
                 // Handle out-of-bounds or invalid index as undefined
@@ -535,7 +535,7 @@ struct ComparisonTokenFactory<ComparisonFilterType::ArrayToProperty> {
                 const auto rightVal{obj.value(rightProp)};
                 
                 bool ok;
-                auto idx = leftIndex.toInt(&ok);
+                auto idx{leftIndex.toInt(&ok)};
                 QJsonValue leftVal;
                 
                 // Handle out-of-bounds or invalid index as undefined
@@ -614,7 +614,7 @@ struct ComparisonTokenFactory<ComparisonFilterType::BasicArrayIndex> {
             Builder b{out};
             return b.add([prop = std::move(prop), ctx = *ctx](const QJsonValue& j){
                 bool ok;
-                auto index = prop.toInt(&ok);
+                auto index{prop.toInt(&ok)};
                 if (!ok) return false; // Invalid index
                 
                 if (j.isArray()) {
@@ -766,8 +766,8 @@ std::optional<Token> parseEmbeddedOr(const QString& s)
         
         // Embed a composite filter that evaluates both sides with OR logic
         result.embedFilter([leftToken = *leftToken, rightToken = *rightToken](const QJsonValue& value) -> bool {
-            auto leftResult = leftToken.evaluateEmbeddedFilter(value);
-            auto rightResult = rightToken.evaluateEmbeddedFilter(value);
+            auto leftResult{leftToken.evaluateEmbeddedFilter(value)};
+            auto rightResult{rightToken.evaluateEmbeddedFilter(value)};
             return leftResult || rightResult;
         });
         
@@ -795,8 +795,8 @@ std::optional<Token> parseEmbeddedAnd(const QString& s)
         
         // Embed a composite filter that evaluates both sides with AND logic
         result.embedFilter([leftToken = *leftToken, rightToken = *rightToken](const QJsonValue& value) -> bool {
-            auto leftResult = leftToken.evaluateEmbeddedFilter(value);
-            auto rightResult = rightToken.evaluateEmbeddedFilter(value);
+            auto leftResult{leftToken.evaluateEmbeddedFilter(value)};
+            auto rightResult{rightToken.evaluateEmbeddedFilter(value)};
             return leftResult && rightResult;
         });
         
@@ -828,8 +828,8 @@ std::optional<Token> parseEmbeddedComparePropToProp(const QString& s)
             if (!j.isObject()) return false;
             
             const auto obj{j.toObject()};
-            const auto leftValue = obj.value(leftProp);
-            const auto rightValue = obj.value(rightProp);
+            const auto leftValue{obj.value(leftProp)};
+            const auto rightValue{obj.value(rightProp)};
             
             // Use the same logic as legacy performComparison function
             // Handle undefined values
@@ -848,22 +848,22 @@ std::optional<Token> parseEmbeddedComparePropToProp(const QString& s)
             
             // Handle ordering comparisons by type
             if (leftValue.isDouble() && rightValue.isDouble()) {
-                auto left = leftValue.toDouble();
-                auto right = rightValue.toDouble();
+                auto left{leftValue.toDouble()};
+                auto right{rightValue.toDouble()};
                 if (op == "<") return left < right;
                 if (op == ">") return left > right;
                 if (op == "<=") return left <= right;
                 if (op == ">=") return left >= right;
             } else if (leftValue.isBool() && rightValue.isBool()) {
-                auto left = leftValue.toBool();
-                auto right = rightValue.toBool();
+                auto left{leftValue.toBool()};
+                auto right{rightValue.toBool()};
                 if (op == "<") return !left && right;  // false < true
                 if (op == ">") return left && !right;  // true > false
                 if (op == "<=") return !left || right; // false <= anything, true <= true
                 if (op == ">=") return left || !right; // true >= anything, false >= false
             } else if (leftValue.isString() && rightValue.isString()) {
-                auto left = leftValue.toString();
-                auto right = rightValue.toString();
+                auto left{leftValue.toString()};
+                auto right{rightValue.toString()};
                 if (op == "<") return left < right;
                 if (op == ">") return left > right;
                 if (op == "<=") return left <= right;
@@ -896,11 +896,11 @@ std::optional<Token> parseEmbeddedComparePropToArrayIdx(const QString& s)
             if (!j.isObject()) return false;
             
             const auto obj{j.toObject()};
-            const auto leftValue = obj.value(leftProp);
+            const auto leftValue{obj.value(leftProp)};
             const auto rightArr{obj.value(rightProp).toArray()};
             
             bool ok;
-            auto idx = rightIndex.toInt(&ok);
+            auto idx{rightIndex.toInt(&ok)};
             QJsonValue rightValue;
             
             // Handle out-of-bounds or invalid index as undefined
@@ -927,22 +927,22 @@ std::optional<Token> parseEmbeddedComparePropToArrayIdx(const QString& s)
             
             // Handle ordering comparisons by type
             if (leftValue.isDouble() && rightValue.isDouble()) {
-                auto left = leftValue.toDouble();
-                auto right = rightValue.toDouble();
+                auto left{leftValue.toDouble()};
+                auto right{rightValue.toDouble()};
                 if (op == "<") return left < right;
                 if (op == ">") return left > right;
                 if (op == "<=") return left <= right;
                 if (op == ">=") return left >= right;
             } else if (leftValue.isBool() && rightValue.isBool()) {
-                auto left = leftValue.toBool();
-                auto right = rightValue.toBool();
+                auto left{leftValue.toBool()};
+                auto right{rightValue.toBool()};
                 if (op == "<") return !left && right;  // false < true
                 if (op == ">") return left && !right;  // true > false
                 if (op == "<=") return !left || right; // false <= anything, true <= true
                 if (op == ">=") return left || !right; // true >= anything, false >= false
             } else if (leftValue.isString() && rightValue.isString()) {
-                auto left = leftValue.toString();
-                auto right = rightValue.toString();
+                auto left{leftValue.toString()};
+                auto right{rightValue.toString()};
                 if (op == "<") return left < right;
                 if (op == ">") return left > right;
                 if (op == "<=") return left <= right;
@@ -959,7 +959,7 @@ std::optional<Token> parseEmbeddedComparePropToArrayIdx(const QString& s)
 
 std::optional<Token> parseEmbeddedCompare(const QString& s)
 {
-    QString localS = s;  // Create local copy for modification
+    QString localS{s};  // Create local copy for modification
     localS = stripOuterParens(localS);
     
     // Trim whitespace from logical operator splitting
@@ -1040,7 +1040,7 @@ std::optional<Token> parseEmbeddedRegex(const QString& s)
 
 std::optional<Token> parseEmbeddedExists(const QString& s)
 {
-    QString localS = s;  // Create local copy for modification
+    QString localS{s};  // Create local copy for modification
     localS = stripOuterParens(localS);
     
     // Trim whitespace from logical operator splitting
@@ -1163,7 +1163,7 @@ std::optional<Token> parseEmbeddedExists(const QString& s)
         token.embedFilter([localS](const QJsonValue& j) {
             // Multiple selector existence: parse the selectors and check if ANY would return values
             // Extract the content between brackets: @[0, 0, 'a'] -> "0, 0, 'a'"
-            auto content = localS;
+            auto content{localS};
             if (content.startsWith("@[") && content.endsWith("]")) {
                 content = content.mid(2, content.length() - 3);
             }
@@ -1171,15 +1171,15 @@ std::optional<Token> parseEmbeddedExists(const QString& s)
             // Split by comma and check each selector
             QStringList selectors = content.split(',', Qt::SkipEmptyParts);
             for (const QString& selector : selectors) {
-                auto trimmedSelector = selector.trimmed();
+                auto trimmedSelector{selector.trimmed()};
                 
                 // Check if this individual selector would return a value
-                auto selectorExists = false;
+                auto selectorExists{false};
                 
                 // Handle quoted string selectors (property names)
                 if ((trimmedSelector.startsWith("'") && trimmedSelector.endsWith("'")) ||
                     (trimmedSelector.startsWith("\"") && trimmedSelector.endsWith("\""))) {
-                    auto propName = trimmedSelector.mid(1, trimmedSelector.length() - 2);
+                    auto propName{trimmedSelector.mid(1, trimmedSelector.length() - 2)};
                     if (j.isObject()) {
                         selectorExists = j.toObject().contains(propName);
                     }
@@ -1187,7 +1187,7 @@ std::optional<Token> parseEmbeddedExists(const QString& s)
                 // Handle numeric selectors (array indices)
                 else {
                     bool ok;
-                    auto index = trimmedSelector.toInt(&ok);
+                    auto index{trimmedSelector.toInt(&ok)};
                     if (ok && j.isArray()) {
                         const auto arr{j.toArray()};
                         // Handle negative indices
@@ -1310,7 +1310,7 @@ std::optional<Token> parseEmbeddedExists(const QString& s)
     if (auto m = ctre::match<idxExistsPat>(to_sv(localS))) {
         auto&& indexStr{to_qstr(m.template get<1>().to_view())};
         bool ok;
-        const auto index = indexStr.toInt(&ok);
+        const auto index{indexStr.toInt(&ok)};
         if (!ok) return std::nullopt;
         
         Token token;
@@ -1321,7 +1321,7 @@ std::optional<Token> parseEmbeddedExists(const QString& s)
             // Index existence: @[index] - true if array has element at index
             if (j.isArray()) {
                 const auto arr{j.toArray()};
-                const auto size = arr.size();
+                const auto size{arr.size()};
                 // Handle negative indices
                 const auto actualIndex = (index < 0) ? size + index : index;
                 return actualIndex >= 0 && actualIndex < size;
@@ -1345,7 +1345,7 @@ std::optional<Token> parseEmbeddedNot(const QString& s)
 {
     // Check if the expression starts with '!' (negation)
     if (s.startsWith('!')) {
-        auto innerExpr = s.mid(1).trimmed();
+        auto innerExpr{s.mid(1).trimmed()};
         
         // Parse the inner expression recursively
         auto innerToken{compileEmbeddedFilter(innerExpr)};
@@ -1361,7 +1361,7 @@ std::optional<Token> parseEmbeddedNot(const QString& s)
         
         // Embed a negated filter that inverts the result of the inner filter
         result.embedFilter([innerToken = *innerToken](const QJsonValue& value) -> bool {
-            auto innerResult = innerToken.evaluateEmbeddedFilter(value);
+            auto innerResult{innerToken.evaluateEmbeddedFilter(value)};
             return !innerResult;
         });
         
@@ -1381,15 +1381,15 @@ std::optional<Token> parseEmbeddedFunction(const QString& s)
         auto&& right{to_qstr(m.template get<3>().to_view()).trimmed()};
         
         // Check if either side contains a function call
-        auto leftHasFunc = left.contains("(") && left.contains(")");
-        auto rightHasFunc = right.contains("(") && right.contains(")");
+        auto leftHasFunc{left.contains("(") && left.contains(")")};
+        auto rightHasFunc{right.contains("(") && right.contains(")")};
         
         if (!leftHasFunc && !rightHasFunc) {
             return std::nullopt; // No function calls found
         }
         
         // Check if any function call needs root context (value($...))
-        auto needsRootContext = false;
+        auto needsRootContext{false};
         if (leftHasFunc && left.contains("value($")) {
             qCDebug(jsonPathLog) << "Left side contains value($...): " << left;
             needsRootContext = true;
@@ -1423,8 +1423,8 @@ std::optional<Token> parseEmbeddedFunction(const QString& s)
                     }
                 } else if (left.startsWith("@.")) {
                     // Property access - RFC 9535 "nothing" semantics
-                    auto prop = left.mid(2);
-                    auto val = j.toObject().value(prop);
+                    auto prop{left.mid(2)};
+                    auto val{j.toObject().value(prop)};
                     leftVal = val.isUndefined() ? QJsonValue() : val; // Undefined becomes Nothing
                 } else {
                     leftVal = parseJsonLiteral(left);
@@ -1440,8 +1440,8 @@ std::optional<Token> parseEmbeddedFunction(const QString& s)
                     }
                 } else if (right.startsWith("@.")) {
                     // Property access - RFC 9535 "nothing" semantics
-                    auto prop = right.mid(2);
-                    auto val = j.toObject().value(prop);
+                    auto prop{right.mid(2)};
+                    auto val{j.toObject().value(prop)};
                     rightVal = val.isUndefined() ? QJsonValue() : val; // Undefined becomes Nothing
                 } else {
                     rightVal = parseJsonLiteral(right);
@@ -1449,8 +1449,8 @@ std::optional<Token> parseEmbeddedFunction(const QString& s)
                 
                 // Perform comparison with RFC 9535 "Nothing" semantics
                 // Nothing == Nothing should be true
-                auto leftIsNothing = leftVal.isUndefined();
-                auto rightIsNothing = rightVal.isUndefined();
+                auto leftIsNothing{leftVal.isUndefined()};
+                auto rightIsNothing{rightVal.isUndefined()};
                 
                 if (op == "==") {
                     if (leftIsNothing && rightIsNothing) return true;  // Nothing == Nothing
@@ -1482,8 +1482,8 @@ std::optional<Token> parseEmbeddedFunction(const QString& s)
                 auto op = QString::fromStdString(std::string(m.template get<2>()));
                 auto right = QString::fromStdString(std::string(m.template get<3>()));
                 
-                auto leftHasFunc = left.contains(QRegularExpression(R"(\b(length|count|match|search|value)\s*\()"));
-                auto rightHasFunc = right.contains(QRegularExpression(R"(\b(length|count|match|search|value)\s*\()"));
+                auto leftHasFunc{left.contains(QRegularExpression(R"(\b(length|count|match|search|value)\s*\()"))};
+                auto rightHasFunc{right.contains(QRegularExpression(R"(\b(length|count|match|search|value)\s*\()"))};
                 
                 QJsonValue leftVal, rightVal;
                 
@@ -1492,8 +1492,8 @@ std::optional<Token> parseEmbeddedFunction(const QString& s)
                     leftVal = evaluateFunction(left, j);
                 } else if (left.startsWith("@.")) {
                     // Property access - RFC 9535 "nothing" semantics
-                    auto prop = left.mid(2);
-                    auto val = j.toObject().value(prop);
+                    auto prop{left.mid(2)};
+                    auto val{j.toObject().value(prop)};
                     leftVal = val.isUndefined() ? QJsonValue() : val; // Undefined becomes Nothing
                 } else {
                     leftVal = parseJsonLiteral(left);
@@ -1504,8 +1504,8 @@ std::optional<Token> parseEmbeddedFunction(const QString& s)
                     rightVal = evaluateFunction(right, j);
                 } else if (right.startsWith("@.")) {
                     // Property access - RFC 9535 "nothing" semantics
-                    auto prop = right.mid(2);
-                    auto val = j.toObject().value(prop);
+                    auto prop{right.mid(2)};
+                    auto val{j.toObject().value(prop)};
                     rightVal = val.isUndefined() ? QJsonValue() : val; // Undefined becomes Nothing
                 } else {
                     rightVal = parseJsonLiteral(right);
@@ -1513,8 +1513,8 @@ std::optional<Token> parseEmbeddedFunction(const QString& s)
                 
                 // Perform comparison with RFC 9535 "Nothing" semantics
                 // Nothing == Nothing should be true
-                auto leftIsNothing = leftVal.isUndefined();
-                auto rightIsNothing = rightVal.isUndefined();
+                auto leftIsNothing{leftVal.isUndefined()};
+                auto rightIsNothing{rightVal.isUndefined()};
                 
                 if (op == "==") {
                     if (leftIsNothing && rightIsNothing) return true;  // Nothing == Nothing
