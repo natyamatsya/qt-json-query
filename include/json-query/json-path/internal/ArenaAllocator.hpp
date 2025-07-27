@@ -77,7 +77,7 @@ public:
     void* allocate(size_t size, size_t alignment = alignof(std::max_align_t)) {
         // Align the current position
         size_t alignedPos = alignUp(currentPos_, alignment);
-        size_t newPos = alignedPos + size;
+        size_t newPos{alignedPos + size};
         
         // Check if we need a new block
         if (newPos > currentEnd_) {
@@ -169,8 +169,8 @@ public:
     };
     
     Stats getStats() const {
-        auto currentBlockUsed = currentPos_;
-        auto currentBlockRemaining = currentEnd_ - currentPos_;
+        auto currentBlockUsed{currentPos_};
+        auto currentBlockRemaining{currentEnd_ - currentPos_};
         double utilization = totalAllocated_ > 0 ? 
             (static_cast<double>(totalAllocated_) / (blocks_.size() * blockSize_) * 100.0) : 0.0;
         
@@ -216,10 +216,10 @@ private:
     
     size_t blockSize_;
     std::vector<void*> blocks_;
-    char* currentBlock_ = nullptr;
-    size_t currentPos_ = 0;
-    size_t currentEnd_ = 0;
-    size_t totalAllocated_ = 0;
+    char* currentBlock_{nullptr};
+    size_t currentPos_{0};
+    size_t currentEnd_{0};
+    size_t totalAllocated_{0};
 };
 
 /**

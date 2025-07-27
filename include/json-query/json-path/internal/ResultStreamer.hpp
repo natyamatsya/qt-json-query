@@ -267,7 +267,7 @@ private:
     // Only used if error handling needed
     bool hasErrorHandler_;
     EvalError lastError_ = EvalError::TypeMismatchObject;
-    bool hasError_ = false;
+    bool hasError_{false};
 };
 
 /**
@@ -397,7 +397,7 @@ private:
     // Only used if error handling needed
     bool hasErrorHandler_;
     EvalError lastError_ = EvalError::TypeMismatchObject;
-    bool hasError_ = false;
+    bool hasError_{false};
 };
 
 } // namespace json_query::json_path::internal

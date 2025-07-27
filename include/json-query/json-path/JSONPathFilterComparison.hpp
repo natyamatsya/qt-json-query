@@ -39,10 +39,10 @@ bool compareValue<ComparisonType::DeepEquality>(const QJsonValue& v, const QStri
 struct ComparisonContext {
     QString op;
     QString rhs;
-    double numVal = 0.0;
-    bool boolVal = false;
+    double numVal{0.0};
+    bool boolVal{false};
     ComparisonType type;
-    bool rhsQuoted = false;
+    bool rhsQuoted{false};
     
     // Template-based comparison dispatch
     bool compare(const QJsonValue& v) const;

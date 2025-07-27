@@ -54,7 +54,7 @@ template<auto PAT>
                         
                     case ComparisonType::Null:
                         return b.add([op = ctx.op](const QJsonValue& j) {
-                            auto isJNull = j.isNull();
+                            auto isJNull{j.isNull()};
                             // Null only supports equality comparisons
                             if (op == "==") return isJNull;
                             if (op == "!=") return !isJNull;
@@ -108,7 +108,7 @@ template<auto PAT>
                 return b.add([prop, ctx](const QJsonValue& j){
                     // Convert prop to integer for array index access
                     bool ok;
-                    auto index = prop.toInt(&ok);
+                    auto index{prop.toInt(&ok)};
                     if (!ok) return false; // Invalid index
                     
                     // Array index access: only works on arrays, not objects
@@ -181,7 +181,7 @@ template<auto PAT>
                         
                     case ComparisonType::Null:
                         return b.add([op = ctx.op](const QJsonValue& j) {
-                            auto isJNull = j.isNull();
+                            auto isJNull{j.isNull()};
                             // Null only supports equality comparisons
                             if (op == "==") return isJNull;
                             if (op == "!=") return !isJNull;
@@ -225,7 +225,7 @@ template<auto PAT>
                         
                     case ComparisonType::Null:
                         return b.add([op = ctx.op](const QJsonValue& j) {
-                            auto isJNull = j.isNull();
+                            auto isJNull{j.isNull()};
                             // Null only supports equality comparisons
                             if (op == "==") return isJNull;
                             if (op == "!=") return !isJNull;
@@ -280,7 +280,7 @@ template<auto PAT>
         return Builder{out}.add([prop, ctx](const QJsonValue& j){
             // Convert prop to integer for array index access
             bool ok;
-            auto index = prop.toInt(&ok);
+            auto index{prop.toInt(&ok)};
             if (!ok) return false; // Invalid index
             
             // Array index access: only works on arrays, not objects
@@ -361,7 +361,7 @@ std::optional<Token> parseEmbeddedCompareIndex(const QString& s)
         if (!ctx) return std::nullopt;
         
         bool ok;
-        auto index = indexStr.toInt(&ok);
+        auto index{indexStr.toInt(&ok)};
         if (!ok) return std::nullopt;
         
         Token token;

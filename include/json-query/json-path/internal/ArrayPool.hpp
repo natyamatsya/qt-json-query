@@ -170,9 +170,9 @@ private:
     std::vector<std::unique_ptr<QJsonArray>> pool_;
     
     // Statistics
-    size_t totalCreated_ = 0;
-    size_t acquisitions_ = 0;
-    size_t returns_ = 0;
+    size_t totalCreated_{0};
+    size_t acquisitions_{0};
+    size_t returns_{0};
 };
 
 /**

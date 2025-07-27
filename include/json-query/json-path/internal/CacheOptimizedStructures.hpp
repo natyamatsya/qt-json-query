@@ -29,9 +29,9 @@ namespace json_query::json_path::detail {
  */
 struct alignas(32) CacheOptimizedStackFrame {
     QJsonValue value;           // 8 bytes (pointer to Qt's internal data)
-    bool processed = false;     // Processing state flag
-    uint32_t depth = 0;        // Current traversal depth
-    uint32_t flags = 0;        // Additional processing flags/state
+    bool processed{false};     // Processing state flag
+    uint32_t depth{0};        // Current traversal depth
+    uint32_t flags{0};        // Additional processing flags/state
     // Total: 16 bytes + QJsonValue overhead, aligned to 32 bytes
     
     CacheOptimizedStackFrame() = default;
@@ -58,7 +58,7 @@ private:
     
     struct Pool {
         alignas(CACHE_LINE_SIZE) std::array<CacheOptimizedStackFrame, FRAMES_PER_POOL> frames;
-        size_t nextIndex = 0;
+        size_t nextIndex{0};
         
         CacheOptimizedStackFrame* allocate() {
             if (nextIndex >= FRAMES_PER_POOL) {
@@ -73,7 +73,7 @@ private:
     };
     
     std::vector<std::unique_ptr<Pool>> pools_;
-    size_t currentPoolIndex_ = 0;
+    size_t currentPoolIndex_{0};
     
 public:
     StackFramePool() {
@@ -84,7 +84,7 @@ public:
     CacheOptimizedStackFrame* allocate() {
         // Try current pool first
         if (currentPoolIndex_ < pools_.size()) {
-            auto* frame = pools_[currentPoolIndex_]->allocate();
+            auto* frame{pools_[currentPoolIndex_]->allocate()};
             if (frame) return frame;
         }
         
@@ -102,7 +102,7 @@ public:
     }
     
     size_t totalAllocated() const {
-        auto total = 0;
+        auto total{0};
         for (const auto& pool : pools_) {
             total += (FRAMES_PER_POOL - pool->available());
         }
@@ -136,13 +136,13 @@ public:
     }
     
     void push(const QJsonValue& value, uint32_t depth = 0, uint32_t flags = 0) {
-        auto* frame = pool_.allocate();
+        auto* frame{pool_.allocate()};
         *frame = CacheOptimizedStackFrame(value, false, depth, flags);
         frames_.push_back(frame);
     }
     
     void push(QJsonValue&& value, uint32_t depth = 0, uint32_t flags = 0) {
-        auto* frame = pool_.allocate();
+        auto* frame{pool_.allocate()};
         *frame = CacheOptimizedStackFrame(std::move(value), false, depth, flags);
         frames_.push_back(frame);
     }
@@ -284,7 +284,7 @@ private:
     struct CachedKey {
         QString key;
         uint32_t hash;
-        uint32_t accessCount = 1;
+        uint32_t accessCount{1};
         
         CachedKey(const QString& k, uint32_t h) : key(k), hash(h) {}
     };

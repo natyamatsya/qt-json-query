@@ -15,6 +15,9 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Refactoring tools option (disabled by default)
+option(WITH_REFACTORING_TOOLS "Build C++ modernization refactoring tools" OFF)
+
 # Allow the user to specify a Qt installation via CMAKE_PREFIX_PATH
 # Example:
 #   cmake -S . -B build -DCMAKE_PREFIX_PATH=$HOME/Qt/6.8.3/macos
@@ -108,4 +111,11 @@ if(JSON_QUERY_ENABLE_INSTALL)
             FILE json_queryTargets.cmake
             NAMESPACE json_query::
             DESTINATION ${CMAKE_INSTALL_DATADIR}/json_query/cmake)
+endif()
+
+# ---------------------------------------------------------------------------
+# Refactoring tools (optional)
+# ---------------------------------------------------------------------------
+if(WITH_REFACTORING_TOOLS)
+    add_subdirectory(refactoring)
 endif()

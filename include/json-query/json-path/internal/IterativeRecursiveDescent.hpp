@@ -57,14 +57,14 @@ public:
                 
                 // Add children to stack for traversal using cache-optimized approach
                 if (frame.value.isObject()) {
-                    const auto obj = frame.value.toObject();
+                    const auto obj{frame.value.toObject()};
                     // Add in reverse order so we process in original order
                     for (auto it = obj.end(); it != obj.begin(); ) {
                         --it;
                         stack.push(it.value());
                     }
                 } else if (frame.value.isArray()) {
-                    const auto arr = frame.value.toArray();
+                    const auto arr{frame.value.toArray()};
                     // Add in reverse order so we process in original order
                     for (qsizetype i = arr.size() - 1; i >= 0; --i) {
                         stack.push(arr[i]);
@@ -123,7 +123,7 @@ public:
         struct CacheOptimizedDepthFrame {
             QJsonValue value;
             size_t depth;
-            bool processed = false;
+            bool processed{false};
             
             CacheOptimizedDepthFrame(const QJsonValue& v, size_t d) : value(v), depth(d) {}
             CacheOptimizedDepthFrame(QJsonValue&& v, size_t d) : value(std::move(v)), depth(d) {}
@@ -147,13 +147,13 @@ public:
                 // Add children if within depth limit
                 if (maxDepth == 0 || frame.depth < maxDepth) {
                     if (frame.value.isObject()) {
-                        const auto obj = frame.value.toObject();
+                        const auto obj{frame.value.toObject()};
                         for (auto it = obj.end(); it != obj.begin(); ) {
                             --it;
                             stack.emplace_back(it.value(), frame.depth + 1);
                         }
                     } else if (frame.value.isArray()) {
-                        const auto arr = frame.value.toArray();
+                        const auto arr{frame.value.toArray()};
                         for (qsizetype i = arr.size() - 1; i >= 0; --i) {
                             stack.emplace_back(arr[i], frame.depth + 1);
                         }
@@ -223,7 +223,7 @@ public:
         const bool useEarlyTermination = !targetField.isEmpty() && 
                                        EarlyTerminationPatterns::isCommonField(targetField);
         const auto maxTraversalCost = useEarlyTermination ? 1000 : SIZE_MAX;
-        auto currentCost = 0;
+        auto currentCost{0};
         
         // Start with root value
         stack.emplace_back(rootValue);
@@ -237,7 +237,7 @@ public:
             }
             
             if (frame.value.isObject()) {
-                const auto obj = frame.value.toObject();
+                const auto obj{frame.value.toObject()};
                 
                 if (!frame.processed) {
                     // Emit the object itself
@@ -246,7 +246,7 @@ public:
                     
                     // Early termination: if we found the target field, prioritize it
                     if (useEarlyTermination && obj.contains(targetField)) {
-                        const auto targetValue = obj[targetField];
+                        const auto targetValue{obj[targetField]};
                         streamer.emitValue(targetValue);
                         
                         // If target is a leaf value, we can potentially skip other fields
@@ -258,7 +258,7 @@ public:
                 }
                 
                 // Add children to stack (reverse order for correct traversal)
-                auto hasUnprocessedChildren = false;
+                auto hasUnprocessedChildren{false};
                 for (auto it = obj.end(); it != obj.begin(); ) {
                     --it;
                     if (!frame.processed || it == obj.begin()) {
@@ -274,7 +274,7 @@ public:
                 }
                 
             } else if (frame.value.isArray()) {
-                const auto arr = frame.value.toArray();
+                const auto arr{frame.value.toArray()};
                 
                 if (!frame.processed) {
                     // Emit the array itself
@@ -283,7 +283,7 @@ public:
                 }
                 
                 // Add children to stack
-                auto hasUnprocessedChildren = false;
+                auto hasUnprocessedChildren{false};
                 for (qsizetype i = arr.size() - 1; i >= 0; --i) {
                     if (!frame.processed || i == 0) {
                         stack.emplace_back(arr[i]);
@@ -341,7 +341,7 @@ public:
             
             // Branch prediction: Most common case is Object traversal
             if (Q_LIKELY(current.value.isObject())) {
-                const auto obj = current.value.toObject();
+                const auto obj{current.value.toObject()};
                 
                 // Phase 3: Direct key lookup for target field (fastest path)
                 if (Q_LIKELY(!targetField.isEmpty())) {
@@ -360,7 +360,7 @@ public:
                 }
             }
             else if (Q_UNLIKELY(current.value.isArray())) {
-                const auto arr = current.value.toArray();
+                const auto arr{current.value.toArray()};
                 
                 // Phase 3: Reverse iteration for better cache locality
                 for (qsizetype i = arr.size() - 1; i >= 0; --i) {
@@ -392,8 +392,8 @@ public:
      */
     struct Stats {
         size_t maxStackDepth = 0;
-        size_t totalFramesProcessed = 0;
-        size_t memoryReused = 0; // Number of times thread_local stack was reused
+        size_t totalFramesProcessed{0};
+        size_t memoryReused{0}; // Number of times thread_local stack was reused
     };
     
     // Thread-local statistics
