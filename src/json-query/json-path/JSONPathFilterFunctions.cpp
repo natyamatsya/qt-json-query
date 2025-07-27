@@ -42,9 +42,9 @@ QJsonValue evaluateFunction(const QString& funcCall, const QJsonValue& context)
     // Calculate length
     auto calculateLength = [](const QJsonValue& value) -> QJsonValue {
         if (value.isUndefined() || value.isNull()) return {}; // Return Nothing for undefined/null
-        if (value.isString()) return QJsonValue(value.toString().length());
-        if (value.isArray()) return QJsonValue(value.toArray().size());
-        if (value.isObject()) return QJsonValue(value.toObject().size());
+        if (value.isString()) return QJsonValue{value.toString().length()};
+        if (value.isArray()) return QJsonValue{value.toArray().size()};
+        if (value.isObject()) return QJsonValue{value.toObject().size()};
         return {}; // Return Nothing for other types (RFC 9535)
     };
     
@@ -106,25 +106,25 @@ QJsonValue parseJsonLiteral(const QString& value)
     
     // Parse literal using monadic pattern with optional chaining
     auto parseNull = [](const QString& s) -> std::optional<QJsonValue> {
-        return (s == "null") ? std::optional<QJsonValue>{QJsonValue()} : std::nullopt;
+        return (s == "null") ? std::optional<QJsonValue>{QJsonValue{}} : std::nullopt;
     };
     
     auto parseBoolean = [](const QString& s) -> std::optional<QJsonValue> {
-        if (s == "true") return QJsonValue(true);
-        if (s == "false") return QJsonValue(false);
+        if (s == "true") return QJsonValue{true};
+        if (s == "false") return QJsonValue{false};
         return std::nullopt;
     };
     
     auto parseNumber = [](const QString& s) -> std::optional<QJsonValue> {
         bool ok;
         double num = s.toDouble(&ok);
-        return ok ? std::optional<QJsonValue>{QJsonValue(num)} : std::nullopt;
+        return ok ? std::optional<QJsonValue>{QJsonValue{num}} : std::nullopt;
     };
     
     auto parseQuotedString = [](const QString& s) -> std::optional<QJsonValue> {
         if ((s.startsWith('"') && s.endsWith('"')) ||
             (s.startsWith('\'') && s.endsWith('\''))) {
-            return QJsonValue(s.mid(1, s.length() - 2));
+            return QJsonValue{s.mid(1, s.length() - 2)};
         }
         return std::nullopt;
     };
@@ -134,7 +134,7 @@ QJsonValue parseJsonLiteral(const QString& value)
         .or_else([&]() { return parseBoolean(trimmed); })
         .or_else([&]() { return parseNumber(trimmed); })
         .or_else([&]() { return parseQuotedString(trimmed); })
-        .value_or(QJsonValue(trimmed)); // Default to string
+        .value_or(QJsonValue{trimmed}); // Default to string
 }
 
 // Helper function to compare QJsonValues for ordering
@@ -213,7 +213,7 @@ std::optional<Token> parseFunction(const QString& s, std::vector<FilterFn>& out)
                 // Property access - RFC 9535 "nothing" semantics
                 const auto prop = left.mid(2);
                 QJsonValue val = j.toObject().value(prop);
-                leftVal = val.isUndefined() ? QJsonValue(0) : val; // Undefined becomes 0
+                leftVal = val.isUndefined() ? QJsonValue{0} : val; // Undefined becomes 0
             } else {
                 leftVal = parseJsonLiteral(left);
             }
@@ -225,7 +225,7 @@ std::optional<Token> parseFunction(const QString& s, std::vector<FilterFn>& out)
                 // Property access - RFC 9535 "nothing" semantics
                 const auto prop = right.mid(2);
                 QJsonValue val = j.toObject().value(prop);
-                rightVal = val.isUndefined() ? QJsonValue(0) : val; // Undefined becomes 0
+                rightVal = val.isUndefined() ? QJsonValue{0} : val; // Undefined becomes 0
             } else {
                 rightVal = parseJsonLiteral(right);
             }
