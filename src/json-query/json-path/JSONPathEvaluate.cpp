@@ -1,29 +1,28 @@
 #include "json-query/json-path/JSONPathEvaluate.hpp"
-#include "json-query/json-path/JSONPathEvalHelpers.hpp"
+#include "json-query/json-path/JSONPathTokenEvaluators.hpp"
 #include "json-query/json-path/JSONPathTokenDispatch.hpp"
 #include "json-query/json-path/JSONPathWildcardRecursive.hpp"
+#include "json-query/json-path/JSONPathEvalHelpers.hpp"
+#include "json-query/json-path/JSONPathLog.hpp"
+#include "json-query/json-path/internal/ArrayPool.hpp"
+#include "json-query/json-path/internal/PathEvalCtx.hpp"
 #include "json-query/json-path/internal/ContainerCursor.hpp"
 #include "json-query/json-path/internal/ContextAwareContainerCursor.hpp"
 #include "json-query/json-path/internal/ResultStreamer.hpp"
 #include "json-query/json-path/internal/PathPatternSpecializations.hpp"
 #include <expected>
 #include "json-query/json-path/JSONPathEvalError.hpp"
-#include "json-query/json-path/JSONPathTokenEvaluators.hpp"
 #include "json-query/json-path/JSONPathPointerConversion.hpp"
-#include "json-query/json-path/internal/PassPipeline.hpp"
+#include "json-query/json-path/internal/QtHash.hpp"
 
 #include <array>
 #include <deque>
 #include <QSet>
 #include <QJsonDocument>
-#include "json-query/json-path/internal/QtHash.hpp"
-
 #include <QStringList>
 #include <QString>
 #include <QDebug>
 #include <algorithm>
-#include "json-query/json-path/JSONPathLog.hpp"
-#include "json-query/json-path/internal/ArrayPool.hpp"
 #include "json-query/json-path/internal/IterativeRecursiveDescent.hpp"
 #include "json-query/json-path/internal/ArenaAllocator.hpp"
 

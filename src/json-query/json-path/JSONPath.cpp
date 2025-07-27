@@ -2,7 +2,6 @@
 #include "json-query/json-path/JSONPathTokenEvaluators.hpp"
 #include "json-query/json-path/JSONPathEvaluate.hpp"
 #include "json-query/json-path/JSONPathExpected.hpp"
-#include "json-query/json-path/internal/PassPipeline.hpp"
 
 #include <vector>
 #include <deque>

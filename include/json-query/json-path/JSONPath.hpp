@@ -17,10 +17,13 @@
 
 // ────────────────────────────── Project
 #include "JSONPathCompile.hpp"
+#include "json-query/json-path/JSONPathEvaluate.hpp"
+#include "json-query/json-path/JSONPathEvalError.hpp"
+#include "json-query/json-path/JSONPathExpected.hpp"
+#include "json-query/json-path/JSONPathOption.hpp"
+#include "json-query/json-path/JSONPathHelpers.hpp"
 #include "json-query/utils/JSONQueryUtils.hpp"
 #include "json-query/json-pointer/JSONPointer.hpp"
-#include "json-query/json-path/JSONPathEvalError.hpp"
-#include "json-query/json-path/internal/PassPipeline.hpp"
 
 using namespace Qt::StringLiterals;
 // ======================================================================
@@ -37,8 +40,6 @@ public:
     using Result = std::expected<JSONPath, json_query::json_path::Error>;
     // ★
     static Result create(QStringView path);                      // ★
-    // LLVM-inspired compilation with optimization levels
-    static Result create(QStringView path, json_query::json_path::internal::PassManager::OptimizationLevel optLevel);
     // ★
     // -----------------------------------------------------------------
     //  Evaluation API with error reporting (std::expected)

@@ -1,5 +1,4 @@
 #include "json-query/json-path/JSONPath.hpp"
-#include "json-query/json-path/internal/PassPipeline.hpp"
 
 #include <QJsonDocument>
 #include <QJsonObject>

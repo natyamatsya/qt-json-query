@@ -20,14 +20,13 @@ set(JSON_QUERY_SOURCES
     json-path/JSONPathContextFilter.cpp
     json-path/JSONPathTokenEvaluators.cpp
     json-path/JSONPathPointerConversion.cpp
-    json-path/internal/PassPipeline.cpp
+    json-path/internal/IterativeRecursiveDescent.cpp
     json-path/JSONPathEvaluate.cpp
     json-path/JSONPathEvalHelpers.cpp
     json-path/JSONPathTokenDispatch.cpp
     json-path/JSONPathWildcardRecursive.cpp
     json-path/JSONPathExpected.cpp
     json-path/JSONPathLog.cpp
-    json-path/internal/IterativeRecursiveDescent.cpp
 )
 
 # ---------------------------------------------------------------------------

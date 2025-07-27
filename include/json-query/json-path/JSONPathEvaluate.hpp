@@ -1,8 +1,8 @@
 #pragma once
 
+#include "json-query/json-path/JSONPathCompile.hpp"
 #include "json-query/json-path/JSONPathEvalError.hpp"
 #include "json-query/json-path/internal/PathEvalCtx.hpp"
-#include "json-query/json-path/internal/PassPipeline.hpp"
 #include "json-query/json-path/JSONPathEvalHelpers.hpp"
 #include "json-query/json-path/JSONPathTokenDispatch.hpp"
 #include "json-query/json-path/JSONPathWildcardRecursive.hpp"
@@ -10,8 +10,6 @@
 #include <QJsonValue>
 #include <QJsonArray>
 #include <expected>
-
-#include "json-query/json-path/JSONPathCompile.hpp"
 
 // (legacy JSONPath bridge removed)
 
