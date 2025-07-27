@@ -1,0 +1,162 @@
+{
+  "version": 9,
+  "include": [
+    "CMakePresets.json"
+  ],
+  "configurePresets": [
+    {
+      "name": "debug-qt",
+      "inherits": "debug",
+      "displayName": "Debug with Qt",
+      "description": "Debug preset with Qt CMAKE_PREFIX_PATH set",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "$env{HOME}/dev/qt/qt-6.8.3/6.8.3/macos"
+      }
+    },
+    {
+      "name": "debug-qt-apple-clang",
+      "inherits": "debug-apple-clang",
+      "displayName": "Debug with Qt (Apple Clang)",
+      "description": "Debug preset with Qt and Apple Clang compiler",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "$env{HOME}/dev/qt/qt-6.8.3/6.8.3/macos"
+      }
+    },
+    {
+      "name": "debug-qt-llvm-clang",
+      "inherits": "debug-llvm-clang",
+      "displayName": "Debug with Qt (LLVM Clang)",
+      "description": "Debug preset with Qt and LLVM Clang compiler",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "$env{HOME}/dev/qt/qt-6.8.3/6.8.3/macos"
+      }
+    },
+    {
+      "name": "release-qt",
+      "inherits": "release",
+      "displayName": "Release with Qt",
+      "description": "Release preset with Qt CMAKE_PREFIX_PATH set",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "$env{HOME}/dev/qt/qt-6.8.3/6.8.3/macos"
+      }
+    },
+    {
+      "name": "release-qt-apple-clang",
+      "inherits": "release-apple-clang",
+      "displayName": "Release with Qt (Apple Clang)",
+      "description": "Release preset with Qt and Apple Clang compiler",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "$env{HOME}/dev/qt/qt-6.8.3/6.8.3/macos"
+      }
+    },
+    {
+      "name": "release-qt-llvm-clang",
+      "inherits": "release-llvm-clang",
+      "displayName": "Release with Qt (LLVM Clang)",
+      "description": "Release preset with Qt and LLVM Clang compiler",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "$env{HOME}/dev/qt/qt-6.8.3/6.8.3/macos"
+      }
+    },
+    {
+      "name": "relwithdebinfo-qt",
+      "inherits": "relwithdebinfo",
+      "displayName": "Release with Debug Info and Qt",
+      "description": "Release with debug info preset with Qt CMAKE_PREFIX_PATH set for profiling",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "$env{HOME}/dev/qt/qt-6.8.3/6.8.3/macos"
+      }
+    },
+    {
+      "name": "relwithdebinfo-qt-apple-clang",
+      "inherits": "relwithdebinfo-apple-clang",
+      "displayName": "RelWithDebInfo with Qt (Apple Clang)",
+      "description": "Release with debug info preset with Qt and Apple Clang compiler",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "$env{HOME}/dev/qt/qt-6.8.3/6.8.3/macos"
+      }
+    },
+    {
+      "name": "relwithdebinfo-qt-llvm-clang",
+      "inherits": "relwithdebinfo-llvm-clang",
+      "displayName": "RelWithDebInfo with Qt (LLVM Clang)",
+      "description": "Release with debug info preset with Qt and LLVM Clang compiler",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "$env{HOME}/dev/qt/qt-6.8.3/6.8.3/macos"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "debug-qt",
+      "configurePreset": "debug-qt",
+      "description": "Build debug configuration with Qt",
+      "jobs": 8
+    },
+    {
+      "name": "debug-qt-apple-clang",
+      "configurePreset": "debug-qt-apple-clang",
+      "description": "Build debug configuration with Qt and Apple Clang",
+      "jobs": 8
+    },
+    {
+      "name": "debug-qt-llvm-clang",
+      "configurePreset": "debug-qt-llvm-clang",
+      "description": "Build debug configuration with Qt and LLVM Clang",
+      "jobs": 8
+    },
+    {
+      "name": "release-qt",
+      "configurePreset": "release-qt",
+      "description": "Build release configuration with Qt",
+      "jobs": 8
+    },
+    {
+      "name": "release-qt-apple-clang",
+      "configurePreset": "release-qt-apple-clang",
+      "description": "Build release configuration with Qt and Apple Clang",
+      "jobs": 8
+    },
+    {
+      "name": "release-qt-llvm-clang",
+      "configurePreset": "release-qt-llvm-clang",
+      "description": "Build release configuration with Qt and LLVM Clang",
+      "jobs": 8
+    },
+    {
+      "name": "relwithdebinfo-qt",
+      "configurePreset": "relwithdebinfo-qt",
+      "description": "Build release with debug info configuration with Qt",
+      "jobs": 8
+    },
+    {
+      "name": "relwithdebinfo-qt-apple-clang",
+      "configurePreset": "relwithdebinfo-qt-apple-clang",
+      "description": "Build release with debug info configuration with Qt and Apple Clang",
+      "jobs": 8
+    },
+    {
+      "name": "relwithdebinfo-qt-llvm-clang",
+      "configurePreset": "relwithdebinfo-qt-llvm-clang",
+      "description": "Build release with debug info configuration with Qt and LLVM Clang",
+      "jobs": 8
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "debug-qt",
+      "configurePreset": "debug-qt",
+      "description": "Run tests for debug configuration with Qt"
+    },
+    {
+      "name": "release-qt",
+      "configurePreset": "release-qt",
+      "description": "Run tests for release configuration with Qt"
+    },
+    {
+      "name": "relwithdebinfo-qt",
+      "configurePreset": "relwithdebinfo-qt",
+      "description": "Run tests for release with debug info configuration with Qt"
+    }
+  ]
+}
