@@ -59,8 +59,8 @@ std::optional<Slice> makeSlice(QStringView v)
         if (v64 <= -SAFE_INT || v64 >= SAFE_INT)
             return false; // totally out of supported range – selector invalid
 
-        static constexpr qlonglong INT32_MIN_LL = static_cast<qlonglong>(std::numeric_limits<int>::min());
-        static constexpr qlonglong INT32_MAX_LL = static_cast<qlonglong>(std::numeric_limits<int>::max());
+        static constexpr auto INT32_MIN_LL = static_cast<qlonglong>(std::numeric_limits<int>::min());
+        static constexpr auto INT32_MAX_LL = static_cast<qlonglong>(std::numeric_limits<int>::max());
 
         if (v64 < INT32_MIN_LL)
             out = std::numeric_limits<qsizetype>::min();
@@ -243,10 +243,7 @@ bool isValidQuotedKey(QStringView key, QuoteStyle style)
     }
 
     // If we ended expecting a low surrogate, invalid
-    if (expectLowSurrogate)
-        return false;
-
-    return true;
+    return !expectLowSurrogate;
 }
 
 // ──────────────────────────────────────────────────────────────────────

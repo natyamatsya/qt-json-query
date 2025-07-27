@@ -1470,7 +1470,7 @@ std::optional<Token> parseEmbeddedFunction(const QString& s)
             });
         } else {
             // Use regular filter for non-root context evaluation
-            QString expr = s;
+            const QString& expr = s;
             
             result.embedFilter([expr](const QJsonValue& j) -> bool {
                 // Re-parse the expression at runtime to avoid capture issues
@@ -1482,8 +1482,8 @@ std::optional<Token> parseEmbeddedFunction(const QString& s)
                 QString op = QString::fromStdString(std::string(m.template get<2>()));
                 QString right = QString::fromStdString(std::string(m.template get<3>()));
                 
-                bool leftHasFunc = left.contains(QRegularExpression("\\b(length|count|match|search|value)\\s*\\("));
-                bool rightHasFunc = right.contains(QRegularExpression("\\b(length|count|match|search|value)\\s*\\("));
+                bool leftHasFunc = left.contains(QRegularExpression(R"(\b(length|count|match|search|value)\s*\()"));
+                bool rightHasFunc = right.contains(QRegularExpression(R"(\b(length|count|match|search|value)\s*\()"));
                 
                 QJsonValue leftVal, rightVal;
                 

@@ -122,15 +122,15 @@ public:
         returns_ = 0;
     }
     
-private:
-    ArrayPool() = default;
-    ~ArrayPool() = default;
-    
     // Non-copyable, non-movable singleton
     ArrayPool(const ArrayPool&) = delete;
     ArrayPool& operator=(const ArrayPool&) = delete;
     ArrayPool(ArrayPool&&) = delete;
     ArrayPool& operator=(ArrayPool&&) = delete;
+
+private:
+    ArrayPool() = default;
+    ~ArrayPool() = default;
     
     QT_QUERY_JSON_ALWAYS_INLINE PooledArray acquireImpl() {
         std::lock_guard<std::mutex> lock(mutex_);

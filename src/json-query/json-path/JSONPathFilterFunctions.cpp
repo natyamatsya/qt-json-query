@@ -41,11 +41,11 @@ QJsonValue evaluateFunction(const QString& funcCall, const QJsonValue& context)
     
     // Calculate length
     auto calculateLength = [](const QJsonValue& value) -> QJsonValue {
-        if (value.isUndefined() || value.isNull()) return QJsonValue(); // Return Nothing for undefined/null
+        if (value.isUndefined() || value.isNull()) return {}; // Return Nothing for undefined/null
         if (value.isString()) return QJsonValue(value.toString().length());
         if (value.isArray()) return QJsonValue(value.toArray().size());
         if (value.isObject()) return QJsonValue(value.toObject().size());
-        return QJsonValue(); // Return Nothing for other types (RFC 9535)
+        return {}; // Return Nothing for other types (RFC 9535)
     };
     
     // Evaluate JSONPath value
@@ -54,24 +54,24 @@ QJsonValue evaluateFunction(const QString& funcCall, const QJsonValue& context)
             using json_query::JSONPath;
             auto pathResult = JSONPath::create(args);
             if (!pathResult) {
-                return QJsonValue(); // Return null for invalid JSONPath
+                return {}; // Return null for invalid JSONPath
             }
             
             auto evalResult = pathResult->evaluateAll(context);
             if (!evalResult) {
-                return QJsonValue(); // Return null for evaluation errors
+                return {}; // Return null for evaluation errors
             }
             
             // RFC 9535 "value" function semantics: return the value if single node, return Nothing if empty or multiple nodes
             if (evalResult->isEmpty()) {
-                return QJsonValue(); // Return null for no results (RFC 9535 "nothing")
+                return {}; // Return null for no results (RFC 9535 "nothing")
             }
             
             if (evalResult->size() == 1) {
                 return (*evalResult)[0]; // Return the single value
             }
             
-            return QJsonValue(); // Return null for multiple results (RFC 9535 "nothing")
+            return {}; // Return null for multiple results (RFC 9535 "nothing")
         } else if (args.startsWith("@.")) {
             const auto prop = args.mid(2);
             QJsonValue val = context.toObject().value(prop);
@@ -79,13 +79,13 @@ QJsonValue evaluateFunction(const QString& funcCall, const QJsonValue& context)
         } else if (args == "@") {
             return context;
         }
-        return QJsonValue(); // Undefined for complex paths
+        return {}; // Undefined for complex paths
     };
     
     // Main function evaluation
     auto parsed = parseFunctionSyntax(funcCall);
     if (!parsed) {
-        return QJsonValue(); // Invalid function syntax
+        return {}; // Invalid function syntax
     }
     
     const auto& [funcName, args] = *parsed;
@@ -95,7 +95,7 @@ QJsonValue evaluateFunction(const QString& funcCall, const QJsonValue& context)
     } else if (funcName == "value") {
         return evaluateJsonPathValue(args);
     }
-    return QJsonValue(); // Unknown function
+    return {}; // Unknown function
 }
 
 // Helper function to parse JSON literals from strings

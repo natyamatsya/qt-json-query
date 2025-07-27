@@ -40,12 +40,12 @@ namespace json_query::json_path
                 : tk(tokens), kb(keyBuilder), contextFilters(ctxFilters), filters(filterFns), currentBracketGroupId(bracketGroupId) {}
 
             // Token emission methods
-            std::expected<void, Error> key(const QString& key, bool allow = false);
-            void keyList(const std::vector<QString>& keys);
-            void wild();
-            void slice(const Slice& s);
-            void index(int i);
-            void pushFilter(const Token& t);
+            std::expected<void, Error> key(const QString& key, bool allow = false) const;
+            void keyList(const std::vector<QString>& keys) const;
+            void wild() const;
+            void slice(const Slice& s) const;
+            void index(int i) const;
+            void pushFilter(const Token& t) const;
         };
 
         class EmbeddedBracketSink {
@@ -58,12 +58,12 @@ namespace json_query::json_path
                 : tk(tokens), kb(keyBuilder), currentBracketGroupId(bracketGroupId) {}
 
             // Token emission methods
-            std::expected<void, Error> key(const QString& key, bool allow = false);
-            void keyList(const std::vector<QString>& keys);
-            void wild();
-            void slice(const Slice& s);
-            void index(int i);
-            void pushFilter(const Token& t);
+            std::expected<void, Error> key(const QString& key, bool allow = false) const;
+            void keyList(const std::vector<QString>& keys) const;
+            void wild() const;
+            void slice(const Slice& s) const;
+            void index(int i) const;
+            void pushFilter(const Token& t) const;
         };
 
         // ──────────────────────────────────────────────────────────────────────

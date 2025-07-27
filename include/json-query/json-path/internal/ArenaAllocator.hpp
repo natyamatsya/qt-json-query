@@ -23,7 +23,7 @@ public:
      * @param initialCapacity Initial memory block size in bytes
      */
     explicit ArenaAllocator(size_t initialCapacity = 64 * 1024) // 64KB default
-        : blockSize_(initialCapacity), currentBlock_(nullptr), currentPos_(0), currentEnd_(0) {
+        : blockSize_(initialCapacity) {
         allocateNewBlock();
     }
     
@@ -216,9 +216,9 @@ private:
     
     size_t blockSize_;
     std::vector<void*> blocks_;
-    char* currentBlock_;
-    size_t currentPos_;
-    size_t currentEnd_;
+    char* currentBlock_ = nullptr;
+    size_t currentPos_ = 0;
+    size_t currentEnd_ = 0;
     size_t totalAllocated_ = 0;
 };
 

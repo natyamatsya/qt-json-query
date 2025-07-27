@@ -826,7 +826,7 @@ QJsonValue applyTrailing(json_path::FunctionType fn, const QJsonValue& v)
 
     case Min:
     case Max:
-        if (!v.isArray()) return QJsonValue(QJsonValue::Undefined);
+        if (!v.isArray()) return {QJsonValue::Undefined};
         {
             const auto arr = v.toArray();
             bool first=true; double best=0.0;

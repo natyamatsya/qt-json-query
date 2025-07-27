@@ -119,10 +119,10 @@ private:
         for (const QChar& ch : key) {
             const ushort unicode = ch.unicode();
             // Fast check using unicode values to avoid Qt method calls
-            if (!((unicode >= 'a' && unicode <= 'z') ||
-                  (unicode >= 'A' && unicode <= 'Z') ||
-                  (unicode >= '0' && unicode <= '9') ||
-                  unicode == '_' || unicode == '-')) {
+            if ((unicode < 'a' || unicode > 'z') &&
+                  (unicode < 'A' || unicode > 'Z') &&
+                  (unicode < '0' || unicode > '9') &&
+                  unicode != '_' && unicode != '-') {
                 return false; // Contains special characters
             }
         }

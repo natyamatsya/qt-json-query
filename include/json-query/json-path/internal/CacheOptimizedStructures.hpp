@@ -284,9 +284,9 @@ private:
     struct CachedKey {
         QString key;
         uint32_t hash;
-        uint32_t accessCount;
+        uint32_t accessCount = 1;
         
-        CachedKey(const QString& k, uint32_t h) : key(k), hash(h), accessCount(1) {}
+        CachedKey(const QString& k, uint32_t h) : key(k), hash(h) {}
     };
     
     std::vector<CachedKey> cache_;

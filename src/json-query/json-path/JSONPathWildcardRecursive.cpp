@@ -68,7 +68,7 @@ struct RecursivePatternDetector {
                 }
             }
         }
-        return QStringView();
+        return {};
     }
     
     /**

@@ -88,7 +88,7 @@ namespace json_query::json_path::internal {
         }
 
         [[deprecated("Use range-based for loop or iterators instead")]]
-        [[nodiscard]] QJsonValue next() noexcept {
+        [[nodiscard]] QJsonValue next() const noexcept {
             if (m_tagged & ARRAY_TAG) {
                 const auto* a = arrPtr(m_tagged);
                 return a->at(m_idx++);

@@ -18,7 +18,7 @@ QJsonValue evaluateContextFunction(const QString& funcExpr, const QJsonValue& co
     int openParen = funcExpr.indexOf('(');
     int closeParen = funcExpr.lastIndexOf(')');
     if (openParen == -1 || closeParen == -1) {
-        return QJsonValue(); // Invalid function syntax
+        return {}; // Invalid function syntax
     }
     
     QString funcName = funcExpr.mid(0, openParen).trimmed();
@@ -53,7 +53,7 @@ QJsonValue evaluateContextFunction(const QString& funcExpr, const QJsonValue& co
         }
         
         // Return length as QJsonValue - RFC 9535 "nothing" semantics
-        if (argValue.isUndefined() || argValue.isNull()) return QJsonValue(0); // Nothing has length 0
+        if (argValue.isUndefined() || argValue.isNull()) return {0}; // Nothing has length 0
         if (argValue.isString()) return QJsonValue(argValue.toString().length());
         
         // Use ContextAwareContainerCursor for efficient length calculation
@@ -66,7 +66,7 @@ QJsonValue evaluateContextFunction(const QString& funcExpr, const QJsonValue& co
             return QJsonValue(cursor.size()); // Zero-copy size access
         }
         
-        return QJsonValue(0); // Other types have no length
+        return {0}; // Other types have no length
     }
     
     if (funcName == "value") {
@@ -81,7 +81,7 @@ QJsonValue evaluateContextFunction(const QString& funcExpr, const QJsonValue& co
                 auto results = path->evaluateAll(root);
                 if (results) {
                     if (results->isEmpty()) {
-                        return QJsonValue(0); // Return 0 for empty results (RFC 9535 "nothing" semantics)
+                        return {0}; // Return 0 for empty results (RFC 9535 "nothing" semantics)
                     } else {
                         // Use ContextAwareContainerCursor for efficient result processing
                         auto cursor = makeSimpleContextCursor(*results, root, context);
@@ -97,9 +97,9 @@ QJsonValue evaluateContextFunction(const QString& funcExpr, const QJsonValue& co
                         return result;
                     }
                 }
-                return QJsonValue(0); // Invalid JSONPath expression returns 0
+                return {0}; // Invalid JSONPath expression returns 0
             }
-            return QJsonValue(0); // Invalid JSONPath expression returns 0
+            return {0}; // Invalid JSONPath expression returns 0
         } else if (args.startsWith("@.")) {
             QString prop = args.mid(2);
             if (context.isObject()) {
@@ -113,10 +113,10 @@ QJsonValue evaluateContextFunction(const QString& funcExpr, const QJsonValue& co
         } else if (args == "@") {
             return context;
         }
-        return QJsonValue(0); // Undefined for complex paths returns 0
+        return {0}; // Undefined for complex paths returns 0
     }
     
-    return QJsonValue(); // Unknown function
+    return {}; // Unknown function
 }
 
 // Parse context-aware function calls like length(@.a) == value($..c)

@@ -16,7 +16,7 @@ namespace json_query::json_path::detail
 //  BracketSink Implementation
 // ──────────────────────────────────────────────────────────────────────
 
-std::expected<void, Error> BracketSink::key(const QString& key, bool allow)
+std::expected<void, Error> BracketSink::key(const QString& key, bool allow) const
 {
     // Create token with bracket group ID
     if (!allow && key.contains(u' '))
@@ -27,7 +27,7 @@ std::expected<void, Error> BracketSink::key(const QString& key, bool allow)
     return {};
 }
 
-void BracketSink::keyList(const std::vector<QString>& keys)
+void BracketSink::keyList(const std::vector<QString>& keys) const
 {
     if (keys.empty()) return;
 
@@ -46,21 +46,21 @@ void BracketSink::keyList(const std::vector<QString>& keys)
     tk.emplace_back(std::move(t));
 }
 
-void BracketSink::wild()
+void BracketSink::wild() const
 {
     Token t{Token::Kind::Wildcard};
     t.bracketGroupId = currentBracketGroupId;
     tk.emplace_back(t);
 }
 
-void BracketSink::slice(const Slice& s)
+void BracketSink::slice(const Slice& s) const
 {
     Token t{Token::Kind::Slice, 0, s, 0u};
     t.bracketGroupId = currentBracketGroupId;
     tk.emplace_back(t);
 }
 
-void BracketSink::index(int i)
+void BracketSink::index(int i) const
 {
     qCDebug(jsonPathLog) << "BracketSink::index emit" << i;
     Token t{Token::Kind::Index, i};
@@ -68,7 +68,7 @@ void BracketSink::index(int i)
     tk.emplace_back(t);
 }
 
-void BracketSink::pushFilter(const Token& t)
+void BracketSink::pushFilter(const Token& t) const
 {
     Token token = t;  // Copy the token
     token.bracketGroupId = currentBracketGroupId; // Set bracket group ID
@@ -79,7 +79,7 @@ void BracketSink::pushFilter(const Token& t)
 //  EmbeddedBracketSink Implementation (Zero-Overhead)
 // ──────────────────────────────────────────────────────────────────────
 
-std::expected<void, Error> EmbeddedBracketSink::key(const QString& key, bool allow)
+std::expected<void, Error> EmbeddedBracketSink::key(const QString& key, bool allow) const
 {
     // Create token with bracket group ID (same logic as legacy BracketSink)
     if (!allow && key.contains(u' '))
@@ -90,7 +90,7 @@ std::expected<void, Error> EmbeddedBracketSink::key(const QString& key, bool all
     return {};
 }
 
-void EmbeddedBracketSink::keyList(const std::vector<QString>& keys)
+void EmbeddedBracketSink::keyList(const std::vector<QString>& keys) const
 {
     if (keys.empty()) return;
 
@@ -109,28 +109,28 @@ void EmbeddedBracketSink::keyList(const std::vector<QString>& keys)
     tk.emplace_back(std::move(t));
 }
 
-void EmbeddedBracketSink::wild()
+void EmbeddedBracketSink::wild() const
 {
     Token t{Token::Kind::Wildcard};
     t.bracketGroupId = currentBracketGroupId; // Set bracket group ID
     tk.emplace_back(t);
 }
 
-void EmbeddedBracketSink::slice(const Slice& s)
+void EmbeddedBracketSink::slice(const Slice& s) const
 {
     Token t{Token::Kind::Slice, 0, s};
     t.bracketGroupId = currentBracketGroupId; // Set bracket group ID
     tk.emplace_back(t);
 }
 
-void EmbeddedBracketSink::index(int i)
+void EmbeddedBracketSink::index(int i) const
 {
     Token t{Token::Kind::Index, i};
     t.bracketGroupId = currentBracketGroupId; // Set bracket group ID
     tk.emplace_back(t);
 }
 
-void EmbeddedBracketSink::pushFilter(const Token& t)
+void EmbeddedBracketSink::pushFilter(const Token& t) const
 {
     Token token = t;  // Copy the token
     token.bracketGroupId = currentBracketGroupId; // Set bracket group ID
@@ -178,12 +178,7 @@ bool matchesIndexList(QStringView content)
     if (!content.contains(u',')) return false;
     
     const auto parts = content.split(u',');
-    if (parts.size() < 2) return false;
-    
-    for (const auto& part : parts) {
-        if (!isValidIndexLiteral(part)) return false;
-    }
-    return true;
+    return static_cast<bool>(parts.size() >= 2);
 }
 
 bool matchesSlice(QStringView content)
@@ -718,7 +713,7 @@ std::vector<BracketRuleMetadata> BracketRuleDispatcher::createRules()
             .priority = 400,
             .matcher = matchers::matchesQuotedKey,
             .handler = handlers::handleQuotedKey,
-            .description = "Quoted string key (e.g., \"'key'\" or '\"key\"')"
+            .description = R"(Quoted string key (e.g., "'key'" or '"key"'))"
         },
         {
             .name = "unquoted_key",
@@ -859,7 +854,7 @@ std::vector<EmbeddedBracketRuleMetadata> EmbeddedBracketRuleDispatcher::createRu
             .priority = 400,
             .matcher = matchers::matchesQuotedKey,
             .handler = embedded_handlers::handleQuotedKey,
-            .description = "Quoted string key (e.g., \"'key'\" or '\"key\"')"
+            .description = R"(Quoted string key (e.g., "'key'" or '"key"'))"
         },
         {
             .name = "unquoted_key",

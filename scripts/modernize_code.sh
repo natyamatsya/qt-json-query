@@ -57,12 +57,13 @@ apply_fixes() {
     
     echo "🔧 Applying fixes to $file for $description..."
     
-    # Apply fixes with clang-tidy
+    # Apply fixes with clang-tidy, using --fix-errors to apply fixes even with system header errors
     "$CLANG_TIDY" "$file" \
         -p "$BUILD_DIR" \
         --checks="$check" \
         --header-filter='(include/json-query/.*\.(h|hpp)|src/json-query/.*\.(h|hpp))$' \
         --fix \
+        --fix-errors \
         --format-style=none \
         2>/dev/null || true
 }
