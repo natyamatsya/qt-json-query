@@ -29,13 +29,6 @@ if(TARGET function_ref_interface)
   target_link_libraries(refactor_potential PRIVATE function_ref_interface)
 endif()
 
-# function_ref demonstration and performance comparison
-add_executable(function_ref_demo function_ref_demo.cpp)
-target_link_libraries(function_ref_demo PRIVATE json_query)
-if(TARGET function_ref_interface)
-  target_link_libraries(function_ref_demo PRIVATE function_ref_interface)
-endif()
-
 install(TARGETS simple_pointer monadic_error_handling_demo simple_path
-                complex_query refactor_potential function_ref_demo
+                complex_query refactor_potential
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}/examples)
