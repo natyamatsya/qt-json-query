@@ -385,6 +385,11 @@ std::optional<Token> parseEmbeddedAbsolutePathContext(QString s)
 {
     qCDebug(jsonPathLog) << "parseEmbeddedAbsolutePathContext() s=" << s;
 
+    // Context filter expressions like "@.a", "@.b", etc. should be handled by parseEmbeddedExists
+    // This function is called from compileEmbeddedContextFilter for bracket filter expressions
+    if (s.startsWith("@"))
+        return detail::parseEmbeddedExists(s);
+
     return std::nullopt;
 }
 

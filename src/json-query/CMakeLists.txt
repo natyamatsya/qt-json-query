@@ -7,29 +7,30 @@
 set(JSON_QUERY_SOURCES
     json-pointer/JSONPointer.cpp
     json-path/JSONPath.cpp
-    json-path/JSONPathCreate.cpp
-    json-path/JSONPathCompile.cpp
-    json-path/JSONPathParseUtils.cpp
     json-path/JSONPathBracketRules.cpp
-    json-path/JSONPathParsers.cpp
-    json-path/JSONPathFilterHelpers.cpp
-    json-path/JSONPathFilterComparison.cpp
-    json-path/JSONPathFilterOrchestration.cpp
-    json-path/JSONPathFilterComparisonDispatcher.cpp
-    json-path/JSONPathFilterParsers.cpp
-    json-path/JSONPathFilterFunctions.cpp
-    json-path/JSONPathFilterEmbeddedParsers.cpp
+    json-path/JSONPathCompile.cpp
     json-path/JSONPathContextFilter.cpp
-    json-path/JSONPathTokenEvaluators.cpp
-    json-path/JSONPathPointerConversion.cpp
-    json-path/internal/IterativeRecursiveDescent.cpp
-    json-path/internal/CacheOptimizedStructures.cpp
+    json-path/JSONPathCreate.cpp
     json-path/JSONPathEvaluate.cpp
     json-path/JSONPathEvalHelpers.cpp
-    json-path/JSONPathTokenDispatch.cpp
-    json-path/JSONPathWildcardRecursive.cpp
     json-path/JSONPathExpected.cpp
-    json-path/JSONPathLog.cpp)
+    json-path/JSONPathFilterComparison.cpp
+    json-path/JSONPathFilterComparisonDispatcher.cpp
+    json-path/JSONPathFilterEmbeddedParsers.cpp
+    json-path/JSONPathFilterExistenceParsers.cpp
+    json-path/JSONPathFilterFunctions.cpp
+    json-path/JSONPathFilterHelpers.cpp
+    json-path/JSONPathFilterOrchestration.cpp
+    json-path/JSONPathFilterParsers.cpp
+    json-path/JSONPathLog.cpp
+    json-path/JSONPathParseUtils.cpp
+    json-path/JSONPathParsers.cpp
+    json-path/JSONPathPointerConversion.cpp
+    json-path/JSONPathTokenDispatch.cpp
+    json-path/JSONPathTokenEvaluators.cpp
+    json-path/JSONPathWildcardRecursive.cpp
+    json-path/internal/CacheOptimizedStructures.cpp
+    json-path/internal/IterativeRecursiveDescent.cpp)
 
 # ---------------------------------------------------------------------------
 # Library target
