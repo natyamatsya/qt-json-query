@@ -15,14 +15,19 @@
 #include <QStringView>
 #include <QElapsedTimer>
 #include <QRandomGenerator>
+#include <type_traits>
 
 #include "../include/json-query/json-pointer/JSONPointer.hpp"
 #include "../include/json-query/json-path/JSONPath.hpp"
+#include "../include/json-query/utils/JSONValueUtils.hpp"
 
 using json_query::JSONPath;
 using json_query::JSONPointer;
 
 using namespace Qt::StringLiterals;
+
+using json_query::utils::as;
+using json_query::utils::errorMessage;
 
 // -----------------------------------------------------------------------------
 // Sample data – book store with inventory array
