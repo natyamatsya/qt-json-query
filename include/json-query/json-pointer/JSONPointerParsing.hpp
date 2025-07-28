@@ -63,20 +63,22 @@ struct Token
     return out;
 }
 
-[[nodiscard]] inline bool parseArrayIndex(const QString& s, qsizetype& out) noexcept
+[[nodiscard]] inline bool parseArrayIndex(const QString& s, qsizetype& out)
 {
     if (s.isEmpty())
         return false;
-    qsizetype value{0};
-    for (const QChar ch : s)
+    if (s == QLatin1String("0"))
     {
-        if (ch < u'0' || ch > u'9')
-            return false;
-        const auto digit{ch.unicode() - u'0'};
-        if (value > (std::numeric_limits<qsizetype>::max() - digit) / 10)
-            return false;
-        value = value * 10 + digit;
+        out = 0;
+        return true;
     }
+    // RFC 6901: Leading zeros are not allowed in array indices
+    if (s.startsWith(u'0'))
+        return false;
+    bool       ok;
+    const auto value = s.toLongLong(&ok);
+    if (!ok || value < 0)
+        return false;
     out = value;
     return true;
 }
@@ -140,6 +142,19 @@ enum class ParseError : std::uint8_t
             }
             if (digits)
                 return std::unexpected(ParseError::ArrayIndexOverflow);
+            // Check for invalid escape sequences in the raw token
+            for (qsizetype i = 0; i < raw.size(); ++i)
+            {
+                if (raw[i] == u'~')
+                {
+                    if (i + 1 >= raw.size())
+                        return std::unexpected(ParseError::InvalidEscapeSequence);
+                    const auto next = raw[i + 1];
+                    if (next != u'0' && next != u'1')
+                        return std::unexpected(ParseError::InvalidEscapeSequence);
+                    ++i; // Skip the next character as it's part of the escape sequence
+                }
+            }
             if (decoded.isEmpty() && !raw.isEmpty())
                 return std::unexpected(ParseError::InvalidEscapeSequence);
             tokens.push_back(Token{Token::Kind::Key, 0, decoded});
