@@ -14,13 +14,26 @@ using json_query::json_pointer::detail::ParseError;
 void evaluateAndPrint(const JSONPointer& pointer, const QJsonDocument& doc, const QString& desc)
 {
     qDebug().noquote() << "\n" << desc << ":";
-    qDebug() << "  Pointer:" << pointer.toString();
+    qDebug() << "  Pointer:" << (pointer.toString().isEmpty() ? "\"\" (empty string)" : pointer.toString());
 
     auto result = pointer.evaluate(doc);
     if (result)
-        qDebug() << "  Result:  " << result->toVariant().toString();
+    {
+        if (pointer.toString().isEmpty())
+        {
+            // Special case: Show the whole document for empty pointer
+            qDebug() << "  Result:  (whole document)";
+            qDebug().noquote() << "  " << QJsonDocument(result->toObject()).toJson(QJsonDocument::Indented);
+        }
+        else
+        {
+            qDebug() << "  Result:  " << result->toVariant().toString();
+        }
+    }
     else
+    {
         qDebug() << "  Error:   Could not evaluate pointer";
+    }
 }
 
 // Helper function to create a pointer and handle errors
