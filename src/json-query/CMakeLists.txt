@@ -17,7 +17,7 @@ set(JSON_QUERY_SOURCES
     json-path/JSONPathFilterComparisonDispatcher.cpp
     json-path/JSONPathFilterParsers.cpp
     json-path/JSONPathFilterFunctions.cpp
-    json-path/JSONPathFilterCore.cpp
+    json-path/JSONPathFilterEmbeddedParsers.cpp
     json-path/JSONPathContextFilter.cpp
     json-path/JSONPathTokenEvaluators.cpp
     json-path/JSONPathPointerConversion.cpp
