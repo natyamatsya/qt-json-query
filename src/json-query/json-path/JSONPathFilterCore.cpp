@@ -1,6 +1,7 @@
 #include "json-query/json-path/JSONPathFilterParsers.hpp"
 #include "json-query/json-path/JSONPathFilterFunctions.hpp"
 #include "json-query/json-path/JSONPathFilterHelpers.hpp"
+#include "json-query/json-path/JSONPathFilterComparison.hpp"
 #include "json-query/json-path/JSONPathHelpers.hpp"
 #include "json-query/json-path/JSONPathLog.hpp"
 #include "json-query/json-path/JSONPath.hpp"
@@ -14,11 +15,11 @@ namespace json_query::json_path::detail
 
 using json_query::json_path::FilterFn;
 using json_query::json_path::Token;
+using json_query::json_path::detail::performComparison;
 using json_query::json_path::detail::splitTopLevel;
 using json_query::json_path::detail::stripOuterParens;
 using json_query::utils::to_qstr;
 using json_query::utils::to_sv;
-
 // Remaining parser function implementations
 std::optional<Token> parseOr(const QString& s, std::vector<FilterFn>& out)
 {
@@ -238,73 +239,6 @@ struct ComparisonTokenFactory
         return std::nullopt; // Default: not implemented
     }
 };
-
-// Helper function for value comparison logic (eliminates code duplication)
-inline bool performComparison(const QJsonValue& leftVal, const QString& op, const QJsonValue& rightVal)
-{
-    // Handle undefined values
-    if (leftVal.type() == QJsonValue::Undefined || rightVal.type() == QJsonValue::Undefined)
-    {
-        if (op == "==")
-            return leftVal.type() == rightVal.type(); // both undefined
-        if (op == "!=")
-            return leftVal.type() != rightVal.type(); // one undefined, one not
-        return false;                                 // ordering comparisons require same type
-    }
-
-    // Use deep equality for == and !=
-    if (op == "==")
-        return leftVal == rightVal;
-    if (op == "!=")
-        return leftVal != rightVal;
-
-    // For ordering comparisons, ensure same type
-    if (leftVal.type() != rightVal.type())
-        return false;
-
-    // Handle ordering comparisons by type
-    if (leftVal.isDouble() && rightVal.isDouble())
-    {
-        auto left{leftVal.toDouble()};
-        auto right{rightVal.toDouble()};
-        if (op == "<")
-            return left < right;
-        if (op == ">")
-            return left > right;
-        if (op == "<=")
-            return left <= right;
-        if (op == ">=")
-            return left >= right;
-    }
-    else if (leftVal.isBool() && rightVal.isBool())
-    {
-        auto left{leftVal.toBool()};
-        auto right{rightVal.toBool()};
-        if (op == "<")
-            return !left && right; // false < true
-        if (op == ">")
-            return left && !right; // true > false
-        if (op == "<=")
-            return !left || right; // false <= anything, true <= true
-        if (op == ">=")
-            return left || !right; // true >= anything, false >= false
-    }
-    else if (leftVal.isString() && rightVal.isString())
-    {
-        auto left{leftVal.toString()};
-        auto right{rightVal.toString()};
-        if (op == "<")
-            return left < right;
-        if (op == ">")
-            return left > right;
-        if (op == "<=")
-            return left <= right;
-        if (op == ">=")
-            return left >= right;
-    }
-
-    return false; // unsupported comparison
-}
 
 // Null comparison factories
 template <>

@@ -291,4 +291,71 @@ bool applyOperator<QString>(const QString& op, const QString& left, const QStrin
     return false;
 }
 
+// Helper function for JSON value comparison logic with RFC 9535 semantics
+bool performComparison(const QJsonValue& leftVal, const QString& op, const QJsonValue& rightVal)
+{
+    // Handle undefined values
+    if (leftVal.type() == QJsonValue::Undefined || rightVal.type() == QJsonValue::Undefined)
+    {
+        if (op == "==")
+            return leftVal.type() == rightVal.type(); // both undefined
+        if (op == "!=")
+            return leftVal.type() != rightVal.type(); // one undefined, one not
+        return false;                                 // ordering comparisons require same type
+    }
+
+    // Use deep equality for == and !=
+    if (op == "==")
+        return leftVal == rightVal;
+    if (op == "!=")
+        return leftVal != rightVal;
+
+    // For ordering comparisons, ensure same type
+    if (leftVal.type() != rightVal.type())
+        return false;
+
+    // Handle ordering comparisons by type
+    if (leftVal.isDouble() && rightVal.isDouble())
+    {
+        auto left{leftVal.toDouble()};
+        auto right{rightVal.toDouble()};
+        if (op == "<")
+            return left < right;
+        if (op == ">")
+            return left > right;
+        if (op == "<=")
+            return left <= right;
+        if (op == ">=")
+            return left >= right;
+    }
+    else if (leftVal.isBool() && rightVal.isBool())
+    {
+        auto left{leftVal.toBool()};
+        auto right{rightVal.toBool()};
+        if (op == "<")
+            return !left && right; // false < true
+        if (op == ">")
+            return left && !right; // true > false
+        if (op == "<=")
+            return !left || right; // false <= anything, true <= true
+        if (op == ">=")
+            return left || !right; // true >= anything, false >= false
+    }
+    else if (leftVal.isString() && rightVal.isString())
+    {
+        auto left{leftVal.toString()};
+        auto right{rightVal.toString()};
+        if (op == "<")
+            return left < right;
+        if (op == ">")
+            return left > right;
+        if (op == "<=")
+            return left <= right;
+        if (op == ">=")
+            return left >= right;
+    }
+
+    return false; // unsupported comparison
+}
+
 } // namespace json_query::json_path::detail

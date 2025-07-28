@@ -37,6 +37,15 @@ bool compareValue<ComparisonType::String>(const QJsonValue& v, const QString& op
 template <>
 bool compareValue<ComparisonType::DeepEquality>(const QJsonValue& v, const QString& op, const QString& rhs);
 
+template <>
+bool compareValue<ComparisonType::String>(const QJsonValue& v, const QString& op, const QString& strVal);
+
+template <>
+bool compareValue<ComparisonType::DeepEquality>(const QJsonValue& v, const QString& op, const QJsonValue& rhsVal);
+
+// Helper function for JSON value comparison logic with RFC 9535 semantics
+bool performComparison(const QJsonValue& leftVal, const QString& op, const QJsonValue& rightVal);
+
 // Lightweight comparison context using template dispatch
 struct ComparisonContext
 {
