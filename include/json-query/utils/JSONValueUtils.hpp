@@ -196,50 +196,19 @@ std::expected<T, ErrorType> as_impl(const QJsonValue& value)
  * @tparam E The error enum type (JSONPath or JSONPointer EvalError)
  * @param error The error to convert
  * @return QString containing the error message
+ *
+ * @note This function uses the built-in to_string functions from the respective
+ *       error enums to ensure consistent error message formatting.
  */
 template <typename E>
-[[nodiscard]] inline QString errorMessage(E error)
+[[nodiscard]] inline QString errorMessage(E error) noexcept
 {
     if constexpr (std::is_same_v<E, json_query::json_path::EvalError>)
-    {
-        using E = json_query::json_path::EvalError;
-        switch (error)
-        {
-        case E::TypeMismatchObject:
-            return "Expected object type";
-        case E::TypeMismatchArray:
-            return "Expected array type";
-        case E::KeyNotFound:
-            return "Key not found";
-        case E::IndexOutOfRange:
-            return "Index out of range";
-        case E::InvalidSlice:
-            return "Invalid slice parameters";
-        default:
-            return "Unknown error";
-        }
-    }
+        return QString::fromUtf8(json_query::json_path::to_string(error).data());
     else if constexpr (std::is_same_v<E, json_query::json_pointer::detail::EvalError>)
-    {
-        using E = json_query::json_pointer::detail::EvalError;
-        switch (error)
-        {
-        case E::TypeMismatchObject:
-            return "Expected object type";
-        case E::TypeMismatchArray:
-            return "Expected array type";
-        case E::KeyNotFound:
-            return "Key not found";
-        case E::IndexOutOfRange:
-            return "Index out of range";
-        default:
-            return "Unknown error";
-        }
-    }
+        return QString::fromUtf8(json_query::json_pointer::detail::to_string(error).data());
     else
-    {
         static_assert(always_false<E>, "Unsupported error type for errorMessage");
-    }
 }
 
 } // namespace json_query::utils
