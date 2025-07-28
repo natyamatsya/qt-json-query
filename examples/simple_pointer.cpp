@@ -21,23 +21,21 @@ void evaluateAndPrint(const JSONPointer& pointer, const QJsonDocument& doc, QStr
     qDebug() << "  Pointer:" << (pointer.toString().isEmpty() ? "\"\" (empty string)" : pointer.toString());
 
     auto result = pointer.evaluate(doc);
-    if (result)
-    {
-        if (pointer.toString().isEmpty())
-        {
-            // Special case: Show the whole document for empty pointer
-            qDebug() << "  Result:  (whole document)";
-            qDebug().noquote() << "  " << QJsonDocument(result->toObject()).toJson(QJsonDocument::Indented);
-        }
-        else
-        {
-            qDebug() << "  Result:  " << result->toVariant().toString();
-        }
-    }
-    else
+    if (!result)
     {
         qDebug() << "  Error:   Could not evaluate pointer";
+        return;
     }
+
+    if (pointer.toString().isEmpty())
+    {
+        // Special case: Show the whole document for empty pointer
+        qDebug() << "  Result:  (whole document)";
+        qDebug().noquote() << "  " << QJsonDocument(result->toObject()).toJson(QJsonDocument::Indented);
+        return;
+    }
+
+    qDebug() << "  Result:  " << result->toVariant().toString();
 }
 
 // Helper function to create a pointer and handle errors
@@ -49,6 +47,7 @@ bool evaluatePointer(QStringView path, const QJsonDocument& doc, QStringView des
         qWarning() << "Failed to create pointer:" << path << "-" << description;
         return false;
     }
+
     evaluateAndPrint(*pointer, doc, description);
     return true;
 }
