@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 #include "json-query/json-pointer/JSONPointer.hpp"
 #include "json-query/utils/JSONQueryUtils.hpp"
 #include "json-query/json-pointer/JSONPointerParsing.hpp"

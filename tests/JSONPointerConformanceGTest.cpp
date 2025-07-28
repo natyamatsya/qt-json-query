@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 // JSONPointerConformanceGTest.cpp - GoogleTest port of RFC-6901 suite
 #include <gtest/gtest.h>
 #include <QJsonDocument>

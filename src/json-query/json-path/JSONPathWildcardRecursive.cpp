@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 #include "json-query/json-path/JSONPathWildcardRecursive.hpp"
 #include "json-query/json-path/internal/ContainerCursor.hpp"
 #include "json-query/json-path/internal/ArrayPool.hpp"

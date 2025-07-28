@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 // JSONPathLogicalOrGTest.cpp
 // ──────────────────────────
 // Sharp tests for logical OR support in JSONPath filters (Qt 6).

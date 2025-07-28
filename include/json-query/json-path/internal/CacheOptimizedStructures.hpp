@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 /**
  * @file CacheOptimizedStructures.hpp
  * @brief Cache-conscious data structures for JSONPath recursive queries

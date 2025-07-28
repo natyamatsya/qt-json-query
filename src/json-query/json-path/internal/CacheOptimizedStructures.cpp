@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 #include "json-query/json-path/internal/CacheOptimizedStructures.hpp"
 #include <QJsonArray>
 #include <QJsonObject>

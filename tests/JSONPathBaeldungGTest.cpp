@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 // JSONPathBaeldungGTest.cpp - Tests adapted from Baeldung JsonPath tutorial
 // Article: https://www.baeldung.com/guide-to-jayway-jsonpath
 // These tests validate that our C++ JSONPath implementation behaves equivalently

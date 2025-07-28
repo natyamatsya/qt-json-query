@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 // Comprehensive Auto Modernization Tool
 // Systematically replaces explicit types with 'auto' where safe and beneficial
 // Based on the successful comprehensive_variable_modernizer.cpp approach

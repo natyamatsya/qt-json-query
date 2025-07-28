@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 /**
  * @file cache_analysis_tool.cpp
  * @brief Cache-conscious data structure analysis tool for JSONPath recursive queries

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 // Comprehensive Variable Assignment Modernization Tool
 // Safely refactors 'const auto var = expr' to 'const auto var{expr}' style
 // while preserving references and avoiding control statements

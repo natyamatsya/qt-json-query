@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 // CTSComplianceGTest.cpp - Parameterised Google-Test runner for JSONPath RFC 9535
 // compliance test-suite (cts.json files).
 // -----------------------------------------------------------------------------

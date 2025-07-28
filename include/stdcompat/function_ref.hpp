@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 ///
 // stdcompat/function_ref.hpp - Wrapper for tl::function_ref
 // Provides std::function_ref-like interface in stdcompat namespace

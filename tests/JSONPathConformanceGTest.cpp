@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 // JSONPathConformanceGTest.cpp - GoogleTest version of minimal conformance suite
 #include <gtest/gtest.h>
 #include <QJsonDocument>

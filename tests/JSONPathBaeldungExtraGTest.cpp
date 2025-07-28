@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 // JSONPathBaeldungExtraGTest.cpp - Additional tests derived from Baeldung article
 // These cover features not yet supported by the C++ implementation. They are
 // wrapped with EXPECT_NO_FATAL_FAILURE so the suite passes while preserving the

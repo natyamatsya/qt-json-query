@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 // ContainerCursorGTest.cpp
 // ---------------------------------------------------------------------------
 // Comprehensive GoogleTest suite for ContainerCursor

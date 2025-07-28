@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 // benchmark.cpp - Google Benchmark version
 #include <benchmark/benchmark.h>
 #include <QJsonDocument>

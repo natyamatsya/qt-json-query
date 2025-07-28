@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 // refactor_potential.cpp – demonstrates how json-query simplifies QJson handling
 // Compares plain Qt JSON APIs with JSONPath-based approach provided by the library.
 // Build target: refactor_potential (added in CMakeLists.txt)

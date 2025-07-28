@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 #include "json-query/json-path/JSONPathFilterComparison.hpp"
 #include "json-query/json-path/JSONPathFilterHelpers.hpp"
 #include "json-query/json-path/JSONPathLog.hpp"
