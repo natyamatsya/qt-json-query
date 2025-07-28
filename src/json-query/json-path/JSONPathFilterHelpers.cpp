@@ -165,6 +165,37 @@ bool unquote(QString& s)
     return false;
 }
 
+// Helper function to strip outer parentheses from expressions
+QString stripOuterParens(QString s)
+{
+    s = s.trimmed();
+    while (s.startsWith('(') && s.endsWith(')'))
+    {
+        // Check if these are truly outer parentheses by counting
+        auto depth{0};
+        auto isOuter{true};
+        for (int i = 1; i < s.length() - 1; ++i)
+        {
+            if (s[i] == '(')
+                depth++;
+            else if (s[i] == ')')
+            {
+                depth--;
+                if (depth < 0)
+                {
+                    isOuter = false;
+                    break;
+                }
+            }
+        }
+        if (isOuter && depth == 0)
+            s = s.mid(1, s.length() - 2).trimmed();
+        else
+            break;
+    }
+    return s;
+}
+
 // Builder implementation
 Token Builder::add(FilterFn fn, QString key)
 {

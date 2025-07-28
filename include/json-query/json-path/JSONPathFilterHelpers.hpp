@@ -22,6 +22,9 @@ namespace json_query::json_path::detail
 // Helper function for unquoting strings
 bool unquote(QString& s);
 
+// Helper function to strip outer parentheses from expressions
+QString stripOuterParens(QString s);
+
 // A tiny façade so every parser can push a predicate and immediately obtain the corresponding Token
 class Builder
 {

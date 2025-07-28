@@ -15,39 +15,9 @@ namespace json_query::json_path::detail
 using json_query::json_path::FilterFn;
 using json_query::json_path::Token;
 using json_query::json_path::detail::splitTopLevel;
+using json_query::json_path::detail::stripOuterParens;
 using json_query::utils::to_qstr;
 using json_query::utils::to_sv;
-
-// Helper function to strip outer parentheses
-QString stripOuterParens(QString s)
-{
-    s = s.trimmed();
-    while (s.startsWith('(') && s.endsWith(')'))
-    {
-        // Check if these are truly outer parentheses by counting
-        auto depth{0};
-        auto isOuter{true};
-        for (int i = 1; i < s.length() - 1; ++i)
-        {
-            if (s[i] == '(')
-                depth++;
-            else if (s[i] == ')')
-            {
-                depth--;
-                if (depth < 0)
-                {
-                    isOuter = false;
-                    break;
-                }
-            }
-        }
-        if (isOuter && depth == 0)
-            s = s.mid(1, s.length() - 2).trimmed();
-        else
-            break;
-    }
-    return s;
-}
 
 // Remaining parser function implementations
 std::optional<Token> parseOr(const QString& s, std::vector<FilterFn>& out)
@@ -889,7 +859,7 @@ namespace json_query::json_path
 // Public dispatcher
 std::optional<Token> compileFilter(const QString& expr, std::vector<FilterFn>& out)
 {
-    auto s = json_query::json_path::detail::stripOuterParens(expr);
+    auto s = detail::stripOuterParens(expr);
     qCDebug(jsonPathLog) << "compileFilter expr=" << expr << "stripped=" << s;
     for (int i = 0; i < detail::rules.size(); ++i)
     {
@@ -1187,7 +1157,7 @@ std::optional<Token> parseEmbeddedComparePropToArrayIdx(const QString& s)
 std::optional<Token> parseEmbeddedCompare(const QString& s)
 {
     QString localS{s}; // Create local copy for modification
-    localS = stripOuterParens(localS);
+    localS = detail::stripOuterParens(localS);
 
     // Trim whitespace from logical operator splitting
     localS = localS.trimmed();
@@ -1277,7 +1247,7 @@ std::optional<Token> parseEmbeddedRegex(const QString& s)
 std::optional<Token> parseEmbeddedExists(const QString& s)
 {
     QString localS{s}; // Create local copy for modification
-    localS = stripOuterParens(localS);
+    localS = detail::stripOuterParens(localS);
 
     // Trim whitespace from logical operator splitting
     localS = localS.trimmed();
@@ -1866,9 +1836,9 @@ std::optional<Token> parseEmbeddedFunction(const QString& s)
                 if (!m)
                     return false;
 
-                auto left  = QString::fromStdString(std::string(m.template get<1>()));
-                auto op    = QString::fromStdString(std::string(m.template get<2>()));
-                auto right = QString::fromStdString(std::string(m.template get<3>()));
+                auto left{QString::fromStdString(std::string(m.template get<1>()))};
+                auto op{QString::fromStdString(std::string(m.template get<2>()))};
+                auto right{QString::fromStdString(std::string(m.template get<3>()))};
 
                 auto leftHasFunc =
                     ctre::search<ctll::fixed_string{R"(\b(length|count|match|search|value)\s*\()"}>(to_sv(left));
