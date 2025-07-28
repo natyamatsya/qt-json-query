@@ -5,26 +5,171 @@
 // Build target: refactor_potential (added in CMakeLists.txt)
 
 #include <QCoreApplication>
+#include <QDebug>
+#include <QDir>
+#include <QFile>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QJsonArray>
 #include <QJsonValue>
-#include <QDebug>
-#include <QFile>
+#include <QString>
+#include <QStringList>
 #include <QTextStream>
-#include <QStringView>
-#include <QElapsedTimer>
 #include <QRandomGenerator>
 #include <type_traits>
+#include <expected>
+#include <variant>
 
-#include "../include/json-query/json-pointer/JSONPointer.hpp"
-#include "../include/json-query/json-path/JSONPath.hpp"
-#include "../include/json-query/utils/JSONValueUtils.hpp"
+#include "json-query/json-path/JSONPath.hpp"
+#include "json-query/json-pointer/JSONPointer.hpp"
 
+// Import the main JSONPath and JSONPointer classes
 using json_query::JSONPath;
 using json_query::JSONPointer;
-using json_query::utils::as;
-using json_query::utils::errorMessage;
+
+// Custom error type for JSON value conversion
+template <typename T>
+struct ConversionError
+{
+    QString          message;
+    QJsonValue::Type expectedType;
+    QJsonValue::Type actualType;
+};
+
+// Type-safe conversion from QJsonValue to T
+template <typename T>
+std::expected<T, ConversionError<T>> as(const QJsonValue& value);
+
+// Specialization for QString
+template <>
+std::expected<QString, ConversionError<QString>> as<QString>(const QJsonValue& value)
+{
+    if (value.isString())
+    {
+        return value.toString();
+    }
+    else if (value.isDouble())
+    {
+        return QString::number(value.toDouble());
+    }
+    else if (value.isBool())
+    {
+        return value.toBool() ? QStringLiteral("true") : QStringLiteral("false");
+    }
+    else if (value.isNull() || value.isUndefined())
+    {
+        return std::unexpected(
+            ConversionError<QString>{"Cannot convert null/undefined to QString", QJsonValue::String, value.type()});
+    }
+    else if (value.isArray() || value.isObject())
+    {
+        QJsonDocument doc = value.isArray() ? QJsonDocument(value.toArray()) : QJsonDocument(value.toObject());
+        return doc.toJson(QJsonDocument::Compact);
+    }
+
+    return std::unexpected(
+        ConversionError<QString>{"Unsupported type for QString conversion", QJsonValue::String, value.type()});
+}
+
+// Specialization for int
+template <>
+std::expected<int, ConversionError<int>> as<int>(const QJsonValue& value)
+{
+    if (value.isDouble())
+    {
+        return static_cast<int>(value.toDouble());
+    }
+    else if (value.isString())
+    {
+        bool ok;
+        int  result = value.toString().toInt(&ok);
+        if (ok)
+            return result;
+    }
+    else if (value.isBool())
+    {
+        return value.toBool() ? 1 : 0;
+    }
+
+    return std::unexpected(ConversionError<int>{"Cannot convert to int", QJsonValue::Double, value.type()});
+}
+
+// Specialization for double
+template <>
+std::expected<double, ConversionError<double>> as<double>(const QJsonValue& value)
+{
+    if (value.isDouble())
+    {
+        return value.toDouble();
+    }
+    else if (value.isString())
+    {
+        bool   ok;
+        double result = value.toString().toDouble(&ok);
+        if (ok)
+            return result;
+    }
+    else if (value.isBool())
+    {
+        return value.toBool() ? 1.0 : 0.0;
+    }
+
+    return std::unexpected(ConversionError<double>{"Cannot convert to double", QJsonValue::Double, value.type()});
+}
+
+// Specialization for bool
+template <>
+std::expected<bool, ConversionError<bool>> as<bool>(const QJsonValue& value)
+{
+    if (value.isBool())
+    {
+        return value.toBool();
+    }
+    else if (value.isDouble())
+    {
+        return value.toDouble() != 0.0;
+    }
+    else if (value.isString())
+    {
+        const QString str = value.toString().toLower();
+        if (str == "true" || str == "1")
+            return true;
+        if (str == "false" || str == "0")
+            return false;
+    }
+
+    return std::unexpected(ConversionError<bool>{"Cannot convert to bool", QJsonValue::Bool, value.type()});
+}
+
+// Specialization for QJsonArray
+template <>
+std::expected<QJsonArray, ConversionError<QJsonArray>> as<QJsonArray>(const QJsonValue& value)
+{
+    if (value.isArray())
+        return value.toArray();
+
+    return std::unexpected(ConversionError<QJsonArray>{"Value is not an array", QJsonValue::Array, value.type()});
+}
+
+// Specialization for QJsonObject
+template <>
+std::expected<QJsonObject, ConversionError<QJsonObject>> as<QJsonObject>(const QJsonValue& value)
+{
+    if (value.isObject())
+        return value.toObject();
+
+    return std::unexpected(ConversionError<QJsonObject>{"Value is not an object", QJsonValue::Object, value.type()});
+}
+
+// Helper function to convert QJsonValue to QString with error checking using as<T>
+static std::optional<QString> jsonValueToString(const QJsonValue& value)
+{
+    auto result = as<QString>(value);
+    if (result)
+        return *result;
+    qWarning() << "Failed to convert JSON value to string:" << result.error().message;
+    return std::nullopt;
+}
 
 using namespace Qt::StringLiterals;
 
@@ -84,27 +229,64 @@ static QString editionIsbn_plain(const QJsonDocument& doc, int index)
 
 [[nodiscard]] static std::optional<QString> editionIsbn_pointer(const QJsonDocument& doc, int index)
 {
-    return JSONPointer::create(QString("/inventory/%1/details/edition/isbn").arg(index))
-        .and_then([&doc](const JSONPointer& ptr) { return ptr.evaluate(doc); })
-        .and_then([](const QJsonValue& v) { return as<QString>(v); })
-        .value_or(std::nullopt);
+    auto result = JSONPointer::create(QString("/inventory/%1/details/edition/isbn").arg(index));
+    if (!result)
+    {
+        qWarning() << "Failed to create JSONPointer";
+        return std::nullopt;
+    }
+
+    auto evalResult = result->evaluate(doc);
+    if (!evalResult)
+    {
+        qWarning() << "Failed to evaluate JSONPointer";
+        return std::nullopt;
+    }
+
+    // Use the as<T> function for type-safe conversion
+    auto strResult = as<QString>(*evalResult);
+    if (!strResult)
+    {
+        qWarning() << "Failed to convert to string:" << strResult.error().message;
+        return std::nullopt;
+    }
+
+    return *strResult;
 }
 
 [[nodiscard]] static std::optional<QString> editionIsbn_path(const QJsonDocument& doc, int index)
 {
-    return JSONPath::create(QString(u"$.inventory[%1].details.edition.isbn").arg(index))
-        .and_then([&doc](const JSONPath& path) { return path.evaluate(doc); })
-        .and_then(
-            [](const QJsonValue& v)
-            {
-                if (v.isArray())
-                {
-                    const auto arr = v.toArray();
-                    return arr.isEmpty() ? std::optional<QJsonValue>{} : std::optional{arr.first()};
-                }
-                return std::optional{v};
-            })
-        .and_then([](const QJsonValue& v) { return as<QString>(v); })
+    auto path = JSONPath::create(QString(u"$.inventory[%1].details.edition.isbn").arg(index));
+    if (!path)
+    {
+        qWarning() << "Failed to create JSONPath";
+        return std::nullopt;
+    }
+
+    auto evalResult = path->evaluate(doc);
+    if (!evalResult)
+    {
+        qWarning() << "Failed to evaluate JSONPath";
+        return std::nullopt;
+    }
+
+    // Handle array result (JSONPath can return arrays)
+    auto arrResult = as<QJsonArray>(*evalResult);
+    if (arrResult)
+    {
+        if (arrResult->isEmpty())
+        {
+            qWarning() << "Empty array result from JSONPath";
+            return std::nullopt;
+        }
+        return as<QString>(arrResult->first())
+            .transform([](const QString& s) { return std::optional<QString>(s); })
+            .value_or(std::nullopt);
+    }
+
+    // Handle single value result
+    return as<QString>(*evalResult)
+        .transform([](const QString& s) { return std::optional<QString>(s); })
         .value_or(std::nullopt);
 }
 
@@ -113,20 +295,51 @@ static QString editionIsbn_plain(const QJsonDocument& doc, int index)
 // -----------------------------------------------------------------------------
 [[nodiscard]] static QStringList titlesAbovePrice_jsonquery(const QJsonDocument& doc, double threshold)
 {
-    return JSONPath::create(QString("$.inventory[?(@.price > %1)].title").arg(threshold))
-        .and_then([&doc](const JSONPath& path) { return path.evaluate(doc); })
-        .transform(
-            [](const QJsonValue& v)
-            {
-                QStringList result;
-                if (v.isArray())
-                    for (const auto& item : v.toArray())
-                        as<QString>(item).transform([&](const QString& s) { result << s; });
-                else if (!v.isUndefined())
-                    as<QString>(v).transform([&](const QString& s) { result << s; });
-                return result;
-            })
-        .value_or(QStringList{});
+    auto path = JSONPath::create(QString("$.inventory[?(@.price > %1)].title").arg(threshold));
+    if (!path)
+    {
+        qWarning() << "Failed to create JSONPath";
+        return {};
+    }
+
+    auto evalResult = path->evaluate(doc);
+    if (!evalResult)
+    {
+        qWarning() << "Failed to evaluate JSONPath";
+        return {};
+    }
+
+    QStringList result;
+
+    // Handle array result
+    auto arrResult = as<QJsonArray>(*evalResult);
+    if (arrResult)
+    {
+        for (const auto& item : *arrResult)
+        {
+            auto strResult = as<QString>(item);
+            if (strResult)
+                result << *strResult;
+            else
+                qWarning() << "Skipping non-string title:" << item << "Error:" << strResult.error().message;
+        }
+    }
+    // Handle single value result
+    else if (!evalResult->isUndefined())
+    {
+        auto strResult = as<QString>(*evalResult);
+        if (strResult)
+        {
+            result << *strResult;
+        }
+        else
+        {
+            qWarning() << "Expected string title but got type:" << evalResult->type()
+                       << "Error:" << strResult.error().message;
+        }
+    }
+
+    return result;
 }
 
 int main(int argc, char** argv)
