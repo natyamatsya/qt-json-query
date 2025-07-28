@@ -1,0 +1,403 @@
+{
+  "description": "RFC 6901 JSON Pointer Compliance Test Suite",
+  "specification": "https://tools.ietf.org/rfc/rfc6901.txt",
+  "tests": [
+    {
+      "name": "root_pointer_empty_string",
+      "description": "Empty string pointer should return the whole document",
+      "pointer": "",
+      "document": {
+        "foo": ["bar", "baz"],
+        "": 0,
+        "a/b": 1,
+        "c%d": 2,
+        "e^f": 3,
+        "g|h": 4,
+        "i\\j": 5,
+        "k\"l": 6,
+        " ": 7,
+        "m~n": 8
+      },
+      "expected": {
+        "foo": ["bar", "baz"],
+        "": 0,
+        "a/b": 1,
+        "c%d": 2,
+        "e^f": 3,
+        "g|h": 4,
+        "i\\j": 5,
+        "k\"l": 6,
+        " ": 7,
+        "m~n": 8
+      }
+    },
+    {
+      "name": "property_access_foo",
+      "description": "Access property 'foo'",
+      "pointer": "/foo",
+      "document": {
+        "foo": ["bar", "baz"],
+        "": 0,
+        "a/b": 1,
+        "c%d": 2,
+        "e^f": 3,
+        "g|h": 4,
+        "i\\j": 5,
+        "k\"l": 6,
+        " ": 7,
+        "m~n": 8
+      },
+      "expected": ["bar", "baz"]
+    },
+    {
+      "name": "array_access_first_element",
+      "description": "Access first element of array foo",
+      "pointer": "/foo/0",
+      "document": {
+        "foo": ["bar", "baz"],
+        "": 0,
+        "a/b": 1,
+        "c%d": 2,
+        "e^f": 3,
+        "g|h": 4,
+        "i\\j": 5,
+        "k\"l": 6,
+        " ": 7,
+        "m~n": 8
+      },
+      "expected": "bar"
+    },
+    {
+      "name": "empty_property_name",
+      "description": "Access property with empty name",
+      "pointer": "/",
+      "document": {
+        "foo": ["bar", "baz"],
+        "": 0,
+        "a/b": 1,
+        "c%d": 2,
+        "e^f": 3,
+        "g|h": 4,
+        "i\\j": 5,
+        "k\"l": 6,
+        " ": 7,
+        "m~n": 8
+      },
+      "expected": 0
+    },
+    {
+      "name": "escape_sequence_slash",
+      "description": "Escape sequence ~1 should become /",
+      "pointer": "/a~1b",
+      "document": {
+        "foo": ["bar", "baz"],
+        "": 0,
+        "a/b": 1,
+        "c%d": 2,
+        "e^f": 3,
+        "g|h": 4,
+        "i\\j": 5,
+        "k\"l": 6,
+        " ": 7,
+        "m~n": 8
+      },
+      "expected": 1
+    },
+    {
+      "name": "special_char_percent",
+      "description": "Property with percent character",
+      "pointer": "/c%d",
+      "document": {
+        "foo": ["bar", "baz"],
+        "": 0,
+        "a/b": 1,
+        "c%d": 2,
+        "e^f": 3,
+        "g|h": 4,
+        "i\\j": 5,
+        "k\"l": 6,
+        " ": 7,
+        "m~n": 8
+      },
+      "expected": 2
+    },
+    {
+      "name": "special_char_caret",
+      "description": "Property with caret character",
+      "pointer": "/e^f",
+      "document": {
+        "foo": ["bar", "baz"],
+        "": 0,
+        "a/b": 1,
+        "c%d": 2,
+        "e^f": 3,
+        "g|h": 4,
+        "i\\j": 5,
+        "k\"l": 6,
+        " ": 7,
+        "m~n": 8
+      },
+      "expected": 3
+    },
+    {
+      "name": "special_char_pipe",
+      "description": "Property with pipe character",
+      "pointer": "/g|h",
+      "document": {
+        "foo": ["bar", "baz"],
+        "": 0,
+        "a/b": 1,
+        "c%d": 2,
+        "e^f": 3,
+        "g|h": 4,
+        "i\\j": 5,
+        "k\"l": 6,
+        " ": 7,
+        "m~n": 8
+      },
+      "expected": 4
+    },
+    {
+      "name": "special_char_backslash",
+      "description": "Property with backslash character",
+      "pointer": "/i\\j",
+      "document": {
+        "foo": ["bar", "baz"],
+        "": 0,
+        "a/b": 1,
+        "c%d": 2,
+        "e^f": 3,
+        "g|h": 4,
+        "i\\j": 5,
+        "k\"l": 6,
+        " ": 7,
+        "m~n": 8
+      },
+      "expected": 5
+    },
+    {
+      "name": "special_char_quote",
+      "description": "Property with quote character",
+      "pointer": "/k\"l",
+      "document": {
+        "foo": ["bar", "baz"],
+        "": 0,
+        "a/b": 1,
+        "c%d": 2,
+        "e^f": 3,
+        "g|h": 4,
+        "i\\j": 5,
+        "k\"l": 6,
+        " ": 7,
+        "m~n": 8
+      },
+      "expected": 6
+    },
+    {
+      "name": "special_char_space",
+      "description": "Property with space character",
+      "pointer": "/ ",
+      "document": {
+        "foo": ["bar", "baz"],
+        "": 0,
+        "a/b": 1,
+        "c%d": 2,
+        "e^f": 3,
+        "g|h": 4,
+        "i\\j": 5,
+        "k\"l": 6,
+        " ": 7,
+        "m~n": 8
+      },
+      "expected": 7
+    },
+    {
+      "name": "escape_sequence_tilde",
+      "description": "Escape sequence ~0 should become ~",
+      "pointer": "/m~0n",
+      "document": {
+        "foo": ["bar", "baz"],
+        "": 0,
+        "a/b": 1,
+        "c%d": 2,
+        "e^f": 3,
+        "g|h": 4,
+        "i\\j": 5,
+        "k\"l": 6,
+        " ": 7,
+        "m~n": 8
+      },
+      "expected": 8
+    },
+    {
+      "name": "array_after_last_element",
+      "description": "Special array pointer /- should fail (non-existent)",
+      "pointer": "/foo/-",
+      "document": {
+        "foo": ["bar", "baz"],
+        "": 0,
+        "a/b": 1,
+        "c%d": 2,
+        "e^f": 3,
+        "g|h": 4,
+        "i\\j": 5,
+        "k\"l": 6,
+        " ": 7,
+        "m~n": 8
+      },
+      "should_fail": true
+    },
+    {
+      "name": "nonexistent_property",
+      "description": "Non-existent property should fail",
+      "pointer": "/nonexistent",
+      "document": {
+        "foo": ["bar", "baz"],
+        "": 0,
+        "a/b": 1,
+        "c%d": 2,
+        "e^f": 3,
+        "g|h": 4,
+        "i\\j": 5,
+        "k\"l": 6,
+        " ": 7,
+        "m~n": 8
+      },
+      "should_fail": true
+    },
+    {
+      "name": "array_out_of_bounds",
+      "description": "Array index out of bounds should fail",
+      "pointer": "/foo/5",
+      "document": {
+        "foo": ["bar", "baz"],
+        "": 0,
+        "a/b": 1,
+        "c%d": 2,
+        "e^f": 3,
+        "g|h": 4,
+        "i\\j": 5,
+        "k\"l": 6,
+        " ": 7,
+        "m~n": 8
+      },
+      "should_fail": true
+    },
+    {
+      "name": "invalid_array_index_negative",
+      "description": "Negative array index should fail",
+      "pointer": "/foo/-1",
+      "document": {
+        "foo": ["bar", "baz"],
+        "": 0,
+        "a/b": 1,
+        "c%d": 2,
+        "e^f": 3,
+        "g|h": 4,
+        "i\\j": 5,
+        "k\"l": 6,
+        " ": 7,
+        "m~n": 8
+      },
+      "should_fail": true
+    },
+    {
+      "name": "invalid_array_index_leading_zero",
+      "description": "Array index with leading zero should fail",
+      "pointer": "/foo/01",
+      "document": {
+        "foo": ["bar", "baz"],
+        "": 0,
+        "a/b": 1,
+        "c%d": 2,
+        "e^f": 3,
+        "g|h": 4,
+        "i\\j": 5,
+        "k\"l": 6,
+        " ": 7,
+        "m~n": 8
+      },
+      "should_fail": true
+    },
+    {
+      "name": "invalid_pointer_no_leading_slash",
+      "description": "Pointer without leading slash should be invalid",
+      "pointer": "foo/bar",
+      "document": {
+        "foo": {"bar": "baz"}
+      },
+      "invalid_pointer": true
+    },
+    {
+      "name": "invalid_escape_sequence",
+      "description": "Invalid escape sequence ~2 should be invalid",
+      "pointer": "/foo~2bar",
+      "document": {
+        "foo~2bar": "test"
+      },
+      "invalid_pointer": true
+    },
+    {
+      "name": "complex_escape_sequences",
+      "description": "Complex escape sequences should work correctly",
+      "pointer": "/~01~1~0",
+      "document": {
+        "~1/~": "complex_escape_test"
+      },
+      "expected": "complex_escape_test"
+    },
+    {
+      "name": "nested_object_access",
+      "description": "Nested object property access",
+      "pointer": "/nested/deep/value",
+      "document": {
+        "nested": {
+          "deep": {
+            "value": "found"
+          }
+        }
+      },
+      "expected": "found"
+    },
+    {
+      "name": "nested_array_access",
+      "description": "Nested array element access",
+      "pointer": "/array/1/nested",
+      "document": {
+        "array": [
+          {"nested": "first"},
+          {"nested": "second"},
+          {"nested": "third"}
+        ]
+      },
+      "expected": "second"
+    },
+    {
+      "name": "mixed_types_document",
+      "description": "Document with mixed types",
+      "pointer": "/mixed/1",
+      "document": {
+        "mixed": [null, true, false, 42, "string", {"object": "value"}, [1, 2, 3]]
+      },
+      "expected": true
+    },
+    {
+      "name": "unicode_property_name",
+      "description": "Unicode property name support",
+      "pointer": "/café",
+      "document": {
+        "café": "unicode_test"
+      },
+      "expected": "unicode_test"
+    },
+    {
+      "name": "array_with_zero_index",
+      "description": "Array access with zero index (valid)",
+      "pointer": "/numbers/0",
+      "document": {
+        "numbers": [100, 200, 300]
+      },
+      "expected": 100
+    }
+  ]
+}

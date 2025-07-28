@@ -83,6 +83,26 @@ target_compile_definitions(
   rfc9535_tests PRIVATE JSON_QUERY_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 
 # ---------------------------------------------------------------------------
+# RFC 6901 JSON Pointer compliance test suite
+# ---------------------------------------------------------------------------
+add_executable(rfc6901_tests
+               ${CMAKE_CURRENT_SOURCE_DIR}/RFC6901ComplianceGTest.cpp)
+
+target_include_directories(
+  rfc6901_tests PRIVATE ${PROJECT_SOURCE_DIR}/include
+                        ${PROJECT_SOURCE_DIR}/tests/include)
+
+target_link_libraries(
+  rfc6901_tests PRIVATE json_query GTest::gtest GTest::gmock GTest::gtest_main
+                        Qt6::Core)
+
+# Provide project source dir to tests so they can locate compliance JSON files
+target_compile_definitions(
+  rfc6901_tests PRIVATE JSON_QUERY_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+
+target_compile_features(rfc6901_tests PRIVATE cxx_std_23)
+
+# ---------------------------------------------------------------------------
 # Test discovery via CTest / GoogleTest module
 # ---------------------------------------------------------------------------
 include(GoogleTest)
@@ -99,6 +119,9 @@ endif()
 
 gtest_discover_tests(rfc9535_tests DISCOVERY_MODE PRE_TEST
                      TEST_PREFIX "RFC9535/")
+
+gtest_discover_tests(rfc6901_tests DISCOVERY_MODE PRE_TEST
+                     TEST_PREFIX "RFC6901/")
 
 # ---------------------------------------------------------------------------
 # CompactContextFilterStorage lifetime fix test
