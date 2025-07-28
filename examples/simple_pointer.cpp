@@ -4,14 +4,18 @@
 #include <QJsonArray>
 #include <QDebug>
 #include <QString>
+#include <QStringConverter>
 #include <expected>
+
+// Enable string literal operators for QString
+using namespace Qt::StringLiterals;
 
 #include "json-query/json-pointer/JSONPointer.hpp"
 
 using json_query::JSONPointer;
 using json_query::json_pointer::detail::ParseError;
 
-void evaluateAndPrint(const JSONPointer& pointer, const QJsonDocument& doc, const QString& desc)
+void evaluateAndPrint(const JSONPointer& pointer, const QJsonDocument& doc, QStringView desc)
 {
     qDebug().noquote() << "\n" << desc << ":";
     qDebug() << "  Pointer:" << (pointer.toString().isEmpty() ? "\"\" (empty string)" : pointer.toString());
@@ -37,7 +41,7 @@ void evaluateAndPrint(const JSONPointer& pointer, const QJsonDocument& doc, cons
 }
 
 // Helper function to create a pointer and handle errors
-bool evaluatePointer(const QString& path, const QJsonDocument& doc, const QString& description)
+bool evaluatePointer(QStringView path, const QJsonDocument& doc, QStringView description)
 {
     auto pointer = JSONPointer::create(path);
     if (!pointer)
@@ -69,41 +73,35 @@ int main(int argc, char** argv)
 
     // RFC 6901 Section 5: Syntax
     // The empty string evaluates to the whole document
-    evaluatePointer(
-        QStringLiteral(""), doc, QStringLiteral("RFC 6901 Section 5: Empty pointer references the entire document"));
+    evaluatePointer(u"", doc, u"RFC 6901 Section 5: Empty pointer references the entire document");
 
     // RFC 6901 Section 3: JSON Pointer Syntax
     // Simple property access using a single reference token
-    evaluatePointer(QStringLiteral("/name"), doc, QStringLiteral("RFC 6901 Section 3: Simple property access"));
+    evaluatePointer(u"/name", doc, u"RFC 6901 Section 3: Simple property access");
 
     // RFC 6901 Section 3: JSON Pointer Syntax
     // Nested object access using multiple reference tokens
-    evaluatePointer(QStringLiteral("/address/city"), doc, QStringLiteral("RFC 6901 Section 3: Nested object access"));
+    evaluatePointer(u"/address/city", doc, u"RFC 6901 Section 3: Nested object access");
 
     // RFC 6901 Section 4: Evaluation
     // Array access using a zero-based index
-    evaluatePointer(
-        QStringLiteral("/tags/1"), doc, QStringLiteral("RFC 6901 Section 4: Array access (zero-based index)"));
+    evaluatePointer(u"/tags/1", doc, u"RFC 6901 Section 4: Array access (zero-based index)");
 
     // RFC 6901 Section 3: JSON Pointer Syntax
     // Special character handling: '~1' is the escape sequence for '/'
-    evaluatePointer(QStringLiteral("/special~1chars"),
-                    doc,
-                    QStringLiteral("RFC 6901 Section 3: Special character '/' in key (escaped as '~1')"));
+    evaluatePointer(u"/special~1chars", doc, u"RFC 6901 Section 3: Special character '/' in key (escaped as '~1')");
 
     // RFC 6901 Section 3: JSON Pointer Syntax
     // Tilde escaping: '~0' is the escape sequence for '~'
-    evaluatePointer(
-        QStringLiteral("/escaped~0chars"), doc, QStringLiteral("RFC 6901 Section 3: Tilde in key (escaped as '~0')"));
+    evaluatePointer(u"/escaped~0chars", doc, u"RFC 6901 Section 3: Tilde in key (escaped as '~0')");
 
     // RFC 6901 Section 5: Evaluation
     // Non-existent path evaluation
-    evaluatePointer(
-        QStringLiteral("/nonexistent"), doc, QStringLiteral("RFC 6901 Section 5: Non-existent path evaluation"));
+    evaluatePointer(u"/nonexistent", doc, u"RFC 6901 Section 5: Non-existent path evaluation");
 
     // RFC 6901 Section 3: JSON Pointer Syntax
     // Example of an invalid pointer (doesn't start with '/' or be empty)
-    auto invalidPointer = JSONPointer::create(QStringLiteral("invalid"));
+    auto invalidPointer = JSONPointer::create(u"invalid");
     if (!invalidPointer)
     {
         qDebug() << "\nRFC 6901 Section 3: Invalid pointer (must be empty or start with '/'):";
