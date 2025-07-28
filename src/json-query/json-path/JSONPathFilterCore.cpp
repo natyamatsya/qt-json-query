@@ -16,6 +16,7 @@ namespace json_query::json_path::detail
 using json_query::json_path::FilterFn;
 using json_query::json_path::Token;
 using json_query::json_path::detail::parseJsonLiteral;
+using json_query::json_path::detail::parseRegex;
 using json_query::json_path::detail::parseRegex1;
 using json_query::json_path::detail::performComparison;
 using json_query::json_path::detail::splitTopLevel;
@@ -762,16 +763,6 @@ std::optional<Token> parseCompare(const QString& s, std::vector<FilterFn>& out)
     return ComparisonDispatcher::dispatch(s, out);
 }
 
-std::optional<Token> parseRegex(const QString& s, std::vector<FilterFn>& out)
-{
-    constexpr auto dotPat = ctll::fixed_string{R"(@\.([\w$]+)\s*=~\s*/(.+)/)"};
-    constexpr auto brkPat = ctll::fixed_string{R"(@\[['\"]([^'"]+)['\"]\]\s*=~\s*/(.+)/)"};
-
-    if (auto t = parseRegex1<dotPat>(s, out))
-        return t;
-    return parseRegex1<brkPat>(s, out);
-}
-
 // Forward-declare the individual parsers
 using RuleFn = std::optional<Token> (*)(const QString&, std::vector<FilterFn>&);
 
@@ -1167,18 +1158,7 @@ std::optional<Token> parseEmbeddedCompare(const QString& s)
 template <ctll::fixed_string Pattern>
 std::optional<Token> parseEmbeddedComparePropToArrayIdx(const QString& s);
 
-std::optional<Token> parseEmbeddedRegex(const QString& s)
-{
-    constexpr auto dotPat = ctll::fixed_string{R"(@\.([\w$]+)\s*=~\s*/(.+)/)"};
-    constexpr auto brkPat = ctll::fixed_string{R"(@\[['\"]([^'"]+)['\"]\]\s*=~\s*/(.+)/)"};
-
-    if (auto t = parseEmbeddedRegex1<dotPat>(s))
-        return t;
-    if (auto t = parseEmbeddedRegex1<brkPat>(s))
-        return t;
-
-    return std::nullopt;
-}
+std::optional<Token> parseEmbeddedRegex(const QString& s) { return std::nullopt; }
 
 std::optional<Token> parseEmbeddedExists(const QString& s)
 {

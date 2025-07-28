@@ -680,4 +680,14 @@ QJsonValue parseJsonLiteral(const QString& value)
         .value_or(QJsonValue{trimmed}); // Default to string
 }
 
+std::optional<Token> parseRegex(const QString& s, std::vector<FilterFn>& out)
+{
+    constexpr auto dotPat = ctll::fixed_string{R"(@\.([\w$]+)\s*=~\s*/(.+)/)"};
+    constexpr auto brkPat = ctll::fixed_string{R"(@\[['\"]([^'"]+)['\"]\]\s*=~\s*/(.+)/)"};
+
+    if (auto t = parseRegex1<dotPat>(s, out))
+        return t;
+    return parseRegex1<brkPat>(s, out);
+}
+
 } // namespace json_query::json_path::detail
