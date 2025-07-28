@@ -23,11 +23,10 @@
 
 using json_query::JSONPath;
 using json_query::JSONPointer;
-
-using namespace Qt::StringLiterals;
-
 using json_query::utils::as;
 using json_query::utils::errorMessage;
+
+using namespace Qt::StringLiterals;
 
 // -----------------------------------------------------------------------------
 // Sample data – book store with inventory array
@@ -83,69 +82,91 @@ static QString editionIsbn_plain(const QJsonDocument& doc, int index)
     return edition.value("isbn").toString();
 }
 
-static QString editionIsbn_pointer(const QJsonDocument& doc, int index)
+[[nodiscard]] static std::optional<QString> editionIsbn_pointer(const QJsonDocument& doc, int index)
 {
-    auto ptr{JSONPointer::create(QString("/inventory/%1/details/edition/isbn").arg(index))};
-    if (!ptr)
-        return {};
-    auto res{ptr->evaluate(doc)};
-    return res ? res->toString() : QString{};
+    return JSONPointer::create(QString("/inventory/%1/details/edition/isbn").arg(index))
+        .and_then([&doc](const JSONPointer& ptr) { return ptr.evaluate(doc); })
+        .and_then([](const QJsonValue& v) { return as<QString>(v); })
+        .value_or(std::nullopt);
 }
 
-static QString editionIsbn_path(const QJsonDocument& doc, int index)
+[[nodiscard]] static std::optional<QString> editionIsbn_path(const QJsonDocument& doc, int index)
 {
-    auto pathResult{JSONPath::create(QString(u"$.inventory[%1].details.edition.isbn").arg(index))};
-    auto result{pathResult->evaluate(doc)};
-    if (!result)
-        return QString{}; // Return empty string on error
-    auto r{*result};
-    if (r.isArray())
-    {
-        const auto arr{r.toArray()};
-        return arr.isEmpty() ? QString{} : arr.first().toString();
-    }
-    return r.toString();
+    return JSONPath::create(QString(u"$.inventory[%1].details.edition.isbn").arg(index))
+        .and_then([&doc](const JSONPath& path) { return path.evaluate(doc); })
+        .and_then(
+            [](const QJsonValue& v)
+            {
+                if (v.isArray())
+                {
+                    const auto arr = v.toArray();
+                    return arr.isEmpty() ? std::optional<QJsonValue>{} : std::optional{arr.first()};
+                }
+                return std::optional{v};
+            })
+        .and_then([](const QJsonValue& v) { return as<QString>(v); })
+        .value_or(std::nullopt);
 }
 
 // -----------------------------------------------------------------------------
 // 2) Library implementation using JSONPath – concise & expressive
 // -----------------------------------------------------------------------------
-static QStringList titlesAbovePrice_jsonquery(const QJsonDocument& doc, double threshold)
+[[nodiscard]] static QStringList titlesAbovePrice_jsonquery(const QJsonDocument& doc, double threshold)
 {
-    // Build a JSONPath expression with the price threshold.
-    auto pathView = QString("$.inventory[?(@.price > %1)].title").arg(threshold);
-    auto query{JSONPath::create(pathView)};
-    auto result{query->evaluate(doc)};
-    if (!result)
-        return QStringList(); // Return empty list on error
-    auto        r{*result};
-    QStringList result_list;
-    if (r.isArray())
-        for (const QJsonValue& v : r.toArray())
-            result_list << v.toString();
-    else if (!r.isUndefined())
-        result_list << r.toString();
-    return result_list;
+    return JSONPath::create(QString("$.inventory[?(@.price > %1)].title").arg(threshold))
+        .and_then([&doc](const JSONPath& path) { return path.evaluate(doc); })
+        .transform(
+            [](const QJsonValue& v)
+            {
+                QStringList result;
+                if (v.isArray())
+                    for (const auto& item : v.toArray())
+                        as<QString>(item).transform([&](const QString& s) { result << s; });
+                else if (!v.isUndefined())
+                    as<QString>(v).transform([&](const QString& s) { result << s; });
+                return result;
+            })
+        .value_or(QStringList{});
 }
 
 int main(int argc, char** argv)
 {
-    QCoreApplication app(argc, argv); // Needed for QString conversions on some platforms
-
+    QCoreApplication    app(argc, argv); // Needed for QString conversions on some platforms
     const QJsonDocument doc       = loadTestDocument();
     constexpr double    threshold = 25.0;
 
-    const QStringList plain    = titlesAbovePrice_plain(doc, threshold);
-    const QStringList viaQuery = titlesAbovePrice_jsonquery(doc, threshold);
+    // Test title queries
+    const auto plainTitles = titlesAbovePrice_plain(doc, threshold);
+    const auto queryTitles = titlesAbovePrice_jsonquery(doc, threshold);
 
-    qDebug() << "Plain QtJSON   :" << plain;
-    qDebug() << "json-query path:" << viaQuery;
+    qDebug() << "=== Books with price >" << threshold << "===";
+    qDebug() << "Plain QtJSON   :" << plainTitles;
+    qDebug() << "json-query path:" << queryTitles;
 
-    // Deep nested ISBN retrieval demo
-    const auto bookIndex{7};
-    qDebug() << "ISBN plain      :" << editionIsbn_plain(doc, bookIndex);
-    qDebug() << "ISBN via pointer:" << editionIsbn_pointer(doc, bookIndex);
-    qDebug() << "ISBN via path   :" << editionIsbn_path(doc, bookIndex);
+    // Test ISBN retrieval for different books
+    const std::array<int, 3> testIndices{0, 5, 7};
+    qDebug() << "\n=== ISBN Retrieval ===";
+
+    for (const int index : testIndices)
+    {
+        const auto plainIsbn   = editionIsbn_plain(doc, index);
+        const auto pointerIsbn = editionIsbn_pointer(doc, index).value_or("(not found)");
+        const auto pathIsbn    = editionIsbn_path(doc, index).value_or("(not found)");
+
+        qDebug() << "\nBook index:" << index;
+        qDebug() << "  Plain:   " << plainIsbn;
+        qDebug() << "  Pointer: " << pointerIsbn;
+        qDebug() << "  Path:    " << pathIsbn;
+    }
+
+    // Test error case (invalid index)
+    const int invalidIndex = 100;
+    qDebug() << "\n=== Error Case (invalid index:" << invalidIndex << ") ===";
+    const auto invalidPointer = editionIsbn_pointer(doc, invalidIndex);
+    const auto invalidPath    = editionIsbn_path(doc, invalidIndex);
+
+    qDebug() << "Pointer result:" << (invalidPointer ? *invalidPointer : "(not found)");
+    qDebug() << "Path result:   " << (invalidPath ? *invalidPath : "(not found)");
 
     return 0;
 }
