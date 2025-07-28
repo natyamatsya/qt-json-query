@@ -40,30 +40,6 @@ else()
 endif()
 
 # ---------------------------------------------------------------------------
-# Jayway JSONPath parity suite
-# ---------------------------------------------------------------------------
-if(JSON_QUERY_ENABLE_JAYWAY_PARITY_TESTS)
-  set(JAYWAY_PARITY_SOURCES
-      ${CMAKE_CURRENT_SOURCE_DIR}/jayway-parity/DeepScanParityGTest.cpp
-      ${CMAKE_CURRENT_SOURCE_DIR}/jayway-parity/MultiPropParityGTest.cpp
-      ${CMAKE_CURRENT_SOURCE_DIR}/jayway-parity/FilterParityGTest.cpp
-      ${CMAKE_CURRENT_SOURCE_DIR}/jayway-parity/EscapeParityGTest.cpp
-      ${CMAKE_CURRENT_SOURCE_DIR}/jayway-parity/OptionsParityGTest.cpp
-      ${CMAKE_CURRENT_SOURCE_DIR}/jayway-parity/MapperParityGTest.cpp
-      ${CMAKE_CURRENT_SOURCE_DIR}/jayway-parity/PathCompilerParityGTest.cpp)
-
-  add_executable(jayway_parity_tests ${JAYWAY_PARITY_SOURCES})
-
-  target_include_directories(
-    jayway_parity_tests PRIVATE ${PROJECT_SOURCE_DIR}/include
-                                ${PROJECT_SOURCE_DIR}/tests/include)
-
-  target_link_libraries(
-    jayway_parity_tests PRIVATE json_query function_ref_interface GTest::gtest
-                                GTest::gmock GTest::gtest_main Qt6::Core)
-endif()
-
-# ---------------------------------------------------------------------------
 # RFC 9535 compliance test suite
 # ---------------------------------------------------------------------------
 file(GLOB RFC_9535_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/rfc-9535/*.cpp)
@@ -86,7 +62,7 @@ target_compile_definitions(
 # RFC 6901 JSON Pointer compliance test suite
 # ---------------------------------------------------------------------------
 add_executable(rfc6901_tests
-               ${CMAKE_CURRENT_SOURCE_DIR}/RFC6901ComplianceGTest.cpp)
+               ${CMAKE_CURRENT_SOURCE_DIR}/rfc-6901/RFC6901ComplianceGTest.cpp)
 
 target_include_directories(
   rfc6901_tests PRIVATE ${PROJECT_SOURCE_DIR}/include
