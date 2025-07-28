@@ -1,4 +1,5 @@
 #include "json-query/json-path/JSONPathFilterParsers.hpp"
+#include "json-query/json-path/JSONPathFilterComparisonDispatcher.hpp"
 #include "json-query/json-path/JSONPathFilterComparison.hpp"
 #include "json-query/json-path/JSONPathFilterHelpers.hpp"
 #include "json-query/json-path/JSONPathCompile.hpp"
@@ -13,8 +14,8 @@
 namespace json_query::json_path::detail
 {
 
-using json_query::utils::to_qstr;
-using json_query::utils::to_sv;
+using utils::to_qstr;
+using utils::to_sv;
 
 // Existence filter type enumeration for compile-time dispatch
 enum class ExistenceFilterType
@@ -469,7 +470,7 @@ using ExistenceDispatcher = ExistenceDispatchTable<ExistenceFilterType::NegPrope
                                                    ExistenceFilterType::NestedFilter>;
 
 // Individual parser function implementations (non-template)
-// Note: parseOr, parseAnd, parseIn, parseCompare, parseRegex are implemented in JSONPathFilterCore.cpp
+// Note: parseOr, parseAnd, parseIn, parseRegex are implemented in JSONPathFilterCore.cpp
 
 std::optional<json_query::json_path::Token> parseExists(const QString&                                s,
                                                         std::vector<json_query::json_path::FilterFn>& out)
@@ -688,6 +689,12 @@ std::optional<Token> parseRegex(const QString& s, std::vector<FilterFn>& out)
     if (auto t = parseRegex1<dotPat>(s, out))
         return t;
     return parseRegex1<brkPat>(s, out);
+}
+
+std::optional<Token> parseCompare(const QString& s, std::vector<FilterFn>& out)
+{
+    // Use TableGen-inspired compile-time dispatch with priority ordering
+    return ComparisonDispatcher::dispatch(s, out);
 }
 
 } // namespace json_query::json_path::detail
