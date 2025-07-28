@@ -16,11 +16,11 @@ set(JSON_QUERY_SOURCES
     json-path/JSONPathExpected.cpp
     json-path/JSONPathFilterComparison.cpp
     json-path/JSONPathFilterComparisonDispatcher.cpp
+    json-path/JSONPathFilterCompile.cpp
     json-path/JSONPathFilterEmbeddedParsers.cpp
     json-path/JSONPathFilterExistenceParsers.cpp
     json-path/JSONPathFilterFunctions.cpp
     json-path/JSONPathFilterHelpers.cpp
-    json-path/JSONPathFilterOrchestration.cpp
     json-path/JSONPathFilterParsers.cpp
     json-path/JSONPathLog.cpp
     json-path/JSONPathParseUtils.cpp
