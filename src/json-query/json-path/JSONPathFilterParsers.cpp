@@ -639,4 +639,45 @@ std::optional<json_query::json_path::Token> parseAbsolutePath(const QString&    
         s);
 }
 
+// Helper function to parse JSON literals from strings
+QJsonValue parseJsonLiteral(const QString& value)
+{
+    // Refactored to use monadic error handling patterns
+    const auto trimmed{value.trimmed()};
+
+    // Parse literal using monadic pattern with optional chaining
+    auto parseNull = [](const QString& s) -> std::optional<QJsonValue>
+    { return (s == "null") ? std::optional<QJsonValue>{QJsonValue{}} : std::nullopt; };
+
+    auto parseBoolean = [](const QString& s) -> std::optional<QJsonValue>
+    {
+        if (s == "true")
+            return QJsonValue{true};
+        if (s == "false")
+            return QJsonValue{false};
+        return std::nullopt;
+    };
+
+    auto parseNumber = [](const QString& s) -> std::optional<QJsonValue>
+    {
+        bool ok;
+        auto num{s.toDouble(&ok)};
+        return ok ? std::optional<QJsonValue>{QJsonValue{num}} : std::nullopt;
+    };
+
+    auto parseQuotedString = [](const QString& s) -> std::optional<QJsonValue>
+    {
+        if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith('\'') && s.endsWith('\'')))
+            return QJsonValue{s.mid(1, s.length() - 2)};
+        return std::nullopt;
+    };
+
+    // Try parsing in order using monadic chaining
+    return parseNull(trimmed)
+        .or_else([&]() { return parseBoolean(trimmed); })
+        .or_else([&]() { return parseNumber(trimmed); })
+        .or_else([&]() { return parseQuotedString(trimmed); })
+        .value_or(QJsonValue{trimmed}); // Default to string
+}
+
 } // namespace json_query::json_path::detail

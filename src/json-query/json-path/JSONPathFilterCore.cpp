@@ -15,6 +15,7 @@ namespace json_query::json_path::detail
 
 using json_query::json_path::FilterFn;
 using json_query::json_path::Token;
+using json_query::json_path::detail::parseJsonLiteral;
 using json_query::json_path::detail::performComparison;
 using json_query::json_path::detail::splitTopLevel;
 using json_query::json_path::detail::stripOuterParens;

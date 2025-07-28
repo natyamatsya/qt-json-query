@@ -397,6 +397,16 @@ std::optional<json_query::json_path::Token> parseNot(const QString&             
 std::optional<json_query::json_path::Token> parseAbsolutePath(const QString&                                s,
                                                               std::vector<json_query::json_path::FilterFn>& out);
 
+// Forward declarations
+std::optional<Token> parseOr(const QString& s, std::vector<FilterFn>& out);
+std::optional<Token> parseAnd(const QString& s, std::vector<FilterFn>& out);
+std::optional<Token> parseIn(const QString& s, std::vector<FilterFn>& out);
+
+// JSON literal parsing utility
+QJsonValue parseJsonLiteral(const QString& value);
+
+// Other parser functions
+
 // ──────────────────────────────────────────────────────────────────────
 //  Modern Embedded Filter Parser Functions (Zero-Overhead)
 // ──────────────────────────────────────────────────────────────────────

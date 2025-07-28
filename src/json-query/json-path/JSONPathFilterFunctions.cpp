@@ -1,4 +1,5 @@
 #include "json-query/json-path/JSONPathFilterFunctions.hpp"
+#include "json-query/json-path/JSONPathFilterParsers.hpp"
 #include "json-query/json-path/JSONPathFilterHelpers.hpp"
 #include "json-query/json-path/JSONPath.hpp"
 #include "json-query/json-path/JSONPathHelpers.hpp"
@@ -10,6 +11,7 @@
 namespace json_query::json_path::detail
 {
 
+using json_query::json_path::detail::parseJsonLiteral;
 using json_query::utils::to_qstr;
 using json_query::utils::to_sv;
 
@@ -109,48 +111,7 @@ QJsonValue evaluateFunction(const QString& funcCall, const QJsonValue& context)
     return {}; // Unknown function
 }
 
-// Helper function to parse JSON literals from strings
-QJsonValue parseJsonLiteral(const QString& value)
-{
-    // Refactored to use monadic error handling patterns
-    const auto trimmed{value.trimmed()};
-
-    // Parse literal using monadic pattern with optional chaining
-    auto parseNull = [](const QString& s) -> std::optional<QJsonValue>
-    { return (s == "null") ? std::optional<QJsonValue>{QJsonValue{}} : std::nullopt; };
-
-    auto parseBoolean = [](const QString& s) -> std::optional<QJsonValue>
-    {
-        if (s == "true")
-            return QJsonValue{true};
-        if (s == "false")
-            return QJsonValue{false};
-        return std::nullopt;
-    };
-
-    auto parseNumber = [](const QString& s) -> std::optional<QJsonValue>
-    {
-        bool ok;
-        auto num{s.toDouble(&ok)};
-        return ok ? std::optional<QJsonValue>{QJsonValue{num}} : std::nullopt;
-    };
-
-    auto parseQuotedString = [](const QString& s) -> std::optional<QJsonValue>
-    {
-        if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith('\'') && s.endsWith('\'')))
-            return QJsonValue{s.mid(1, s.length() - 2)};
-        return std::nullopt;
-    };
-
-    // Try parsing in order using monadic chaining
-    return parseNull(trimmed)
-        .or_else([&]() { return parseBoolean(trimmed); })
-        .or_else([&]() { return parseNumber(trimmed); })
-        .or_else([&]() { return parseQuotedString(trimmed); })
-        .value_or(QJsonValue{trimmed}); // Default to string
-}
-
-// Helper function to compare QJsonValues for ordering
+// Helper function for value comparison with type checking
 int compareValues(const QJsonValue& left, const QJsonValue& right)
 {
     // Handle null values
@@ -255,10 +216,9 @@ std::optional<Token> parseFunction(const QString& s, std::vector<FilterFn>& out)
                 }
                 else if (right.startsWith("@."))
                 {
-                    // Property access - RFC 9535 "nothing" semantics
-                    const auto prop{right.mid(2)};
-                    auto       val{j.toObject().value(prop)};
-                    rightVal = val.isUndefined() ? QJsonValue{0} : val; // Undefined becomes 0
+                    auto prop = right.mid(2);
+                    auto val  = j.toObject().value(prop);
+                    rightVal  = val.isUndefined() ? QJsonValue() : val;
                 }
                 else
                 {
