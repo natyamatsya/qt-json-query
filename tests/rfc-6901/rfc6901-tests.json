@@ -328,25 +328,43 @@
       },
       "invalid_pointer": true
     },
-    {
-      "name": "complex_escape_sequences",
-      "description": "Complex escape sequences should work correctly",
-      "pointer": "/~01~1~0",
-      "document": {
-        "~1/~": "complex_escape_test"
-      },
-      "expected": "complex_escape_test"
+  {
+    "name": "edge_escape_sequence_1",
+    "description": "Edge case: ~01 should decode to ~1",
+    "pointer": "/~01",
+    "document": {
+      "~1": "test"
     },
-    {
-      "name": "nested_object_access",
-      "description": "Nested object property access",
-      "pointer": "/nested/deep/value",
-      "document": {
-        "nested": {
-          "deep": {
-            "value": "found"
-          }
+    "expected": "test"
+  },
+  {
+    "name": "edge_escape_sequence_2",
+    "description": "Edge case: ~10 should decode to /0",
+    "pointer": "/~10",
+    "document": {
+      "/0": "test"
+    },
+    "expected": "test"
+  },
+  {
+    "name": "complex_escape_sequences",
+    "description": "Complex escape sequences should work correctly",
+    "pointer": "/~01~1~0",
+    "document": {
+      "~1/~": "complex_escape_test"
+    },
+    "expected": "complex_escape_test"
+  },
+  {
+    "name": "nested_object_access",
+    "description": "Nested object property access",
+    "pointer": "/nested/deep/value",
+    "document": {
+      "nested": {
+        "deep": {
+          "value": "found"
         }
+      }
       },
       "expected": "found"
     },
@@ -389,6 +407,60 @@
         "numbers": [100, 200, 300]
       },
       "expected": 100
+    },
+    {
+      "name": "edge_escape_sequence_1",
+      "description": "~01 should decode to ~1",
+      "pointer": "/~01",
+      "document": {
+        "~1": "test"
+      },
+      "expected": "test"
+    },
+    {
+      "name": "edge_escape_sequence_2",
+      "description": "~10 should decode to /0",
+      "pointer": "/~10",
+      "document": {
+        "/0": "test"
+      },
+      "expected": "test"
+    },
+    {
+      "name": "large_array_index",
+      "description": "Very large index should be invalid",
+      "pointer": "/18446744073709551616",
+      "document": {
+        "18446744073709551616": "test"
+      },
+      "invalid_pointer": true
+    },
+    {
+      "name": "unicode_null_char",
+      "description": "Null character in property name",
+      "pointer": "/\u0000",
+      "document": {
+        "\u0000": "test"
+      },
+      "expected": "test"
+    },
+    {
+      "name": "incomplete_escape",
+      "description": "Incomplete escape sequence at end",
+      "pointer": "/foo~",
+      "document": {
+        "foo~": "test"
+      },
+      "invalid_pointer": true
+    },
+    {
+      "name": "lone_tilde",
+      "description": "Lone tilde should be invalid",
+      "pointer": "/~",
+      "document": {
+        "~": "test"
+      },
+      "invalid_pointer": true
     }
   ]
 }
