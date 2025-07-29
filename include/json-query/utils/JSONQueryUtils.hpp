@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-
 #pragma once
 
 // Modern utilities for JSONQuery library

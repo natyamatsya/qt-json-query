@@ -12,8 +12,8 @@
 #include <cmath>
 #include <utility>
 
-#include "../json-path/JSONPathEvalError.hpp"        // json_query::json_path::EvalError, to_string(...)
-#include "../json-pointer/JSONPointerEvaluation.hpp" // json_query::json_pointer::detail::EvalError, to_string(...)
+#include "../json-path/JSONPathEvalError.hpp"        // json_query::json_path::EvalError
+#include "../json-pointer/JSONPointerEvaluation.hpp" // json_query::json_pointer::detail::EvalError
 
 namespace json_query
 {
@@ -177,16 +177,18 @@ inline std::expected<int, ConvError> as_core(const QJsonValue& v)
 {
     if (!v.isDouble())
         return std::unexpected(ConvError{ConvErrorCode::TypeMismatch, JsonKind::Number, kind_of(v)});
+
     const double d = v.toDouble();
     if (!std::isfinite(d))
         return std::unexpected(ConvError{ConvErrorCode::OutOfRange, JsonKind::Number, JsonKind::Number});
+
     if (d < static_cast<double>(std::numeric_limits<int>::min()) ||
         d > static_cast<double>(std::numeric_limits<int>::max()))
-    {
         return std::unexpected(ConvError{ConvErrorCode::OutOfRange, JsonKind::Number, JsonKind::Number});
-    }
+
     if (std::trunc(d) != d)
         return std::unexpected(ConvError{ConvErrorCode::NotIntegral, JsonKind::Number, JsonKind::Number});
+
     return static_cast<int>(d);
 }
 
@@ -194,9 +196,6 @@ inline std::expected<int, ConvError> as_core(const QJsonValue& v)
 
 //------------------------------------------------------------------------------
 // Error adapters: ConvError -> domain error
-// NOTE: JSONPath/JSON Pointer enums only distinguish object vs array mismatches,
-//       plus bounds/slice issues. For primitive mismatches and numeric conversion
-//       errors, we conservatively map to TypeMismatchArray (tunable).
 //------------------------------------------------------------------------------
 
 template <class E>
@@ -216,10 +215,10 @@ struct ErrorAdapter<json_query::json_path::EvalError>
                 return EP::TypeMismatchObject;
             if (e.expected == JsonKind::Array)
                 return EP::TypeMismatchArray;
-            // Primitive kind mismatch: no exact code -> treat as general mismatch.
+            // Primitive mismatches: choose a generic mismatch.
             return EP::TypeMismatchArray;
         }
-        // Numeric errors: no dedicated codes in JSONPath::EvalError -> pick closest generic.
+        // Numeric errors: closest generic.
         return EP::TypeMismatchArray;
     }
 };
@@ -238,37 +237,39 @@ struct ErrorAdapter<json_query::json_pointer::detail::EvalError>
                 return EP::TypeMismatchObject;
             if (e.expected == JsonKind::Array)
                 return EP::TypeMismatchArray;
-            // Primitive kind mismatch: no exact code -> treat as general mismatch.
+            // Primitive mismatches: choose a generic mismatch.
             return EP::TypeMismatchArray;
         }
-        // Numeric errors: no dedicated codes in Pointer::EvalError -> pick closest generic.
+        // Numeric errors: closest generic.
         return EP::TypeMismatchArray;
     }
 };
 
 //------------------------------------------------------------------------------
-// Function-object variable template: as<T>
-//   - QJsonValue -> expected<T, ConvError>
-//   - expected<QJsonValue, E> -> expected<T, E>  (E auto-deduced)
+// Public helpers
+//   - as<T>(QJsonValue)               -> expected<T, ConvError>
+//   - as<T>(expected<QJsonValue, E>)  -> expected<T, E>   (preserves E)
+//   - pipe: expected<QJsonValue,E> | as<T>
+//   - WARNING: do not use `.and_then(as<T>)`; see note below.
 //------------------------------------------------------------------------------
 
 template <JsonTarget T>
 struct AsFn
 {
-    // Chaining case: preserve domain error E
+    // 1) Plain value: domain-agnostic conversion
+    [[nodiscard]] constexpr auto operator()(QJsonValue v) const -> std::expected<T, ConvError>
+    {
+        return detail::as_core<T>(v);
+    }
+
+    // 2) Chaining case: preserve domain error E
     template <class E>
     [[nodiscard]] constexpr auto operator()(const std::expected<QJsonValue, E>& r) const -> std::expected<T, E>
     {
         if (!r)
             return std::unexpected(r.error());
-        auto base = detail::as_core<T>(*r);
-        return base.transform_error(ErrorAdapter<E>::from);
-    }
-
-    // Plain value: domain-agnostic conversion
-    [[nodiscard]] constexpr auto operator()(const QJsonValue& v) const -> std::expected<T, ConvError>
-    {
-        return detail::as_core<T>(v);
+        auto base = detail::as_core<T>(*r);                 // expected<T, ConvError>
+        return base.transform_error(ErrorAdapter<E>::from); // map ConvError -> E
     }
 };
 
@@ -276,7 +277,7 @@ struct AsFn
 template <JsonTarget T>
 inline constexpr AsFn<T> as{};
 
-// Optional pipeline sugar: result | as<T>
+// Pipeline sugar: result | as<T>
 template <class LHS, JsonTarget T>
 [[nodiscard]] constexpr auto operator|(LHS&& lhs, const AsFn<T>& f) -> decltype(f(std::forward<LHS>(lhs)))
 {
@@ -284,100 +285,3 @@ template <class LHS, JsonTarget T>
 }
 
 } // namespace json_query
-
-//------------------------------------------------------------------------------
-// Extension methods (.as<T>()) using explicit object parameter (C++23)
-// Enables: jsonPath.evaluate(doc).as<QJsonArray>()
-//------------------------------------------------------------------------------
-
-namespace json_query::json_path
-{
-
-#if defined(__cpp_explicit_this_parameter) && __cpp_explicit_this_parameter >= 202110
-
-template <json_query::JsonTarget T>
-[[nodiscard]] inline auto as(this std::expected<QJsonValue, EvalError>& self) -> std::expected<T, EvalError>
-{
-    if (!self)
-        return std::unexpected(self.error());
-    auto base = json_query::detail::as_core<T>(*self);
-    return base.transform_error(json_query::ErrorAdapter<EvalError>::from);
-}
-
-template <json_query::JsonTarget T>
-[[nodiscard]] inline auto as(this const std::expected<QJsonValue, EvalError>& self) -> std::expected<T, EvalError>
-{
-    if (!self)
-        return std::unexpected(self.error());
-    auto base = json_query::detail::as_core<T>(*self);
-    return base.transform_error(json_query::ErrorAdapter<EvalError>::from);
-}
-
-template <json_query::JsonTarget T>
-[[nodiscard]] inline auto as(this std::expected<QJsonValue, EvalError>&& self) -> std::expected<T, EvalError>
-{
-    if (!self)
-        return std::unexpected(std::move(self).error());
-    auto base = json_query::detail::as_core<T>(*self);
-    return base.transform_error(json_query::ErrorAdapter<EvalError>::from);
-}
-
-#else
-// Fallback for compilers without explicit-this: ADL free function
-template <json_query::JsonTarget T>
-[[nodiscard]] inline auto as(const std::expected<QJsonValue, EvalError>& self) -> std::expected<T, EvalError>
-{
-    if (!self)
-        return std::unexpected(self.error());
-    auto base = json_query::detail::as_core<T>(*self);
-    return base.transform_error(json_query::ErrorAdapter<EvalError>::from);
-}
-#endif
-
-} // namespace json_query::json_path
-
-namespace json_query::json_pointer::detail
-{
-
-#if defined(__cpp_explicit_this_parameter) && __cpp_explicit_this_parameter >= 202110
-
-template <json_query::JsonTarget T>
-[[nodiscard]] inline auto as(this std::expected<QJsonValue, EvalError>& self) -> std::expected<T, EvalError>
-{
-    if (!self)
-        return std::unexpected(self.error());
-    auto base = json_query::detail::as_core<T>(*self);
-    return base.transform_error(json_query::ErrorAdapter<EvalError>::from);
-}
-
-template <json_query::JsonTarget T>
-[[nodiscard]] inline auto as(this const std::expected<QJsonValue, EvalError>& self) -> std::expected<T, EvalError>
-{
-    if (!self)
-        return std::unexpected(self.error());
-    auto base = json_query::detail::as_core<T>(*self);
-    return base.transform_error(json_query::ErrorAdapter<EvalError>::from);
-}
-
-template <json_query::JsonTarget T>
-[[nodiscard]] inline auto as(this std::expected<QJsonValue, EvalError>&& self) -> std::expected<T, EvalError>
-{
-    if (!self)
-        return std::unexpected(std::move(self).error());
-    auto base = json_query::detail::as_core<T>(*self);
-    return base.transform_error(json_query::ErrorAdapter<EvalError>::from);
-}
-
-#else
-// Fallback for compilers without explicit-this: ADL free function
-template <json_query::JsonTarget T>
-[[nodiscard]] inline auto as(const std::expected<QJsonValue, EvalError>& self) -> std::expected<T, EvalError>
-{
-    if (!self)
-        return std::unexpected(self.error());
-    auto base = json_query::detail::as_core<T>(*self);
-    return base.transform_error(json_query::ErrorAdapter<EvalError>::from);
-}
-#endif
-
-} // namespace json_query::json_pointer::detail
