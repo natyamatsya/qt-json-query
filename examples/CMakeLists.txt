@@ -29,6 +29,13 @@ if(TARGET function_ref_interface)
   target_link_libraries(refactor_potential PRIVATE function_ref_interface)
 endif()
 
+# Example demonstrating the as<T> function
+add_executable(as_function_demo as_function_demo.cpp)
+target_link_libraries(as_function_demo PRIVATE json_query Qt6::Core)
+if(TARGET function_ref_interface)
+  target_link_libraries(as_function_demo PRIVATE function_ref_interface)
+endif()
+
 install(TARGETS simple_pointer monadic_error_handling_demo simple_path
-                complex_query refactor_potential
+                complex_query refactor_potential as_function_demo
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}/examples)
