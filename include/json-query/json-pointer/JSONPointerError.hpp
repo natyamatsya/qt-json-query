@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 #pragma once
 
+#include <string_view>
+
 namespace json_query::json_pointer
 {
 
@@ -23,21 +25,53 @@ enum class EvalError : std::uint8_t
     IndexOutOfRange
 };
 
+/**
+ * @brief Convert a ParseError to a human-readable string
+ *
+ * @param e The evaluation error to convert
+ * @return std::string_view A descriptive error message for the evaluation error
+ */
+[[nodiscard]] inline constexpr std::string_view to_string(ParseError e) noexcept
+{
+    using enum ParseError;
+    switch (e)
+    {
+    case MissingLeadingSlash:
+        return "JSON Pointer must start with a leading slash";
+    case EmptyNonTerminalToken:
+        return "Non-terminal token in JSON Pointer cannot be empty";
+    case InvalidEscapeSequence:
+        return "Invalid escape sequence in JSON Pointer (only ~0 and ~1 are valid)";
+    case NonDecimalArrayIndex:
+        return "Array index contains non-decimal characters or leading zeros";
+    case ArrayIndexOverflow:
+        return "Array index is too large to be represented";
+    default:
+        return "Unknown parse error";
+    }
+}
+
+/**
+ * @brief Convert an EvalError to a human-readable string
+ *
+ * @param e The evaluation error to convert
+ * @return std::string_view A descriptive error message for the evaluation error
+ */
 [[nodiscard]] inline constexpr std::string_view to_string(EvalError e) noexcept
 {
     using enum EvalError;
     switch (e)
     {
     case TypeMismatchObject:
-        return "type mismatch: expected object";
+        return "Type mismatch: Cannot access property on non-object value (expected JSON object)";
     case TypeMismatchArray:
-        return "type mismatch: expected array";
+        return "Type mismatch: Cannot use array index on non-array value (expected JSON array)";
     case KeyNotFound:
-        return "key not found in object";
+        return "Key not found: The specified property does not exist in the target object";
     case IndexOutOfRange:
-        return "array index out of range";
+        return "Index out of range: Array index exceeds the bounds of the target array";
     default:
-        return "unknown evaluation error";
+        return "Unknown evaluation error";
     }
 }
 
