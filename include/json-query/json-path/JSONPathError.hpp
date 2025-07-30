@@ -11,28 +11,28 @@ namespace json_query::json_path
 // Parse-time errors
 enum class ParseError : std::uint8_t
 {
+    BlankInKey,
+    EmptySegment,
+    InvalidIdentifier, // RFC 9535: invalid member-name-shorthand
+    InvalidIndex,
+    InvalidSlice,
     MissingRoot,
     TrailingDot,
     TrailingRecursive,
-    EmptySegment,
-    BlankInKey,
+    UnexpectedAfterRoot,
     UnmatchedBracket,
     UnmatchedQuote,
     UnsupportedFilter,
-    InvalidSlice,
-    InvalidIndex,
-    InvalidIdentifier, // RFC 9535: invalid member-name-shorthand
-    UnexpectedAfterRoot,
 };
 
 // Evaluation-time errors
 enum class EvalError : std::uint8_t
 {
-    TypeMismatchObject = 0, // expected object but found other when key access
-    TypeMismatchArray,      // expected array but found other when index/slice
-    KeyNotFound,            // object key missing (for definite access)
     IndexOutOfRange,        // array index OOB
     InvalidSlice,           // invalid slice parameters (e.g., zero step)
+    KeyNotFound,            // object key missing (for definite access)
+    TypeMismatchArray,      // expected array but found other when index/slice
+    TypeMismatchObject = 0, // expected object but found other when key access
 };
 
 /**

@@ -9,20 +9,20 @@ namespace json_query::json_pointer
 // Parse-time errors
 enum class ParseError : std::uint8_t
 {
-    MissingLeadingSlash,
+    ArrayIndexOverflow,
     EmptyNonTerminalToken,
     InvalidEscapeSequence,
+    MissingLeadingSlash,
     NonDecimalArrayIndex,
-    ArrayIndexOverflow
 };
 
 // Evaluation-time errors
 enum class EvalError : std::uint8_t
 {
-    TypeMismatchObject,
-    TypeMismatchArray,
+    IndexOutOfRange,
     KeyNotFound,
-    IndexOutOfRange
+    TypeMismatchArray,
+    TypeMismatchObject,
 };
 
 /**
