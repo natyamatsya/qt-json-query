@@ -13,18 +13,20 @@
 
 #include <vector> // added include for std::vector
 
+#include "json-query/utils/JSONQueryError.hpp"
+
 namespace json_query::json_pointer
 {
 
 class JSONPointer
 {
   public:
-    using ParseError = json_pointer::ParseError; // alias internal
-    using EvalError  = json_pointer::EvalError;  // alias internal
-
     // Factory function mirroring JSONPath
-    using ParseResult = std::expected<JSONPointer, ParseError>;
-    using EvalResult  = std::expected<QJsonValue, EvalError>;
+    using ParseResult = std::expected<JSONPointer, json_query::QueryError>;
+    using EvalResult  = std::expected<QJsonValue, json_query::QueryError>;
+
+    // Note: Internal error types are not exposed in the public API
+    // All error handling should use the QueryError type
 
     // Factory function mirroring JSONPath
     static ParseResult create(QStringView pointer);
@@ -38,8 +40,7 @@ class JSONPointer
   private:
     JSONPointer() = default; // internal default ctor for factory
 
-    using Token = json_query::json_pointer::detail::Token;
-    std::vector<Token> m_tokens; // QVector replaced with std::vector
+    std::vector<Token> m_tokens;
 };
 
 } // namespace json_query::json_pointer

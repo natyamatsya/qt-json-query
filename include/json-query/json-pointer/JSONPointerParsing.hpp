@@ -12,9 +12,8 @@
 #include <cstring>
 #include <vector>
 
-namespace json_query::json_pointer::detail
+namespace json_query::json_pointer
 {
-
 struct Token
 {
     enum class Kind : quint8
@@ -26,6 +25,10 @@ struct Token
     qsizetype index{};
     QString   key{};
 };
+} // namespace json_query::json_pointer
+
+namespace json_query::json_pointer::detail
+{
 
 [[nodiscard]] inline QString decodeToken(QStringView token) noexcept
 {

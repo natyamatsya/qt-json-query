@@ -21,35 +21,35 @@
 // ────────────────────────────── Project
 #include "JSONPathCompile.hpp"
 #include "json-query/json-path/JSONPathEvaluate.hpp"
-#include "json-query/json-path/JSONPathEvalError.hpp"
 #include "json-query/json-path/JSONPathExpected.hpp"
 #include "json-query/json-path/JSONPathOption.hpp"
 #include "json-query/json-path/JSONPathHelpers.hpp"
 #include "json-query/utils/JSONQueryUtils.hpp"
+#include "json-query/utils/JSONQueryError.hpp"
 #include "json-query/json-pointer/JSONPointer.hpp"
 
 using namespace Qt::StringLiterals;
 // ======================================================================
 //  JSONPath
 // ======================================================================
-namespace json_query
+namespace json_query::json_path
 {
 
 class JSONPath
 {
   public:
     // -----------------------------------------------------------------
-    //  Factory (replaces throwing constructor)                    ★
+    //  Factory (replaces throwing constructor)
     // -----------------------------------------------------------------
-    using Result = std::expected<JSONPath, json_query::json_path::Error>;
-    // ★
-    static Result create(QStringView path); // ★
-    // ★
+    using Result = std::expected<JSONPath, json_query::QueryError>;
+
+    static Result create(QStringView path);
+
     // -----------------------------------------------------------------
     //  Evaluation API with error reporting (std::expected)
     // -----------------------------------------------------------------
-    using EvalResult      = std::expected<QJsonValue, json_query::json_path::EvalError>;
-    using EvalArrayResult = std::expected<QJsonArray, json_query::json_path::EvalError>;
+    using EvalResult      = std::expected<QJsonValue, json_query::QueryError>;
+    using EvalArrayResult = std::expected<QJsonArray, json_query::QueryError>;
 
     [[nodiscard]] EvalResult evaluate(const QJsonDocument& doc) const;
     [[nodiscard]] EvalResult evaluate(const QJsonValue& value) const;
@@ -60,21 +60,13 @@ class JSONPath
     // -----------------------------------------------------------------
     //  Other
     // -----------------------------------------------------------------
-    [[nodiscard]] QString toString() const { return m_originalPath; }
+    [[nodiscard]] QString to_string() const { return m_originalPath; }
 
     //  Move / copy remain defaulted
     JSONPath(JSONPath&&) noexcept            = default;
     JSONPath(const JSONPath&)                = default;
     JSONPath& operator=(JSONPath&&) noexcept = default;
     JSONPath& operator=(const JSONPath&)     = default;
-
-    //  Aliases exported for callers
-    using FunctionType    = json_query::json_path::FunctionType;
-    using Slice           = json_query::json_path::Slice;
-    using Token           = json_query::json_path::Token;
-    using FilterFn        = json_query::json_path::FilterFn;
-    using ContextFilterFn = json_query::json_path::ContextFilterFn;
-    using Error           = json_query::json_path::Error;
 
   private:
     // -----------------------------------------------------------------
@@ -93,8 +85,6 @@ class JSONPath
     json_query::json_path::FunctionType       m_func{json_query::json_path::FunctionType::None};
     QString                                   m_originalPath;
     std::vector<json_query::json_path::Token> m_tokens;
-    // Legacy filter storage removed - now using embedded filters only
-
 }; // end class JSONPath
 
-} // namespace json_query
+} // namespace json_query::json_path

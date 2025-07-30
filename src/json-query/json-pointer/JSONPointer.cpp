@@ -2,6 +2,7 @@
 
 #include "json-query/json-pointer/JSONPointer.hpp"
 #include "json-query/utils/JSONQueryUtils.hpp"
+#include "json-query/utils/JSONQueryError.hpp"
 #include "json-query/json-pointer/JSONPointerParsing.hpp"
 #include "json-query/json-pointer/JSONPointerEvaluation.hpp"
 
@@ -19,7 +20,7 @@ JSONPointer::Result JSONPointer::create(QStringView pointer)
 {
     JSONPointer jp;
     if (auto res = json_pointer::detail::parsePointer(pointer, jp.m_tokens); !res)
-        return std::unexpected(res.error());
+        return std::unexpected(QueryError{ErrorDomain::PointerParse, static_cast<std::uint8_t>(res.error())});
     return jp;
 }
 
@@ -44,7 +45,7 @@ JSONPointer::EvalResult JSONPointer::evaluate(const QJsonValue& value) const
     auto res{json_pointer::detail::evaluatePointer(m_tokens, value)};
     if (res)
         return res.value();
-    return std::unexpected(res.error());
+    return std::unexpected(QueryError{ErrorDomain::PointerEval, static_cast<std::uint8_t>(res.error())});
 }
 
 QString JSONPointer::toString() const
