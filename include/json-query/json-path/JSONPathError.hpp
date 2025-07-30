@@ -28,11 +28,11 @@ enum class ParseError : std::uint8_t
 // Evaluation-time errors
 enum class EvalError : std::uint8_t
 {
-    IndexOutOfRange,        // array index OOB
-    InvalidSlice,           // invalid slice parameters (e.g., zero step)
-    KeyNotFound,            // object key missing (for definite access)
-    TypeMismatchArray,      // expected array but found other when index/slice
-    TypeMismatchObject = 0, // expected object but found other when key access
+    IndexOutOfRange,    // array index OOB
+    InvalidSlice,       // invalid slice parameters (e.g., zero step)
+    KeyNotFound,        // object key missing (for definite access)
+    TypeMismatchArray,  // expected array but found other when index/slice
+    TypeMismatchObject, // expected object but found other when key access
 };
 
 /**
@@ -46,31 +46,31 @@ enum class EvalError : std::uint8_t
     using enum ParseError;
     switch (e)
     {
+    case BlankInKey:
+        return "Syntax error: Blank or invalid character in member name (use quotes for names with special "
+               "characters)";
+    case EmptySegment:
+        return "Syntax error: Empty segment between dots (consecutive '..' or segment with no identifier)";
+    case InvalidIdentifier:
+        return "Syntax error: Invalid member name identifier (must be a valid JSON string or JavaScript identifier)";
+    case InvalidIndex:
+        return "Syntax error: Invalid index-selector syntax (expected non-negative integer or comma-separated list)";
+    case InvalidSlice:
+        return "Syntax error: Invalid slice-selector syntax (expected [start:end:step] with optional values)";
     case MissingRoot:
         return "Syntax error: JSONPath must start with root identifier '$' (document root) or '@' (current node)";
     case TrailingDot:
         return "Syntax error: Trailing '.' in segment (must be followed by a member name or wildcard)";
     case TrailingRecursive:
         return "Syntax error: Trailing '..' in descendant segment (must be followed by a member name or selector)";
-    case EmptySegment:
-        return "Syntax error: Empty segment between dots (consecutive '..' or segment with no identifier)";
-    case BlankInKey:
-        return "Syntax error: Blank or invalid character in member name (use quotes for names with special "
-               "characters)";
+    case UnexpectedAfterRoot:
+        return "Syntax error: Root identifier must be followed by '.' (dot) or '[' (bracket)";
     case UnmatchedBracket:
         return "Syntax error: Unmatched '[' in selector (missing closing ']')";
     case UnmatchedQuote:
         return "Syntax error: Unmatched quote in string literal (missing closing quote)";
     case UnsupportedFilter:
         return "Syntax error: Unsupported or invalid filter-selector expression (check filter syntax)";
-    case InvalidSlice:
-        return "Syntax error: Invalid slice-selector syntax (expected [start:end:step] with optional values)";
-    case InvalidIndex:
-        return "Syntax error: Invalid index-selector syntax (expected non-negative integer or comma-separated list)";
-    case InvalidIdentifier:
-        return "Syntax error: Invalid member name identifier (must be a valid JSON string or JavaScript identifier)";
-    case UnexpectedAfterRoot:
-        return "Syntax error: Root identifier must be followed by '.' (dot) or '[' (bracket)";
     default:
         return "Unknown parse error";
     }
@@ -87,16 +87,16 @@ enum class EvalError : std::uint8_t
     using enum EvalError;
     switch (e)
     {
-    case TypeMismatchObject:
-        return "Type error: Cannot access property on non-object value (expected JSON object)";
-    case TypeMismatchArray:
-        return "Type error: Cannot use array index or slice on non-array value (expected JSON array)";
-    case KeyNotFound:
-        return "Key error: The specified property does not exist in the target object";
     case IndexOutOfRange:
         return "Range error: Array index exceeds the bounds of the target array";
     case InvalidSlice:
         return "Range error: Invalid slice parameters (start, end, or step values are invalid)";
+    case KeyNotFound:
+        return "Key error: The specified property does not exist in the target object";
+    case TypeMismatchArray:
+        return "Type error: Cannot use array index or slice on non-array value (expected JSON array)";
+    case TypeMismatchObject:
+        return "Type error: Cannot access property on non-object value (expected JSON object)";
     default:
         return "Unknown evaluation error";
     }

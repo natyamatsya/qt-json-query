@@ -36,16 +36,16 @@ enum class EvalError : std::uint8_t
     using enum ParseError;
     switch (e)
     {
-    case MissingLeadingSlash:
-        return "JSON Pointer must start with a leading slash";
+    case ArrayIndexOverflow:
+        return "Array index is too large to be represented";
     case EmptyNonTerminalToken:
         return "Non-terminal token in JSON Pointer cannot be empty";
     case InvalidEscapeSequence:
         return "Invalid escape sequence in JSON Pointer (only ~0 and ~1 are valid)";
+    case MissingLeadingSlash:
+        return "JSON Pointer must start with a leading slash";
     case NonDecimalArrayIndex:
         return "Array index contains non-decimal characters or leading zeros";
-    case ArrayIndexOverflow:
-        return "Array index is too large to be represented";
     default:
         return "Unknown parse error";
     }
@@ -62,14 +62,14 @@ enum class EvalError : std::uint8_t
     using enum EvalError;
     switch (e)
     {
-    case TypeMismatchObject:
-        return "Type mismatch: Cannot access property on non-object value (expected JSON object)";
-    case TypeMismatchArray:
-        return "Type mismatch: Cannot use array index on non-array value (expected JSON array)";
-    case KeyNotFound:
-        return "Key not found: The specified property does not exist in the target object";
     case IndexOutOfRange:
         return "Index out of range: Array index exceeds the bounds of the target array";
+    case KeyNotFound:
+        return "Key not found: The specified property does not exist in the target object";
+    case TypeMismatchArray:
+        return "Type mismatch: Cannot use array index on non-array value (expected JSON array)";
+    case TypeMismatchObject:
+        return "Type mismatch: Cannot access property on non-object value (expected JSON object)";
     default:
         return "Unknown evaluation error";
     }
