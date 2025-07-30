@@ -1,27 +1,35 @@
-// json-query/core/QueryError.hpp
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 #pragma once
+
 #include <cstdint>
 #include <string_view>
 #include <type_traits>
 #include <utility>
 
-// Forward declare your domain enums + their to_string functions
+// Forward declare domain enums and their to_string functions
 namespace json_query::json_path
 {
-enum class Error : std::uint8_t;     // parser/compile errors
-enum class EvalError : std::uint8_t; // JSONPath evaluation errors
+// JSONPath parse/compile errors
+enum class ParseError : std::uint8_t;
+// JSONPath evaluation errors
+enum class EvalError : std::uint8_t;
 
-// You already have these:
-std::string_view toString(Error) noexcept;      // note: toString (parser)
-std::string_view to_string(EvalError) noexcept; // note: to_string (eval)
+// String conversion functions
+[[nodiscard]] constexpr std::string_view to_string(ParseError) noexcept;
+[[nodiscard]] constexpr std::string_view to_string(EvalError) noexcept;
 } // namespace json_query::json_path
 
-namespace json_query::json_pointer::detail
+namespace json_query::json_pointer
 {
-enum class EvalError : std::uint8_t; // JSON Pointer evaluation errors
-std::string_view to_string(EvalError) noexcept;
-} // namespace json_query::json_pointer::detail
+// JSON Pointer parse errors
+enum class ParseError : std::uint8_t;
+// JSON Pointer evaluation errors
+enum class EvalError : std::uint8_t;
+
+// String conversion functions
+[[nodiscard]] constexpr std::string_view to_string(ParseError) noexcept;
+[[nodiscard]] constexpr std::string_view to_string(EvalError) noexcept;
+} // namespace json_query::json_pointer
 
 // Conversion (QJsonValue -> T) errors live in this small enum
 namespace json_query
@@ -55,10 +63,11 @@ namespace json_query
 
 enum class ErrorDomain : std::uint8_t
 {
-    Parse,
-    PathEval,
-    PointerEval,
-    Convert
+    PathParse,    // JSONPath parse errors
+    PointerParse, // JSONPointer parse errors
+    PathEval,     // JSONPath evaluation errors
+    PointerEval,  // JSONPointer evaluation errors
+    Convert       // General conversion errors
 };
 
 // Compile-time mapping from enum type -> domain
@@ -66,9 +75,14 @@ template <class E>
 struct error_domain;
 
 template <>
-struct error_domain<json_path::Error>
+struct error_domain<json_path::ParseError>
 {
-    static constexpr ErrorDomain value = ErrorDomain::Parse;
+    static constexpr ErrorDomain value = ErrorDomain::PathParse;
+};
+template <>
+struct error_domain<json_pointer::ParseError>
+{
+    static constexpr ErrorDomain value = ErrorDomain::PointerParse;
 };
 template <>
 struct error_domain<json_path::EvalError>
@@ -76,7 +90,7 @@ struct error_domain<json_path::EvalError>
     static constexpr ErrorDomain value = ErrorDomain::PathEval;
 };
 template <>
-struct error_domain<json_pointer::detail::EvalError>
+struct error_domain<json_pointer::EvalError>
 {
     static constexpr ErrorDomain value = ErrorDomain::PointerEval;
 };
@@ -88,8 +102,9 @@ struct error_domain<ConvertError>
 
 template <class E>
 inline constexpr bool is_domain_enum_v =
-    std::is_same_v<E, json_path::Error> || std::is_same_v<E, json_path::EvalError> ||
-    std::is_same_v<E, json_pointer::EvalError> || std::is_same_v<E, ConvertError>;
+    std::is_same_v<E, json_path::ParseError> || std::is_same_v<E, json_pointer::ParseError> ||
+    std::is_same_v<E, json_path::EvalError> || std::is_same_v<E, json_pointer::EvalError> ||
+    std::is_same_v<E, ConvertError>;
 
 // The compact, unified error type
 struct QueryError
@@ -136,21 +151,30 @@ struct QueryError
 
 static_assert(sizeof(QueryError) == 2, "QueryError should remain compact (2 bytes).");
 
-// Message formatting — delegates to each domain's own to_string/toString
+/**
+ * @brief Convert a QueryError to a human-readable string
+ *
+ * @param e The query error to convert
+ * @return std::string_view A descriptive error message for the query error
+ */
 [[nodiscard]] inline constexpr std::string_view to_string(QueryError e) noexcept
 {
+    using enum ErrorDomain;
     switch (e.domain)
     {
-    case ErrorDomain::Parse:
-        return json_path::toString(static_cast<json_path::Error>(e.code));
-    case ErrorDomain::PathEval:
+    case PathParse:
+        return json_path::to_string(static_cast<json_path::ParseError>(e.code));
+    case PointerParse:
+        return json_pointer::to_string(static_cast<json_pointer::ParseError>(e.code));
+    case PathEval:
         return json_path::to_string(static_cast<json_path::EvalError>(e.code));
-    case ErrorDomain::PointerEval:
-        return json_pointer::detail::to_string(static_cast<json_pointer::detail::EvalError>(e.code));
-    case ErrorDomain::Convert:
+    case PointerEval:
+        return json_pointer::to_string(static_cast<json_pointer::EvalError>(e.code));
+    case Convert:
         return to_string(static_cast<ConvertError>(e.code));
+    default:
+        return "Unknown error domain";
     }
-    return "unknown error";
 }
 
 } // namespace json_query
