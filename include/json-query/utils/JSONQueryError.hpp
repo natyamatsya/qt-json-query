@@ -115,7 +115,33 @@ struct QueryError
     constexpr QueryError() = default;
     constexpr QueryError(ErrorDomain d, std::uint8_t c) : domain(d), code(c) {}
 
-    // Implicit construction from any known domain enum (typesafe; no macros)
+    // Explicit constructors for each domain error type
+    constexpr explicit QueryError(json_path::ParseError e) noexcept
+        : domain(ErrorDomain::PathParse), code(static_cast<std::uint8_t>(e))
+    {
+    }
+
+    constexpr explicit QueryError(json_pointer::ParseError e) noexcept
+        : domain(ErrorDomain::PointerParse), code(static_cast<std::uint8_t>(e))
+    {
+    }
+
+    constexpr explicit QueryError(json_path::EvalError e) noexcept
+        : domain(ErrorDomain::PathEval), code(static_cast<std::uint8_t>(e))
+    {
+    }
+
+    constexpr explicit QueryError(json_pointer::EvalError e) noexcept
+        : domain(ErrorDomain::PointerEval), code(static_cast<std::uint8_t>(e))
+    {
+    }
+
+    constexpr explicit QueryError(ConvertError e) noexcept
+        : domain(ErrorDomain::Convert), code(static_cast<std::uint8_t>(e))
+    {
+    }
+
+    // Fallback template for any other enum type that maps to a domain
     template <class E>
         requires is_domain_enum_v<E>
     constexpr QueryError(E e) noexcept
