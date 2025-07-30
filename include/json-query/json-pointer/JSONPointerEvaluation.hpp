@@ -4,6 +4,7 @@
 
 #include "JSONPointerParsing.hpp"
 #include "internal/PointerEvalCtx.hpp"
+#include "json-query/utils/JSONQueryError.hpp"
 
 #include <QJsonValue>
 #include <QJsonObject>
@@ -34,11 +35,13 @@ namespace json_query::json_pointer::detail
     return true;
 }
 
-[[nodiscard]] inline std::expected<QJsonValue, EvalError> evaluatePointer(const std::vector<Token>& tokens,
-                                                                          const QJsonValue&         root) noexcept
+// Internal implementation that returns domain-specific errors
+[[nodiscard]] inline std::expected<QJsonValue, EvalError> evaluatePointerImpl(const std::vector<Token>& tokens,
+                                                                              const QJsonValue&         root) noexcept
 {
     if (tokens.empty())
         return root; // success with root value
+
     QJsonValue current{root};
     for (const Token& tk : tokens)
     {
@@ -57,16 +60,25 @@ namespace json_query::json_pointer::detail
                 return std::unexpected(EvalError::IndexOutOfRange);
             break;
         default:
-            return std::unexpected(tk.kind == Token::Kind::Key ? EvalError::TypeMismatchObject
-                                                               : EvalError::TypeMismatchArray);
+            return std::unexpected(EvalError::TypeMismatchObject);
         }
     }
     return current; // success
 }
 
+// Public API that converts domain errors to QueryError
+[[nodiscard]] inline std::expected<QJsonValue, json_query::QueryError>
+evaluatePointer(const std::vector<Token>& tokens, const QJsonValue& root) noexcept
+{
+    auto result = evaluatePointerImpl(tokens, root);
+    if (!result)
+        return std::unexpected(json_query::QueryError{result.error()});
+    return *result;
+}
+
 // Convenience overload taking a PointerEvalCtx to mirror JSONPath's API
-[[nodiscard]] inline std::expected<QJsonValue, EvalError> evaluatePointer(const PointerEvalCtx& ctx,
-                                                                          const QJsonValue&     root) noexcept
+[[nodiscard]] inline std::expected<QJsonValue, json_query::QueryError> evaluatePointer(const PointerEvalCtx& ctx,
+                                                                                       const QJsonValue& root) noexcept
 {
     return evaluatePointer(ctx.tokens, root);
 }

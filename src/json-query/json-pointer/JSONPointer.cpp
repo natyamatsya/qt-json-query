@@ -16,36 +16,58 @@ namespace json_query::json_pointer
 // ────────────────────────────────────────────────────────────────────
 //  Factory
 // ────────────────────────────────────────────────────────────────────
-JSONPointer::Result JSONPointer::create(QStringView pointer)
+JSONPointer::ParseResult JSONPointer::create(QStringView pointer) noexcept
 {
     JSONPointer jp;
-    if (auto res = json_pointer::detail::parsePointer(pointer, jp.m_tokens); !res)
-        return std::unexpected(QueryError{ErrorDomain::PointerParse, static_cast<std::uint8_t>(res.error())});
+    if (auto parseResult = json_pointer::detail::parsePointer(pointer, jp.m_tokens); !parseResult)
+        return std::unexpected(QueryError{parseResult.error()});
     return jp;
 }
 
 // ────────────────────────────────────────────────────────────
-//  Public evaluation with detailed error
+//  Public evaluation with unified error type
 // ────────────────────────────────────────────────────────────
 
-JSONPointer::EvalResult JSONPointer::evaluate(const QJsonDocument& doc) const
+namespace
 {
-    if (doc.isNull())
-        return evaluate(QJsonValue{});
-    if (doc.isObject())
-        return evaluate(QJsonValue{doc.object()});
-    if (doc.isArray())
-        return evaluate(QJsonValue{doc.array()});
-    // otherwise, treat as undefined
-    return evaluate(QJsonValue{});
+// Internal implementation that returns domain-specific errors
+std::expected<QJsonValue, EvalError> evaluateImpl(const std::vector<json_pointer::detail::Token>& tokens,
+                                                  const QJsonValue&                               value) noexcept
+{
+    return json_pointer::detail::evaluatePointerImpl(tokens, value);
 }
 
+// Internal implementation for QJsonDocument that returns domain-specific errors
+std::expected<QJsonValue, EvalError> evaluateDocumentImpl(const std::vector<json_pointer::detail::Token>& tokens,
+                                                          const QJsonDocument&                            doc) noexcept
+{
+    if (doc.isNull())
+        return evaluateImpl(tokens, QJsonValue{});
+    if (doc.isObject())
+        return evaluateImpl(tokens, QJsonValue{doc.object()});
+    if (doc.isArray())
+        return evaluateImpl(tokens, QJsonValue{doc.array()});
+    // otherwise, treat as undefined
+    return evaluateImpl(tokens, QJsonValue{});
+}
+} // namespace
+
+// Public API that converts domain errors to QueryError
+JSONPointer::EvalResult JSONPointer::evaluate(const QJsonDocument& doc) const
+{
+    auto result = evaluateDocumentImpl(m_tokens, doc);
+    if (!result)
+        return std::unexpected(QueryError{result.error()});
+    return *result;
+}
+
+// Public API that converts domain errors to QueryError
 JSONPointer::EvalResult JSONPointer::evaluate(const QJsonValue& value) const
 {
-    auto res{json_pointer::detail::evaluatePointer(m_tokens, value)};
-    if (res)
-        return res.value();
-    return std::unexpected(QueryError{ErrorDomain::PointerEval, static_cast<std::uint8_t>(res.error())});
+    auto result = evaluateImpl(m_tokens, value);
+    if (!result)
+        return std::unexpected(QueryError{result.error()});
+    return *result;
 }
 
 QString JSONPointer::to_string() const

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "JSONPointerError.hpp"
+#include "json-query/utils/JSONQueryError.hpp"
 
 #include <QString>
 #include <QStringView>
@@ -90,18 +91,23 @@ namespace json_query::json_pointer::detail
     return true;
 }
 
+// Parse a JSON Pointer string into a sequence of tokens
 [[nodiscard]] inline std::expected<void, ParseError> parsePointer(QStringView ptr, std::vector<Token>& tokens) noexcept
 {
+    using enum ParseError;
+
     tokens.clear();
     constexpr char16_t Slash{u'/'};
     if (ptr.isEmpty())
-        return std::expected<void, ParseError>{}; // success
+        return {}; // success (empty pointer is valid)
+
     if (ptr.front() != Slash)
-        return std::unexpected(ParseError::MissingLeadingSlash);
+        return std::unexpected(MissingLeadingSlash);
+
     if (ptr.size() == 1)
     {
         tokens.push_back(Token{Token::Kind::Key, 0, QString{}});
-        return std::expected<void, ParseError>{};
+        return {};
     }
 
     const auto approx{ptr.count(Slash)};
@@ -112,16 +118,19 @@ namespace json_query::json_pointer::detail
         const auto end{ptr.indexOf(Slash, begin)};
         const auto atEnd{end == -1};
         const auto raw = atEnd ? ptr.sliced(begin) : ptr.sliced(begin, end - begin);
+
         if (raw.isEmpty() && !atEnd)
         {
             tokens.clear();
-            return std::unexpected(ParseError::EmptyNonTerminalToken);
+            return std::unexpected(EmptyNonTerminalToken);
         }
+
         const auto decoded = decodeToken(raw);
         if (raw.contains(u'~') && decoded.isEmpty() && !raw.isEmpty())
         {
             // decodeToken failing would produce same string; we approximate by checking unsupported escape later
         }
+
         qsizetype idx{};
         if (parseArrayIndex(decoded, idx))
         {
@@ -139,29 +148,35 @@ namespace json_query::json_pointer::detail
                 }
             }
             if (digits)
-                return std::unexpected(ParseError::ArrayIndexOverflow);
+                return std::unexpected(ArrayIndexOverflow);
+
             // Check for invalid escape sequences in the raw token
             for (qsizetype i = 0; i < raw.size(); ++i)
             {
                 if (raw[i] == u'~')
                 {
                     if (i + 1 >= raw.size())
-                        return std::unexpected(ParseError::InvalidEscapeSequence);
+                        return std::unexpected(InvalidEscapeSequence);
                     const auto next = raw[i + 1];
                     if (next != u'0' && next != u'1')
-                        return std::unexpected(ParseError::InvalidEscapeSequence);
+                        return std::unexpected(InvalidEscapeSequence);
                     ++i; // Skip the next character as it's part of the escape sequence
                 }
             }
+
             if (decoded.isEmpty() && !raw.isEmpty())
-                return std::unexpected(ParseError::InvalidEscapeSequence);
+                return std::unexpected(InvalidEscapeSequence);
+
             tokens.push_back(Token{Token::Kind::Key, 0, decoded});
         }
+
         if (atEnd)
             break;
+
         begin = end + 1;
     }
-    return std::expected<void, ParseError>{};
+
+    return {};
 }
 
 } // namespace json_query::json_pointer::detail
