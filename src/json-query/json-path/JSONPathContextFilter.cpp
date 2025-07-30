@@ -3,7 +3,6 @@
 #include "json-query/json-path/JSONPathCompile.hpp"
 #include "json-query/json-path/JSONPathLog.hpp"
 #include "json-query/json-path/JSONPath.hpp"
-#include "json-query/json-path/JSONPathEvalError.hpp"
 #include "json-query/json-path/internal/ContextAwareContainerCursor.hpp"
 #include "json-query/json-path/internal/ContainerCursor.hpp"
 #include <QDebug>
@@ -689,7 +688,7 @@ struct ContextFilterParsingStrategy<ContextFilterParsingType::ExistencePattern>
                 if (expr.startsWith("$"))
                 {
                     // Use proper monadic error handling instead of try/catch
-                    auto absolutePath{json_query::JSONPath::create(expr)};
+                    auto absolutePath{JSONPath::create(expr)};
                     if (absolutePath)
                     {
                         auto results{absolutePath->evaluateAll(root)};
@@ -700,7 +699,7 @@ struct ContextFilterParsingStrategy<ContextFilterParsingType::ExistencePattern>
                         if (!results)
                         {
                             qCDebug(jsonPathLog) << "Failed to evaluate absolute path:" << expr
-                                                 << "error:" << to_string(results.error());
+                                                 << "error:" << toQStringView(results.error());
                         }
                     }
                     else

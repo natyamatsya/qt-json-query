@@ -10,6 +10,8 @@
 
 #pragma once
 
+#include "../JSONPathError.hpp"
+
 #include <vector>
 #include <memory>
 #include <cstddef>
@@ -17,7 +19,6 @@
 #include <QJsonValue>
 #include <QJsonArray>
 #include <QStringView>
-#include "json-query/json-path/JSONPathEvalError.hpp"
 
 namespace json_query::json_path::detail
 {

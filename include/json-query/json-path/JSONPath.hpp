@@ -40,9 +40,9 @@ class JSONPath
     // -----------------------------------------------------------------
     //  Factory (replaces throwing constructor)
     // -----------------------------------------------------------------
-    using Result = std::expected<JSONPath, json_query::QueryError>;
+    using ParseResult = std::expected<JSONPath, json_query::QueryError>;
 
-    static Result create(QStringView path);
+    static ParseResult create(QStringView path);
 
     // -----------------------------------------------------------------
     //  Evaluation API with error reporting (std::expected)

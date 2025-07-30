@@ -362,7 +362,7 @@ bool isValidIndexLiteral(QStringView content)
 namespace detail
 {
 
-std::expected<void, Error> KeyBuilder::push(QString key, bool allowSpace)
+std::expected<void, ParseError> KeyBuilder::push(QString key, bool allowSpace)
 {
     if (!allowSpace && key.contains(u' '))
         return std::unexpected(ParseError::BlankInKey);

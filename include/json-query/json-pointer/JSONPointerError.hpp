@@ -60,10 +60,22 @@ enum class EvalError : std::uint8_t
  */
 [[nodiscard]] inline QStringView toQStringView(ParseError e) noexcept
 {
-    const auto                  sv = to_string(e);
-    static thread_local QString str;
-    str = QString::fromUtf8(sv.data(), static_cast<qsizetype>(sv.size()));
-    return str;
+    using enum ParseError;
+    switch (e)
+    {
+    case ArrayIndexOverflow:
+        return QStringLiteral("Array index is too large to be represented");
+    case EmptyNonTerminalToken:
+        return QStringLiteral("Non-terminal token in JSON Pointer cannot be empty");
+    case InvalidEscapeSequence:
+        return QStringLiteral("Invalid escape sequence in JSON Pointer (only ~0 and ~1 are valid)");
+    case MissingLeadingSlash:
+        return QStringLiteral("JSON Pointer must start with a leading slash");
+    case NonDecimalArrayIndex:
+        return QStringLiteral("Array index contains non-decimal characters or leading zeros");
+    default:
+        return QStringLiteral("Unknown parse error");
+    }
 }
 
 /**
@@ -106,10 +118,20 @@ enum class EvalError : std::uint8_t
  */
 [[nodiscard]] inline QStringView toQStringView(EvalError e) noexcept
 {
-    const auto                  sv = to_string(e);
-    static thread_local QString str;
-    str = QString::fromUtf8(sv.data(), static_cast<qsizetype>(sv.size()));
-    return str;
+    using enum EvalError;
+    switch (e)
+    {
+    case IndexOutOfRange:
+        return QStringLiteral("Index out of range: Array index exceeds the bounds of the target array");
+    case KeyNotFound:
+        return QStringLiteral("Key not found: The specified property does not exist in the target object");
+    case TypeMismatchArray:
+        return QStringLiteral("Type mismatch: Cannot use array index on non-array value (expected JSON array)");
+    case TypeMismatchObject:
+        return QStringLiteral("Type mismatch: Cannot access property on non-object value (expected JSON object)");
+    default:
+        return QStringLiteral("Unknown evaluation error");
+    }
 }
 
 /**

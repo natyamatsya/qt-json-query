@@ -3,7 +3,6 @@
 #pragma once
 
 #include "json-query/Common.h"
-#include "json-query/json-path/JSONPathEvalError.hpp"
 #include "json-query/json-path/internal/PathEvalCtx.hpp"
 #include "json-query/json-path/internal/ArrayPool.hpp"
 #include "json-query/json-path/JSONPathCompile.hpp"

@@ -2,7 +2,6 @@
 
 #include "json-query/json-path/JSONPathTokenEvaluators.hpp"
 #include "json-query/json-path/JSONPathEvaluate.hpp"                     // normalizeIndex, evalSlice
-#include "json-query/json-path/JSONPathEvalError.hpp"                    // EvalError
 #include "json-query/json-path/internal/ContainerCursor.hpp"             // ContainerCursor for optimized iteration
 #include "json-query/json-path/internal/ContextAwareContainerCursor.hpp" // ContextAwareContainerCursor for context-aware iteration
 #include "json-query/json-path/internal/ArrayPool.hpp"                   // acquirePooledArray, emptyResult

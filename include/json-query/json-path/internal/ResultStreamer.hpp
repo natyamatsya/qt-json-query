@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include "../JSONPathError.hpp"
+
 #include <QJsonValue>
 #include <QJsonArray>
 #include <functional>

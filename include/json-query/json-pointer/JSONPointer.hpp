@@ -29,7 +29,7 @@ class JSONPointer
     // All error handling should use the QueryError type
 
     // Factory function mirroring JSONPath
-    static ParseResult create(QStringView pointer);
+    static ParseResult create(QStringView pointer) noexcept;
 
     // Detailed-error variants
     [[nodiscard]] EvalResult evaluate(const QJsonDocument&) const;

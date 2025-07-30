@@ -9,7 +9,7 @@
 #include <QJsonValue>
 #include <expected>
 
-namespace json_query
+namespace json_query::json_path
 {
 class JSONPath; // Forward declaration
 }

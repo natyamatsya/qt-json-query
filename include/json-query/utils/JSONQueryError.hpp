@@ -1,66 +1,58 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 #pragma once
 
+#include "json-path/JSONPathError.hpp"
+#include "json-pointer/JSONPointerError.hpp"
+
 #include <QtCore/QString>
 #include <QtCore/QStringView>
+
 #include <cstdint>
 #include <string_view>
 #include <type_traits>
 #include <utility>
 
-// Forward declare domain enums and their to_string functions
-namespace json_query::json_path
-{
-// JSONPath parse/compile errors
-enum class ParseError : std::uint8_t;
-// JSONPath evaluation errors
-enum class EvalError : std::uint8_t;
-
-// String conversion functions
-[[nodiscard]] constexpr std::string_view to_string(ParseError) noexcept;
-[[nodiscard]] constexpr std::string_view to_string(EvalError) noexcept;
-} // namespace json_query::json_path
-
-namespace json_query::json_pointer
-{
-// JSON Pointer parse errors
-enum class ParseError : std::uint8_t;
-// JSON Pointer evaluation errors
-enum class EvalError : std::uint8_t;
-
-// String conversion functions
-[[nodiscard]] constexpr std::string_view to_string(ParseError) noexcept;
-[[nodiscard]] constexpr std::string_view to_string(EvalError) noexcept;
-} // namespace json_query::json_pointer
-
 // Conversion (QJsonValue -> T) errors live in this small enum
 namespace json_query
 {
+
 enum class ConvertError : std::uint8_t
 {
     TypeMismatch,
     NumericOutOfRange,
     NumericNotIntegral
 };
-inline constexpr std::string_view to_string(ConvertError e) noexcept
+
+/**
+ * @brief Convert a ConvertError to a human-readable QStringView
+ *
+ * @param e The conversion error to convert
+ * @return QStringView A view of a descriptive error message
+ */
+inline QStringView toQStringView(ConvertError e) noexcept
 {
     using enum ConvertError;
     switch (e)
     {
     case TypeMismatch:
-        return "type mismatch during conversion";
+        return QStringLiteral("type mismatch during conversion");
     case NumericOutOfRange:
-        return "numeric conversion out of range";
+        return QStringLiteral("numeric conversion out of range");
     case NumericNotIntegral:
-        return "expected integral number";
+        return QStringLiteral("expected integral number");
+    default:
+        return QStringLiteral("unknown conversion error");
     }
-    return "unknown conversion error";
 }
 
-inline QString toQString(ConvertError e) noexcept
-{
-    return QString::fromUtf8(to_string(e).data(), static_cast<qsizetype>(to_string(e).size()));
-}
+/**
+ * @brief Convert a ConvertError to a human-readable QString
+ *
+ * @param e The conversion error to convert
+ * @return QString A descriptive error message for the conversion error
+ */
+inline QString toQString(ConvertError e) noexcept { return QString(toQStringView(e)); }
+
 } // namespace json_query
 
 // -----------------------------------------------------------------------------
@@ -169,7 +161,8 @@ struct QueryError
     }
 
     // Domain predicates
-    [[nodiscard]] constexpr bool is_parse() const noexcept { return domain == ErrorDomain::Parse; }
+    [[nodiscard]] constexpr bool is_path_parse() const noexcept { return domain == ErrorDomain::PathParse; }
+    [[nodiscard]] constexpr bool is_pointer_parse() const noexcept { return domain == ErrorDomain::PointerParse; }
     [[nodiscard]] constexpr bool is_path_eval() const noexcept { return domain == ErrorDomain::PathEval; }
     [[nodiscard]] constexpr bool is_pointer_eval() const noexcept { return domain == ErrorDomain::PointerEval; }
     [[nodiscard]] constexpr bool is_convert() const noexcept { return domain == ErrorDomain::Convert; }
@@ -183,31 +176,6 @@ struct QueryError
 };
 
 static_assert(sizeof(QueryError) == 2, "QueryError should remain compact (2 bytes).");
-
-/**
- * @brief Convert a QueryError to a human-readable string view
- *
- * @param e The query error to convert
- * @return std::string_view A descriptive error message for the query error
- */
-[[nodiscard]] inline constexpr std::string_view to_string(QueryError e) noexcept
-{
-    using enum ErrorDomain;
-    switch (e.domain)
-    {
-    case PathParse:
-        return json_path::to_string(static_cast<json_path::ParseError>(e.code));
-    case PointerParse:
-        return json_pointer::to_string(static_cast<json_pointer::ParseError>(e.code));
-    case PathEval:
-        return json_path::to_string(static_cast<json_path::EvalError>(e.code));
-    case PointerEval:
-        return json_pointer::to_string(static_cast<json_pointer::EvalError>(e.code));
-    case Convert:
-        return to_string(static_cast<ConvertError>(e.code));
-    }
-    return "unknown error domain";
-}
 
 /**
  * @brief Convert a QueryError to a human-readable QStringView
@@ -229,7 +197,7 @@ static_assert(sizeof(QueryError) == 2, "QueryError should remain compact (2 byte
     case PointerEval:
         return json_pointer::toQStringView(static_cast<json_pointer::EvalError>(e.code));
     case Convert:
-        return QStringView(toQString(static_cast<ConvertError>(e.code)));
+        return toQStringView(static_cast<ConvertError>(e.code));
     default:
         break;
     }

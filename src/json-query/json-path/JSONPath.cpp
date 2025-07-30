@@ -3,7 +3,6 @@
 #include "json-query/json-path/JSONPath.hpp"
 #include "json-query/json-path/JSONPathTokenEvaluators.hpp"
 #include "json-query/json-path/JSONPathEvaluate.hpp"
-#include "json-query/json-path/JSONPathExpected.hpp"
 #include "json-query/utils/JSONQueryError.hpp"
 
 #include <vector>

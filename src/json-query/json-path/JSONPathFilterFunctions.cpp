@@ -67,7 +67,6 @@ QJsonValue evaluateFunction(const QString& funcCall, const QJsonValue& context)
     {
         if (args.startsWith("$"))
         {
-            using json_query::JSONPath;
             auto pathResult{JSONPath::create(args)};
             if (!pathResult)
                 return {}; // Return null for invalid JSONPath
