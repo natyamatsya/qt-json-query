@@ -26,6 +26,11 @@ namespace json_query::json_path::detail
 std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const QJsonValue& root);
 std::expected<QJsonArray, EvalError> evaluateAll(const PathEvalCtx& ctx, const QJsonValue& root);
 
+// Evaluate a *definite* JSONPath (no wildcard/recursive/filter) sequentially
+// and return either the resulting value or an EvalError.
+std::expected<QJsonValue, EvalError> evaluateDefinite(const std::vector<Token>& tokens,
+                                                      const QJsonValue&         root) noexcept;
+
 // Convenience top-level entry that uses std::expected
 std::expected<QJsonValue, EvalError> evaluate(const PathEvalCtx& ctx, const QJsonValue& root);
 

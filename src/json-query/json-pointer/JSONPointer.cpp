@@ -10,7 +10,7 @@
 #include <cmath>    // std::log10 (for capacity guess)
 #include <expected>
 
-namespace json_query
+namespace json_query::json_pointer
 {
 
 // ────────────────────────────────────────────────────────────────────
@@ -48,7 +48,7 @@ JSONPointer::EvalResult JSONPointer::evaluate(const QJsonValue& value) const
     return std::unexpected(QueryError{ErrorDomain::PointerEval, static_cast<std::uint8_t>(res.error())});
 }
 
-QString JSONPointer::toString() const
+QString JSONPointer::to_string() const
 {
     if (m_tokens.empty())
         return {};
@@ -119,4 +119,4 @@ QString JSONPointer::toString() const
     return out;
 }
 
-} // namespace json_query
+} // namespace json_query::json_pointer

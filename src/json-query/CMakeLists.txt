@@ -13,7 +13,6 @@ set(JSON_QUERY_SOURCES
     json-path/JSONPathCreate.cpp
     json-path/JSONPathEvaluate.cpp
     json-path/JSONPathEvalHelpers.cpp
-    json-path/JSONPathExpected.cpp
     json-path/JSONPathFilterComparison.cpp
     json-path/JSONPathFilterComparisonDispatcher.cpp
     json-path/JSONPathFilterCompile.cpp
