@@ -8,8 +8,6 @@
 #include <expected>
 #include <memory>
 #include <concepts>
-#include <stdcompat/function_ref.hpp>
-#include "json-query/json-path/JSONPathEvalError.hpp"
 
 namespace json_query::json_path::internal
 {

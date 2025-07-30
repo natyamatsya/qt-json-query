@@ -2,12 +2,12 @@
 
 #pragma once
 
+#include "JSONPathCompile.hpp"
+#include "internal/PathEvalCtx.hpp"
+
 #include <QJsonArray>
 #include <QJsonValue>
 #include <expected>
-#include "JSONPathCompile.hpp"
-#include "JSONPathEvalError.hpp"
-#include "internal/PathEvalCtx.hpp"
 
 namespace json_query
 {

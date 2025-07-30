@@ -20,7 +20,7 @@ std::expected<qsizetype, Error> parseDot(qsizetype pos, QStringView sv, KeyBuild
     qCDebug(jsonPathLog) << "parseDot pos=" << pos;
     const auto n{sv.size()};
     if (++pos >= n)
-        return std::unexpected(Error::TrailingDot);
+        return std::unexpected(ParseError::TrailingDot);
 
     QChar nxt = sv[pos];
     qCDebug(jsonPathLog) << "parseDot: processing character '" << nxt << "' at pos=" << pos;
@@ -51,12 +51,12 @@ std::expected<qsizetype, Error> parseDot(qsizetype pos, QStringView sv, KeyBuild
     if (first.isDigit())
     {
         qCDebug(jsonPathLog) << "parseDot: rejecting numeric identifier" << identifier;
-        return std::unexpected(Error::InvalidIdentifier);
+        return std::unexpected(ParseError::InvalidIdentifier);
     }
     if (!first.isLetter() && first != u'_' && first.unicode() < 0x80)
     {
         qCDebug(jsonPathLog) << "parseDot: rejecting invalid identifier" << identifier;
-        return std::unexpected(Error::InvalidIdentifier);
+        return std::unexpected(ParseError::InvalidIdentifier);
     }
 
     // Check remaining characters: must be name-first or DIGIT
@@ -66,7 +66,7 @@ std::expected<qsizetype, Error> parseDot(qsizetype pos, QStringView sv, KeyBuild
         if (!ch.isLetterOrNumber() && ch != u'_')
         {
             qCDebug(jsonPathLog) << "parseDot: rejecting identifier with invalid character" << identifier;
-            return std::unexpected(Error::InvalidIdentifier);
+            return std::unexpected(ParseError::InvalidIdentifier);
         }
     }
 
@@ -85,7 +85,7 @@ std::expected<qsizetype, Error> parseBare(qsizetype pos, QStringView sv, KeyBuil
     while (pos < sv.size() && sv[pos] != u'.' && sv[pos] != u'[')
         ++pos;
     if (pos == start)
-        return std::unexpected(Error::EmptySegment);
+        return std::unexpected(ParseError::EmptySegment);
 
     auto identifier{sv.sliced(start, pos - start)};
 
@@ -118,7 +118,7 @@ std::expected<qsizetype, Error> parseBracket(qsizetype                     pos,
     if (pos >= sv.size() || sv[pos] != u'[')
     {
         qCDebug(jsonPathLog) << "parseBracket: not a bracket at pos=" << pos;
-        return std::unexpected(Error::UnmatchedBracket);
+        return std::unexpected(ParseError::UnmatchedBracket);
     }
 
     // Find matching closing bracket, handling nested brackets and quotes
@@ -181,7 +181,7 @@ std::expected<qsizetype, Error> parseBracket(qsizetype                     pos,
     if (level != 0)
     {
         qCDebug(jsonPathLog) << "parseBracket: unmatched bracket";
-        return std::unexpected(Error::UnmatchedBracket);
+        return std::unexpected(ParseError::UnmatchedBracket);
     }
 
     // Extract content between brackets
@@ -219,7 +219,7 @@ std::expected<qsizetype, Error> parseEmbeddedBracket(
     if (pos >= sv.size() || sv[pos] != u'[')
     {
         qCDebug(jsonPathLog) << "parseEmbeddedBracket: not a bracket at pos=" << pos;
-        return std::unexpected(Error::UnmatchedBracket);
+        return std::unexpected(ParseError::UnmatchedBracket);
     }
 
     // Find matching closing bracket, handling nested brackets and quotes
@@ -282,7 +282,7 @@ std::expected<qsizetype, Error> parseEmbeddedBracket(
     if (level != 0)
     {
         qCDebug(jsonPathLog) << "parseEmbeddedBracket: unmatched bracket";
-        return std::unexpected(Error::UnmatchedBracket);
+        return std::unexpected(ParseError::UnmatchedBracket);
     }
 
     // Extract content between brackets

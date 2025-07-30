@@ -31,15 +31,15 @@ JSONPointer::ParseResult JSONPointer::create(QStringView pointer) noexcept
 namespace
 {
 // Internal implementation that returns domain-specific errors
-std::expected<QJsonValue, EvalError> evaluateImpl(const std::vector<json_pointer::detail::Token>& tokens,
-                                                  const QJsonValue&                               value) noexcept
+std::expected<QJsonValue, EvalError> evaluateImpl(const std::vector<json_pointer::Token>& tokens,
+                                                  const QJsonValue&                       value) noexcept
 {
     return json_pointer::detail::evaluatePointerImpl(tokens, value);
 }
 
 // Internal implementation for QJsonDocument that returns domain-specific errors
-std::expected<QJsonValue, EvalError> evaluateDocumentImpl(const std::vector<json_pointer::detail::Token>& tokens,
-                                                          const QJsonDocument&                            doc) noexcept
+std::expected<QJsonValue, EvalError> evaluateDocumentImpl(const std::vector<json_pointer::Token>& tokens,
+                                                          const QJsonDocument&                    doc) noexcept
 {
     if (doc.isNull())
         return evaluateImpl(tokens, QJsonValue{});

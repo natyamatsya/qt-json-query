@@ -21,7 +21,6 @@
 // ────────────────────────────── Project
 #include "JSONPathCompile.hpp"
 #include "json-query/json-path/JSONPathEvaluate.hpp"
-#include "json-query/json-path/JSONPathExpected.hpp"
 #include "json-query/json-path/JSONPathOption.hpp"
 #include "json-query/json-path/JSONPathHelpers.hpp"
 #include "json-query/utils/JSONQueryUtils.hpp"

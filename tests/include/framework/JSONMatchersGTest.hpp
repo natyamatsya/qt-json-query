@@ -33,7 +33,7 @@
 #include "json-query/json-path/JSONPath.hpp"
 
 using json_query::JSONPath;
-using json_query::json_path::Error;
+using json_query::json_path::ParseError;
 
 // Parse raw JSON C-string into a QJsonDocument.
 inline QJsonDocument parseJson(const char* src)
@@ -122,7 +122,7 @@ using EvalResult = std::expected<QJsonValue, Error>;
 
 // Evaluate path and propagate compile-time errors via std::expected.  Runtime
 // evaluation errors are also propagated via std::expected.
-inline std::expected<QJsonValue, json_query::json_path::Error> evalExp(QStringView path, const QJsonDocument& doc)
+inline std::expected<QJsonValue, json_query::json_path::ParseError> evalExp(QStringView path, const QJsonDocument& doc)
 {
     auto compiled{JSONPath::create(path)};
     if (!compiled)
@@ -140,9 +140,9 @@ inline std::expected<QJsonValue, json_query::json_path::Error> evalExp(QStringVi
         case json_query::json_path::EvalError::TypeMismatchArray:
         case json_query::json_path::EvalError::KeyNotFound:
         case json_query::json_path::EvalError::IndexOutOfRange:
-            return std::unexpected(json_query::json_path::Error::UnsupportedFilter);
+            return std::unexpected(json_query::json_path::ParseError::UnsupportedFilter);
         default:
-            return std::unexpected(json_query::json_path::Error::UnsupportedFilter);
+            return std::unexpected(json_query::json_path::ParseError::UnsupportedFilter);
         }
     }
     return *result;

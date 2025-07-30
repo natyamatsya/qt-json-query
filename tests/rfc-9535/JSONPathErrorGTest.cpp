@@ -8,7 +8,7 @@
 #include "framework/JSONMatchersGTest.hpp"
 
 using json_query::JSONPath;
-using json_query::json_path::Error;
+using json_query::json_path::ParseError;
 using namespace ::testing;
 
 // RFC 9535 Test Validation Issue: This test expects @.bar to be invalid syntax,

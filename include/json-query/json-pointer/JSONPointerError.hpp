@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 #pragma once
 
+#include <QtCore/QString>
 #include <string_view>
 
 namespace json_query::json_pointer
@@ -52,6 +53,26 @@ enum class EvalError : std::uint8_t
 }
 
 /**
+ * @brief Convert a ParseError to a human-readable QStringView
+ *
+ * @param e The parse error to convert
+ * @return QStringView A view of a descriptive error message
+ */
+[[nodiscard]] inline constexpr QStringView toQStringView(ParseError e) noexcept
+{
+    const auto sv = to_string(e);
+    return QStringView(sv.data(), static_cast<qsizetype>(sv.size()));
+}
+
+/**
+ * @brief Convert a ParseError to a human-readable QString
+ *
+ * @param e The parse error to convert
+ * @return QString A descriptive error message for the parse error
+ */
+[[nodiscard]] inline QString toQString(ParseError e) noexcept { return QString(toQStringView(e)); }
+
+/**
  * @brief Convert an EvalError to a human-readable string
  *
  * @param e The evaluation error to convert
@@ -74,5 +95,25 @@ enum class EvalError : std::uint8_t
         return "Unknown evaluation error";
     }
 }
+
+/**
+ * @brief Convert an EvalError to a human-readable QStringView
+ *
+ * @param e The evaluation error to convert
+ * @return QStringView A view of a descriptive error message
+ */
+[[nodiscard]] inline constexpr QStringView toQStringView(EvalError e) noexcept
+{
+    const auto sv = to_string(e);
+    return QStringView(sv.data(), static_cast<qsizetype>(sv.size()));
+}
+
+/**
+ * @brief Convert an EvalError to a human-readable QString
+ *
+ * @param e The evaluation error to convert
+ * @return QString A descriptive error message for the evaluation error
+ */
+[[nodiscard]] inline QString toQString(EvalError e) noexcept { return QString(toQStringView(e)); }
 
 } // namespace json_query::json_pointer

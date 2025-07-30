@@ -14,6 +14,7 @@
 #include "json-query/json-path/internal/QtHash.hpp"
 #include "json-query/utils/JSONQueryUtils.hpp"
 #include "json-query/json-path/JSONPathFilter.hpp" // For compileFilter implementation
+#include "json-query/json-path/JSONPathError.hpp"  // For ParseError
 
 #include <limits>
 #include <ctre.hpp>
@@ -116,7 +117,7 @@ struct CharacterParsingDef<CharacterParsingType::BareSegment>
 template <CharacterParsingType Type>
 struct CharacterParsingStrategy
 {
-    static std::expected<qsizetype, json_query::json_path::Error>
+    static std::expected<qsizetype, json_query::json_path::ParseError>
     parse(qsizetype                                  pos,
           QStringView                                sv,
           json_query::json_path::detail::KeyBuilder& kb,
@@ -127,7 +128,7 @@ struct CharacterParsingStrategy
 template <>
 struct CharacterParsingStrategy<CharacterParsingType::DescendantSegment>
 {
-    static std::expected<qsizetype, json_query::json_path::Error>
+    static std::expected<qsizetype, json_query::json_path::ParseError>
     parse(qsizetype                                  pos,
           QStringView                                sv,
           json_query::json_path::detail::KeyBuilder& kb,
@@ -138,7 +139,7 @@ struct CharacterParsingStrategy<CharacterParsingType::DescendantSegment>
         tokens.emplace_back(json_query::json_path::Token{json_query::json_path::Token::Kind::Recursive});
         auto newPos{pos + 2};
         if (newPos >= sv.size())
-            return std::unexpected(json_query::json_path::Error::TrailingRecursive);
+            return std::unexpected(json_query::json_path::ParseError::TrailingRecursive);
         return newPos;
     }
 };
@@ -147,7 +148,7 @@ struct CharacterParsingStrategy<CharacterParsingType::DescendantSegment>
 template <>
 struct CharacterParsingStrategy<CharacterParsingType::WildcardCharacter>
 {
-    static std::expected<qsizetype, json_query::json_path::Error>
+    static std::expected<qsizetype, json_query::json_path::ParseError>
     parse(qsizetype                                  pos,
           QStringView                                sv,
           json_query::json_path::detail::KeyBuilder& kb,
@@ -164,14 +165,17 @@ struct CharacterParsingStrategy<CharacterParsingType::WildcardCharacter>
 template <>
 struct CharacterParsingStrategy<CharacterParsingType::DotSegment>
 {
-    static std::expected<qsizetype, json_query::json_path::Error>
+    static std::expected<qsizetype, json_query::json_path::ParseError>
     parse(qsizetype                                  pos,
           QStringView                                sv,
           json_query::json_path::detail::KeyBuilder& kb,
           std::vector<json_query::json_path::Token>& tokens)
     {
 
-        return json_query::json_path::detail::parseDot(pos, sv, kb, tokens);
+        auto result = json_query::json_path::detail::parseDot(pos, sv, kb, tokens);
+        if (!result)
+            return std::unexpected(static_cast<json_query::json_path::ParseError>(result.error()));
+        return result;
     }
 };
 
@@ -179,7 +183,7 @@ struct CharacterParsingStrategy<CharacterParsingType::DotSegment>
 template <>
 struct CharacterParsingStrategy<CharacterParsingType::BracketSegment>
 {
-    static std::expected<qsizetype, json_query::json_path::Error>
+    static std::expected<qsizetype, json_query::json_path::ParseError>
     parse(qsizetype                                  pos,
           QStringView                                sv,
           json_query::json_path::detail::KeyBuilder& kb,
@@ -187,7 +191,10 @@ struct CharacterParsingStrategy<CharacterParsingType::BracketSegment>
     {
 
         std::vector<FilterFn> filterFns; // Temporary for compatibility
-        return json_query::json_path::detail::parseEmbeddedBracket(pos, sv, kb, tokens, filterFns);
+        auto result = json_query::json_path::detail::parseEmbeddedBracket(pos, sv, kb, tokens, filterFns);
+        if (!result)
+            return std::unexpected(static_cast<json_query::json_path::ParseError>(result.error()));
+        return result;
     }
 };
 
@@ -195,14 +202,17 @@ struct CharacterParsingStrategy<CharacterParsingType::BracketSegment>
 template <>
 struct CharacterParsingStrategy<CharacterParsingType::BareSegment>
 {
-    static std::expected<qsizetype, json_query::json_path::Error>
+    static std::expected<qsizetype, json_query::json_path::ParseError>
     parse(qsizetype                                  pos,
           QStringView                                sv,
           json_query::json_path::detail::KeyBuilder& kb,
           std::vector<json_query::json_path::Token>& tokens)
     {
 
-        return json_query::json_path::detail::parseBare(pos, sv, kb, tokens);
+        auto result = json_query::json_path::detail::parseBare(pos, sv, kb, tokens);
+        if (!result)
+            return std::unexpected(static_cast<json_query::json_path::ParseError>(result.error()));
+        return result;
     }
 };
 
@@ -213,7 +223,7 @@ struct CharacterParsingDispatchTable;
 template <CharacterParsingType FirstType, CharacterParsingType... RestTypes>
 struct CharacterParsingDispatchTable<FirstType, RestTypes...>
 {
-    static std::expected<qsizetype, json_query::json_path::Error>
+    static std::expected<qsizetype, json_query::json_path::ParseError>
     dispatch(qsizetype                                  pos,
              QStringView                                sv,
              json_query::json_path::detail::KeyBuilder& kb,
@@ -235,14 +245,14 @@ struct CharacterParsingDispatchTable<FirstType, RestTypes...>
 template <>
 struct CharacterParsingDispatchTable<>
 {
-    static std::expected<qsizetype, json_query::json_path::Error>
+    static std::expected<qsizetype, json_query::json_path::ParseError>
     dispatch(qsizetype                                  pos,
              QStringView                                sv,
              json_query::json_path::detail::KeyBuilder& kb,
              std::vector<json_query::json_path::Token>& tokens)
     {
 
-        return std::unexpected(json_query::json_path::Error::UnsupportedFilter);
+        return std::unexpected(json_query::json_path::ParseError::UnsupportedFilter);
     }
 };
 
@@ -256,7 +266,7 @@ using CharacterParsingDispatcher = CharacterParsingDispatchTable<CharacterParsin
 // ──────────────────────────────────────────────────────────────────────
 //  compilePath - Refactored with TableGen-inspired architecture
 // ──────────────────────────────────────────────────────────────────────
-std::expected<json_query::json_path::Compiled, json_query::json_path::Error> compilePath(QStringView sv)
+std::expected<json_query::json_path::Compiled, json_query::json_path::ParseError> compilePath(QStringView sv)
 {
     qCDebug(json_query::json_path::jsonPathLog) << "compilePath() sv=" << sv;
     using K = json_query::json_path::Token::Kind;
@@ -264,12 +274,12 @@ std::expected<json_query::json_path::Compiled, json_query::json_path::Error> com
     json_query::json_path::detail::KeyBuilder kb{tokens};
 
     if (sv.isEmpty() || sv[0] != u'$')
-        return std::unexpected(json_query::json_path::Error::MissingRoot);
+        return std::unexpected(json_query::json_path::ParseError::MissingRoot);
     tokens.emplace_back(json_query::json_path::Token{
         json_query::json_path::Token::Kind::Key, 0, {}, qt_hash(sv.first(1)), sv.first(1).toString()});
 
     if (sv.size() > 1 && sv[1] != u'.' && sv[1] != u'[')
-        return std::unexpected(json_query::json_path::Error::UnexpectedAfterRoot);
+        return std::unexpected(json_query::json_path::ParseError::UnexpectedAfterRoot);
 
     // TableGen-inspired monadic parsing loop with compile-time dispatch
     auto pos{1};
@@ -280,9 +290,8 @@ std::expected<json_query::json_path::Compiled, json_query::json_path::Error> com
 
         if (!nextPosResult)
         {
-            qCDebug(json_query::json_path::jsonPathLog)
-                << "compilePath: parser returned error" << static_cast<int>(nextPosResult.error());
-            return std::unexpected(nextPosResult.error());
+            qCDebug(json_query::json_path::jsonPathLog) << "  Error:" << toQString(nextPosResult.error());
+            return std::unexpected(static_cast<json_query::json_path::ParseError>(nextPosResult.error().code));
         }
 
         pos = *nextPosResult;
@@ -295,7 +304,7 @@ std::expected<json_query::json_path::Compiled, json_query::json_path::Error> com
 // ──────────────────────────────────────────────────────────────────────
 //  High-level compile function
 // ──────────────────────────────────────────────────────────────────────
-std::expected<json_query::json_path::CompilationResult, json_query::json_path::Error> compile(QStringView rawPath)
+std::expected<json_query::json_path::CompilationResult, json_query::json_path::ParseError> compile(QStringView rawPath)
 {
     qCDebug(json_query::json_path::jsonPathLog) << "compile() rawPath=" << rawPath;
     auto path{rawPath.toString()};
@@ -304,7 +313,7 @@ std::expected<json_query::json_path::CompilationResult, json_query::json_path::E
     json_query::json_path::FunctionType func = json_query::json_path::detectTrailingFunction(path);
 
     if (path.isEmpty())
-        return std::unexpected(json_query::json_path::Error::EmptySegment);
+        return std::unexpected(json_query::json_path::ParseError::EmptySegment);
 
     // C++23 Monadic Chain - Elegant error composition without manual checks!
     return json_query::json_path::compilePath(path)
@@ -315,8 +324,8 @@ std::expected<json_query::json_path::CompilationResult, json_query::json_path::E
                 return json_query::json_path::CompilationResult{func, std::move(compiled)};
             })
         .or_else(
-            [](json_query::json_path::Error error)
-                -> std::expected<json_query::json_path::CompilationResult, json_query::json_path::Error>
+            [](json_query::json_path::ParseError error)
+                -> std::expected<json_query::json_path::CompilationResult, json_query::json_path::ParseError>
             {
                 qCDebug(json_query::json_path::jsonPathLog)
                     << "compile: compilePath failed with error" << static_cast<int>(error);

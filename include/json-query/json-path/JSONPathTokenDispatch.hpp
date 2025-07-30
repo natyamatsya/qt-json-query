@@ -6,7 +6,6 @@
 #include <QJsonArray>
 #include <expected>
 #include "json-query/json-path/JSONPathCompile.hpp"
-#include "json-query/json-path/JSONPathEvalError.hpp"
 #include "json-query/json-path/internal/PathEvalCtx.hpp"
 #include "json-query/json-path/internal/ResultStreamer.hpp"
 

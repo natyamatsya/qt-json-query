@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "json-query/json-path/JSONPathEvalError.hpp"
+#include "json-query/json-path/JSONPathError.hpp"
 #include "json-query/json-path/JSONPathCompile.hpp"
 #include "json-query/json-path/internal/PathEvalCtx.hpp"
 

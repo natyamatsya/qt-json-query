@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "json-query/json-path/JSONPathEvalError.hpp"
+#include "JSONPathError.hpp"
 
 #include <QJsonValue>
 #include <QJsonArray>

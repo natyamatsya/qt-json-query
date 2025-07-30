@@ -365,7 +365,7 @@ namespace detail
 std::expected<void, Error> KeyBuilder::push(QString key, bool allowSpace)
 {
     if (!allowSpace && key.contains(u' '))
-        return std::unexpected(Error::BlankInKey);
+        return std::unexpected(ParseError::BlankInKey);
     tgt.emplace_back(Token{Token::Kind::Key, 0, {}, qt_hash(key), key});
     return {};
 }

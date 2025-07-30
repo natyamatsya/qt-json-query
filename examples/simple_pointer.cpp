@@ -6,7 +6,6 @@
 #include <QJsonArray>
 #include <QDebug>
 #include <QString>
-#include <QStringConverter>
 #include <expected>
 
 // Enable string literal operators for QString
@@ -15,38 +14,52 @@ using namespace Qt::StringLiterals;
 #include "json-query/JSONQuery"
 
 using json_query::JSONPointer;
-using json_query::json_pointer::ParseError;
+using json_query::QueryError;
+using json_query::toQString;
 
-void evaluateAndPrint(const JSONPointer& pointer, const QJsonDocument& doc, QStringView desc)
+// Helper function to evaluate a JSON Pointer and print the result
+void evaluateAndPrint(const JSONPointer& pointer, const QJsonDocument& doc, QStringView description)
 {
-    qDebug().noquote() << "\n" << desc << ":";
-    qDebug() << "  Pointer:" << (pointer.toString().isEmpty() ? "\"\" (empty string)" : pointer.toString());
+    qDebug().noquote() << "\n" << description << ":";
+    qDebug() << "  Pointer:" << (pointer.to_string().isEmpty() ? "\"\" (empty string)" : pointer.to_string());
 
+    // Evaluate the pointer against the document
     auto result = pointer.evaluate(doc);
+
     if (!result)
     {
-        qDebug() << "  Error:   Could not evaluate pointer";
+        qDebug() << "  Error:" << toQString(*result.error());
         return;
     }
 
+    // Special case: Show the whole document for empty pointer
     if (pointer.to_string().isEmpty())
     {
-        // Special case: Show the whole document for empty pointer
-        qDebug() << "  Result:  (whole document)";
+        qDebug() << "  Result: (whole document)";
         qDebug().noquote() << "  " << QJsonDocument(result->toObject()).toJson(QJsonDocument::Indented);
-        return;
     }
+    else
+    {
+        // Convert the result to a string for display
+        QString resultStr;
+        if (result->isObject() || result->isArray())
+            resultStr = QJsonDocument(result->toObject()).toJson(QJsonDocument::Compact);
+        else
+            resultStr = result->toVariant().toString();
 
-    qDebug() << "  Result:  " << result->toVariant().toString();
+        qDebug() << "  Result:" << resultStr;
+    }
 }
 
-// Helper function to create a pointer and handle errors
+// Helper function to create and evaluate a pointer
 bool evaluatePointer(QStringView path, const QJsonDocument& doc, QStringView description)
 {
+    // Create the JSON Pointer
     auto pointer = JSONPointer::create(path);
     if (!pointer)
     {
         qWarning() << "Failed to create pointer:" << path << "-" << description;
+        qWarning() << "  Error:" << toQString(*pointer.error());
         return false;
     }
 
@@ -58,56 +71,55 @@ int main(int argc, char** argv)
 {
     QCoreApplication app(argc, argv);
 
-    // Sample JSON document
-    QJsonObject   docObj{{"name", "John Doe"},
-                         {"age", 42},
-                         {"active", true},
-                         {"address", QJsonObject{{"street", "123 Main St"}, {"city", "Anytown"}}},
-                         {"tags", QJsonArray{"dev", "qt", "c++"}},
-                         {"special/chars", "value"},
-                         {"escaped~chars", "value"}};
+    // Sample JSON document demonstrating various JSON Pointer features
+    QJsonObject docObj{
+        {"name", "John Doe"},
+        {"age", 42},
+        {"active", true},
+        {"address",
+         QJsonObject{{"street", "123 Main St"}, {"city", "Anytown"}, {"coordinates", QJsonArray{12.34, 56.78}}}},
+        {"tags", QJsonArray{"dev", "qt", "c++"}},
+        {"special/chars", "value"}, // Key with a forward slash
+        {"escaped~chars", "value"}, // Key with a tilde
+        {"nested/array",
+         QJsonArray{QJsonObject{{"id", 1}, {"value", "first"}}, QJsonObject{{"id", 2}, {"value", "second"}}}}};
+
     QJsonDocument doc(docObj);
 
     qDebug() << "=== JSON Document ===";
     qDebug().noquote() << doc.toJson(QJsonDocument::Indented);
     qDebug() << "====================";
 
-    // RFC 6901 Section 5: Syntax
-    // The empty string evaluates to the whole document
-    evaluatePointer(u"", doc, u"RFC 6901 Section 5: Empty pointer references the entire document");
+    // 1. Basic access
+    evaluatePointer(u"", doc, u"1. Empty pointer references the entire document");
+    evaluatePointer(u"/name", doc, u"2. Simple property access");
+    evaluatePointer(u"/age", doc, u"3. Numeric value access");
+    evaluatePointer(u"/active", doc, u"4. Boolean value access");
 
-    // RFC 6901 Section 3: JSON Pointer Syntax
-    // Simple property access using a single reference token
-    evaluatePointer(u"/name", doc, u"RFC 6901 Section 3: Simple property access");
+    // 2. Nested object access
+    evaluatePointer(u"/address/street", doc, u"5. Nested object property");
+    evaluatePointer(u"/address/coordinates/0", doc, u"6. Nested array access (first element)");
 
-    // RFC 6901 Section 3: JSON Pointer Syntax
-    // Nested object access using multiple reference tokens
-    evaluatePointer(u"/address/city", doc, u"RFC 6901 Section 3: Nested object access");
+    // 3. Array access
+    evaluatePointer(u"/tags/0", doc, u"7. First array element (zero-based)");
+    evaluatePointer(u"/tags/1", doc, u"8. Second array element");
 
-    // RFC 6901 Section 4: Evaluation
-    // Array access using a zero-based index
-    evaluatePointer(u"/tags/1", doc, u"RFC 6901 Section 4: Array access (zero-based index)");
+    // 4. Special characters in keys
+    evaluatePointer(u"/special~1chars", doc, u"9. Key with '/' (escaped as '~1')");
+    evaluatePointer(u"/escaped~0chars", doc, u"10. Key with '~' (escaped as '~0')");
 
-    // RFC 6901 Section 3: JSON Pointer Syntax
-    // Special character handling: '~1' is the escape sequence for '/'
-    evaluatePointer(u"/special~1chars", doc, u"RFC 6901 Section 3: Special character '/' in key (escaped as '~1')");
+    // 5. Complex nested access
+    evaluatePointer(u"/nested~1array/1/value", doc, u"11. Nested array with special characters in key");
 
-    // RFC 6901 Section 3: JSON Pointer Syntax
-    // Tilde escaping: '~0' is the escape sequence for '~'
-    evaluatePointer(u"/escaped~0chars", doc, u"RFC 6901 Section 3: Tilde in key (escaped as '~0')");
+    // 6. Error cases
+    evaluatePointer(u"/nonexistent", doc, u"12. Non-existent path");
+    evaluatePointer(u"/tags/10", doc, u"13. Array index out of bounds");
+    evaluatePointer(u"/address/coordinates/not_an_index", doc, u"14. Invalid array index");
 
-    // RFC 6901 Section 5: Evaluation
-    // Non-existent path evaluation
-    evaluatePointer(u"/nonexistent", doc, u"RFC 6901 Section 5: Non-existent path evaluation");
-
-    // RFC 6901 Section 3: JSON Pointer Syntax
-    // Example of an invalid pointer (doesn't start with '/' or be empty)
-    auto invalidPointer = JSONPointer::create(u"invalid");
-    if (!invalidPointer)
-    {
-        qDebug() << "\nRFC 6901 Section 3: Invalid pointer (must be empty or start with '/'):";
-        qDebug() << "  Failed to create pointer: invalid";
-    }
+    // 7. Invalid pointer syntax
+    qDebug() << "\n=== Error Cases ===";
+    evaluatePointer(u"no_leading_slash", doc, u"15. Missing leading slash (invalid)");
+    evaluatePointer(u"/invalid~escape", doc, u"16. Invalid escape sequence (invalid)");
 
     return EXIT_SUCCESS;
 }

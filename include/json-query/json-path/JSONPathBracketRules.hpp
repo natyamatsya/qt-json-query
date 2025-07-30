@@ -14,7 +14,8 @@ namespace json_query::json_path
 // Forward declarations from JSONPathCompile.hpp
 struct Token;
 struct Slice;
-enum class Error : std::uint8_t;
+// Using ParseError from JSONPathError.hpp instead of Error
+enum class ParseError : std::uint8_t;
 
 namespace detail
 {
@@ -88,8 +89,8 @@ class EmbeddedBracketSink
 // Function type aliases for rule system
 // Note: These are used as function pointers in static arrays, so std::function works better
 using BracketRuleMatcher         = std::function<bool(QStringView)>;
-using BracketRuleHandler         = std::function<std::expected<void, Error>(QStringView, BracketSink&)>;
-using EmbeddedBracketRuleHandler = std::function<std::expected<void, Error>(QStringView, EmbeddedBracketSink&)>;
+using BracketRuleHandler         = std::function<std::expected<void, ParseError>(QStringView, BracketSink&)>;
+using EmbeddedBracketRuleHandler = std::function<std::expected<void, ParseError>(QStringView, EmbeddedBracketSink&)>;
 
 /**
  * Declarative rule metadata structure (Legacy - with std::function storage)
@@ -139,16 +140,16 @@ bool matchesUnquotedKey(QStringView content);
 
 namespace handlers
 {
-std::expected<void, Error> handleUnionComma(QStringView content, BracketSink& out);
-std::expected<void, Error> handleWildcard(QStringView content, BracketSink& out);
-std::expected<void, Error> handleSingleIndex(QStringView content, BracketSink& out);
-std::expected<void, Error> handleIndexList(QStringView content, BracketSink& out);
-std::expected<void, Error> handleSlice(QStringView content, BracketSink& out);
-std::expected<void, Error> handleFilterWithParens(QStringView content, BracketSink& out);
-std::expected<void, Error> handleFilterWithoutParens(QStringView content, BracketSink& out);
-std::expected<void, Error> handlePlaceholder(QStringView content, BracketSink& out);
-std::expected<void, Error> handleQuotedKey(QStringView content, BracketSink& out);
-std::expected<void, Error> handleUnquotedKey(QStringView content, BracketSink& out);
+std::expected<void, ParseError> handleUnionComma(QStringView content, BracketSink& out);
+std::expected<void, ParseError> handleWildcard(QStringView content, BracketSink& out);
+std::expected<void, ParseError> handleSingleIndex(QStringView content, BracketSink& out);
+std::expected<void, ParseError> handleIndexList(QStringView content, BracketSink& out);
+std::expected<void, ParseError> handleSlice(QStringView content, BracketSink& out);
+std::expected<void, ParseError> handleFilterWithParens(QStringView content, BracketSink& out);
+std::expected<void, ParseError> handleFilterWithoutParens(QStringView content, BracketSink& out);
+std::expected<void, ParseError> handlePlaceholder(QStringView content, BracketSink& out);
+std::expected<void, ParseError> handleQuotedKey(QStringView content, BracketSink& out);
+std::expected<void, ParseError> handleUnquotedKey(QStringView content, BracketSink& out);
 } // namespace handlers
 
 // ──────────────────────────────────────────────────────────────────────
@@ -157,16 +158,16 @@ std::expected<void, Error> handleUnquotedKey(QStringView content, BracketSink& o
 
 namespace embedded_handlers
 {
-std::expected<void, Error> handleUnionComma(QStringView content, EmbeddedBracketSink& out);
-std::expected<void, Error> handleWildcard(QStringView content, EmbeddedBracketSink& out);
-std::expected<void, Error> handleSingleIndex(QStringView content, EmbeddedBracketSink& out);
-std::expected<void, Error> handleIndexList(QStringView content, EmbeddedBracketSink& out);
-std::expected<void, Error> handleSlice(QStringView content, EmbeddedBracketSink& out);
-std::expected<void, Error> handleFilterWithParens(QStringView content, EmbeddedBracketSink& out);
-std::expected<void, Error> handleFilterWithoutParens(QStringView content, EmbeddedBracketSink& out);
-std::expected<void, Error> handlePlaceholder(QStringView content, EmbeddedBracketSink& out);
-std::expected<void, Error> handleQuotedKey(QStringView content, EmbeddedBracketSink& out);
-std::expected<void, Error> handleUnquotedKey(QStringView content, EmbeddedBracketSink& out);
+std::expected<void, ParseError> handleUnionComma(QStringView content, EmbeddedBracketSink& out);
+std::expected<void, ParseError> handleWildcard(QStringView content, EmbeddedBracketSink& out);
+std::expected<void, ParseError> handleSingleIndex(QStringView content, EmbeddedBracketSink& out);
+std::expected<void, ParseError> handleIndexList(QStringView content, EmbeddedBracketSink& out);
+std::expected<void, ParseError> handleSlice(QStringView content, EmbeddedBracketSink& out);
+std::expected<void, ParseError> handleFilterWithParens(QStringView content, EmbeddedBracketSink& out);
+std::expected<void, ParseError> handleFilterWithoutParens(QStringView content, EmbeddedBracketSink& out);
+std::expected<void, ParseError> handlePlaceholder(QStringView content, EmbeddedBracketSink& out);
+std::expected<void, ParseError> handleQuotedKey(QStringView content, EmbeddedBracketSink& out);
+std::expected<void, ParseError> handleUnquotedKey(QStringView content, EmbeddedBracketSink& out);
 } // namespace embedded_handlers
 
 // ──────────────────────────────────────────────────────────────────────
@@ -187,10 +188,10 @@ class BracketRuleDispatcher
     static const std::vector<BracketRuleMetadata>& getRules();
 
     // Main dispatch function using declarative rule table
-    static std::expected<void, Error> dispatch(QStringView content, BracketSink& sink);
+    static std::expected<void, ParseError> dispatch(QStringView content, BracketSink& sink);
 
     // Helper for union processing to avoid recursion
-    static std::expected<void, Error> processSegmentExcludingUnion(QStringView content, BracketSink& sink);
+    static std::expected<void, ParseError> processSegmentExcludingUnion(QStringView content, BracketSink& sink);
 
     // Utility function to get rule metadata for debugging/documentation
     static const BracketRuleMetadata* findRuleByName(const char* name);
@@ -201,13 +202,14 @@ class EmbeddedBracketRuleDispatcher
   public:
     static std::vector<EmbeddedBracketRuleMetadata>        createRules();
     static const std::vector<EmbeddedBracketRuleMetadata>& getRules();
-    static std::expected<void, Error>                      dispatch(QStringView content, EmbeddedBracketSink& sink);
+    static std::expected<void, ParseError>                 dispatch(QStringView content, EmbeddedBracketSink& sink);
     static const EmbeddedBracketRuleMetadata*              findRuleByName(const char* name);
-    static std::expected<void, Error> processSegmentExcludingUnion(QStringView content, EmbeddedBracketSink& sink);
+    static std::expected<void, ParseError>                 processSegmentExcludingUnion(QStringView          content,
+                                                                                        EmbeddedBracketSink& sink);
 };
 
-std::expected<void, Error> parseBracket(QStringView content, BracketSink& sink);
-std::expected<void, Error> parseBracket(QStringView content, EmbeddedBracketSink& sink);
+std::expected<void, ParseError> parseBracket(QStringView content, BracketSink& sink);
+std::expected<void, ParseError> parseBracket(QStringView content, EmbeddedBracketSink& sink);
 
 } // namespace detail
 

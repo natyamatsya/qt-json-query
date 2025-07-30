@@ -2,10 +2,7 @@
 
 #pragma once
 
-// Initial scaffolding for the upcoming JSONPath parser split.
-// In the next step we will move the full path-parsing logic from
-// JSONPath.cpp into PathParser.cpp and expose it via the `parse` free
-// function below.
+#include "json-path/JSONPathError.hpp"
 
 #include <QJsonValue>
 #include <QJsonArray>
@@ -665,7 +662,7 @@ struct Compiled
 /// Compile a JSONPath string into tokens and filters
 /// @param path The JSONPath string to compile (without trailing functions)
 /// @return Compiled tokens and filters, or compilation error
-[[nodiscard]] std::expected<Compiled, Error> compilePath(QStringView path);
+[[nodiscard]] std::expected<Compiled, ParseError> compilePath(QStringView path);
 
 /// Detect and remove trailing function from path (.length(), .min(), .max())
 /// @param path Path string that will be modified to remove trailing function

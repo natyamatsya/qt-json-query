@@ -31,7 +31,7 @@
 #include "json-query/json-path/JSONPath.hpp"
 
 using json_query::JSONPath;
-using json_query::json_path::Error;
+using json_query::json_path::ParseError;
 
 namespace
 {

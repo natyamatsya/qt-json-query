@@ -18,11 +18,11 @@ namespace json_query::json_path::detail
 //  BracketSink Implementation
 // ──────────────────────────────────────────────────────────────────────
 
-std::expected<void, Error> BracketSink::key(const QString& key, bool allow) const
+std::expected<void, ParseError> BracketSink::key(const QString& key, bool allow) const
 {
     // Create token with bracket group ID
     if (!allow && key.contains(u' '))
-        return std::unexpected(Error::BlankInKey);
+        return std::unexpected(ParseError::BlankInKey);
     Token t{Token::Kind::Key, 0, {}, qt_hash(key), key};
     t.bracketGroupId = currentBracketGroupId;
     tk.emplace_back(std::move(t));
@@ -82,11 +82,11 @@ void BracketSink::pushFilter(const Token& t) const
 //  EmbeddedBracketSink Implementation (Zero-Overhead)
 // ──────────────────────────────────────────────────────────────────────
 
-std::expected<void, Error> EmbeddedBracketSink::key(const QString& key, bool allow) const
+std::expected<void, ParseError> EmbeddedBracketSink::key(const QString& key, bool allow) const
 {
     // Create token with bracket group ID (same logic as legacy BracketSink)
     if (!allow && key.contains(u' '))
-        return std::unexpected(Error::BlankInKey);
+        return std::unexpected(ParseError::BlankInKey);
     Token t{Token::Kind::Key, 0, {}, qt_hash(key), key};
     t.bracketGroupId = currentBracketGroupId;
     tk.emplace_back(std::move(t));
@@ -231,13 +231,13 @@ bool matchesUnquotedKey(QStringView /*content*/)
 namespace handlers
 {
 
-std::expected<void, Error> handleWildcard(QStringView /*content*/, BracketSink& out)
+std::expected<void, ParseError> handleWildcard(QStringView /*content*/, BracketSink& out)
 {
     out.wild();
     return {};
 }
 
-std::expected<void, Error> handleSingleIndex(QStringView content, BracketSink& out)
+std::expected<void, ParseError> handleSingleIndex(QStringView content, BracketSink& out)
 {
     auto trimmed{content.trimmed()};
     qCDebug(jsonPathLog) << "BR_RULE index-single check" << trimmed.toString();
@@ -245,7 +245,7 @@ std::expected<void, Error> handleSingleIndex(QStringView content, BracketSink& o
     if (!isValidIndexLiteral(trimmed))
     {
         qCDebug(jsonPathLog) << "handleSingleIndex: invalid index literal" << trimmed;
-        return std::unexpected(Error::InvalidSlice);
+        return std::unexpected(ParseError::InvalidSlice);
     }
 
     auto      ok{false};
@@ -253,7 +253,7 @@ std::expected<void, Error> handleSingleIndex(QStringView content, BracketSink& o
     if (!ok)
     {
         qCDebug(jsonPathLog) << "handleSingleIndex: failed to parse" << trimmed;
-        return std::unexpected(Error::InvalidSlice);
+        return std::unexpected(ParseError::InvalidSlice);
     }
 
     int idx = (val > std::numeric_limits<int>::max())   ? std::numeric_limits<int>::max()
@@ -265,7 +265,7 @@ std::expected<void, Error> handleSingleIndex(QStringView content, BracketSink& o
     return {};
 }
 
-std::expected<void, Error> handleIndexList(QStringView content, BracketSink& out)
+std::expected<void, ParseError> handleIndexList(QStringView content, BracketSink& out)
 {
     qCDebug(jsonPathLog) << "BR_RULE index-list raw" << content.toString();
 
@@ -277,13 +277,13 @@ std::expected<void, Error> handleIndexList(QStringView content, BracketSink& out
         if (!isValidIndexLiteral(t))
         {
             qCDebug(jsonPathLog) << "handleIndexList: invalid index literal" << t;
-            return std::unexpected(Error::InvalidSlice);
+            return std::unexpected(ParseError::InvalidSlice);
         }
 
         auto      ok{false};
         qlonglong val = t.toLongLong(&ok);
         if (!ok)
-            return std::unexpected(Error::InvalidSlice);
+            return std::unexpected(ParseError::InvalidSlice);
 
         int idx = (val > std::numeric_limits<int>::max())   ? std::numeric_limits<int>::max()
                   : (val < std::numeric_limits<int>::min()) ? std::numeric_limits<int>::min()
@@ -295,16 +295,16 @@ std::expected<void, Error> handleIndexList(QStringView content, BracketSink& out
     return {};
 }
 
-std::expected<void, Error> handleSlice(QStringView content, BracketSink& out)
+std::expected<void, ParseError> handleSlice(QStringView content, BracketSink& out)
 {
     auto slice{makeSlice(content)};
     if (!slice)
-        return std::unexpected(Error::InvalidSlice);
+        return std::unexpected(ParseError::InvalidSlice);
     out.slice(*slice);
     return {};
 }
 
-std::expected<void, Error> handleFilterWithParens(QStringView content, BracketSink& out)
+std::expected<void, ParseError> handleFilterWithParens(QStringView content, BracketSink& out)
 {
     auto trimmed{content.trimmed()};
     // Extract the full expression after the '?' prefix
@@ -328,11 +328,11 @@ std::expected<void, Error> handleFilterWithParens(QStringView content, BracketSi
     else
     {
         qCDebug(jsonPathLog) << "handleFilterWithParens: failed to compile filter" << expr;
-        return std::unexpected(Error::UnsupportedFilter);
+        return std::unexpected(ParseError::UnsupportedFilter);
     }
 }
 
-std::expected<void, Error> handleFilterWithoutParens(QStringView content, BracketSink& out)
+std::expected<void, ParseError> handleFilterWithoutParens(QStringView content, BracketSink& out)
 {
     auto trimmed{content.trimmed()};
     // Extract the full expression after the '?' prefix
@@ -356,11 +356,11 @@ std::expected<void, Error> handleFilterWithoutParens(QStringView content, Bracke
     else
     {
         qCDebug(jsonPathLog) << "handleFilterWithoutParens: failed to compile filter" << expr;
-        return std::unexpected(Error::UnsupportedFilter);
+        return std::unexpected(ParseError::UnsupportedFilter);
     }
 }
 
-std::expected<void, Error> handlePlaceholder(QStringView content, BracketSink& out)
+std::expected<void, ParseError> handlePlaceholder(QStringView content, BracketSink& out)
 {
     auto trimmed{content.trimmed()};
 
@@ -395,38 +395,38 @@ std::expected<void, Error> handlePlaceholder(QStringView content, BracketSink& o
     return {};
 }
 
-std::expected<void, Error> handleQuotedKey(QStringView content, BracketSink& out)
+std::expected<void, ParseError> handleQuotedKey(QStringView content, BracketSink& out)
 {
     auto trimmed{content.trimmed()};
 
     if (trimmed.size() < 2)
-        return std::unexpected(Error::InvalidSlice);
+        return std::unexpected(ParseError::InvalidSlice);
 
     QChar quote = trimmed.front();
     auto  keyContent{trimmed.mid(1, trimmed.size() - 2)};
 
     QuoteStyle style = (quote == u'\'') ? QuoteStyle::Single : QuoteStyle::Double;
     if (!isValidQuotedKey(keyContent, style))
-        return std::unexpected(Error::InvalidSlice);
+        return std::unexpected(ParseError::InvalidSlice);
 
     auto unescapedKey = unescapeQuotedKey(keyContent);
     return out.key(unescapedKey, true); // Allow spaces in quoted keys
 }
 
-std::expected<void, Error> handleUnquotedKey(QStringView /*content*/, BracketSink& /*out*/)
+std::expected<void, ParseError> handleUnquotedKey(QStringView /*content*/, BracketSink& /*out*/)
 {
     // Unquoted keys are forbidden by RFC 9535
-    return std::unexpected(Error::UnsupportedFilter);
+    return std::unexpected(ParseError::UnsupportedFilter);
 }
 
 // Forward declaration for union handler
-std::expected<void, Error> handleUnionComma(QStringView content, BracketSink& out)
+std::expected<void, ParseError> handleUnionComma(QStringView content, BracketSink& out)
 {
     auto segmentsResult{splitTopLevelMultiple(content, QLatin1StringView(","))};
     if (!segmentsResult)
     {
         qCDebug(jsonPathLog) << "handleUnionComma: failed to split content";
-        return std::unexpected(Error::UnsupportedFilter);
+        return std::unexpected(ParseError::UnsupportedFilter);
     }
 
     const auto& segments{*segmentsResult};
@@ -473,7 +473,7 @@ std::expected<void, Error> handleSingleIndex(QStringView content, EmbeddedBracke
     if (!isValidIndexLiteral(trimmed.toString()))
     {
         qCDebug(jsonPathLog) << "handleSingleIndex: invalid index literal" << trimmed;
-        return std::unexpected(Error::InvalidIndex);
+        return std::unexpected(ParseError::InvalidIndex);
     }
 
     auto ok{false};
@@ -482,7 +482,7 @@ std::expected<void, Error> handleSingleIndex(QStringView content, EmbeddedBracke
     if (!ok)
     {
         qCDebug(jsonPathLog) << "handleSingleIndex: failed to convert to long long" << trimmed;
-        return std::unexpected(Error::InvalidIndex);
+        return std::unexpected(ParseError::InvalidIndex);
     }
 
     // Convert to int for the token (with range checking)
@@ -508,12 +508,12 @@ std::expected<void, Error> handleIndexList(QStringView content, EmbeddedBracketS
     {
         auto indexStr{part.trimmed()};
         if (!isValidIndexLiteral(indexStr.toString()))
-            return std::unexpected(Error::InvalidIndex);
+            return std::unexpected(ParseError::InvalidIndex);
 
         auto ok{false};
         auto index{indexStr.toString().toInt(&ok)};
         if (!ok)
-            return std::unexpected(Error::InvalidIndex);
+            return std::unexpected(ParseError::InvalidIndex);
 
         out.index(index);
     }
@@ -524,7 +524,7 @@ std::expected<void, Error> handleSlice(QStringView content, EmbeddedBracketSink&
 {
     auto slice{makeSlice(content.toString())};
     if (!slice)
-        return std::unexpected(Error::InvalidSlice);
+        return std::unexpected(ParseError::InvalidSlice);
     out.slice(*slice);
     return {};
 }
@@ -546,7 +546,7 @@ std::expected<void, Error> handleFilterWithParens(QStringView content, EmbeddedB
     else
     {
         qCDebug(jsonPathLog) << "handleFilterWithParens: failed to compile embedded filter" << expr;
-        return std::unexpected(Error::UnsupportedFilter);
+        return std::unexpected(ParseError::UnsupportedFilter);
     }
 }
 
@@ -567,7 +567,7 @@ std::expected<void, Error> handleFilterWithoutParens(QStringView content, Embedd
     else
     {
         qCDebug(jsonPathLog) << "handleFilterWithoutParens: failed to compile embedded filter" << expr;
-        return std::unexpected(Error::UnsupportedFilter);
+        return std::unexpected(ParseError::UnsupportedFilter);
     }
 }
 
@@ -611,14 +611,14 @@ std::expected<void, Error> handleQuotedKey(QStringView content, EmbeddedBracketS
     auto trimmed{content.trimmed()};
 
     if (trimmed.size() < 2)
-        return std::unexpected(Error::InvalidSlice);
+        return std::unexpected(ParseError::InvalidSlice);
 
     QChar quote = trimmed.front();
     auto  keyContent{trimmed.mid(1, trimmed.size() - 2)};
 
     QuoteStyle style = (quote == u'\'') ? QuoteStyle::Single : QuoteStyle::Double;
     if (!isValidQuotedKey(keyContent, style))
-        return std::unexpected(Error::InvalidSlice);
+        return std::unexpected(ParseError::InvalidSlice);
 
     auto unescapedKey = unescapeQuotedKey(keyContent);
     return out.key(unescapedKey, true); // Allow spaces in quoted keys
@@ -627,7 +627,7 @@ std::expected<void, Error> handleQuotedKey(QStringView content, EmbeddedBracketS
 std::expected<void, Error> handleUnquotedKey(QStringView /*content*/, EmbeddedBracketSink& /*out*/)
 {
     // Unquoted keys are forbidden by RFC 9535
-    return std::unexpected(Error::InvalidIdentifier);
+    return std::unexpected(ParseError::InvalidIdentifier);
 }
 
 // Helper function to split union segments
@@ -767,7 +767,7 @@ std::expected<void, Error> BracketRuleDispatcher::dispatch(QStringView content, 
     }
 
     qCDebug(jsonPathLog) << "No rules matched, returning UnsupportedFilter";
-    return std::unexpected(Error::UnsupportedFilter);
+    return std::unexpected(ParseError::UnsupportedFilter);
 }
 
 std::expected<void, Error> BracketRuleDispatcher::processSegmentExcludingUnion(QStringView content, BracketSink& sink)
@@ -781,7 +781,7 @@ std::expected<void, Error> BracketRuleDispatcher::processSegmentExcludingUnion(Q
         if (rule.matcher(content))
             return rule.handler(content, sink);
     }
-    return std::unexpected(Error::UnsupportedFilter);
+    return std::unexpected(ParseError::UnsupportedFilter);
 }
 
 const BracketRuleMetadata* BracketRuleDispatcher::findRuleByName(const char* name)
@@ -893,7 +893,7 @@ std::expected<void, Error> EmbeddedBracketRuleDispatcher::dispatch(QStringView c
     }
 
     qCDebug(jsonPathLog) << "No rules matched, returning UnsupportedFilter";
-    return std::unexpected(Error::UnsupportedFilter);
+    return std::unexpected(ParseError::UnsupportedFilter);
 }
 
 std::expected<void, Error> EmbeddedBracketRuleDispatcher::processSegmentExcludingUnion(QStringView          content,
@@ -908,7 +908,7 @@ std::expected<void, Error> EmbeddedBracketRuleDispatcher::processSegmentExcludin
         if (rule.matcher(content))
             return rule.handler(content, sink);
     }
-    return std::unexpected(Error::UnsupportedFilter);
+    return std::unexpected(ParseError::UnsupportedFilter);
 }
 
 const EmbeddedBracketRuleMetadata* EmbeddedBracketRuleDispatcher::findRuleByName(const char* name)

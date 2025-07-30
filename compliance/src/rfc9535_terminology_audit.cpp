@@ -31,23 +31,29 @@ void analyzeTerminology()
 
     // Compilation Error Messages
     std::cout << "\n** Compilation Errors (Error) **" << std::endl;
-    std::cout << "MissingRoot:        \"" << json_path::toString(json_path::Error::MissingRoot) << "\"" << std::endl;
-    std::cout << "TrailingDot:        \"" << json_path::toString(json_path::Error::TrailingDot) << "\"" << std::endl;
-    std::cout << "TrailingRecursive:  \"" << json_path::toString(json_path::Error::TrailingRecursive) << "\""
+    std::cout << "MissingRoot:        \"" << json_path::toString(json_path::ParseError::MissingRoot) << "\""
               << std::endl;
-    std::cout << "EmptySegment:       \"" << json_path::toString(json_path::Error::EmptySegment) << "\"" << std::endl;
-    std::cout << "BlankInKey:         \"" << json_path::toString(json_path::Error::BlankInKey) << "\"" << std::endl;
-    std::cout << "UnmatchedBracket:   \"" << json_path::toString(json_path::Error::UnmatchedBracket) << "\""
+    std::cout << "TrailingDot:        \"" << json_path::toString(json_path::ParseError::TrailingDot) << "\""
               << std::endl;
-    std::cout << "UnmatchedQuote:     \"" << json_path::toString(json_path::Error::UnmatchedQuote) << "\""
+    std::cout << "TrailingRecursive:  \"" << json_path::toString(json_path::ParseError::TrailingRecursive) << "\""
               << std::endl;
-    std::cout << "UnsupportedFilter:  \"" << json_path::toString(json_path::Error::UnsupportedFilter) << "\""
+    std::cout << "EmptySegment:       \"" << json_path::toString(json_path::ParseError::EmptySegment) << "\""
               << std::endl;
-    std::cout << "InvalidSlice:       \"" << json_path::toString(json_path::Error::InvalidSlice) << "\"" << std::endl;
-    std::cout << "InvalidIndex:       \"" << json_path::toString(json_path::Error::InvalidIndex) << "\"" << std::endl;
-    std::cout << "InvalidIdentifier:  \"" << json_path::toString(json_path::Error::InvalidIdentifier) << "\""
+    std::cout << "BlankInKey:         \"" << json_path::toString(json_path::ParseError::BlankInKey) << "\""
               << std::endl;
-    std::cout << "UnexpectedAfterRoot:\"" << json_path::toString(json_path::Error::UnexpectedAfterRoot) << "\""
+    std::cout << "UnmatchedBracket:   \"" << json_path::toString(json_path::ParseError::UnmatchedBracket) << "\""
+              << std::endl;
+    std::cout << "UnmatchedQuote:     \"" << json_path::toString(json_path::ParseError::UnmatchedQuote) << "\""
+              << std::endl;
+    std::cout << "UnsupportedFilter:  \"" << json_path::toString(json_path::ParseError::UnsupportedFilter) << "\""
+              << std::endl;
+    std::cout << "InvalidSlice:       \"" << json_path::toString(json_path::ParseError::InvalidSlice) << "\""
+              << std::endl;
+    std::cout << "InvalidIndex:       \"" << json_path::toString(json_path::ParseError::InvalidIndex) << "\""
+              << std::endl;
+    std::cout << "InvalidIdentifier:  \"" << json_path::toString(json_path::ParseError::InvalidIdentifier) << "\""
+              << std::endl;
+    std::cout << "UnexpectedAfterRoot:\"" << json_path::toString(json_path::ParseError::UnexpectedAfterRoot) << "\""
               << std::endl;
 
     std::cout << "\n### RFC 9535 TERMINOLOGY ANALYSIS ###" << std::endl;

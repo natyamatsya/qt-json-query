@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 #pragma once
 
+#include <QtCore/QString>
+#include <QtCore/QStringView>
 #include <cstdint>
 #include <string_view>
 #include <type_traits>
@@ -53,6 +55,11 @@ inline constexpr std::string_view to_string(ConvertError e) noexcept
         return "expected integral number";
     }
     return "unknown conversion error";
+}
+
+inline QString toQString(ConvertError e) noexcept
+{
+    return QString::fromUtf8(to_string(e).data(), static_cast<qsizetype>(to_string(e).size()));
 }
 } // namespace json_query
 
@@ -178,7 +185,7 @@ struct QueryError
 static_assert(sizeof(QueryError) == 2, "QueryError should remain compact (2 bytes).");
 
 /**
- * @brief Convert a QueryError to a human-readable string
+ * @brief Convert a QueryError to a human-readable string view
  *
  * @param e The query error to convert
  * @return std::string_view A descriptive error message for the query error
@@ -198,9 +205,43 @@ static_assert(sizeof(QueryError) == 2, "QueryError should remain compact (2 byte
         return json_pointer::to_string(static_cast<json_pointer::EvalError>(e.code));
     case Convert:
         return to_string(static_cast<ConvertError>(e.code));
-    default:
-        return "Unknown error domain";
     }
+    return "unknown error domain";
 }
+
+/**
+ * @brief Convert a QueryError to a human-readable QStringView
+ *
+ * @param e The query error to convert
+ * @return QStringView A view of a descriptive error message
+ */
+[[nodiscard]] inline QStringView toQStringView(QueryError e) noexcept
+{
+    using enum ErrorDomain;
+    switch (e.domain)
+    {
+    case PathParse:
+        return json_path::toQStringView(static_cast<json_path::ParseError>(e.code));
+    case PointerParse:
+        return json_pointer::toQStringView(static_cast<json_pointer::ParseError>(e.code));
+    case PathEval:
+        return json_path::toQStringView(static_cast<json_path::EvalError>(e.code));
+    case PointerEval:
+        return json_pointer::toQStringView(static_cast<json_pointer::EvalError>(e.code));
+    case Convert:
+        return QStringView(toQString(static_cast<ConvertError>(e.code)));
+    default:
+        break;
+    }
+    return QStringLiteral("unknown error domain");
+}
+
+/**
+ * @brief Convert a QueryError to a human-readable QString
+ *
+ * @param e The query error to convert
+ * @return QString A descriptive error message for the query error
+ */
+[[nodiscard]] inline QString toQString(QueryError e) noexcept { return QString(toQStringView(e)); }
 
 } // namespace json_query
