@@ -1,0 +1,15 @@
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+#pragma once
+
+#include "json-path/JSONPath.hpp"
+#include "json-pointer/JSONPointer.hpp"
+#include "utils/JSONValueUtils.hpp"
+
+namespace json_query
+{
+
+using JSONPath    = json_path::JSONPath;
+using JSONPointer = json_pointer::JSONPointer;
+
+}

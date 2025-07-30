@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include "JSONPointerError.hpp"
+
 #include <QString>
 #include <QStringView>
 #include <QVector>
@@ -84,15 +86,6 @@ struct Token
     out = value;
     return true;
 }
-
-enum class ParseError : std::uint8_t
-{
-    MissingLeadingSlash,
-    EmptyNonTerminalToken,
-    InvalidEscapeSequence,
-    NonDecimalArrayIndex,
-    ArrayIndexOverflow
-};
 
 [[nodiscard]] inline std::expected<void, ParseError> parsePointer(QStringView ptr, std::vector<Token>& tokens) noexcept
 {

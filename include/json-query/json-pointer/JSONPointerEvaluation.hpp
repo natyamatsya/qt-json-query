@@ -2,44 +2,18 @@
 
 #pragma once
 
+#include "JSONPointerParsing.hpp"
+#include "internal/PointerEvalCtx.hpp"
+
 #include <QJsonValue>
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QVector>
 #include <vector>
-#include "json-query/json-pointer/JSONPointerParsing.hpp"
-#include "internal/PointerEvalCtx.hpp"
 #include <expected>
 
 namespace json_query::json_pointer::detail
 {
-
-// Evaluation-time errors
-enum class EvalError : std::uint8_t
-{
-    TypeMismatchObject,
-    TypeMismatchArray,
-    KeyNotFound,
-    IndexOutOfRange
-};
-
-[[nodiscard]] inline constexpr std::string_view to_string(EvalError e) noexcept
-{
-    using enum EvalError;
-    switch (e)
-    {
-    case TypeMismatchObject:
-        return "type mismatch: expected object";
-    case TypeMismatchArray:
-        return "type mismatch: expected array";
-    case KeyNotFound:
-        return "key not found in object";
-    case IndexOutOfRange:
-        return "array index out of range";
-    default:
-        return "unknown evaluation error";
-    }
-}
 
 [[nodiscard]] inline bool stepObject(QJsonValue& current, const QString& key) noexcept
 {

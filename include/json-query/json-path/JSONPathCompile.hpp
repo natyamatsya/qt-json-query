@@ -646,60 +646,6 @@ struct Token
     }
 };
 
-// ------------------------------------------------------------------
-//  Parser / compiler error codes
-// ------------------------------------------------------------------
-enum class Error : std::uint8_t
-{
-    Ok = 0, // not used in expected<T,E>
-    MissingRoot,
-    TrailingDot,
-    TrailingRecursive,
-    EmptySegment,
-    BlankInKey,
-    UnmatchedBracket,
-    UnmatchedQuote,
-    UnsupportedFilter,
-    InvalidSlice,
-    InvalidIndex,
-    InvalidIdentifier, // RFC 9535: invalid member-name-shorthand
-    UnexpectedAfterRoot
-};
-
-[[nodiscard]] inline constexpr std::string_view toString(Error e) noexcept
-{
-    using enum Error;
-    switch (e)
-    {
-    case MissingRoot:
-        return "JSONPath must start with root identifier '$' or '@'";
-    case TrailingDot:
-        return "trailing '.' in segment";
-    case TrailingRecursive:
-        return "trailing '..' in descendant segment";
-    case EmptySegment:
-        return "empty segment";
-    case BlankInKey:
-        return "blank in member name";
-    case UnmatchedBracket:
-        return "unmatched '[' in selector";
-    case UnmatchedQuote:
-        return "unmatched quote in selector";
-    case UnsupportedFilter:
-        return "unsupported filter-selector expression";
-    case InvalidSlice:
-        return "invalid slice-selector syntax";
-    case InvalidIndex:
-        return "invalid index-selector syntax";
-    case InvalidIdentifier:
-        return "invalid member name identifier";
-    case UnexpectedAfterRoot:
-        return "root identifier must be followed by '.' or '['";
-    default:
-        return "unknown compilation error";
-    }
-}
-
 // ======================================================================
 //  Compilation API - extracted from JSONPath for testability
 // ======================================================================

@@ -12,10 +12,10 @@
 // Enable string literal operators for QString
 using namespace Qt::StringLiterals;
 
-#include "json-query/json-pointer/JSONPointer.hpp"
+#include "json-query/JSONQuery"
 
 using json_query::JSONPointer;
-using json_query::json_pointer::detail::ParseError;
+using json_query::json_pointer::ParseError;
 
 void evaluateAndPrint(const JSONPointer& pointer, const QJsonDocument& doc, QStringView desc)
 {
@@ -29,7 +29,7 @@ void evaluateAndPrint(const JSONPointer& pointer, const QJsonDocument& doc, QStr
         return;
     }
 
-    if (pointer.toString().isEmpty())
+    if (pointer.to_string().isEmpty())
     {
         // Special case: Show the whole document for empty pointer
         qDebug() << "  Result:  (whole document)";

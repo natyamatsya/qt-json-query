@@ -13,27 +13,27 @@
 
 #include <vector> // added include for std::vector
 
-namespace json_query
+namespace json_query::json_pointer
 {
 
 class JSONPointer
 {
   public:
-    using Error     = json_pointer::detail::ParseError; // alias internal
-    using EvalError = json_pointer::detail::EvalError;  // alias internal
+    using ParseError = json_pointer::ParseError; // alias internal
+    using EvalError  = json_pointer::EvalError;  // alias internal
 
     // Factory function mirroring JSONPath
-    using Result     = std::expected<JSONPointer, Error>;
-    using EvalResult = std::expected<QJsonValue, EvalError>;
+    using ParseResult = std::expected<JSONPointer, ParseError>;
+    using EvalResult  = std::expected<QJsonValue, EvalError>;
 
     // Factory function mirroring JSONPath
-    static Result create(QStringView pointer);
+    static ParseResult create(QStringView pointer);
 
     // Detailed-error variants
     [[nodiscard]] EvalResult evaluate(const QJsonDocument&) const;
     [[nodiscard]] EvalResult evaluate(const QJsonValue&) const;
 
-    [[nodiscard]] QString toString() const;
+    [[nodiscard]] QString to_string() const;
 
   private:
     JSONPointer() = default; // internal default ctor for factory
@@ -42,4 +42,4 @@ class JSONPointer
     std::vector<Token> m_tokens; // QVector replaced with std::vector
 };
 
-} // namespace json_query
+} // namespace json_query::json_pointer

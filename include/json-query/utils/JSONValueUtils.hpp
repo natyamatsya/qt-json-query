@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 #pragma once
 
+#include "JSONQueryError.hpp"
+
 #include <QJsonValue>
 #include <QJsonArray>
 #include <QJsonObject>
@@ -11,9 +13,6 @@
 #include <limits>
 #include <cmath>
 #include <utility>
-
-#include "../json-path/JSONPathEvalError.hpp"        // json_query::json_path::EvalError
-#include "../json-pointer/JSONPointerEvaluation.hpp" // json_query::json_pointer::detail::EvalError
 
 namespace json_query
 {
