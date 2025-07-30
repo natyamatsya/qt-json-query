@@ -29,7 +29,7 @@ using FilterFn = json_path::FilterFn;
 
 // Same error enum as the main compiler – handy if users need to signal
 // syntax errors.
-using Error = json_path::ParseError;
+using ParseError = json_path::ParseError;
 
 // ---------------------------------------------------------------------
 //  Individual rule parsers

@@ -13,7 +13,7 @@ namespace json_query::json_path
 // Forward declarations from JSONPathCompile.hpp
 struct Token;
 struct Slice;
-enum class Error : std::uint8_t;
+enum class ParseError : std::uint8_t;
 
 // ──────────────────────────────────────────────────────────────────────
 //  Parsing Utility Functions
@@ -79,7 +79,7 @@ class KeyBuilder
      * @param allowSpace Whether to allow spaces in the key
      * @return Success or error result
      */
-    std::expected<void, Error> push(QString key, bool allowSpace = false);
+    std::expected<void, ParseError> push(QString key, bool allowSpace = false);
 };
 } // namespace detail
 

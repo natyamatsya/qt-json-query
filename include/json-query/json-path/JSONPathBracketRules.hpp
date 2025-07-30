@@ -53,12 +53,12 @@ class BracketSink
     }
 
     // Token emission methods
-    std::expected<void, Error> key(const QString& key, bool allow = false) const;
-    void                       keyList(const std::vector<QString>& keys) const;
-    void                       wild() const;
-    void                       slice(const Slice& s) const;
-    void                       index(int i) const;
-    void                       pushFilter(const Token& t) const;
+    std::expected<void, ParseError> key(const QString& key, bool allow = false) const;
+    void                            keyList(const std::vector<QString>& keys) const;
+    void                            wild() const;
+    void                            slice(const Slice& s) const;
+    void                            index(int i) const;
+    void                            pushFilter(const Token& t) const;
 };
 
 class EmbeddedBracketSink
@@ -74,12 +74,12 @@ class EmbeddedBracketSink
     }
 
     // Token emission methods
-    std::expected<void, Error> key(const QString& key, bool allow = false) const;
-    void                       keyList(const std::vector<QString>& keys) const;
-    void                       wild() const;
-    void                       slice(const Slice& s) const;
-    void                       index(int i) const;
-    void                       pushFilter(const Token& t) const;
+    std::expected<void, ParseError> key(const QString& key, bool allow = false) const;
+    void                            keyList(const std::vector<QString>& keys) const;
+    void                            wild() const;
+    void                            slice(const Slice& s) const;
+    void                            index(int i) const;
+    void                            pushFilter(const Token& t) const;
 };
 
 // ──────────────────────────────────────────────────────────────────────

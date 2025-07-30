@@ -460,13 +460,13 @@ std::expected<void, ParseError> handleUnionComma(QStringView content, BracketSin
 namespace embedded_handlers
 {
 
-std::expected<void, Error> handleWildcard(QStringView /*content*/, EmbeddedBracketSink& out)
+std::expected<void, ParseError> handleWildcard(QStringView /*content*/, EmbeddedBracketSink& out)
 {
     out.wild();
     return {};
 }
 
-std::expected<void, Error> handleSingleIndex(QStringView content, EmbeddedBracketSink& out)
+std::expected<void, ParseError> handleSingleIndex(QStringView content, EmbeddedBracketSink& out)
 {
     auto trimmed{content.trimmed()};
 
@@ -499,7 +499,7 @@ std::expected<void, Error> handleSingleIndex(QStringView content, EmbeddedBracke
     return {};
 }
 
-std::expected<void, Error> handleIndexList(QStringView content, EmbeddedBracketSink& out)
+std::expected<void, ParseError> handleIndexList(QStringView content, EmbeddedBracketSink& out)
 {
     auto       trimmed{content.trimmed()};
     const auto parts{trimmed.split(u',')};
@@ -520,7 +520,7 @@ std::expected<void, Error> handleIndexList(QStringView content, EmbeddedBracketS
     return {};
 }
 
-std::expected<void, Error> handleSlice(QStringView content, EmbeddedBracketSink& out)
+std::expected<void, ParseError> handleSlice(QStringView content, EmbeddedBracketSink& out)
 {
     auto slice{makeSlice(content.toString())};
     if (!slice)
@@ -529,7 +529,7 @@ std::expected<void, Error> handleSlice(QStringView content, EmbeddedBracketSink&
     return {};
 }
 
-std::expected<void, Error> handleFilterWithParens(QStringView content, EmbeddedBracketSink& out)
+std::expected<void, ParseError> handleFilterWithParens(QStringView content, EmbeddedBracketSink& out)
 {
     auto trimmed{content.trimmed()};
     // Extract the full expression after the '?' prefix
@@ -550,7 +550,7 @@ std::expected<void, Error> handleFilterWithParens(QStringView content, EmbeddedB
     }
 }
 
-std::expected<void, Error> handleFilterWithoutParens(QStringView content, EmbeddedBracketSink& out)
+std::expected<void, ParseError> handleFilterWithoutParens(QStringView content, EmbeddedBracketSink& out)
 {
     auto trimmed{content.trimmed()};
     // Extract the full expression after the '?' prefix
@@ -571,7 +571,7 @@ std::expected<void, Error> handleFilterWithoutParens(QStringView content, Embedd
     }
 }
 
-std::expected<void, Error> handlePlaceholder(QStringView content, EmbeddedBracketSink& out)
+std::expected<void, ParseError> handlePlaceholder(QStringView content, EmbeddedBracketSink& out)
 {
     auto trimmed{content.trimmed()};
 
@@ -606,7 +606,7 @@ std::expected<void, Error> handlePlaceholder(QStringView content, EmbeddedBracke
     return {};
 }
 
-std::expected<void, Error> handleQuotedKey(QStringView content, EmbeddedBracketSink& out)
+std::expected<void, ParseError> handleQuotedKey(QStringView content, EmbeddedBracketSink& out)
 {
     auto trimmed{content.trimmed()};
 
@@ -624,7 +624,7 @@ std::expected<void, Error> handleQuotedKey(QStringView content, EmbeddedBracketS
     return out.key(unescapedKey, true); // Allow spaces in quoted keys
 }
 
-std::expected<void, Error> handleUnquotedKey(QStringView /*content*/, EmbeddedBracketSink& /*out*/)
+std::expected<void, ParseError> handleUnquotedKey(QStringView /*content*/, EmbeddedBracketSink& /*out*/)
 {
     // Unquoted keys are forbidden by RFC 9535
     return std::unexpected(ParseError::InvalidIdentifier);
@@ -654,7 +654,7 @@ std::vector<QString> splitUnionSegments(QStringView content)
 }
 
 // Forward declaration for embedded union handler
-std::expected<void, Error> handleUnionComma(QStringView content, EmbeddedBracketSink& out)
+std::expected<void, ParseError> handleUnionComma(QStringView content, EmbeddedBracketSink& out)
 {
     const auto segments{splitUnionSegments(content)};
 
@@ -735,7 +735,7 @@ const std::vector<BracketRuleMetadata>& BracketRuleDispatcher::getRules()
     return rules;
 }
 
-std::expected<void, Error> BracketRuleDispatcher::dispatch(QStringView content, BracketSink& sink)
+std::expected<void, ParseError> BracketRuleDispatcher::dispatch(QStringView content, BracketSink& sink)
 {
     qCDebug(jsonPathLog) << "BracketRuleDispatcher::dispatch content=" << content.toString();
 
@@ -770,7 +770,8 @@ std::expected<void, Error> BracketRuleDispatcher::dispatch(QStringView content, 
     return std::unexpected(ParseError::UnsupportedFilter);
 }
 
-std::expected<void, Error> BracketRuleDispatcher::processSegmentExcludingUnion(QStringView content, BracketSink& sink)
+std::expected<void, ParseError> BracketRuleDispatcher::processSegmentExcludingUnion(QStringView  content,
+                                                                                    BracketSink& sink)
 {
     // Apply all rules except union_comma to prevent recursion
     for (const auto& rule : getRules())
@@ -861,7 +862,7 @@ const std::vector<EmbeddedBracketRuleMetadata>& EmbeddedBracketRuleDispatcher::g
     return rules;
 }
 
-std::expected<void, Error> EmbeddedBracketRuleDispatcher::dispatch(QStringView content, EmbeddedBracketSink& sink)
+std::expected<void, ParseError> EmbeddedBracketRuleDispatcher::dispatch(QStringView content, EmbeddedBracketSink& sink)
 {
     qCDebug(jsonPathLog) << "EmbeddedBracketRuleDispatcher::dispatch content=" << content.toString();
 
@@ -896,8 +897,8 @@ std::expected<void, Error> EmbeddedBracketRuleDispatcher::dispatch(QStringView c
     return std::unexpected(ParseError::UnsupportedFilter);
 }
 
-std::expected<void, Error> EmbeddedBracketRuleDispatcher::processSegmentExcludingUnion(QStringView          content,
-                                                                                       EmbeddedBracketSink& sink)
+std::expected<void, ParseError> EmbeddedBracketRuleDispatcher::processSegmentExcludingUnion(QStringView content,
+                                                                                            EmbeddedBracketSink& sink)
 {
     // Apply all rules except union_comma to prevent recursion
     for (const auto& rule : getRules())

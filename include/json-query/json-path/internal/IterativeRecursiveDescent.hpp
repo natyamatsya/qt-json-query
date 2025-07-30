@@ -7,11 +7,10 @@
 #include <QJsonObject>
 #include <vector>
 #include <expected>
-#include "json-query/json-path/JSONPathEvalError.hpp"
+
 #include "json-query/json-path/internal/ResultStreamer.hpp"
 #include "json-query/json-path/internal/ArrayPool.hpp"
 #include "json-query/json-path/internal/CacheOptimizedStructures.hpp"
-#include "json-query/json-path/JSONPathExpected.hpp"
 
 namespace json_query::json_path::internal
 {

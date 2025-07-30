@@ -12,13 +12,13 @@
 #include "json-query/json-path/internal/ContextAwareContainerCursor.hpp"
 #include "json-query/json-path/internal/ResultStreamer.hpp"
 #include "json-query/json-path/internal/PathPatternSpecializations.hpp"
-#include <expected>
-#include "json-query/json-path/JSONPathEvalError.hpp"
+
 #include "json-query/json-path/JSONPathPointerConversion.hpp"
 #include "json-query/json-path/internal/QtHash.hpp"
 
 #include <array>
 #include <deque>
+#include <expected>
 #include <QSet>
 #include <QJsonDocument>
 #include <QStringList>

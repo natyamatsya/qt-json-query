@@ -722,7 +722,7 @@ struct CompilationResult
     Compiled     compiled;
 };
 
-[[nodiscard]] std::expected<CompilationResult, Error> compile(QStringView rawPath);
+[[nodiscard]] std::expected<CompilationResult, ParseError> compile(QStringView rawPath);
 
 // ======================================================================
 //  Template-based zero-overhead filter tokens

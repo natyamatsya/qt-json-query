@@ -16,7 +16,7 @@ namespace json_query::json_path
 {
 // Forward declarations from JSONPathCompile.hpp
 struct Token;
-enum class Error : std::uint8_t;
+enum class ParseError : std::uint8_t;
 
 namespace detail
 {
@@ -35,7 +35,8 @@ class KeyBuilder;
  * @param tokens Output vector for generated tokens
  * @return Next position or error
  */
-std::expected<qsizetype, Error> parseDot(qsizetype pos, QStringView sv, KeyBuilder& kb, std::vector<Token>& tokens);
+std::expected<qsizetype, ParseError>
+parseDot(qsizetype pos, QStringView sv, KeyBuilder& kb, std::vector<Token>& tokens);
 
 /**
  * Parse bare identifier (unquoted name)
@@ -45,7 +46,8 @@ std::expected<qsizetype, Error> parseDot(qsizetype pos, QStringView sv, KeyBuild
  * @param tokens Output vector for generated tokens
  * @return Next position or error
  */
-std::expected<qsizetype, Error> parseBare(qsizetype pos, QStringView sv, KeyBuilder& kb, std::vector<Token>& tokens);
+std::expected<qsizetype, ParseError>
+parseBare(qsizetype pos, QStringView sv, KeyBuilder& kb, std::vector<Token>& tokens);
 
 /**
  * Parse bracket notation [...] (Legacy - with std::function storage)
@@ -57,7 +59,7 @@ std::expected<qsizetype, Error> parseBare(qsizetype pos, QStringView sv, KeyBuil
  * @param filters Output vector for regular filters
  * @return Next position or error
  */
-std::expected<qsizetype, Error>
+std::expected<qsizetype, ParseError>
 parseBracket(qsizetype                                                               pos,
              QStringView                                                             sv,
              KeyBuilder&                                                             kb,
@@ -73,7 +75,7 @@ parseBracket(qsizetype                                                          
  * @param tokens Token vector to append to
  * @return Next position or error
  */
-std::expected<qsizetype, Error> parseEmbeddedBracket(
+std::expected<qsizetype, ParseError> parseEmbeddedBracket(
     qsizetype pos, QStringView sv, KeyBuilder& kb, std::vector<Token>& tokens, std::vector<FilterFn>& filterFns);
 
 } // namespace detail

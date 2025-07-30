@@ -129,10 +129,12 @@ enum class EvalError : std::uint8_t
  * @param e The evaluation error to convert
  * @return QStringView A view of a descriptive error message
  */
-[[nodiscard]] inline constexpr QStringView toQStringView(EvalError e) noexcept
+[[nodiscard]] inline QStringView toQStringView(EvalError e) noexcept
 {
-    const auto sv = to_string(e);
-    return QStringView(sv.data(), static_cast<qsizetype>(sv.size()));
+    const auto                  sv = to_string(e);
+    static thread_local QString str;
+    str = QString::fromUtf8(sv.data(), static_cast<qsizetype>(sv.size()));
+    return str;
 }
 
 /**
