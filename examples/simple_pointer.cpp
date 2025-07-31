@@ -15,8 +15,6 @@ using namespace Qt::StringLiterals;
 
 using json_query::JSONPointer;
 using json_query::QueryError;
-using json_query::toQString;
-using json_query::toQStringView;
 
 // Helper function to evaluate a JSON Pointer and print the result
 void evaluateAndPrint(const JSONPointer& pointer, const QJsonDocument& doc, QStringView description)
@@ -29,7 +27,7 @@ void evaluateAndPrint(const JSONPointer& pointer, const QJsonDocument& doc, QStr
 
     if (!result)
     {
-        qDebug() << "  Error:" << toQStringView(result.error());
+        qDebug() << "  Error:" << to_qt_sv(result.error());
         return;
     }
 
@@ -60,7 +58,7 @@ bool evaluatePointer(QStringView path, const QJsonDocument& doc, QStringView des
     if (!pointer)
     {
         qWarning() << "Failed to create pointer:" << path << "-" << description;
-        qWarning() << "  Error:" << toQStringView(pointer.error());
+        qWarning() << "  Error:" << to_qt_sv(pointer.error());
         return false;
     }
 

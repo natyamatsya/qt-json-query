@@ -15,8 +15,7 @@ JSONPath::ParseResult JSONPath::create(QStringView rawPath)
 
     if (!compileResult)
     {
-        qCDebug(jsonPathLog) << "JSONPath::create() compile failed with error:"
-                             << json_query::toQStringView(compileResult.error());
+        qCDebug(jsonPathLog) << "JSONPath::create() compile failed with error:" << to_qt_sv(compileResult.error());
         return std::unexpected(QueryError{ErrorDomain::PathParse, static_cast<std::uint8_t>(compileResult.error())});
     }
 

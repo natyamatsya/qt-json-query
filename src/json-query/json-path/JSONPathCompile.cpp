@@ -290,7 +290,7 @@ std::expected<json_query::json_path::Compiled, json_query::json_path::ParseError
 
         if (!nextPosResult)
         {
-            qCDebug(json_query::json_path::jsonPathLog) << "  Error:" << toQString(nextPosResult.error());
+            qCDebug(json_query::json_path::jsonPathLog) << "  Error:" << to_qt_sv(nextPosResult.error());
             return std::unexpected(static_cast<ParseError>(nextPosResult.error()));
         }
 

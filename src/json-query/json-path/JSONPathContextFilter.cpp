@@ -173,7 +173,7 @@ QJsonValue evaluateAbsolutePath(const QString& path, const QJsonValue& root, con
     if (result)
         return *result;
 
-    qCDebug(jsonPathLog) << "Absolute path evaluation failed:" << path << "error:" << toQStringView(result.error());
+    qCDebug(jsonPathLog) << "Absolute path evaluation failed:" << path << "error:" << to_qt_sv(result.error());
     return QJsonValue{};
 }
 
@@ -697,7 +697,7 @@ struct ContextFilterParsingStrategy<ContextFilterParsingType::ExistencePattern>
                         if (!results)
                         {
                             qCDebug(jsonPathLog) << "Failed to evaluate absolute path:" << expr
-                                                 << "error:" << toQStringView(results.error());
+                                                 << "error:" << to_qt_sv(results.error());
                         }
                     }
                     else

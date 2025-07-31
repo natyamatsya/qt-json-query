@@ -30,7 +30,7 @@ void analyzeTestCase(const TestCase& testCase)
     auto pathResult = JSONPath::create(testCase.selector);
     if (!pathResult)
     {
-        std::cout << "✅ COMPILATION ERROR: " << toQStringView(pathResult.error()).toString().toStdString()
+        std::cout << "✅ COMPILATION ERROR: " << to_std_sv(pathResult.error())
                   << " (code: " << static_cast<int>(pathResult.error().code) << ")" << std::endl;
         if (!testCase.invalid_selector)
             std::cout << "⚠️  WARNING: Expected valid selector but got compilation error!" << std::endl;
@@ -49,7 +49,7 @@ void analyzeTestCase(const TestCase& testCase)
         auto evalResult{pathResult->evaluateAll(testCase.document)};
         if (!evalResult)
         {
-            std::cout << "❌ EVALUATION ERROR: " << toQStringView(evalResult.error()).toString().toStdString()
+            std::cout << "❌ EVALUATION ERROR: " << to_std_sv(evalResult.error())
                       << " (code: " << static_cast<int>(evalResult.error().code) << ")" << std::endl;
         }
         else

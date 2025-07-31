@@ -30,7 +30,6 @@
 
 #include "json-query/JSONQuery"
 
-using json_query::toQStringView;
 using json_query::json_path::JSONPath;
 using json_query::json_path::ParseError;
 
@@ -184,8 +183,8 @@ TEST_P(CtsJsonPathTest, EvaluatesPerSpec)
     auto            result{path.evaluate(doc)};
     if (!result.has_value())
     {
-        std::cout << "Evaluation error for " << tc.selector.toStdString() << ": "
-                  << toQStringView(result.error()).toString().toStdString() << std::endl;
+        std::cout << "Evaluation error for " << tc.selector.toStdString() << ": " << to_std_sv(result.error())
+                  << std::endl;
     }
     ASSERT_TRUE(result.has_value()) << "Failed to evaluate: " << tc.selector.toStdString();
 
