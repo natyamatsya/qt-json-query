@@ -149,13 +149,29 @@ static QStringList titlesAbovePrice_plain(const QJsonDocument& doc, double thres
     return isbn.toString();
 }
 
+// Helper function to log query errors
+
+static auto log_query_error(const QString& context)
+{
+    return [&](const QueryError& error)
+    {
+        qWarning() << context << ":" << to_qt_sv(error);
+        return error;
+    };
+}
+
 [[nodiscard]] static std::optional<QString> editionIsbn_pointer(const QJsonDocument& doc, int index)
 {
+    auto path        = QString("/inventory/%1/details/edition/isbn").arg(index);
     auto evaluate    = [&doc](const auto&& pointer) { return pointer.evaluate(doc); };
     auto to_optional = [](const auto&& s) -> std::optional<QString> { return s; };
-    return JSONPointer::create(QString("/inventory/%1/details/edition/isbn").arg(index))
+
+    return JSONPointer::create(path)
+        .transform_error(log_query_error(QString("Failed to create JSONPointer for path %1").arg(path)))
         .and_then(evaluate)
+        .transform_error(log_query_error(QString("Failed to evaluate JSONPointer %1").arg(path)))
         .and_then(as<QString>)
+        .transform_error(log_query_error(QString("Failed to convert result")))
         .transform(to_optional)
         .value_or(std::nullopt);
 }
