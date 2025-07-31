@@ -23,147 +23,10 @@
 #include <type_traits>
 #include <variant>
 
+using json_query::as;
 using json_query::JSONPath;
 using json_query::JSONPointer;
 using json_query::QueryError;
-
-// Custom error type for JSON value conversion
-template <typename T>
-struct ConversionError
-{
-    QString          message;
-    QJsonValue::Type expectedType;
-    QJsonValue::Type actualType;
-};
-
-// Type-safe conversion from QJsonValue to T
-template <typename T>
-std::expected<T, ConversionError<T>> as(const QJsonValue& value);
-
-// Specialization for QString
-template <>
-std::expected<QString, ConversionError<QString>> as<QString>(const QJsonValue& value)
-{
-    if (value.isString())
-        return value.toString();
-    if (value.isDouble())
-        return QString::number(value.toDouble());
-    if (value.isBool())
-        return value.toBool() ? QStringLiteral("true") : QStringLiteral("false");
-    if (value.isNull() || value.isUndefined())
-    {
-        return std::unexpected(
-            ConversionError<QString>{"Cannot convert null/undefined to QString", QJsonValue::String, value.type()});
-    }
-    if (value.isArray() || value.isObject())
-    {
-        QJsonDocument doc = value.isArray() ? QJsonDocument(value.toArray()) : QJsonDocument(value.toObject());
-        return doc.toJson(QJsonDocument::Compact);
-    }
-
-    return std::unexpected(
-        ConversionError<QString>{"Unsupported type for QString conversion", QJsonValue::String, value.type()});
-}
-
-// Specialization for int
-template <>
-std::expected<int, ConversionError<int>> as<int>(const QJsonValue& value)
-{
-    if (value.isDouble())
-    {
-        return static_cast<int>(value.toDouble());
-    }
-    else if (value.isString())
-    {
-        bool ok;
-        int  result = value.toString().toInt(&ok);
-        if (ok)
-            return result;
-    }
-    else if (value.isBool())
-    {
-        return value.toBool() ? 1 : 0;
-    }
-
-    return std::unexpected(ConversionError<int>{"Cannot convert to int", QJsonValue::Double, value.type()});
-}
-
-// Specialization for double
-template <>
-std::expected<double, ConversionError<double>> as<double>(const QJsonValue& value)
-{
-    if (value.isDouble())
-    {
-        return value.toDouble();
-    }
-    else if (value.isString())
-    {
-        bool   ok;
-        double result = value.toString().toDouble(&ok);
-        if (ok)
-            return result;
-    }
-    else if (value.isBool())
-    {
-        return value.toBool() ? 1.0 : 0.0;
-    }
-
-    return std::unexpected(ConversionError<double>{"Cannot convert to double", QJsonValue::Double, value.type()});
-}
-
-// Specialization for bool
-template <>
-std::expected<bool, ConversionError<bool>> as<bool>(const QJsonValue& value)
-{
-    if (value.isBool())
-    {
-        return value.toBool();
-    }
-    else if (value.isDouble())
-    {
-        return value.toDouble() != 0.0;
-    }
-    else if (value.isString())
-    {
-        const QString str = value.toString().toLower();
-        if (str == "true" || str == "1")
-            return true;
-        if (str == "false" || str == "0")
-            return false;
-    }
-
-    return std::unexpected(ConversionError<bool>{"Cannot convert to bool", QJsonValue::Bool, value.type()});
-}
-
-// Specialization for QJsonArray
-template <>
-std::expected<QJsonArray, ConversionError<QJsonArray>> as<QJsonArray>(const QJsonValue& value)
-{
-    if (value.isArray())
-        return value.toArray();
-
-    return std::unexpected(ConversionError<QJsonArray>{"Value is not an array", QJsonValue::Array, value.type()});
-}
-
-// Specialization for QJsonObject
-template <>
-std::expected<QJsonObject, ConversionError<QJsonObject>> as<QJsonObject>(const QJsonValue& value)
-{
-    if (value.isObject())
-        return value.toObject();
-
-    return std::unexpected(ConversionError<QJsonObject>{"Value is not an object", QJsonValue::Object, value.type()});
-}
-
-// Helper function to convert QJsonValue to QString with error checking using as<T>
-static std::optional<QString> jsonValueToString(const QJsonValue& value)
-{
-    auto result = as<QString>(value);
-    if (result)
-        return *result;
-    qWarning() << "Failed to convert JSON value to string:" << result.error().message;
-    return std::nullopt;
-}
 
 using namespace Qt::StringLiterals;
 
@@ -209,43 +72,92 @@ static QStringList titlesAbovePrice_plain(const QJsonDocument& doc, double thres
 // Deeply nested access example
 // Goal: retrieve the ISBN of book at given index (default 7)
 // -----------------------------------------------------------------------------
-static QString editionIsbn_plain(const QJsonDocument& doc, int index)
+[[nodiscard]] static std::optional<QString> editionIsbn_plain(const QJsonDocument& doc, int index)
 {
-    const auto root{doc.object()};
-    const auto inventory{root.value("inventory").toArray()};
+    // Check if root is an object
+    if (!doc.isObject())
+    {
+        qWarning() << "Document root is not an object";
+        return std::nullopt;
+    }
+
+    // Get inventory array
+    const auto root = doc.object();
+    if (!root.contains("inventory"))
+    {
+        qWarning() << "No inventory found in document";
+        return std::nullopt;
+    }
+
+    const auto inventory = root.value("inventory").toArray();
     if (index < 0 || index >= inventory.size())
-        return {};
-    const auto book{inventory.at(index).toObject()};
-    const auto details{book.value("details").toObject()};
-    const auto edition{details.value("edition").toObject()};
-    return edition.value("isbn").toString();
+    {
+        qWarning() << "Index out of range:" << index << "(size:" << inventory.size() << ")";
+        return std::nullopt;
+    }
+
+    // Get book object
+    const auto book = inventory.at(index).toObject();
+    if (book.isEmpty())
+    {
+        qWarning() << "Book at index" << index << "is not a valid object";
+        return std::nullopt;
+    }
+
+    // Get details object
+    if (!book.contains("details"))
+    {
+        qWarning() << "No details found for book at index" << index;
+        return std::nullopt;
+    }
+
+    const auto details = book.value("details").toObject();
+    if (details.isEmpty())
+    {
+        qWarning() << "Details is not a valid object for book at index" << index;
+        return std::nullopt;
+    }
+
+    // Get edition object
+    if (!details.contains("edition"))
+    {
+        qWarning() << "No edition information found in details for book at index" << index;
+        return std::nullopt;
+    }
+
+    const auto edition = details.value("edition").toObject();
+    if (edition.isEmpty())
+    {
+        qWarning() << "Edition is not a valid object for book at index" << index;
+        return std::nullopt;
+    }
+
+    // Get ISBN
+    if (!edition.contains("isbn"))
+    {
+        qWarning() << "No ISBN field found in edition for book at index" << index;
+        return std::nullopt;
+    }
+
+    const auto isbn = edition.value("isbn");
+    if (!isbn.isString())
+    {
+        qWarning() << "ISBN is not a string for book at index" << index << "(type:" << isbn.type() << ")";
+        return std::nullopt;
+    }
+
+    return isbn.toString();
 }
 
 [[nodiscard]] static std::optional<QString> editionIsbn_pointer(const QJsonDocument& doc, int index)
 {
-    auto result = JSONPointer::create(QString("/inventory/%1/details/edition/isbn").arg(index));
-    if (!result)
-    {
-        qWarning() << "Failed to create JSONPointer";
-        return std::nullopt;
-    }
-
-    auto evalResult = result->evaluate(doc);
-    if (!evalResult)
-    {
-        qWarning() << "Failed to evaluate JSONPointer";
-        return std::nullopt;
-    }
-
-    // Use the as<T> function for type-safe conversion
-    auto strResult = as<QString>(*evalResult);
-    if (!strResult)
-    {
-        qWarning() << "Failed to convert to string:" << strResult.error().message;
-        return std::nullopt;
-    }
-
-    return *strResult;
+    auto evaluate    = [&doc](const auto&& pointer) { return pointer.evaluate(doc); };
+    auto to_optional = [](const auto&& s) -> std::optional<QString> { return s; };
+    return JSONPointer::create(QString("/inventory/%1/details/edition/isbn").arg(index))
+        .and_then(evaluate)
+        .and_then(as<QString>)
+        .transform(to_optional)
+        .value_or(std::nullopt);
 }
 
 [[nodiscard]] static std::optional<QString> editionIsbn_path(const QJsonDocument& doc, int index)
@@ -315,7 +227,7 @@ static QString editionIsbn_plain(const QJsonDocument& doc, int index)
             if (strResult)
                 result << *strResult;
             else
-                qWarning() << "Skipping non-string title:" << item << "Error:" << strResult.error().message;
+                qWarning() << "Skipping non-string title:" << item << "Error:" << to_qt_sv(strResult.error());
         }
     }
     // Handle single value result
@@ -329,7 +241,7 @@ static QString editionIsbn_plain(const QJsonDocument& doc, int index)
         else
         {
             qWarning() << "Expected string title but got type:" << evalResult->type()
-                       << "Error:" << strResult.error().message;
+                       << "Error:" << to_qt_sv(strResult.error());
         }
     }
 
@@ -351,22 +263,25 @@ int main(int argc, char** argv)
     qDebug() << "json-query path:" << queryTitles;
 
     // Test ISBN retrieval for different books
-    const std::array<int, 3> testIndices{0, 5, 7};
-    qDebug() << "\n=== ISBN Retrieval ===";
-
-    for (const int index : testIndices)
+    qInfo() << "\n=== ISBN Retrieval ===\n";
+    for (const int idx : {0, 5, 7, 100})
     {
-        const auto plainIsbn   = editionIsbn_plain(doc, index);
-        const auto pointerIsbn = editionIsbn_pointer(doc, index).value_or("(not found)");
-        const auto pathIsbn    = editionIsbn_path(doc, index).value_or("(not found)");
+        qInfo() << "Book index:" << idx;
 
-        qDebug() << "\nBook index:" << index;
-        qDebug() << "  Plain:   " << plainIsbn;
-        qDebug() << "  Pointer: " << pointerIsbn;
-        qDebug() << "  Path:    " << pathIsbn;
+        // Plain version
+        auto plainResult = editionIsbn_plain(doc, idx);
+        qInfo().noquote() << "  Plain:   \"" << (plainResult ? *plainResult : "(not found)") << "\"";
+
+        // Pointer version
+        auto pointerResult = editionIsbn_pointer(doc, idx);
+        qInfo().noquote() << "  Pointer: \"" << (pointerResult ? *pointerResult : "(not found)") << "\"";
+
+        // Path version
+        auto pathResult = editionIsbn_path(doc, idx);
+        qInfo().noquote() << "  Path:    \"" << (pathResult ? *pathResult : "(not found)") << "\"";
+
+        qInfo();
     }
-
-    // Test error case (invalid index)
     const int invalidIndex = 100;
     qDebug() << "\n=== Error Case (invalid index:" << invalidIndex << ") ===";
     const auto invalidPointer = editionIsbn_pointer(doc, invalidIndex);
