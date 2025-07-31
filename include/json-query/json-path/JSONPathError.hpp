@@ -1,10 +1,12 @@
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-
 #pragma once
 
-#include <QtCore/QString>
 #include <cstdint>
+#include <string>
 #include <string_view>
+
+#include <QtCore/QString>
+
+#include "../utils/detail/ErrorMap.hpp"
 
 namespace json_query::json_path
 {
@@ -36,93 +38,65 @@ enum class EvalError : std::uint8_t
     TypeMismatchObject, // expected object but found other when key access
 };
 
+// JSON Path parse error messages
+inline constexpr auto json_path_parse_errors = utils::detail::ErrorMap<ParseError, 12>{
+    {ParseError::BlankInKey, DEFINE_ERROR_STRING("Blank key in member name")},
+    {ParseError::EmptySegment, DEFINE_ERROR_STRING("Empty segment in path")},
+    {ParseError::InvalidIdentifier, DEFINE_ERROR_STRING("Invalid identifier in path")},
+    {ParseError::InvalidIndex, DEFINE_ERROR_STRING("Invalid array index")},
+    {ParseError::InvalidSlice, DEFINE_ERROR_STRING("Invalid array slice")},
+    {ParseError::MissingRoot, DEFINE_ERROR_STRING("Missing root identifier ($) at start of path")},
+    {ParseError::TrailingDot, DEFINE_ERROR_STRING("Trailing dot in path")},
+    {ParseError::TrailingRecursive, DEFINE_ERROR_STRING("Trailing recursive descent (..) in path")},
+    {ParseError::UnexpectedAfterRoot, DEFINE_ERROR_STRING("Unexpected characters after root identifier")},
+    {ParseError::UnmatchedBracket, DEFINE_ERROR_STRING("Unmatched bracket in path")},
+    {ParseError::UnmatchedQuote, DEFINE_ERROR_STRING("Unmatched quote in string")},
+    {ParseError::UnsupportedFilter, DEFINE_ERROR_STRING("Unsupported filter expression")}};
+
+// JSON Path evaluation error messages
+inline constexpr auto json_path_eval_errors = utils::detail::ErrorMap<EvalError, 5>{
+    {EvalError::IndexOutOfRange, DEFINE_ERROR_STRING("Array index out of range")},
+    {EvalError::InvalidSlice, DEFINE_ERROR_STRING("Invalid array slice parameters")},
+    {EvalError::KeyNotFound, DEFINE_ERROR_STRING("Key not found in object")},
+    {EvalError::TypeMismatchArray, DEFINE_ERROR_STRING("Type mismatch: expected array")},
+    {EvalError::TypeMismatchObject, DEFINE_ERROR_STRING("Type mismatch: expected object")}};
+
 /**
  * @brief Convert a ParseError to a human-readable string view
  *
  * @param e The parse error to convert
- * @return QStringView A descriptive error message for the parse error
+ * @return std::string_view A descriptive error message for the parse error
  */
-[[nodiscard]] inline QStringView toQStringView(ParseError e) noexcept
+[[nodiscard]] constexpr std::string_view to_std_sv(ParseError e) noexcept
 {
-    using enum ParseError;
-    switch (e)
-    {
-    case BlankInKey:
-        return QStringLiteral(
-            "Syntax error: Blank or invalid character in member name (use quotes for names with special characters)");
-    case EmptySegment:
-        return QStringLiteral(
-            "Syntax error: Empty segment between dots (consecutive '..' or segment with no identifier)");
-    case InvalidIdentifier:
-        return QStringLiteral(
-            "Syntax error: Invalid member name identifier (must be a valid JSON string or JavaScript identifier)");
-    case InvalidIndex:
-        return QStringLiteral(
-            "Syntax error: Invalid index-selector syntax (expected non-negative integer or comma-separated list)");
-    case InvalidSlice:
-        return QStringLiteral(
-            "Syntax error: Invalid slice-selector syntax (expected [start:end:step] with optional values)");
-    case MissingRoot:
-        return QStringLiteral(
-            "Syntax error: JSONPath must start with root identifier '$' (document root) or '@' (current node)");
-    case TrailingDot:
-        return QStringLiteral("Syntax error: Trailing '.' in segment (must be followed by a member name or wildcard)");
-    case TrailingRecursive:
-        return QStringLiteral(
-            "Syntax error: Trailing '..' in descendant segment (must be followed by a member name or selector)");
-    case UnexpectedAfterRoot:
-        return QStringLiteral("Syntax error: Root identifier must be followed by '.' (dot) or '[' (bracket)");
-    case UnmatchedBracket:
-        return QStringLiteral("Syntax error: Unmatched '[' in selector (missing closing ']')");
-    case UnmatchedQuote:
-        return QStringLiteral("Syntax error: Unmatched quote in string literal (missing closing quote)");
-    case UnsupportedFilter:
-        return QStringLiteral("Syntax error: Unsupported or invalid filter-selector expression (check filter syntax)");
-    default:
-        return QStringLiteral("Unknown parse error");
-    }
+    return json_path_parse_errors.get_std_sv(e);
 }
 
 /**
- * @brief Convert a ParseError to a human-readable QString
+ * @brief Convert a ParseError to a QStringView
  *
  * @param e The parse error to convert
- * @return QString A descriptive error message for the parse error
+ * @return QStringView A view of the error message
  */
-[[nodiscard]] inline QString toQString(ParseError e) noexcept { return QString(toQStringView(e)); }
+[[nodiscard]] constexpr QStringView to_qt_sv(ParseError e) noexcept { return json_path_parse_errors.get_qt_sv(e); }
 
 /**
  * @brief Convert an EvalError to a human-readable string view
  *
  * @param e The evaluation error to convert
- * @return QStringView A descriptive error message for the evaluation error
+ * @return std::string_view A descriptive error message for the evaluation error
  */
-[[nodiscard]] inline QStringView toQStringView(EvalError e) noexcept
+[[nodiscard]] constexpr std::string_view to_std_sv(EvalError e) noexcept
 {
-    using enum EvalError;
-    switch (e)
-    {
-    case IndexOutOfRange:
-        return QStringLiteral("Range error: Array index exceeds the bounds of the target array");
-    case InvalidSlice:
-        return QStringLiteral("Range error: Invalid slice parameters (start, end, or step values are invalid)");
-    case KeyNotFound:
-        return QStringLiteral("Key error: The specified property does not exist in the target object");
-    case TypeMismatchArray:
-        return QStringLiteral("Type error: Cannot use array index or slice on non-array value (expected JSON array)");
-    case TypeMismatchObject:
-        return QStringLiteral("Type error: Cannot access property on non-object value (expected JSON object)");
-    default:
-        return QStringLiteral("Unknown evaluation error");
-    }
+    return json_path_eval_errors.get_std_sv(e);
 }
 
 /**
- * @brief Convert an EvalError to a human-readable QString
+ * @brief Convert an EvalError to a QStringView
  *
  * @param e The evaluation error to convert
- * @return QString A descriptive error message for the evaluation error
+ * @return QStringView A view of the error message
  */
-[[nodiscard]] inline QString toQString(EvalError e) noexcept { return QString(toQStringView(e)); }
+[[nodiscard]] constexpr QStringView to_qt_sv(EvalError e) noexcept { return json_path_eval_errors.get_qt_sv(e); }
 
 } // namespace json_query::json_path

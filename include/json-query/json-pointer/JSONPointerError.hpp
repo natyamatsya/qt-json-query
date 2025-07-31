@@ -48,10 +48,10 @@ inline constexpr auto json_pointer_eval_errors = utils::detail::ErrorMap<EvalErr
     {EvalError::TypeMismatchObject, DEFINE_ERROR_STRING("Type mismatch: expected object")}};
 
 /**
- * @brief Convert a ParseError to a human-readable string
+ * @brief Convert a ParseError to a human-readable string view
  *
  * @param e The parse error to convert
- * @return std::string A descriptive error message for the parse error
+ * @return std::string_view A descriptive error message for the parse error
  */
 [[nodiscard]] constexpr std::string_view to_std_sv(ParseError e) noexcept
 {
@@ -67,10 +67,10 @@ inline constexpr auto json_pointer_eval_errors = utils::detail::ErrorMap<EvalErr
 [[nodiscard]] constexpr QStringView to_qt_sv(ParseError e) noexcept { return json_pointer_parse_errors.get_qt_sv(e); }
 
 /**
- * @brief Convert an EvalError to a human-readable string
+ * @brief Convert an EvalError to a human-readable string view
  *
  * @param e The evaluation error to convert
- * @return std::string A descriptive error message for the evaluation error
+ * @return std::string_view A descriptive error message for the evaluation error
  */
 [[nodiscard]] constexpr std::string_view to_std_sv(EvalError e) noexcept
 {

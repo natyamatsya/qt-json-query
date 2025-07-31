@@ -29,7 +29,28 @@ enum class ConvertError : std::uint8_t
  * @param e The conversion error to convert
  * @return QStringView A view of a descriptive error message
  */
-inline QStringView toQStringView(ConvertError e) noexcept
+constexpr std::string_view to_std_sv(ConvertError e) noexcept
+{
+    using enum ConvertError;
+    switch (e)
+    {
+    case TypeMismatch:
+        return "type mismatch during conversion";
+    case NumericOutOfRange:
+        return "numeric conversion out of range";
+    case NumericNotIntegral:
+        return "expected integral number";
+    default:
+        return "unknown conversion error";
+    }
+}
+/**
+ * @brief Convert a ConvertError to a human-readable QStringView
+ *
+ * @param e The conversion error to convert
+ * @return QStringView A view of a descriptive error message
+ */
+constexpr QStringView to_qt_sv(ConvertError e) noexcept
 {
     using enum ConvertError;
     switch (e)
@@ -44,16 +65,6 @@ inline QStringView toQStringView(ConvertError e) noexcept
         return QStringLiteral("unknown conversion error");
     }
 }
-
-/**
- * @brief Convert a ConvertError to a human-readable QString
- *
- * @param e The conversion error to convert
- * @return QString A descriptive error message for the conversion error
- */
-inline QString toQString(ConvertError e) noexcept { return QString(toQStringView(e)); }
-
-} // namespace json_query
 
 // -----------------------------------------------------------------------------
 
@@ -176,6 +187,32 @@ struct QueryError
 };
 
 static_assert(sizeof(QueryError) == 2, "QueryError should remain compact (2 bytes).");
+/**
+ * @brief Convert a QueryError to a human-readable string view
+ *
+ * @param e The query error to convert
+ * @return std::string_view A descriptive error message for the evaluation error
+ */
+[[nodiscard]] constexpr std::string_view to_std_sv(QueryError e) noexcept
+{
+    using enum ErrorDomain;
+    switch (e.domain)
+    {
+    case PathParse:
+        return json_path::to_std_sv(static_cast<json_path::ParseError>(e.code));
+    case PointerParse:
+        return json_pointer::to_std_sv(static_cast<json_pointer::ParseError>(e.code));
+    case PathEval:
+        return json_path::to_std_sv(static_cast<json_path::EvalError>(e.code));
+    case PointerEval:
+        return json_pointer::to_std_sv(static_cast<json_pointer::EvalError>(e.code));
+    case Convert:
+        return to_std_sv(static_cast<ConvertError>(e.code));
+    default:
+        break;
+    }
+    return "unknown error domain";
+}
 
 /**
  * @brief Convert a QueryError to a human-readable QStringView
@@ -183,33 +220,23 @@ static_assert(sizeof(QueryError) == 2, "QueryError should remain compact (2 byte
  * @param e The query error to convert
  * @return QStringView A view of a descriptive error message
  */
-[[nodiscard]] inline QStringView toQStringView(QueryError e) noexcept
+[[nodiscard]] constexpr QStringView to_qt_sv(QueryError e) noexcept
 {
     using enum ErrorDomain;
     switch (e.domain)
     {
     case PathParse:
-        return json_path::toQStringView(static_cast<json_path::ParseError>(e.code));
+        return json_path::to_qt_sv(static_cast<json_path::ParseError>(e.code));
     case PointerParse:
-        return json_pointer::toQStringView(static_cast<json_pointer::ParseError>(e.code));
+        return json_pointer::to_qt_sv(static_cast<json_pointer::ParseError>(e.code));
     case PathEval:
-        return json_path::toQStringView(static_cast<json_path::EvalError>(e.code));
+        return json_path::to_qt_sv(static_cast<json_path::EvalError>(e.code));
     case PointerEval:
-        return json_pointer::toQStringView(static_cast<json_pointer::EvalError>(e.code));
+        return json_pointer::to_qt_sv(static_cast<json_pointer::EvalError>(e.code));
     case Convert:
-        return toQStringView(static_cast<ConvertError>(e.code));
+        return to_qt_sv(static_cast<ConvertError>(e.code));
     default:
         break;
     }
     return QStringLiteral("unknown error domain");
 }
-
-/**
- * @brief Convert a QueryError to a human-readable QString
- *
- * @param e The query error to convert
- * @return QString A descriptive error message for the query error
- */
-[[nodiscard]] inline QString toQString(QueryError e) noexcept { return QString(toQStringView(e)); }
-
-} // namespace json_query
