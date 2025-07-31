@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 #pragma once
 
-#include "json-path/JSONPathError.hpp"
-#include "json-pointer/JSONPointerError.hpp"
+#include "../json-path/JSONPathError.hpp"
+#include "../json-pointer/JSONPointerError.hpp"
 
 #include <QtCore/QString>
 #include <QtCore/QStringView>

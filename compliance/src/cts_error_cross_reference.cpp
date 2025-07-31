@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <iostream>
-#include <fstream>
-#include <json-query/json-path/JSONPath.hpp>
-#include <json-query/json-path/JSONPathEvalError.hpp>
-#include <json-query/json-path/JSONPathCompile.hpp>
+#include "json-query/JSONQuery"
+
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QJsonParseError>
+
+#include <iostream>
+#include <fstream>
 
 using namespace json_query;
 
@@ -30,8 +30,8 @@ void analyzeTestCase(const TestCase& testCase)
     auto pathResult = JSONPath::create(testCase.selector);
     if (!pathResult)
     {
-        std::cout << "✅ COMPILATION ERROR: " << json_path::toString(pathResult.error()).data()
-                  << " (code: " << static_cast<int>(pathResult.error()) << ")" << std::endl;
+        std::cout << "✅ COMPILATION ERROR: " << toQStringView(pathResult.error()).toString().toStdString()
+                  << " (code: " << static_cast<int>(pathResult.error().code) << ")" << std::endl;
         if (!testCase.invalid_selector)
             std::cout << "⚠️  WARNING: Expected valid selector but got compilation error!" << std::endl;
         return;
@@ -49,8 +49,8 @@ void analyzeTestCase(const TestCase& testCase)
         auto evalResult{pathResult->evaluateAll(testCase.document)};
         if (!evalResult)
         {
-            std::cout << "❌ EVALUATION ERROR: " << json_path::to_string(evalResult.error()).data()
-                      << " (code: " << static_cast<int>(evalResult.error()) << ")" << std::endl;
+            std::cout << "❌ EVALUATION ERROR: " << toQStringView(evalResult.error()).toString().toStdString()
+                      << " (code: " << static_cast<int>(evalResult.error().code) << ")" << std::endl;
         }
         else
         {

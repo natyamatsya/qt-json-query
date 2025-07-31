@@ -26,9 +26,9 @@
 #include <QtDebug>
 #include <QVector>
 
-#include "json-query/json-pointer/JSONPointer.hpp"
+#include "json-query/JSONQuery"
 
-using json_query::JSONPointer;
+using json_query::json_pointer::JSONPointer;
 
 namespace
 {

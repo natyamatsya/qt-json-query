@@ -5,9 +5,14 @@
 #include <vector>
 #include <iomanip>
 #include <unordered_map>
+#include "json-query/JSONQuery"
+
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+
+using namespace json_query;
+using namespace json_query::json_path;
 #include <QJsonValue>
 #include <QString>
 

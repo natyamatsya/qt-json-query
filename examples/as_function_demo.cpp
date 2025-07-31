@@ -1,10 +1,12 @@
-#include "json-query/utils/JSONValueUtils.hpp"
+#include "json-query/JSONQuery"
 
 #include <QCoreApplication>
 #include <QDebug>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+
+using namespace json_query;
 
 // Import the as<T> function and error utilities
 using json_query::as;

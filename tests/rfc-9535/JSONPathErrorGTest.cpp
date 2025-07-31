@@ -3,9 +3,10 @@
 // JSONPathErrorGTest.cpp - Tests adhering to RFC 9535 error semantics
 // Ensures the library rejects invalid JSONPath constructs per spec.
 // -----------------------------------------------------------------------------
-#include <gtest/gtest.h>
-#include "json-query/json-path/JSONPath.hpp"
+
+#include "json-query/JSONQuery"
 #include "framework/JSONMatchersGTest.hpp"
+#include <gtest/gtest.h>
 
 using json_query::JSONPath;
 using json_query::json_path::ParseError;

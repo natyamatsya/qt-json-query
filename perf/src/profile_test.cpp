@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "json-query/JSONQuery"
+
 #include <chrono>
 #include <iostream>
+
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+
 #include <gperftools/profiler.h>
-#include "json-query/json-path/JSONPath.hpp"
 
 using namespace json_query;
 using namespace std::chrono;

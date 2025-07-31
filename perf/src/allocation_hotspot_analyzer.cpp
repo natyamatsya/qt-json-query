@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "json-query/JSONQuery"
+
 #include <iostream>
 #include <chrono>
 #include <vector>
@@ -10,8 +12,6 @@
 #include <QJsonArray>
 #include <QJsonValue>
 #include <QString>
-
-#include "json-query/json-path/JSONPath.hpp"
 
 using namespace json_query;
 

@@ -9,6 +9,9 @@
 #include <iostream>
 #include <chrono>
 
+using namespace json_query;
+using namespace json_query::json_path;
+
 // Helper function to validate JSON document
 std::expected<QJsonDocument, QString> validateJsonDocument(const QString& jsonStr)
 {
@@ -43,10 +46,7 @@ std::expected<JSONPath, QString> createOptimizedPath(const QString& validPath)
 
     auto result{JSONPath::create(validPath)};
     if (!result)
-    {
-        return std::unexpected(
-            QString("JSONPath creation failed: error code %1").arg(static_cast<int>(result.error())));
-    }
+        return std::unexpected(QString("JSONPath creation failed: %1").arg(toQStringView(result.error())));
 
     return std::move(*result);
 }
@@ -58,7 +58,7 @@ std::expected<QJsonArray, QString> executeEvaluation(const JSONPath& path, const
 
     auto result{path.evaluateAll(doc)};
     if (!result)
-        return std::unexpected(QString("Evaluation failed: error code %1").arg(static_cast<int>(result.error())));
+        return std::unexpected(QString("Evaluation failed: %1").arg(toQStringView(result.error())));
 
     return *result;
 }

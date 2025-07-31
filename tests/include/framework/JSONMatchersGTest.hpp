@@ -118,7 +118,7 @@ inline QJsonArray evalArray(QStringView path, const QJsonDocument& doc)
 // Transition from throw-based to std::expected tests.  Provide helpers that
 // check for specific json_query::Error codes instead of exceptions.
 
-using EvalResult = std::expected<QJsonValue, Error>;
+using EvalResult = std::expected<QJsonValue, json_query::json_path::ParseError>;
 
 // Evaluate path and propagate compile-time errors via std::expected.  Runtime
 // evaluation errors are also propagated via std::expected.
@@ -126,24 +126,16 @@ inline std::expected<QJsonValue, json_query::json_path::ParseError> evalExp(QStr
 {
     auto compiled{JSONPath::create(path)};
     if (!compiled)
-        return std::unexpected(compiled.error());
+    {
+        // Convert QueryError to ParseError
+        return std::unexpected(static_cast<json_query::json_path::ParseError>(compiled.error().code));
+    }
 
     auto result{compiled->evaluate(doc)};
     if (!result)
     {
-        // For now, we need to convert EvalError to Error since the return type expects Error
-        // In the future, we might want to have a unified error type or return std::variant
-        // For now, map evaluation errors to the closest compilation error equivalent
-        switch (result.error())
-        {
-        case json_query::json_path::EvalError::TypeMismatchObject:
-        case json_query::json_path::EvalError::TypeMismatchArray:
-        case json_query::json_path::EvalError::KeyNotFound:
-        case json_query::json_path::EvalError::IndexOutOfRange:
-            return std::unexpected(json_query::json_path::ParseError::UnsupportedFilter);
-        default:
-            return std::unexpected(json_query::json_path::ParseError::UnsupportedFilter);
-        }
+        // Convert QueryError to ParseError
+        return std::unexpected(static_cast<json_query::json_path::ParseError>(result.error().code));
     }
     return *result;
 }

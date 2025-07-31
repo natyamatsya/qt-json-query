@@ -23,6 +23,10 @@
 #include <type_traits>
 #include <variant>
 
+using json_query::JSONPath;
+using json_query::JSONPointer;
+using json_query::QueryError;
+
 // Custom error type for JSON value conversion
 template <typename T>
 struct ConversionError

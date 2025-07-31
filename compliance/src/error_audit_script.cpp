@@ -37,16 +37,16 @@ void testErrorScenario(const QString& description, const QString& jsonPath, cons
     auto pathResult = JSONPath::create(jsonPath);
     if (!pathResult)
     {
-        std::cout << "Compilation Error: " << json_path::toString(pathResult.error()).data()
-                  << " (code: " << static_cast<int>(pathResult.error()) << ")" << std::endl;
+        std::cout << "Compilation Error: " << json_query::toQStringView(pathResult.error()).data()
+                  << " (code: " << static_cast<int>(pathResult.error().code) << ")" << std::endl;
         return;
     }
 
     auto evalResult{pathResult->evaluateAll(document)};
     if (!evalResult)
     {
-        std::cout << "Evaluation Error: " << json_path::to_string(evalResult.error()).data()
-                  << " (code: " << static_cast<int>(evalResult.error()) << ")" << std::endl;
+        std::cout << "Evaluation Error: " << json_query::toQStringView(evalResult.error()).data()
+                  << " (code: " << static_cast<int>(evalResult.error().code) << ")" << std::endl;
     }
     else
     {

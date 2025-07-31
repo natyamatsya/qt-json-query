@@ -60,7 +60,7 @@ bool evaluatePointer(QStringView path, const QJsonDocument& doc, QStringView des
     if (!pointer)
     {
         qWarning() << "Failed to create pointer:" << path << "-" << description;
-        qWarning() << "  Error:" << toQStringView(*pointer.error());
+        qWarning() << "  Error:" << toQStringView(pointer.error());
         return false;
     }
 

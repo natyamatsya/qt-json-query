@@ -263,7 +263,7 @@ class CacheAnalysisTests
         analyzer_.startAnalysis(testName.toStdString());
 
         // Perform the JSONPath query using the factory method
-        auto                      jsonPathResult{json_query::JSONPath::create(pattern)};
+        auto                      jsonPathResult{json_query::json_path::JSONPath::create(pattern)};
         std::optional<QJsonArray> result;
 
         if (jsonPathResult)
