@@ -2,7 +2,11 @@
 #pragma once
 
 #include <QtCore/QString>
+#include <cstdint>
+#include <string>
 #include <string_view>
+
+#include "../utils/detail/ErrorMap.hpp"
 
 namespace json_query::json_pointer
 {
@@ -26,120 +30,59 @@ enum class EvalError : std::uint8_t
     TypeMismatchObject,
 };
 
+// JSON Pointer parse error messages
+inline constexpr auto json_pointer_parse_errors = utils::detail::ErrorMap<ParseError, 5>{
+    {ParseError::ArrayIndexOverflow, DEFINE_ERROR_STRING("Array index is too large to be represented")},
+    {ParseError::EmptyNonTerminalToken, DEFINE_ERROR_STRING("Non-terminal token in JSON Pointer cannot be empty")},
+    {ParseError::InvalidEscapeSequence,
+     DEFINE_ERROR_STRING("Invalid escape sequence in JSON Pointer (only ~0 and ~1 are valid)")},
+    {ParseError::MissingLeadingSlash, DEFINE_ERROR_STRING("JSON Pointer must start with a leading slash")},
+    {ParseError::NonDecimalArrayIndex,
+     DEFINE_ERROR_STRING("Array index contains non-decimal characters or leading zeros")}};
+
+// JSON Pointer evaluation error messages
+inline constexpr auto json_pointer_eval_errors = utils::detail::ErrorMap<EvalError, 4>{
+    {EvalError::IndexOutOfRange, DEFINE_ERROR_STRING("Array index out of range")},
+    {EvalError::KeyNotFound, DEFINE_ERROR_STRING("Key not found in object")},
+    {EvalError::TypeMismatchArray, DEFINE_ERROR_STRING("Type mismatch: expected array")},
+    {EvalError::TypeMismatchObject, DEFINE_ERROR_STRING("Type mismatch: expected object")}};
+
 /**
  * @brief Convert a ParseError to a human-readable string
  *
- * @param e The evaluation error to convert
- * @return std::string_view A descriptive error message for the evaluation error
+ * @param e The parse error to convert
+ * @return std::string A descriptive error message for the parse error
  */
-[[nodiscard]] inline constexpr std::string_view to_string(ParseError e) noexcept
+[[nodiscard]] constexpr std::string_view to_std_sv(ParseError e) noexcept
 {
-    using enum ParseError;
-    switch (e)
-    {
-    case ArrayIndexOverflow:
-        return "Array index is too large to be represented";
-    case EmptyNonTerminalToken:
-        return "Non-terminal token in JSON Pointer cannot be empty";
-    case InvalidEscapeSequence:
-        return "Invalid escape sequence in JSON Pointer (only ~0 and ~1 are valid)";
-    case MissingLeadingSlash:
-        return "JSON Pointer must start with a leading slash";
-    case NonDecimalArrayIndex:
-        return "Array index contains non-decimal characters or leading zeros";
-    default:
-        return "Unknown parse error";
-    }
+    return json_pointer_parse_errors.get_std_sv(e);
 }
 
 /**
- * @brief Convert a ParseError to a human-readable QStringView
+ * @brief Convert a ParseError to a QStringView
  *
  * @param e The parse error to convert
- * @return QStringView A view of a descriptive error message
+ * @return QStringView A view of the error message
  */
-[[nodiscard]] inline QStringView toQStringView(ParseError e) noexcept
-{
-    using enum ParseError;
-    switch (e)
-    {
-    case ArrayIndexOverflow:
-        return QStringLiteral("Array index is too large to be represented");
-    case EmptyNonTerminalToken:
-        return QStringLiteral("Non-terminal token in JSON Pointer cannot be empty");
-    case InvalidEscapeSequence:
-        return QStringLiteral("Invalid escape sequence in JSON Pointer (only ~0 and ~1 are valid)");
-    case MissingLeadingSlash:
-        return QStringLiteral("JSON Pointer must start with a leading slash");
-    case NonDecimalArrayIndex:
-        return QStringLiteral("Array index contains non-decimal characters or leading zeros");
-    default:
-        return QStringLiteral("Unknown parse error");
-    }
-}
-
-/**
- * @brief Convert a ParseError to a human-readable QString
- *
- * @param e The parse error to convert
- * @return QString A descriptive error message for the parse error
- */
-[[nodiscard]] inline QString toQString(ParseError e) noexcept { return QString(toQStringView(e)); }
+[[nodiscard]] constexpr QStringView to_qt_sv(ParseError e) noexcept { return json_pointer_parse_errors.get_qt_sv(e); }
 
 /**
  * @brief Convert an EvalError to a human-readable string
  *
  * @param e The evaluation error to convert
- * @return std::string_view A descriptive error message for the evaluation error
+ * @return std::string A descriptive error message for the evaluation error
  */
-[[nodiscard]] inline constexpr std::string_view to_string(EvalError e) noexcept
+[[nodiscard]] constexpr std::string_view to_std_sv(EvalError e) noexcept
 {
-    using enum EvalError;
-    switch (e)
-    {
-    case IndexOutOfRange:
-        return "Index out of range: Array index exceeds the bounds of the target array";
-    case KeyNotFound:
-        return "Key not found: The specified property does not exist in the target object";
-    case TypeMismatchArray:
-        return "Type mismatch: Cannot use array index on non-array value (expected JSON array)";
-    case TypeMismatchObject:
-        return "Type mismatch: Cannot access property on non-object value (expected JSON object)";
-    default:
-        return "Unknown evaluation error";
-    }
+    return json_pointer_eval_errors.get_std_sv(e);
 }
 
 /**
- * @brief Convert an EvalError to a human-readable QStringView
+ * @brief Convert an EvalError to a QStringView
  *
  * @param e The evaluation error to convert
- * @return QStringView A view of a descriptive error message
+ * @return QStringView A view of the error message
  */
-[[nodiscard]] inline QStringView toQStringView(EvalError e) noexcept
-{
-    using enum EvalError;
-    switch (e)
-    {
-    case IndexOutOfRange:
-        return QStringLiteral("Index out of range: Array index exceeds the bounds of the target array");
-    case KeyNotFound:
-        return QStringLiteral("Key not found: The specified property does not exist in the target object");
-    case TypeMismatchArray:
-        return QStringLiteral("Type mismatch: Cannot use array index on non-array value (expected JSON array)");
-    case TypeMismatchObject:
-        return QStringLiteral("Type mismatch: Cannot access property on non-object value (expected JSON object)");
-    default:
-        return QStringLiteral("Unknown evaluation error");
-    }
-}
-
-/**
- * @brief Convert an EvalError to a human-readable QString
- *
- * @param e The evaluation error to convert
- * @return QString A descriptive error message for the evaluation error
- */
-[[nodiscard]] inline QString toQString(EvalError e) noexcept { return QString(toQStringView(e)); }
+[[nodiscard]] constexpr QStringView to_qt_sv(EvalError e) noexcept { return json_pointer_eval_errors.get_qt_sv(e); }
 
 } // namespace json_query::json_pointer
