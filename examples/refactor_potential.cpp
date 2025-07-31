@@ -162,37 +162,20 @@ static QStringList titlesAbovePrice_plain(const QJsonDocument& doc, double thres
 
 [[nodiscard]] static std::optional<QString> editionIsbn_path(const QJsonDocument& doc, int index)
 {
-    auto path = JSONPath::create(QString(u"$.inventory[%1].details.edition.isbn").arg(index));
-    if (!path)
-    {
-        qWarning() << "Failed to create JSONPath";
-        return std::nullopt;
-    }
+    auto create_path = [](int idx)
+    { return JSONPath::create(QString(u"$.inventory[%1].details.edition.isbn").arg(idx)); };
 
-    auto evalResult = path->evaluate(doc);
-    if (!evalResult)
-    {
-        qWarning() << "Failed to evaluate JSONPath";
-        return std::nullopt;
-    }
+    auto evaluate         = [&doc](const JSONPath& path) { return path.evaluate(doc); };
+    auto try_select_first = [](const QJsonArray& array) -> QJsonValue
+    { return array.isEmpty() ? QJsonValue::Undefined : array.first(); };
+    auto to_optional = [](const QString& s) -> std::optional<QString> { return s; };
 
-    // Handle array result (JSONPath can return arrays)
-    auto arrResult = as<QJsonArray>(*evalResult);
-    if (arrResult)
-    {
-        if (arrResult->isEmpty())
-        {
-            qWarning() << "Empty array result from JSONPath";
-            return std::nullopt;
-        }
-        return as<QString>(arrResult->first())
-            .transform([](const QString& s) { return std::optional<QString>(s); })
-            .value_or(std::nullopt);
-    }
-
-    // Handle single value result
-    return as<QString>(*evalResult)
-        .transform([](const QString& s) { return std::optional<QString>(s); })
+    return create_path(index)
+        .and_then(evaluate)
+        .and_then(as<QJsonArray>)
+        .transform(try_select_first)
+        .and_then(as<QString>)
+        .transform(to_optional)
         .value_or(std::nullopt);
 }
 
