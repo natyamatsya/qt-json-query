@@ -70,6 +70,8 @@ std::expected<QJsonArray, QString> processJsonPathMonadic(const QString& jsonStr
     std::cout << "JSON: " << jsonStr.left(50).toStdString() << (jsonStr.length() > 50 ? "..." : "") << "\n";
     std::cout << "Path: " << pathStr.toStdString() << "\n";
 
+    using json_query::JSONPath;
+
     // C++23 Monadic Chain - No manual error checking needed!
     return validateJsonDocument(jsonStr)
         .and_then(

@@ -29,7 +29,7 @@ void evaluateAndPrint(const JSONPointer& pointer, const QJsonDocument& doc, QStr
 
     if (!result)
     {
-        qDebug() << "  Error:" << toQStringView(*result.error());
+        qDebug() << "  Error:" << toQStringView(result.error());
         return;
     }
 

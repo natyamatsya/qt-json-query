@@ -14,7 +14,7 @@
 #include <QJsonValue>
 #include <QString>
 
-#include "json-query/json-path/JSONPath.hpp"
+#include "json-query/JSONQuery"
 
 using namespace json_query;
 

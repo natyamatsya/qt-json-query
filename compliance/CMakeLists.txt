@@ -25,13 +25,10 @@ if(TARGET function_ref_interface)
 endif()
 
 # RFC 9535 terminology audit script for terminology compliance analysis
-add_executable(rfc9535_terminology_audit src/rfc9535_terminology_audit.cpp)
-target_link_libraries(rfc9535_terminology_audit PRIVATE json_query Qt6::Core)
-target_include_directories(
-  rfc9535_terminology_audit PRIVATE ${PROJECT_SOURCE_DIR}/include
-                                    ${PROJECT_SOURCE_DIR}/include/json-query)
-target_compile_features(rfc9535_terminology_audit PRIVATE cxx_std_23)
-if(TARGET function_ref_interface)
-  target_link_libraries(rfc9535_terminology_audit
-                        PRIVATE function_ref_interface)
-endif()
+# add_executable(rfc9535_terminology_audit src/rfc9535_terminology_audit.cpp)
+# target_link_libraries(rfc9535_terminology_audit PRIVATE json_query Qt6::Core)
+# target_include_directories( rfc9535_terminology_audit PRIVATE
+# ${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/include/json-query)
+# target_co if(TARGET function_ref_interface)
+# target_link_libraries(rfc9535_terminology_audit PRIVATE
+# function_ref_interface) endif()

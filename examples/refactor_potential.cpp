@@ -4,6 +4,9 @@
 // Compares plain Qt JSON APIs with JSONPath-based approach provided by the library.
 // Build target: refactor_potential (added in CMakeLists.txt)
 
+#include "json-query/JSONQuery"
+
+#include <expected>
 #include <QCoreApplication>
 #include <QDebug>
 #include <QDir>
@@ -12,20 +15,13 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonValue>
+#include <QRandomGenerator>
 #include <QString>
 #include <QStringList>
 #include <QTextStream>
-#include <QRandomGenerator>
+
 #include <type_traits>
-#include <expected>
 #include <variant>
-
-#include "json-query/json-path/JSONPath.hpp"
-#include "json-query/json-pointer/JSONPointer.hpp"
-
-// Import the main JSONPath and JSONPointer classes
-using json_query::JSONPath;
-using json_query::JSONPointer;
 
 // Custom error type for JSON value conversion
 template <typename T>
@@ -45,23 +41,17 @@ template <>
 std::expected<QString, ConversionError<QString>> as<QString>(const QJsonValue& value)
 {
     if (value.isString())
-    {
         return value.toString();
-    }
-    else if (value.isDouble())
-    {
+    if (value.isDouble())
         return QString::number(value.toDouble());
-    }
-    else if (value.isBool())
-    {
+    if (value.isBool())
         return value.toBool() ? QStringLiteral("true") : QStringLiteral("false");
-    }
-    else if (value.isNull() || value.isUndefined())
+    if (value.isNull() || value.isUndefined())
     {
         return std::unexpected(
             ConversionError<QString>{"Cannot convert null/undefined to QString", QJsonValue::String, value.type()});
     }
-    else if (value.isArray() || value.isObject())
+    if (value.isArray() || value.isObject())
     {
         QJsonDocument doc = value.isArray() ? QJsonDocument(value.toArray()) : QJsonDocument(value.toObject());
         return doc.toJson(QJsonDocument::Compact);
