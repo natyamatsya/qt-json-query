@@ -68,9 +68,6 @@ constexpr QStringView to_qt_sv(ConvertError e) noexcept
 
 // -----------------------------------------------------------------------------
 
-namespace json_query
-{
-
 enum class ErrorDomain : std::uint8_t
 {
     PathParse,    // JSONPath parse errors
@@ -240,3 +237,5 @@ static_assert(sizeof(QueryError) == 2, "QueryError should remain compact (2 byte
     }
     return QStringLiteral("unknown error domain");
 }
+
+} // namespace json_query
