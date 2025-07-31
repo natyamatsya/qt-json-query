@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "json-query/JSONQuery"
+
 // benchmark.cpp - Google Benchmark version
 #include <benchmark/benchmark.h>
 #include <QJsonDocument>
@@ -8,13 +10,11 @@
 #include <QJsonArray>
 #include <QStringView>
 
-#include "json-query/json-path/JSONPath.hpp"
-#include "json-query/json-pointer/JSONPointer.hpp"
-
 #include <utility>
 
 using json_query::JSONPath;
 using json_query::JSONPointer;
+
 using namespace Qt::StringLiterals;
 
 // Helper to build a moderately large test document for benchmarking
