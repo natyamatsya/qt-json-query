@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "json-query/json-path/JSONPath.hpp"
+#include "json-query/JSONQuery"
 
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -8,8 +8,6 @@
 #include <QDebug>
 #include <iostream>
 #include <chrono>
-
-using json_query::JSONPath;
 
 // Helper function to validate JSON document
 std::expected<QJsonDocument, QString> validateJsonDocument(const QString& jsonStr)

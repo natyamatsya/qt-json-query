@@ -617,7 +617,6 @@ std::optional<json_query::json_path::Token> parseAbsolutePath(const QString&    
 
     // Only accept simple absolute path references like $, $.foo, $.*.a, etc.
     // Not complex expressions or comparisons
-    using json_query::JSONPath;
 
     // Try to create the JSONPath - if it fails, the pattern is invalid
     auto testPath{JSONPath::create(s)};

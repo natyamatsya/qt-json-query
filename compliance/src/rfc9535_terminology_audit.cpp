@@ -1,12 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "json-query/JSONQuery"
 #include <iostream>
-#include <json-query/json-path/JSONPath.hpp>
-#include <json-query/json-path/JSONPathEvalError.hpp>
-#include <json-query/json-path/JSONPathCompile.hpp>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QJsonArray>
 
 using namespace json_query;
 

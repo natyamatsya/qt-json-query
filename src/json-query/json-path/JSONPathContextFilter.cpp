@@ -128,14 +128,14 @@ struct ContextBuilder
 };
 
 // Helper: Evaluate absolute path against root with proper error handling
-std::expected<QJsonValue, EvalError>
+std::expected<QJsonValue, QueryError>
 evaluateAbsolutePathSafe(const QString& path, const QJsonValue& root, const QJsonValue& node)
 {
     if (path == "$")
         return root;
 
     // Use monadic error handling instead of try/catch
-    auto absolutePath{json_query::JSONPath::create(path)};
+    auto absolutePath{JSONPath::create(path)};
     if (!absolutePath)
     {
         qCDebug(jsonPathLog) << "Failed to create JSONPath for:" << path;
@@ -173,7 +173,7 @@ QJsonValue evaluateAbsolutePath(const QString& path, const QJsonValue& root, con
     if (result)
         return *result;
 
-    qCDebug(jsonPathLog) << "Absolute path evaluation failed:" << path << "error:" << to_string(result.error());
+    qCDebug(jsonPathLog) << "Absolute path evaluation failed:" << path << "error:" << toQStringView(result.error());
     return QJsonValue{};
 }
 
@@ -314,7 +314,6 @@ QJsonValue evaluateContextFunction(const QString& funcExpr, const QJsonValue& co
         if (args.startsWith("$"))
         {
             // This is a JSONPath expression that needs to be evaluated against the root
-            using json_query::JSONPath;
             auto path{JSONPath::create(args)};
             if (path)
             {
@@ -444,7 +443,6 @@ SideEvaluationResult evaluateExpressionSide(const QString& side, const QJsonValu
         // Check if this represents "nothing" (empty results in value)
         else if (side.startsWith("value($"))
         {
-            using json_query::JSONPath;
             QString pathStr{side.mid(6, side.length() - 7)}; // Extract path
             auto    path{JSONPath::create(pathStr)};
             if (path)
