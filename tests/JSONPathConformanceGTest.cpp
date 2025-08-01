@@ -5,7 +5,10 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <gtest/gtest-spi.h>
+#include <algorithm>
 #include "framework/JSONMatchersGTest.hpp"
+#include "json-query/JSONQuery" // For public API aliases
 
 // Using declarations for convenience
 using json_query::JSONPath;

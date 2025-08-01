@@ -6,9 +6,12 @@
 
 #include <gtest/gtest.h>
 #include <QJsonDocument>
+#include <QJsonObject>
 #include <QJsonArray>
-#include <ranges> // C++20 helpers
-#include <json-query/json-path/JSONPath.hpp>
+#include <gtest/gtest-spi.h>
+#include <algorithm>
+#include "framework/JSONMatchersGTest.hpp"
+#include "json-query/JSONQuery" // For public API aliases
 
 using json_query::JSONPath;
 

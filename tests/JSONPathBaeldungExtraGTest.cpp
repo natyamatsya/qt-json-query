@@ -9,8 +9,10 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <gtest/gtest-spi.h>
+#include <algorithm>
 #include "framework/JSONMatchersGTest.hpp"
-#include "json-query/json-path/JSONPath.hpp"
+#include "json-query/JSONQuery" // For public API aliases
 
 using namespace Qt::StringLiterals;
 using json_query::JSONPath;
