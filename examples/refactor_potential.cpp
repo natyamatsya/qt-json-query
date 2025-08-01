@@ -200,51 +200,41 @@ static auto log_query_error(const QString& context)
 // -----------------------------------------------------------------------------
 [[nodiscard]] static QStringList titlesAbovePrice_jsonquery(const QJsonDocument& doc, double threshold)
 {
-    auto path = JSONPath::create(QString("$.inventory[?(@.price > %1)].title").arg(threshold));
-    if (!path)
+    const auto create_path = [&](double thr)
+    { return JSONPath::create(QString(u"$.inventory[?(@.price > %1)].title").arg(thr)); };
+    const auto evaluate = [&doc](const JSONPath& p)
     {
-        qWarning() << "Failed to create JSONPath";
-        return {};
-    }
-
-    auto evalResult = path->evaluate(doc);
-    if (!evalResult)
+        return p.evaluate(doc); // expected<QJsonValue, QueryError>
+    };
+    const auto normalize_to_array = [](const QJsonValue& v) -> QJsonArray
     {
-        qWarning() << "Failed to evaluate JSONPath";
-        return {};
-    }
-
-    QStringList result;
-
-    // Handle array result
-    auto arrResult = as<QJsonArray>(*evalResult);
-    if (arrResult)
+        if (v.isArray())
+            return v.toArray();
+        QJsonArray a;
+        if (!v.isUndefined())
+            a.append(v);
+        return a;
+    };
+    // Nice name for the larger lambda
+    const auto collect_titles_from_array = [](const QJsonArray& arr) -> QStringList
     {
-        for (const auto& item : *arrResult)
-        {
-            auto strResult = as<QString>(item);
-            if (strResult)
-                result << *strResult;
+        QStringList out;
+        out.reserve(arr.size());
+        for (const auto& item : arr)
+            if (auto s = as<QString>(item))
+                out << *s;
             else
-                qWarning() << "Skipping non-string title:" << item << "Error:" << to_qt_sv(strResult.error());
-        }
-    }
-    // Handle single value result
-    else if (!evalResult->isUndefined())
-    {
-        auto strResult = as<QString>(*evalResult);
-        if (strResult)
-        {
-            result << *strResult;
-        }
-        else
-        {
-            qWarning() << "Expected string title but got type:" << evalResult->type()
-                       << "Error:" << to_qt_sv(strResult.error());
-        }
-    }
+                qWarning() << "Skipping non-string title:" << item << "Error:" << to_qt_sv(s.error());
+        return out;
+    };
 
-    return result;
+    return create_path(threshold)
+        .transform_error(log_query_error("JSONPath creation failed"))
+        .and_then(evaluate)
+        .transform_error(log_query_error("JSONPath evaluation failed"))
+        .transform(normalize_to_array)
+        .transform(collect_titles_from_array)
+        .value_or(QStringList{});
 }
 
 int main(int argc, char** argv)
