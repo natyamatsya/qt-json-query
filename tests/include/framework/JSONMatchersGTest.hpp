@@ -32,7 +32,7 @@
 #include <expected>
 #include "json-query/json-path/JSONPath.hpp"
 
-using json_query::JSONPath;
+using json_query::json_path::JSONPath;
 using json_query::json_path::ParseError;
 
 // Parse raw JSON C-string into a QJsonDocument.

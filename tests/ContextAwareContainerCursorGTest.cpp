@@ -64,7 +64,7 @@ class ContextAwareContainerCursorTest : public ::testing::Test
     QJsonValue  rootValue;
     QJsonValue  currentContext;
 
-    QVector<Token>               tokens;
+    std::vector<Token>           tokens;
     std::unique_ptr<PathEvalCtx> ctx;
 };
 

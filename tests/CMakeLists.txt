@@ -10,17 +10,16 @@ option(JSON_QUERY_ENABLE_JAYWAY_PARITY_TESTS
 # ---------------------------------------------------------------------------
 # Disabled core tests to focus only on RFC 9535 compliance suite
 set(JSON_QUERY_TEST_SOURCES
-    # Core tests temporarily disabled for compliance focus:
-    # ${CMAKE_CURRENT_SOURCE_DIR}/JSONPathConformanceGTest.cpp
-    # ${CMAKE_CURRENT_SOURCE_DIR}/JSONPathGTest.cpp
-    # ${CMAKE_CURRENT_SOURCE_DIR}/JSONPointerConformanceGTest.cpp
-    # ${CMAKE_CURRENT_SOURCE_DIR}/JSONPointerGTest.cpp
-    # ${CMAKE_CURRENT_SOURCE_DIR}/JSONPathBaeldungGTest.cpp
-    # ${CMAKE_CURRENT_SOURCE_DIR}/JSONPathBaeldungExtraGTest.cpp
-    # ${CMAKE_CURRENT_SOURCE_DIR}/JSONPathLogicalOrPredicateGTest.cpp
-    # ${CMAKE_CURRENT_SOURCE_DIR}/ContainerCursorGTest.cpp
-    # ${CMAKE_CURRENT_SOURCE_DIR}/ContextAwareContainerCursorGTest.cpp
-)
+    # Core tests
+    ${CMAKE_CURRENT_SOURCE_DIR}/JSONPathConformanceGTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/JSONPathGTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/JSONPointerConformanceGTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/JSONPointerGTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/JSONPathBaeldungGTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/JSONPathBaeldungExtraGTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/JSONPathLogicalOrPredicateGTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ContainerCursorGTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ContextAwareContainerCursorGTest.cpp)
 
 # Only create json_query_tests target if there are source files
 if(JSON_QUERY_TEST_SOURCES)

@@ -19,7 +19,7 @@ using namespace Qt::StringLiterals;
 using namespace ::testing;
 
 // Using declarations for convenience
-using json_query::JSONPath;
+using json_query::json_path::JSONPath;
 
 //---------------------------------------------
 // 4.1  Access to Documents

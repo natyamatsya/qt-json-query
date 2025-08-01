@@ -15,7 +15,7 @@
 #include "json-query/JSONQuery" // For public API aliases
 
 using namespace Qt::StringLiterals;
-using json_query::JSONPath;
+using json_query::json_path::JSONPath;
 using namespace ::testing;
 
 //---------------------------------------------

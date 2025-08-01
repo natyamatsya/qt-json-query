@@ -10,7 +10,7 @@
 #include "framework/JSONMatchersGTest.hpp"
 #include "json-query/JSONQuery" // For public API aliases
 
-using json_query::JSONPointer;
+using json_query::json_pointer::JSONPointer;
 using namespace ::testing;
 
 static QJsonValue evalPtr(QStringView ptr, const QJsonDocument& doc)
