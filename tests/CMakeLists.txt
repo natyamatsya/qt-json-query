@@ -1,135 +1,119 @@
-# CMake configuration specific to building the json_query test suites. This
-# assumes that GoogleTest has already been fetched and available targets created
-# by the top-level script (see cmake/GoogleTests.cmake).
-
-option(JSON_QUERY_ENABLE_JAYWAY_PARITY_TESTS
-       "Build Jayway JSONPath parity test suite" OFF)
-
+# CMakeLists.txt
 # ---------------------------------------------------------------------------
-# Unit-test executable aggregating ONLY RFC 9535 compliance tests - FOCUSED
+# Modular test suite configuration for json_query
+#
+# This file orchestrates the different test suites by including modular CMake
+# files for each test category. Each module is self-contained and can be
+# enabled/disabled independently.
 # ---------------------------------------------------------------------------
-# Disabled core tests to focus only on RFC 9535 compliance suite
-set(JSON_QUERY_TEST_SOURCES
-    # Core tests
-    ${CMAKE_CURRENT_SOURCE_DIR}/JSONPathConformanceGTest.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/JSONPathGTest.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/JSONPointerConformanceGTest.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/JSONPointerGTest.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/JSONPathBaeldungGTest.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/JSONPathBaeldungExtraGTest.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/JSONPathLogicalOrPredicateGTest.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/ContainerCursorGTest.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/ContextAwareContainerCursorGTest.cpp)
 
-# Only create json_query_tests target if there are source files
-if(JSON_QUERY_TEST_SOURCES)
-  add_executable(json_query_tests ${JSON_QUERY_TEST_SOURCES})
-
-  target_include_directories(
-    json_query_tests PRIVATE ${PROJECT_SOURCE_DIR}/include
-                             ${PROJECT_SOURCE_DIR}/tests/include)
-
-  target_link_libraries(
-    json_query_tests PRIVATE json_query GTest::gtest GTest::gmock
-                             GTest::gtest_main Qt6::Core)
-
-  target_compile_features(json_query_tests PRIVATE cxx_std_23)
-else()
-  message(STATUS "Core test suite disabled - no sources for json_query_tests")
-endif()
-
-# ---------------------------------------------------------------------------
-# RFC 9535 compliance test suite
-# ---------------------------------------------------------------------------
-file(GLOB RFC_9535_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/rfc-9535/*.cpp)
-
-add_executable(rfc9535_tests ${RFC_9535_SOURCES})
-
-target_include_directories(
-  rfc9535_tests PRIVATE ${PROJECT_SOURCE_DIR}/include
-                        ${PROJECT_SOURCE_DIR}/tests/include)
-
-target_link_libraries(
-  rfc9535_tests PRIVATE json_query function_ref_interface GTest::gtest
-                        GTest::gmock GTest::gtest_main Qt6::Core)
-
-# Provide project source dir to tests so they can locate compliance JSON files
-target_compile_definitions(
-  rfc9535_tests PRIVATE JSON_QUERY_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
-
-# ---------------------------------------------------------------------------
-# RFC 6901 JSON Pointer compliance test suite
-# ---------------------------------------------------------------------------
-add_executable(rfc6901_tests
-               ${CMAKE_CURRENT_SOURCE_DIR}/rfc-6901/RFC6901ComplianceGTest.cpp)
-
-target_include_directories(
-  rfc6901_tests PRIVATE ${PROJECT_SOURCE_DIR}/include
-                        ${PROJECT_SOURCE_DIR}/tests/include)
-
-target_link_libraries(
-  rfc6901_tests PRIVATE json_query GTest::gtest GTest::gmock GTest::gtest_main
-                        Qt6::Core)
-
-# Provide project source dir to tests so they can locate compliance JSON files
-target_compile_definitions(
-  rfc6901_tests PRIVATE JSON_QUERY_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
-
-target_compile_features(rfc6901_tests PRIVATE cxx_std_23)
-
-# ---------------------------------------------------------------------------
-# Test discovery via CTest / GoogleTest module
-# ---------------------------------------------------------------------------
+# Ensure GoogleTest is available (assumed to be set up by parent CMake)
 include(GoogleTest)
 
-if(JSON_QUERY_TEST_SOURCES)
-  gtest_discover_tests(json_query_tests DISCOVERY_MODE PRE_TEST
-                       TEST_PREFIX "JsonQuery/")
+# Create cmake subdirectory for our modular test configurations
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+
+# ---------------------------------------------------------------------------
+# Test Suite Options
+# ---------------------------------------------------------------------------
+
+option(JSON_QUERY_ENABLE_CORE_TESTS
+       "Build core JSONPath and JSONPointer functionality tests" ON)
+
+option(JSON_QUERY_ENABLE_INTERNAL_TESTS "Build internal component tests" ON)
+
+option(JSON_QUERY_ENABLE_RFC9535_TESTS
+       "Build RFC 9535 JSONPath compliance tests" ON)
+
+option(JSON_QUERY_ENABLE_RFC6901_TESTS
+       "Build RFC 6901 JSON Pointer compliance tests" ON)
+
+option(JSON_QUERY_ENABLE_EXTENSION_TESTS
+       "Build extension tests (Baeldung, etc.) - DISABLED by default" OFF)
+
+# ---------------------------------------------------------------------------
+# Include Modular Test Suite Configurations
+# ---------------------------------------------------------------------------
+
+# Core functionality tests
+if(JSON_QUERY_ENABLE_CORE_TESTS)
+  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CoreTests.cmake)
+  add_core_tests()
 endif()
 
-if(JSON_QUERY_ENABLE_JAYWAY_PARITY_TESTS)
-  gtest_discover_tests(jayway_parity_tests DISCOVERY_MODE PRE_TEST
-                       TEST_PREFIX "jayway-parity/")
+# Internal component tests
+if(JSON_QUERY_ENABLE_INTERNAL_TESTS)
+  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/InternalTests.cmake)
+  add_internal_tests()
 endif()
 
-gtest_discover_tests(rfc9535_tests DISCOVERY_MODE PRE_TEST
-                     TEST_PREFIX "RFC9535/")
+# RFC 9535 JSONPath compliance tests
+if(JSON_QUERY_ENABLE_RFC9535_TESTS)
+  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/RFC9535Tests.cmake)
+  add_rfc9535_tests()
+endif()
 
-gtest_discover_tests(rfc6901_tests DISCOVERY_MODE PRE_TEST
-                     TEST_PREFIX "RFC6901/")
+# RFC 6901 JSON Pointer compliance tests
+if(JSON_QUERY_ENABLE_RFC6901_TESTS)
+  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/RFC6901Tests.cmake)
+  add_rfc6901_tests()
+endif()
 
-# ---------------------------------------------------------------------------
-# CompactContextFilterStorage lifetime fix test
-# ---------------------------------------------------------------------------
-add_executable(
-  compact_context_filter_fix_test
-  ${CMAKE_CURRENT_SOURCE_DIR}/test_compact_context_filter_standalone.cpp)
-
-target_include_directories(compact_context_filter_fix_test
-                           PRIVATE ${PROJECT_SOURCE_DIR}/include)
-
-target_link_libraries(compact_context_filter_fix_test PRIVATE Qt6::Core)
-
-target_compile_features(compact_context_filter_fix_test PRIVATE cxx_std_23)
-
-# Register the lifetime fix test with CTest
-add_test(NAME CompactContextFilterStorageLifetimeFix
-         COMMAND compact_context_filter_fix_test)
+# Extension tests (optional)
+if(JSON_QUERY_ENABLE_EXTENSION_TESTS)
+  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/ExtensionTests.cmake)
+  add_extension_tests()
+endif()
 
 # ---------------------------------------------------------------------------
-# Comprehensive variant-based storage test
+# Aggregate Test Target (Optional)
 # ---------------------------------------------------------------------------
-add_executable(
-  variant_storage_comprehensive_test
-  ${CMAKE_CURRENT_SOURCE_DIR}/test_variant_storage_comprehensive.cpp)
 
-target_include_directories(variant_storage_comprehensive_test
-                           PRIVATE ${PROJECT_SOURCE_DIR}/include)
+option(JSON_QUERY_CREATE_AGGREGATE_TARGET
+       "Create an aggregate target that runs all enabled test suites" OFF)
 
-target_link_libraries(variant_storage_comprehensive_test PRIVATE Qt6::Core)
+if(JSON_QUERY_CREATE_AGGREGATE_TARGET)
+  # Create a custom target that depends on all enabled test executables
+  set(ALL_TEST_TARGETS)
 
-target_compile_features(variant_storage_comprehensive_test PRIVATE cxx_std_23)
+  if(JSON_QUERY_ENABLE_CORE_TESTS AND TARGET json_query_core_tests)
+    list(APPEND ALL_TEST_TARGETS json_query_core_tests)
+  endif()
 
-# Register the comprehensive variant storage test with CTest
-add_test(NAME VariantStorageComprehensive
-         COMMAND variant_storage_comprehensive_test)
+  if(JSON_QUERY_ENABLE_INTERNAL_TESTS AND TARGET json_query_internal_tests)
+    list(APPEND ALL_TEST_TARGETS json_query_internal_tests)
+  endif()
+
+  if(JSON_QUERY_ENABLE_RFC9535_TESTS AND TARGET rfc9535_compliance_tests)
+    list(APPEND ALL_TEST_TARGETS rfc9535_compliance_tests)
+  endif()
+
+  if(JSON_QUERY_ENABLE_RFC6901_TESTS AND TARGET rfc6901_compliance_tests)
+    list(APPEND ALL_TEST_TARGETS rfc6901_compliance_tests)
+  endif()
+
+  if(JSON_QUERY_ENABLE_EXTENSION_TESTS AND TARGET json_query_extension_tests)
+    list(APPEND ALL_TEST_TARGETS json_query_extension_tests)
+  endif()
+
+  if(ALL_TEST_TARGETS)
+    add_custom_target(all_json_query_tests DEPENDS ${ALL_TEST_TARGETS})
+    message(STATUS "Created aggregate target: all_json_query_tests")
+  endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# Summary
+# ---------------------------------------------------------------------------
+
+message(STATUS "=== JSON Query Test Suite Configuration ===")
+message(STATUS "Core Tests:      ${JSON_QUERY_ENABLE_CORE_TESTS}")
+message(STATUS "Internal Tests:  ${JSON_QUERY_ENABLE_INTERNAL_TESTS}")
+message(STATUS "RFC 9535 Tests:  ${JSON_QUERY_ENABLE_RFC9535_TESTS}")
+message(STATUS "RFC 6901 Tests:  ${JSON_QUERY_ENABLE_RFC6901_TESTS}")
+message(
+  STATUS
+    "Extension Tests: ${JSON_QUERY_ENABLE_EXTENSION_TESTS} (DISABLED by default)"
+)
+message(STATUS "Aggregate Target: ${JSON_QUERY_CREATE_AGGREGATE_TARGET}")
+message(STATUS "=============================================")
