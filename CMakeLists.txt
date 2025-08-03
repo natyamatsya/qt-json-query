@@ -100,6 +100,13 @@ if(BUILD_BENCHMARKING)
 endif()
 
 # ---------------------------------------------------------------------------
+# Sanitizer Debug Test (for investigating sanitizer-induced test failures)
+# ---------------------------------------------------------------------------
+add_executable(sanitizer_debug_test sanitizer_debug_test.cpp)
+target_link_libraries(sanitizer_debug_test PRIVATE Qt6::Core)
+target_compile_features(sanitizer_debug_test PRIVATE cxx_std_23)
+
+# ---------------------------------------------------------------------------
 # Installation (headers and library)
 # ---------------------------------------------------------------------------
 if(JSON_QUERY_ENABLE_INSTALL)
