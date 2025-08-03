@@ -99,7 +99,8 @@ static QList<RFC6901TestCase> loadRFC6901TestFile(const QString& path)
 
 static QList<RFC6901TestCase> collectAllRFC6901Cases()
 {
-    const QString testFile = QStringLiteral(JSON_QUERY_SOURCE_DIR "/tests/rfc-6901/rfc6901-tests.json");
+    const QString testFile =
+        QStringLiteral(JSON_QUERY_SOURCE_DIR "/tests/rfc-compliance-suite/rfc-6901/rfc6901-tests.json");
     return loadRFC6901TestFile(testFile);
 }
 
