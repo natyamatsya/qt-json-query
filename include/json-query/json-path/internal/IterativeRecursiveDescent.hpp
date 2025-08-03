@@ -111,6 +111,114 @@ class IterativeRecursiveDescent
     }
 
     /**
+     * @brief Safe version of evaluateIterativeArray with memory and depth limits
+     *
+     * This version is specifically designed for recursive wildcard operations ($..*)
+     * that can cause memory exhaustion. It includes safety limits while preserving
+     * normal JSONPath functionality.
+     *
+     * @param rootValue The root value to traverse recursively
+     * @return std::expected<QJsonArray, EvalError> Array of all found values or TooComplex error
+     */
+    static std::expected<QJsonArray, EvalError> evaluateIterativeArraySafe(const QJsonValue& rootValue)
+    {
+        constexpr size_t MAX_RESULTS     = 10000; // Limit result count
+        constexpr size_t MAX_STACK_DEPTH = 100;   // Limit stack depth
+        constexpr size_t MAX_MEMORY_MB   = 50;    // Limit memory usage (approximate)
+
+        // Use cache-optimized result collector with limits
+        thread_local json_query::json_path::detail::CacheOptimizedResultCollector collector;
+        collector.clear();
+        collector.reserve(32);
+
+        // Use cache-optimized stack for better memory locality
+        thread_local json_query::json_path::detail::CacheOptimizedStack stack;
+        stack.clear();
+        stack.reserve(64);
+
+        // Start with root value
+        stack.push(rootValue);
+        size_t resultCount            = 0;
+        size_t approximateMemoryUsage = 0;
+
+        while (!stack.empty())
+        {
+            // Check safety limits
+            if (stack.size() > MAX_STACK_DEPTH)
+                return std::unexpected(EvalError::TooComplex);
+
+            if (resultCount > MAX_RESULTS)
+                return std::unexpected(EvalError::TooComplex);
+
+            if (approximateMemoryUsage > MAX_MEMORY_MB * 1024 * 1024)
+                return std::unexpected(EvalError::TooComplex);
+
+            auto& frame = stack.top();
+
+            if (!frame.processed)
+            {
+                // First time processing this frame - emit the value
+                collector.emitValue(frame.value);
+                frame.processed = true;
+                resultCount++;
+
+                // Rough memory usage estimation
+                approximateMemoryUsage += 100; // Approximate per-result overhead
+
+                // Add children to stack for traversal
+                if (frame.value.isObject())
+                {
+                    const auto obj{frame.value.toObject()};
+                    // Add in reverse order so we process in original order
+                    for (auto it = obj.end(); it != obj.begin();)
+                    {
+                        --it;
+                        stack.push(it.value());
+                    }
+                }
+                else if (frame.value.isArray())
+                {
+                    const auto arr{frame.value.toArray()};
+                    // Add in reverse order so we process in original order
+                    for (qsizetype i = arr.size() - 1; i >= 0; --i)
+                        stack.push(arr[i]);
+                }
+            }
+            else
+            {
+                // Frame already processed, remove it
+                stack.pop();
+            }
+        }
+
+        // Convert to QJsonArray for compatibility
+        return collector.toQJsonArray();
+    }
+
+    /**
+     * @brief Iterative recursive descent returning QJsonArray (for compatibility)
+     *
+     * @param rootValue The root value to traverse recursively
+     * @param maxDepth Maximum traversal depth (0 = unlimited)
+     * @return std::expected<QJsonArray, EvalError> Array of all found values
+     */
+    static std::expected<QJsonArray, EvalError> evaluateIterativeArray(const QJsonValue& rootValue, size_t maxDepth)
+    {
+
+        // Use cache-optimized result collector for better memory layout
+        thread_local json_query::json_path::detail::CacheOptimizedResultCollector collector;
+        collector.clear();
+        collector.reserve(32); // Pre-allocate reasonable capacity
+
+        auto result{evaluateIterativeDepthLimited(rootValue, maxDepth, collector)};
+        if (!result)
+            return std::unexpected(result.error());
+
+        // Convert to QJsonArray for compatibility
+        return collector.toQJsonArray();
+    }
+
+    /**
      * @brief Memory-efficient depth-limited recursive descent with cache optimization
      *
      * Prevents stack overflow and excessive memory usage by limiting traversal depth.

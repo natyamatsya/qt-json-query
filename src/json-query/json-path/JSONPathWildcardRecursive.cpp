@@ -79,6 +79,20 @@ struct RecursivePatternDetector
      */
     static size_t estimateDocumentComplexity(const QJsonValue& value)
     {
+        constexpr size_t MAX_RECURSION_DEPTH = 32;
+        return estimateDocumentComplexityImpl(value, MAX_RECURSION_DEPTH);
+    }
+
+  private:
+    /**
+     * @brief Implementation with recursion depth limiting
+     */
+    static size_t estimateDocumentComplexityImpl(const QJsonValue& value, size_t remainingDepth)
+    {
+        // Prevent stack overflow from deeply nested structures
+        if (remainingDepth == 0)
+            return 1000; // Return high complexity for deeply nested structures
+
         if (value.isObject())
         {
             const auto obj{value.toObject()};
@@ -88,7 +102,7 @@ struct RecursivePatternDetector
             auto samples{0};
             for (auto it = obj.begin(); it != obj.end() && samples < 3; ++it, ++samples)
                 if (it.value().isObject() || it.value().isArray())
-                    complexity += estimateDocumentComplexity(it.value()) / 2;
+                    complexity += estimateDocumentComplexityImpl(it.value(), remainingDepth - 1) / 2;
             return complexity;
         }
         else if (value.isArray())
@@ -99,7 +113,7 @@ struct RecursivePatternDetector
             // Sample first few elements
             for (qsizetype i = 0; i < std::min(arr.size(), qsizetype(3)); ++i)
                 if (arr[i].isObject() || arr[i].isArray())
-                    complexity += estimateDocumentComplexity(arr[i]) / 2;
+                    complexity += estimateDocumentComplexityImpl(arr[i], remainingDepth - 1) / 2;
             return complexity;
         }
         return 1;
@@ -108,8 +122,8 @@ struct RecursivePatternDetector
 
 static std::expected<QJsonArray, EvalError> evaluateRecursiveImpl(const QJsonValue& value)
 {
-    // Use iterative implementation with array pooling for better memory efficiency
-    return IterativeRecursiveDescent::evaluateIterativeArray(value);
+    // Use safe iterative implementation for recursive wildcard operations to prevent memory exhaustion
+    return IterativeRecursiveDescent::evaluateIterativeArraySafe(value);
 }
 
 /**
@@ -219,8 +233,8 @@ static std::expected<QJsonArray, EvalError> evaluateRecursiveOptimized(const QJs
         return finalResult;
     }
 
-    // Fallback to standard implementation
-    return IterativeRecursiveDescent::evaluateIterativeArray(value);
+    // Fallback to safe implementation for recursive wildcard operations
+    return IterativeRecursiveDescent::evaluateIterativeArraySafe(value);
 }
 
 // ---------------------------------------------------------------------------

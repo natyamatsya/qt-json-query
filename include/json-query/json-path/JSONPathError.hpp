@@ -36,6 +36,7 @@ enum class EvalError : std::uint8_t
     KeyNotFound,        // object key missing (for definite access)
     TypeMismatchArray,  // expected array but found other when index/slice
     TypeMismatchObject, // expected object but found other when key access
+    TooComplex,         // complexity or memory limit exceeded
 };
 
 // JSON Path parse error messages
@@ -54,12 +55,13 @@ inline constexpr auto json_path_parse_errors = utils::detail::ErrorMap<ParseErro
     {ParseError::UnsupportedFilter, DEFINE_ERROR_STRING("Unsupported filter expression")}};
 
 // JSON Path evaluation error messages
-inline constexpr auto json_path_eval_errors = utils::detail::ErrorMap<EvalError, 5>{
+inline constexpr auto json_path_eval_errors = utils::detail::ErrorMap<EvalError, 6>{
     {EvalError::IndexOutOfRange, DEFINE_ERROR_STRING("Array index out of range")},
     {EvalError::InvalidSlice, DEFINE_ERROR_STRING("Invalid array slice parameters")},
     {EvalError::KeyNotFound, DEFINE_ERROR_STRING("Key not found in object")},
     {EvalError::TypeMismatchArray, DEFINE_ERROR_STRING("Type mismatch: expected array")},
-    {EvalError::TypeMismatchObject, DEFINE_ERROR_STRING("Type mismatch: expected object")}};
+    {EvalError::TypeMismatchObject, DEFINE_ERROR_STRING("Type mismatch: expected object")},
+    {EvalError::TooComplex, DEFINE_ERROR_STRING("Complexity or memory limit exceeded")}};
 
 /**
  * @brief Convert a ParseError to a human-readable string view
