@@ -5,9 +5,10 @@
 #include "json-query/json-path/JSONPathTokenEvaluators.hpp"
 #include "json-query/json-path/JSONPathEvaluate.hpp"
 #include "json-query/json-path/JSONPathWildcardRecursive.hpp"
-#include "json-query/json-path/internal/ContextAwareContainerCursor.hpp"
+#include "json-query/utils/SanitizerCompat.hpp"
 #include "json-query/json-path/internal/ArrayPool.hpp"
 #include "json-query/json-path/internal/ArrayPool.hpp" // acquirePooledArray, emptyResult
+#include "json-query/json-path/internal/ContextAwareContainerCursor.hpp"
 #include "json-query/json-path/JSONPathLog.hpp"
 
 #include <QJsonDocument>
@@ -186,7 +187,10 @@ struct SliceProcessingStrategy<SliceProcessingType::ForwardSlice>
         }
 
         qCDebug(jsonPathLog) << "evalSlice result size=" << out.size();
-        return QJsonArray(std::move(out));
+        // SANITIZER WORKAROUND: Avoid QJsonArray copy constructor corruption
+        // Same issue as in main evaluation pipeline - sanitizer corrupts QJsonArray copy constructor
+        // SOLUTION: Return the pooled array directly via std::move to avoid copy constructor
+        return std::move(out);
     }
 };
 
@@ -247,7 +251,10 @@ struct SliceProcessingStrategy<SliceProcessingType::BackwardSlice>
         }
 
         qCDebug(jsonPathLog) << "evalSlice result size=" << out.size();
-        return QJsonArray(std::move(out));
+        // SANITIZER WORKAROUND: Avoid QJsonArray copy constructor corruption
+        // Same issue as in main evaluation pipeline - sanitizer corrupts QJsonArray copy constructor
+        // SOLUTION: Return the pooled array directly via std::move to avoid copy constructor
+        return std::move(out);
     }
 };
 
@@ -689,6 +696,124 @@ UnionDetectionResult detectUnionTokens(const PathEvalCtx& ctx, qsizetype startIn
     return {unionTokens, shouldUseUnion, static_cast<qsizetype>(nextIndex)};
 }
 
+std::expected<QJsonArray, EvalError> processBranchUniqueSelection(
+    const PathEvalCtx& ctx, qsizetype& i, const QJsonArray& working, const QJsonValue& root, bool isLeaf)
+{
+    auto        keyResult{collectKeysFromTokens(ctx, i)};
+    const auto& keys = keyResult.keys;
+    i                = keyResult.nextIndex;
+
+    if (keys.empty())
+        return std::unexpected(EvalError::KeyNotFound);
+
+    auto  pooledArray{acquirePooledArray()};
+    auto& results = *pooledArray;
+
+    for (const auto& workingValue : working)
+    {
+        if (!workingValue.isObject())
+            continue;
+
+        const auto obj{workingValue.toObject()};
+
+        if (isLeaf)
+            processObjectForLeafSelection(obj, keys, workingValue, &results);
+        else
+            processObjectForNonLeafSelection(obj, keys, workingValue, &results);
+    }
+
+    // Deduplicate results
+    return deduplicateJsonValues(results, root);
+}
+
+bool addsMultiplicity(const Token& tk)
+{
+    switch (tk.kind)
+    {
+    case Token::Kind::Wildcard:
+    case Token::Kind::Recursive:
+    case Token::Kind::KeyList:
+        return true;
+    default:
+        return false;
+    }
+}
+
+QJsonValue squash(QJsonArray arr, bool multi)
+{
+    if (multi || arr.size() != 1)
+        return arr;
+    return arr[0];
+}
+
+QJsonValue applyTrailing(json_path::FunctionType fn, const QJsonValue& v)
+{
+    using enum json_path::FunctionType;
+
+    switch (fn)
+    {
+    case None:
+        return v;
+
+    case Length:
+        if (v.isArray())
+            return v.toArray().size();
+        if (v.isObject())
+            return v.toObject().size();
+        return 0;
+
+    case Min:
+    case Max:
+        if (!v.isArray())
+            return {QJsonValue::Undefined};
+        {
+            const auto arr{v.toArray()};
+            bool       first{true};
+            double     best = 0.0;
+            for (const auto& e : arr)
+            {
+                if (!e.isDouble())
+                    continue;
+                const auto d{e.toDouble()};
+                if (first || (fn == Min ? d < best : d > best))
+                    best = d, first = false;
+            }
+            return first ? QJsonValue{QJsonValue::Undefined} : QJsonValue(best);
+        }
+    }
+    std::unreachable();
+}
+
+// Helper: Collect keys from consecutive Key/KeyList tokens
+KeyCollectionResult collectKeysFromTokens(const PathEvalCtx& ctx, qsizetype startIndex)
+{
+    std::vector<QString> keys;
+    auto                 i{startIndex};
+
+    while (i < ctx.tokens.size())
+    {
+        const auto& token = ctx.tokens[i];
+        if (token.kind == Token::Kind::Key)
+        {
+            keys.push_back(token.key);
+            ++i;
+        }
+        else if (token.kind == Token::Kind::KeyList)
+        {
+            QStringList keyList = token.key.split(u'\n');
+            for (const QString& key : keyList)
+                keys.push_back(key);
+            ++i;
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    return {keys, i};
+}
+
 // Helper: Process a single union token and collect its results
 TokenProcessingResult
 processSingleUnionToken(const PathEvalCtx& ctx, qsizetype tokenIdx, const QJsonArray& working, const QJsonValue& root)
@@ -830,124 +955,6 @@ QJsonArray deduplicateJsonValues(const QJsonArray& input, const QJsonValue& root
     }
 
     return dedup;
-}
-
-std::expected<QJsonArray, EvalError> processBranchUniqueSelection(
-    const PathEvalCtx& ctx, qsizetype& i, const QJsonArray& working, const QJsonValue& root, bool isLeaf)
-{
-    auto        keyResult{collectKeysFromTokens(ctx, i)};
-    const auto& keys = keyResult.keys;
-    i                = keyResult.nextIndex;
-
-    if (keys.empty())
-        return std::unexpected(EvalError::KeyNotFound);
-
-    auto  pooledArray{acquirePooledArray()};
-    auto& results = *pooledArray;
-
-    for (const auto& workingValue : working)
-    {
-        if (!workingValue.isObject())
-            continue;
-
-        const auto obj{workingValue.toObject()};
-
-        if (isLeaf)
-            processObjectForLeafSelection(obj, keys, workingValue, &results);
-        else
-            processObjectForNonLeafSelection(obj, keys, workingValue, &results);
-    }
-
-    // Deduplicate results
-    return deduplicateJsonValues(results, root);
-}
-
-bool addsMultiplicity(const Token& tk)
-{
-    switch (tk.kind)
-    {
-    case Token::Kind::Wildcard:
-    case Token::Kind::Recursive:
-    case Token::Kind::KeyList:
-        return true;
-    default:
-        return false;
-    }
-}
-
-QJsonValue squash(QJsonArray arr, bool multi)
-{
-    if (multi || arr.size() != 1)
-        return arr;
-    return arr[0];
-}
-
-QJsonValue applyTrailing(json_path::FunctionType fn, const QJsonValue& v)
-{
-    using enum json_path::FunctionType;
-
-    switch (fn)
-    {
-    case None:
-        return v;
-
-    case Length:
-        if (v.isArray())
-            return v.toArray().size();
-        if (v.isObject())
-            return v.toObject().size();
-        return 0;
-
-    case Min:
-    case Max:
-        if (!v.isArray())
-            return {QJsonValue::Undefined};
-        {
-            const auto arr{v.toArray()};
-            bool       first{true};
-            double     best = 0.0;
-            for (const auto& e : arr)
-            {
-                if (!e.isDouble())
-                    continue;
-                const auto d{e.toDouble()};
-                if (first || (fn == Min ? d < best : d > best))
-                    best = d, first = false;
-            }
-            return first ? QJsonValue{QJsonValue::Undefined} : QJsonValue(best);
-        }
-    }
-    std::unreachable();
-}
-
-// Helper: Collect keys from consecutive Key/KeyList tokens
-KeyCollectionResult collectKeysFromTokens(const PathEvalCtx& ctx, qsizetype startIndex)
-{
-    std::vector<QString> keys;
-    auto                 i{startIndex};
-
-    while (i < ctx.tokens.size())
-    {
-        const auto& token = ctx.tokens[i];
-        if (token.kind == Token::Kind::Key)
-        {
-            keys.push_back(token.key);
-            ++i;
-        }
-        else if (token.kind == Token::Kind::KeyList)
-        {
-            QStringList keyList = token.key.split(u'\n');
-            for (const QString& key : keyList)
-                keys.push_back(key);
-            ++i;
-        }
-        else
-        {
-            break;
-        }
-    }
-
-    return {keys, i};
 }
 
 } // namespace json_query::json_path::detail

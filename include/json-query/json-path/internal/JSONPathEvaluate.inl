@@ -7,6 +7,7 @@
 #include "json-query/Common.h"
 #include "json-query/json-path/internal/ArrayPool.hpp"
 #include "json-query/json-path/internal/ResultStreamer.hpp"
+#include "json-query/utils/SanitizerCompat.hpp"
 #include "json-query/json-path/JSONPathTokenDispatch.hpp"
 
 namespace json_query::json_path::detail {
@@ -69,6 +70,7 @@ std::expected<QJsonArray, EvalError> evaluateAll(const PathEvalCtx& ctx, const Q
             bool isRootSelectorOnly = (ctx.tokens.size() == 1);
             if (QT_QUERY_JSON_UNLIKELY(isRootSelectorOnly)) {
                 // Root selector should return the document itself as a single result
+                // even if it's an array, to match RFC 9535 CTS expectations
                 if (res.isUndefined() || res.isNull()) return {};
                 return QJsonArray{res};
             }

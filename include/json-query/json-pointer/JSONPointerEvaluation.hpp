@@ -50,7 +50,6 @@ namespace json_query::json_pointer::detail
 // incompatibility with Qt's copy-on-write semantics under AddressSanitizer.
 // The sanitizer's memory layout changes interfere with QJsonArray/QJsonObject operations,
 // causing functional test failures (not memory safety issues).
-JSON_QUERY_NO_SANITIZE_QT_COMPAT
 [[nodiscard]] inline std::expected<QJsonValue, EvalError> evaluatePointerImpl(const std::vector<Token>& tokens,
                                                                               const QJsonValue&         root) noexcept
 {

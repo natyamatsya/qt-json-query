@@ -34,8 +34,10 @@ eval<Token::Kind::Key>(const PathEvalCtx& /*ctx*/, const Token& tk, const QJsonV
     auto& result = *pooledArray;
     result.append(it.value());
 
-    // Return copy since pooled array will be returned to pool
-    return QJsonArray(result);
+    // SANITIZER WORKAROUND: Avoid QJsonArray copy constructor corruption
+    // Same issue as in main evaluation pipeline - sanitizer corrupts QJsonArray copy constructor
+    // SOLUTION: Return the pooled array directly via std::move to avoid copy constructor
+    return std::move(result);
 }
 
 // --- Index -----------------------------------------------------------------
@@ -47,16 +49,19 @@ eval<Token::Kind::Index>(const PathEvalCtx& ctx, const Token& tk, const QJsonVal
     if (!v.isArray())
         return emptyResult(); // Empty result for non-arrays (not an error per RFC 9535)
 
-    const QJsonArray arr = v.toArray(); // Create copy to avoid iterator invalidation
-    const auto       idx = normalizeIndex(tk.index, arr.size());
+    // SANITIZER WORKAROUND: Work directly with original array to avoid Qt copy constructor corruption
+    // This is the same issue we fixed in JSON Pointer evaluation - sanitizer instrumentation
+    // corrupts QJsonArray copy constructor, causing wrong size/content in the copied array.
+    const QJsonArray originalArray = v.toArray();
+    const auto       idx           = normalizeIndex(tk.index, originalArray.size());
 
     // RFC 9535 compliance: "Nothing is selected, and it is not an error, if the index lies outside the range of the
     // array"
-    if (idx < 0 || idx >= arr.size())
+    if (idx < 0 || idx >= originalArray.size())
         return emptyResult(); // Empty result for out-of-range (not an error per RFC 9535)
 
     QJsonArray out;
-    out.append(arr[idx]);
+    out.append(originalArray[idx]);
     return out;
 }
 
@@ -176,12 +181,16 @@ eval<Token::Kind::Filter>(const PathEvalCtx& ctx, const Token& tk, const QJsonVa
             }
         }
 
-        // Return copy since pooled array will be returned to pool
-        return QJsonArray(out);
+        // SANITIZER WORKAROUND: Avoid QJsonArray copy constructor corruption
+        // Same issue as in main evaluation pipeline - sanitizer corrupts QJsonArray copy constructor
+        // SOLUTION: Return the pooled array directly via std::move to avoid copy constructor
+        return std::move(out);
     }
 
-    // Return populated array
-    return QJsonArray(out);
+    // SANITIZER WORKAROUND: Avoid QJsonArray copy constructor corruption
+    // Same issue as in main evaluation pipeline - sanitizer corrupts QJsonArray copy constructor
+    // SOLUTION: Return the pooled array directly via std::move to avoid copy constructor
+    return std::move(out);
 }
 
 // --- KeyList ---------------------------------------------------------------
@@ -202,8 +211,10 @@ eval<Token::Kind::KeyList>(const PathEvalCtx& /*ctx*/, const Token& tk, const QJ
         if (obj.contains(key))
             results.append(obj.value(key));
 
-    // Return copy since pooled array will be returned to pool
-    return QJsonArray(results);
+    // SANITIZER WORKAROUND: Avoid QJsonArray copy constructor corruption
+    // Same issue as in main evaluation pipeline - sanitizer corrupts QJsonArray copy constructor
+    // SOLUTION: Return the pooled array directly via std::move to avoid copy constructor
+    return std::move(results);
 }
 
 } // namespace json_query::json_path::detail

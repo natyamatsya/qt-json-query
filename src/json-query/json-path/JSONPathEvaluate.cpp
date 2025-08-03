@@ -6,6 +6,7 @@
 #include "json-query/json-path/JSONPathWildcardRecursive.hpp"
 #include "json-query/json-path/JSONPathEvalHelpers.hpp"
 #include "json-query/json-path/JSONPathLog.hpp"
+#include "json-query/utils/SanitizerCompat.hpp"
 #include "json-query/json-path/internal/ArrayPool.hpp"
 #include "json-query/json-path/internal/PathEvalCtx.hpp"
 #include "json-query/json-path/internal/ContainerCursor.hpp"
@@ -348,7 +349,11 @@ std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const 
     auto& workingArray = *pooledWorkingArray;
     workingArray.append(root);
 
-    std::expected<QJsonArray, EvalError> working = QJsonArray(workingArray);
+    // SANITIZER WORKAROUND: Avoid QJsonArray copy constructor corruption
+    // This is the same issue we fixed in JSON Pointer and array indexing - sanitizer instrumentation
+    // corrupts QJsonArray copy constructor, causing wrong size/content in the copied array.
+    // SOLUTION: Work directly with the original array to avoid the problematic copy constructor.
+    std::expected<QJsonArray, EvalError> working = std::move(workingArray);
     auto                                 multi{false};
 
     using json_query::json_path::internal::qt_hash;

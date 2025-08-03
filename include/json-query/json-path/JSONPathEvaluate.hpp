@@ -8,6 +8,7 @@
 #include "json-query/json-path/JSONPathEvalHelpers.hpp"
 #include "json-query/json-path/JSONPathTokenDispatch.hpp"
 #include "json-query/json-path/JSONPathWildcardRecursive.hpp"
+#include "json-query/utils/SanitizerCompat.hpp"
 
 #include <QJsonValue>
 #include <QJsonArray>
@@ -27,7 +28,7 @@ std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const 
 std::expected<QJsonArray, EvalError> evaluateAll(const PathEvalCtx& ctx, const QJsonValue& root);
 
 // Evaluate a *definite* JSONPath (no wildcard/recursive/filter) sequentially
-// and return either the resulting value or an EvalError.
+// This is a specialized fast path for simple JSONPaths that don't require complex evaluation
 std::expected<QJsonValue, EvalError> evaluateDefinite(const std::vector<Token>& tokens,
                                                       const QJsonValue&         root) noexcept;
 

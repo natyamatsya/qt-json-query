@@ -7,6 +7,7 @@
 #include "json-query/json-path/internal/CompileTimeTokenDispatch.hpp"
 #include "json-query/json-path/internal/TokenDispatchTable.hpp"
 #include "json-query/json-path/internal/ArrayPool.hpp"
+#include "json-query/utils/SanitizerCompat.hpp"
 #include "json-query/json-path/JSONPathLog.hpp"
 
 #include <QDebug>
