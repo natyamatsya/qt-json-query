@@ -45,8 +45,6 @@ concept ContextFilterConcept = requires(T t, const QJsonValue& currentNode, cons
     { t(currentNode, rootDocument) } -> std::convertible_to<bool>;
 };
 
-// TODO: Remove these legacy type aliases after migrating all usages to embedded filters
-// These are temporarily kept to maintain build compatibility during refactoring
 using FilterFn        = std::function<bool(const QJsonValue&)>;
 using ContextFilterFn = std::function<bool(const QJsonValue& currentNode, const QJsonValue& rootDocument)>;
 

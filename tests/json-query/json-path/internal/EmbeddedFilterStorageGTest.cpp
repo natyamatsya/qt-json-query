@@ -286,8 +286,6 @@ TEST_F(EmbeddedFilterStorageTest, RegularFilterMoveSemantics)
 
     EmbeddedFilter moved = std::move(original);
 
-    // Note: std::variant move semantics don't guarantee the moved-from object is empty
-    // The moved object should work correctly regardless of the original's state
     EXPECT_TRUE(moved.hasRegularFilter()) << "Moved filter should have regular filter";
     EXPECT_FALSE(moved.hasContextFilter()) << "Moved filter should not have context filter";
 
@@ -417,7 +415,7 @@ TEST_F(EmbeddedFilterStorageTest, MixedFilterTypeChaining)
     auto           regularFilter = createSmallRegularFilter();
     EmbeddedFilter filter1(std::move(regularFilter));
 
-    // Create context filter (separate instance)
+    // Create context filter
     auto           contextFilter = createSmallContextFilter();
     EmbeddedFilter filter2(std::move(contextFilter));
 
@@ -428,8 +426,6 @@ TEST_F(EmbeddedFilterStorageTest, MixedFilterTypeChaining)
     EXPECT_TRUE(filter1.hasRegularFilter()) << "Filter1 should have regular filter";
     EXPECT_FALSE(filter1.hasContextFilter()) << "Filter1 should not have context filter";
 
-    // Note: std::variant move semantics don't guarantee the moved-from object is empty
-    // We only verify that the moved-to object has the correct state
     EXPECT_FALSE(filter3.hasRegularFilter()) << "Filter3 should not have regular filter";
     EXPECT_TRUE(filter3.hasContextFilter()) << "Filter3 should have context filter";
 
