@@ -6,7 +6,7 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QJsonValue>
-#include "../include/json-query/json-pointer/JSONPointer.hpp"
+#include "../../../include/json-query/json-pointer/JSONPointer.hpp"
 #include "framework/JSONMatchersGTest.hpp"
 
 using json_query::json_pointer::JSONPointer;
