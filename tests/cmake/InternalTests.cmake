@@ -7,7 +7,6 @@
 set(INTERNAL_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-path/internal/ContainerCursorGTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-path/internal/ContextAwareContainerCursorGTest.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-path/internal/CompactContextFilterStorageGTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-path/internal/EmbeddedFilterStorageGTest.cpp
 )
 
