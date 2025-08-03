@@ -1,0 +1,130 @@
+# JSON Pointer seed corpus for fuzzing (RFC 6901)
+# These are known-good and edge-case JSON Pointer expressions to seed the fuzzer
+
+# Basic pointers
+/
+/foo
+/foo/bar
+/foo/bar/baz
+
+# Array indices
+/0
+/1
+/10
+/100
+/foo/0
+/foo/1/bar
+
+# Empty string keys
+/
+//
+///
+/foo//bar
+/foo///bar
+
+# Escape sequences (RFC 6901)
+/~0
+/~1
+/foo~0bar
+/foo~1bar
+/~0~1
+/~1~0
+
+# Complex escape combinations
+/foo~0~1bar
+/~0foo~1
+/~1foo~0
+/path~0with~1slashes~0and~1tildes
+
+# Nested structures
+/store/book/0/title
+/store/book/1/author
+/store/bicycle/color
+/users/0/profile/name
+/data/items/5/metadata/tags/2
+
+# Edge cases with numbers
+/0
+/00
+/01
+/10
+/-1
+/+1
+/1.0
+/1e10
+
+# Unicode characters
+/café
+/日本語
+/🚀
+/naïve
+/résumé
+
+# Special characters that need careful handling
+/
+/
+/
+/
+/"
+/'
+/\
+/|
+/?
+/#
+/%
+/&
+/=
+/+
+
+# Long paths
+/very/long/path/with/many/segments/that/goes/deep/into/nested/structure/level1/level2/level3/level4/level5
+
+# Malformed pointers (should be handled gracefully)
+foo
+foo/bar
+/foo/
+//foo
+/foo//
+/foo/bar/
+/~
+/~2
+/~01
+/~10
+/~~
+/~0~
+/~1~
+/foo~bar
+/foo~2bar
+
+# Empty and whitespace variations
+/
+/
+/
+/
+/foo/
+/ /bar
+/foo/  /bar
+
+# Boundary conditions
+/999999999
+/0000000000
+/-999999999
+/18446744073709551615
+
+# Mixed valid/invalid escape sequences
+/~0valid~1
+/~2invalid
+/valid~0~1valid
+/~0~2mixed
+
+# Deeply nested arrays
+/0/0/0/0/0
+/1/2/3/4/5
+/items/0/subitems/1/data/2
+
+# Real-world-like paths
+/api/v1/users/123/profile
+/config/database/connection/host
+/response/data/items/0/attributes/name
+/metadata/schema/properties/title/type
+/openapi/paths/~1users~1{id}/get/responses/200

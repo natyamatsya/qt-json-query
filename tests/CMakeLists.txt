@@ -31,6 +31,8 @@ option(JSON_QUERY_ENABLE_RFC6901_TESTS
 option(JSON_QUERY_ENABLE_EXTENSION_TESTS
        "Build extension tests (Baeldung, etc.) - DISABLED by default" OFF)
 
+option(ENABLE_FUZZ_TESTS "Enable LibFuzzer-based fuzz testing" OFF)
+
 # ---------------------------------------------------------------------------
 # Include Modular Test Suite Configurations
 # ---------------------------------------------------------------------------
@@ -65,6 +67,12 @@ if(JSON_QUERY_ENABLE_EXTENSION_TESTS)
   add_extension_tests()
 endif()
 
+# Fuzz tests (optional)
+if(ENABLE_FUZZ_TESTS)
+  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FuzzTests.cmake)
+  add_fuzz_tests()
+endif()
+
 # ---------------------------------------------------------------------------
 # Aggregate Test Target (Optional)
 # ---------------------------------------------------------------------------
@@ -96,6 +104,10 @@ if(JSON_QUERY_CREATE_AGGREGATE_TARGET)
     list(APPEND ALL_TEST_TARGETS json_query_extension_tests)
   endif()
 
+  if(ENABLE_FUZZ_TESTS AND TARGET json_query_fuzz_tests)
+    list(APPEND ALL_TEST_TARGETS json_query_fuzz_tests)
+  endif()
+
   if(ALL_TEST_TARGETS)
     add_custom_target(all_json_query_tests DEPENDS ${ALL_TEST_TARGETS})
     message(STATUS "Created aggregate target: all_json_query_tests")
@@ -115,5 +127,6 @@ message(
   STATUS
     "Extension Tests: ${JSON_QUERY_ENABLE_EXTENSION_TESTS} (DISABLED by default)"
 )
+message(STATUS "Fuzz Tests:      ${ENABLE_FUZZ_TESTS}")
 message(STATUS "Aggregate Target: ${JSON_QUERY_CREATE_AGGREGATE_TARGET}")
 message(STATUS "=============================================")

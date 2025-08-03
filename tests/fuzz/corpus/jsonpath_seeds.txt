@@ -1,0 +1,114 @@
+# JSONPath seed corpus for fuzzing
+# These are known-good and edge-case JSONPath expressions to seed the fuzzer
+
+# Basic expressions
+$
+$.store
+$.store.book
+$.store.book[0]
+$.store.book[*]
+$.store.book[0].title
+
+# Array access patterns
+$[0]
+$[1:3]
+$[1:3:2]
+$[-1]
+$[-2:]
+$[:2]
+$[::2]
+
+# Wildcard patterns
+$.*
+$.store.*
+$.store.book[*].title
+$..title
+$..*
+
+# Filter expressions
+$[?(@.price)]
+$[?(@.price > 10)]
+$[?(@.price < 20)]
+$[?(@.price >= 10)]
+$[?(@.price <= 20)]
+$[?(@.price == 10.99)]
+$[?(@.price != 10.99)]
+$[?(@.title == "Book 1")]
+$[?(@.title != "Book 1")]
+
+# Complex filters
+$.store.book[?(@.price > 10)].title
+$.store.book[?(@.author == "Author 1")]
+$..book[?(@.price > 10)]
+$[?(@.price > $.expensive)]
+
+# Edge cases and potential issues
+$.
+$..
+$...
+$.store..book
+$.store.book.
+$.store.book[]
+$.store.book[
+$.store.book]
+$.store.book[?]
+$.store.book[?()]
+$.store.book[?(@)]
+$.store.book[?(@.)]
+$.store.book[?(@.price)]
+$.store.book[?(@.price >)]
+$.store.book[?(@.price > )]
+$.store.book[?(@.price > 10]
+$.store.book[?(@.price > 10)]
+
+# Bracket notation
+$['store']
+$['store']['book']
+$['store']['book'][0]
+$['store']['book'][*]
+$["store"]
+$["store"]["book"]
+
+# Mixed notation
+$.store['book']
+$['store'].book
+$.store.book['title']
+$['store']['book']['title']
+
+# Unicode and special characters
+$.café
+$['café']
+$.store.book[?(@.title == "Café")]
+$['日本語']
+$.store.book[?(@.author == "José")]
+
+# Empty and whitespace
+$['']
+$[""]
+$.store.book[?(@.title == "")]
+$.store.book[?(@.title == " ")]
+
+# Escape sequences
+$['key with spaces']
+$['key\'with\'quotes']
+$["key\"with\"quotes"]
+$['key\\with\\backslashes']
+
+# Malformed expressions (should be handled gracefully)
+$store
+store
+$.store.
+$.store..
+$.store...
+$..store.
+$...store
+$.store.book[
+$.store.book]
+$.store.book[?
+$.store.book?]
+$.store.book[?(@
+$.store.book[?(@.
+$.store.book[?(@.price
+$.store.book[?(@.price >
+$.store.book[?(@.price > 10
+$.store.book[?(@.price > 10)
