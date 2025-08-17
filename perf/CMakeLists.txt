@@ -66,7 +66,6 @@ if(JSON_QUERY_FETCH_GPERFTOOLS)
   if(WIN32)
     set(JSON_QUERY_GPERFTOOLS_CPU OFF)
   endif()
-
   FetchContent_Declare(
     gperftools
     GIT_REPOSITORY https://github.com/gperftools/gperftools.git
@@ -85,6 +84,10 @@ if(TARGET profiler)
   # Use fetched/built profiler target
   target_link_libraries(profile_test PRIVATE profiler)
   target_compile_definitions(profile_test PRIVATE HAVE_GPERFTOOLS)
+  # Upstream CMake uses directory-level include_directories; ensure headers are visible here
+  if(DEFINED gperftools_SOURCE_DIR)
+    target_include_directories(profile_test PRIVATE ${gperftools_SOURCE_DIR}/src)
+  endif()
 else()
   find_path(GPERFTOOLS_INCLUDE_DIR gperftools/profiler.h HINTS /opt/homebrew/include)
   find_library(GPERFTOOLS_PROFILER_LIB profiler HINTS /opt/homebrew/lib)
@@ -103,6 +106,9 @@ if(TARGET profiler)
   # Prefer fetched profiler target when available
   target_compile_definitions(cache_analysis_tool PRIVATE HAVE_GPERFTOOLS)
   target_link_libraries(cache_analysis_tool PRIVATE profiler)
+  if(DEFINED gperftools_SOURCE_DIR)
+    target_include_directories(cache_analysis_tool PRIVATE ${gperftools_SOURCE_DIR}/src)
+  endif()
   message(STATUS "Using fetched gperftools profiler target for cache_analysis_tool")
 else()
   # Find and link Google perftools (gperftools) - improved detection
