@@ -35,6 +35,16 @@
       }
     },
     {
+      "name": "release-gcc",
+      "inherits": "common-gcc",
+      "displayName": "Release (GCC)",
+      "description": "Release build with GCC compiler",
+      "binaryDir": "${sourceDir}/build-release-gcc",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
       "name": "release-msvc",
       "inherits": "common-msvc",
       "displayName": "Release (MSVC)",
@@ -73,6 +83,12 @@
       "name": "release-llvm-clang",
       "configurePreset": "release-llvm-clang",
       "description": "Build release configuration with LLVM Clang",
+      "jobs": 8
+    },
+    {
+      "name": "release-gcc",
+      "configurePreset": "release-gcc",
+      "description": "Build release configuration with GCC",
       "jobs": 8
     },
     {

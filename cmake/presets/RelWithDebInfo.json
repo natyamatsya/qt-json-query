@@ -35,6 +35,16 @@
       }
     },
     {
+      "name": "relwithdebinfo-gcc",
+      "inherits": "common-gcc",
+      "displayName": "RelWithDebInfo (GCC)",
+      "description": "Release build with debug info using GCC compiler",
+      "binaryDir": "${sourceDir}/build-relwithdebinfo-gcc",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
+    },
+    {
       "name": "relwithdebinfo-msvc",
       "inherits": "common-msvc",
       "displayName": "RelWithDebInfo (MSVC)",
@@ -73,6 +83,12 @@
       "name": "relwithdebinfo-llvm-clang",
       "configurePreset": "relwithdebinfo-llvm-clang",
       "description": "Build RelWithDebInfo configuration with LLVM Clang",
+      "jobs": 8
+    },
+    {
+      "name": "relwithdebinfo-gcc",
+      "configurePreset": "relwithdebinfo-gcc",
+      "description": "Build RelWithDebInfo configuration with GCC",
       "jobs": 8
     },
     {

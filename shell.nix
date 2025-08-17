@@ -8,6 +8,7 @@ pkgs.mkShell {
     cmake
     ninja
     pkg-config
+    valgrind
     # Add other development tools as needed
   ];
 }

@@ -35,6 +35,16 @@
       }
     },
     {
+      "name": "debug-gcc",
+      "inherits": "common-gcc",
+      "displayName": "Debug (GCC)",
+      "description": "Debug build with GCC compiler",
+      "binaryDir": "${sourceDir}/build-debug-gcc",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
       "name": "debug-msvc",
       "inherits": "common-msvc",
       "displayName": "Debug (MSVC)",
@@ -73,6 +83,12 @@
       "name": "debug-llvm-clang",
       "configurePreset": "debug-llvm-clang",
       "description": "Build debug configuration with LLVM Clang",
+      "jobs": 8
+    },
+    {
+      "name": "debug-gcc",
+      "configurePreset": "debug-gcc",
+      "description": "Build debug configuration with GCC",
       "jobs": 8
     },
     {
