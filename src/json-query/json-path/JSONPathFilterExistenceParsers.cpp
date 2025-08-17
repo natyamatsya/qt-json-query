@@ -488,8 +488,15 @@ struct ExistencePatternStrategy<ExistencePatternType::BasicDot>
                 [prop = std::move(prop)](const QJsonValue& j)
                 {
                     // Basic property existence: @.property - true if object contains property
-                    if (j.isObject())
-                        return j.toObject().contains(prop);
+                    qDebug() << "DEBUG: BasicDot evaluating property" << prop << "on value:" << j;
+                    qDebug() << "DEBUG: j.isObject():" << j.isObject() << "j.type():" << j.type();
+                    if (j.isObject()) {
+                        const auto obj = j.toObject();
+                        bool hasProperty = obj.contains(prop);
+                        qDebug() << "DEBUG: Object keys:" << obj.keys() << "contains" << prop << "=" << hasProperty;
+                        return hasProperty;
+                    }
+                    qDebug() << "DEBUG: Not an object, returning false";
                     return false; // Non-objects don't have properties
                 });
 

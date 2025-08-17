@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "json-query/json-path/JSONPathFilterParsers.hpp"
-#include "json-query/json-path/JSONPathFilterFunctions.hpp"
-#include "json-query/json-path/JSONPathFilterHelpers.hpp"
+#include "json-query/json-path/JSONPathCompile.hpp"
+#include "json-query/json-path/JSONPathHelpers.hpp"
 #include "json-query/json-path/JSONPathFilterComparison.hpp"
 #include "json-query/json-path/JSONPathFilterExistenceParsers.hpp"
-#include "json-query/json-path/JSONPathHelpers.hpp"
+#include "json-query/json-path/JSONPathFilterFunctions.hpp"
+#include "json-query/json-path/JSONPathFilterHelpers.hpp"
 #include "json-query/json-path/JSONPathLog.hpp"
 #include "json-query/json-path/JSONPath.hpp"
 #include "json-query/json-path/internal/ContainerCursor.hpp"
@@ -106,20 +107,27 @@ std::optional<Token> parseIn(const QString& s, std::vector<FilterFn>& out)
 
 std::optional<Token> parseEmbeddedOr(const QString& s)
 {
+    // Simple debug output to verify execution
+    qDebug() << "DEBUG: parseEmbeddedOr called with input:" << s;
+    qCDebug(jsonPathLog) << "parseEmbeddedOr: input=" << s;
     if (auto split = splitTopLevel(s, "||"_L1); split)
     {
         auto [lhs, rhs] = *split;
+        qCDebug(jsonPathLog) << "parseEmbeddedOr: split found - lhs=" << lhs << "rhs=" << rhs;
 
         auto leftToken{compileEmbeddedFilter(lhs.trimmed())};
         auto rightToken{compileEmbeddedFilter(rhs.trimmed())};
 
-        if (!leftToken || !rightToken)
+        if (!leftToken || !rightToken) {
+            qCDebug(jsonPathLog) << "parseEmbeddedOr: failed to compile sub-tokens, leftToken=" << (leftToken ? "valid" : "null") << "rightToken=" << (rightToken ? "valid" : "null");
             return std::nullopt;
+        }
 
         // Create composite OR filter using embedded filter composition
         Token result;
         result.kind = Token::Kind::Filter;
         result.key  = QString("(%1)||(%2)").arg(lhs, rhs);
+        qCDebug(jsonPathLog) << "parseEmbeddedOr: created composite OR token with key=" << result.key;
 
         // Embed a composite filter that evaluates both sides with OR logic
         result.embedFilter(
@@ -127,30 +135,37 @@ std::optional<Token> parseEmbeddedOr(const QString& s)
             {
                 auto leftResult{leftToken.evaluateEmbeddedFilter(value)};
                 auto rightResult{rightToken.evaluateEmbeddedFilter(value)};
+                qCDebug(jsonPathLog) << "parseEmbeddedOr: evaluating OR - leftResult=" << leftResult << "rightResult=" << rightResult << "final=" << (leftResult || rightResult);
                 return leftResult || rightResult;
             });
 
         return result;
     }
+    qCDebug(jsonPathLog) << "parseEmbeddedOr: no || split found in" << s;
     return std::nullopt;
 }
 
 std::optional<Token> parseEmbeddedAnd(const QString& s)
 {
+    qCDebug(jsonPathLog) << "parseEmbeddedAnd: input=" << s;
     if (auto split = splitTopLevel(s, "&&"_L1); split)
     {
         auto [lhs, rhs] = *split;
+        qCDebug(jsonPathLog) << "parseEmbeddedAnd: split found - lhs=" << lhs << "rhs=" << rhs;
 
         auto leftToken{compileEmbeddedFilter(lhs.trimmed())};
         auto rightToken{compileEmbeddedFilter(rhs.trimmed())};
 
-        if (!leftToken || !rightToken)
+        if (!leftToken || !rightToken) {
+            qCDebug(jsonPathLog) << "parseEmbeddedAnd: failed to compile sub-tokens, leftToken=" << (leftToken ? "valid" : "null") << "rightToken=" << (rightToken ? "valid" : "null");
             return std::nullopt;
+        }
 
         // Create composite AND filter using embedded filter composition
         Token result;
         result.kind = Token::Kind::Filter;
         result.key  = QString("(%1)&&(%2)").arg(lhs, rhs);
+        qCDebug(jsonPathLog) << "parseEmbeddedAnd: created composite AND token with key=" << result.key;
 
         // Embed a composite filter that evaluates both sides with AND logic
         result.embedFilter(
@@ -158,11 +173,13 @@ std::optional<Token> parseEmbeddedAnd(const QString& s)
             {
                 auto leftResult{leftToken.evaluateEmbeddedFilter(value)};
                 auto rightResult{rightToken.evaluateEmbeddedFilter(value)};
+                qCDebug(jsonPathLog) << "parseEmbeddedAnd: evaluating AND - leftResult=" << leftResult << "rightResult=" << rightResult << "final=" << (leftResult && rightResult);
                 return leftResult && rightResult;
             });
 
         return result;
     }
+    qCDebug(jsonPathLog) << "parseEmbeddedAnd: no && split found in" << s;
     return std::nullopt;
 }
 

@@ -140,10 +140,16 @@ template <>
 std::expected<QJsonArray, EvalError>
 eval<Token::Kind::Filter>(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
 {
+    qDebug() << "DEBUG: Filter token evaluation called with token key:" << tk.key << "value type:" << v.type();
+    
     // First try pattern-aware filter optimization
-    if (auto result = internal::PatternAwareFilterEvaluator::evaluate(ctx, tk, v))
+    if (auto result = internal::PatternAwareFilterEvaluator::evaluate(ctx, tk, v)) {
+        qDebug() << "DEBUG: PatternAwareFilterEvaluator handled filter, returning early";
         return result;
+    }
 
+    qDebug() << "DEBUG: PatternAwareFilterEvaluator did not handle filter, falling back to embedded filter evaluation";
+    
     // Fall back to embedded filter evaluation for complex patterns
     // Use ArrayPool for result to optimize memory allocation
     auto  pooledArray{acquirePooledArray()};
@@ -152,33 +158,43 @@ eval<Token::Kind::Filter>(const PathEvalCtx& ctx, const Token& tk, const QJsonVa
     // Check for embedded filters (zero-overhead)
     if (tk.hasEmbeddedFilter())
     {
+        qDebug() << "DEBUG: Token has embedded filter, processing array/object";
         // Pre-compute context requirement check to avoid repeated string operations
         const auto needsRootContext{tk.key.contains("value($")};
 
         if (v.isArray())
         {
             const auto arr{v.toArray()};
+            qDebug() << "DEBUG: Processing array with" << arr.size() << "elements";
 
             for (const auto& item : arr)
             {
+                qDebug() << "DEBUG: Processing array item:" << item;
                 const bool pass = needsRootContext ? tk.evaluateEmbeddedContextFilter(item, ctx.rootDocument)
                                                    : tk.evaluateEmbeddedFilter(item);
+                qDebug() << "DEBUG: Array item filter result:" << pass;
                 if (pass)
                     out.append(item);
             }
+            qDebug() << "DEBUG: Array processing complete, output has" << out.size() << "items";
         }
         else if (v.isObject())
         {
             const auto obj{v.toObject()};
+            qDebug() << "DEBUG: Processing single object:" << QJsonValue(obj);
 
-            auto cursor{ContainerCursor::object(obj)};
-            for (const auto& val : cursor)
-            {
-                const bool pass = needsRootContext ? tk.evaluateEmbeddedContextFilter(val, ctx.rootDocument)
-                                                   : tk.evaluateEmbeddedFilter(val);
-                if (pass)
-                    out.append(val);
-            }
+            // CRITICAL FIX: Evaluate filter on the whole object, not property values
+            // For JSONPath filters like $[?@.a || @.b && @.c], the filter should be evaluated
+            // once per object with the complete object passed to the embedded filter
+            const QJsonValue objValue{obj};
+            qDebug() << "DEBUG: Evaluating filter on complete object:" << objValue;
+            const bool pass = needsRootContext ? tk.evaluateEmbeddedContextFilter(objValue, ctx.rootDocument)
+                                               : tk.evaluateEmbeddedFilter(objValue);
+            qDebug() << "DEBUG: Object filter result:" << pass;
+            if (pass)
+                out.append(objValue);
+            
+            qDebug() << "DEBUG: Object processing complete, output has" << out.size() << "items";
         }
 
         // SANITIZER WORKAROUND: Avoid QJsonArray copy constructor corruption

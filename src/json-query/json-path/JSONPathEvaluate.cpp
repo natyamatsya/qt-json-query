@@ -347,7 +347,26 @@ std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const 
     // Use ArrayPool for better memory management of working array
     auto  pooledWorkingArray{acquirePooledArray()};
     auto& workingArray = *pooledWorkingArray;
-    workingArray.append(root);
+    
+    // CRITICAL FIX: Handle root document correctly for JSONPath evaluation
+    // For root selector "$", if the root document is an array, we need to populate
+    // the working array with the individual elements, not the array itself as one element
+    qDebug() << "DEBUG: evalStandard - Root document type:" << root.type() << "isArray:" << root.isArray();
+    if (root.isArray()) {
+        // Add individual elements of the root array to working array
+        const auto rootArray = root.toArray();
+        qDebug() << "DEBUG: Root array size:" << rootArray.size();
+        for (qsizetype i = 0; i < rootArray.size(); ++i) {
+            const auto& element = rootArray.at(i);
+            workingArray.append(element);
+            qDebug() << "DEBUG: Added root element[" << i << "]:" << element;
+        }
+        qDebug() << "DEBUG: Root is array, added" << rootArray.size() << "individual elements to working array";
+    } else {
+        // For non-array root, add the root document as a single element
+        workingArray.append(root);
+        qDebug() << "DEBUG: Root is not array (type" << root.type() << "), added single root element to working array";
+    }
 
     // SANITIZER WORKAROUND: Avoid QJsonArray copy constructor corruption
     // This is the same issue we fixed in JSON Pointer and array indexing - sanitizer instrumentation

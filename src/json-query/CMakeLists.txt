@@ -50,7 +50,7 @@ target_include_directories(
 target_link_libraries(json_query PUBLIC Qt6::Core)
 
 # Compile out qDebug calls for performance optimization
-target_compile_definitions(json_query PRIVATE QT_NO_DEBUG_OUTPUT)
+# target_compile_definitions(json_query PRIVATE QT_NO_DEBUG_OUTPUT)  # Temporarily disabled for debugging
 
 # Link CTRE header-only interface when available
 if(TARGET ctre_interface)
