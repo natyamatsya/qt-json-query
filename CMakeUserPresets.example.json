@@ -41,6 +41,15 @@
       }
     },
     {
+      "name": "debug-qt-clang-cl",
+      "inherits": "debug-clang-cl",
+      "displayName": "Debug with Qt (clang-cl)",
+      "description": "Debug preset with Qt and clang-cl",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "D:/dev/sdk/qt/qt-6.8.3/6.8.3/msvc2022_64"
+      }
+    },
+    {
       "name": "release-qt",
       "inherits": "release",
       "displayName": "Release with Qt",
@@ -77,6 +86,15 @@
       }
     },
     {
+      "name": "release-qt-clang-cl",
+      "inherits": "release-clang-cl",
+      "displayName": "Release with Qt (clang-cl)",
+      "description": "Release preset with Qt and clang-cl",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "D:/dev/sdk/qt/qt-6.8.3/6.8.3/msvc2022_64"
+      }
+    },
+    {
       "name": "relwithdebinfo-qt",
       "inherits": "relwithdebinfo",
       "displayName": "Release with Debug Info and Qt",
@@ -101,6 +119,24 @@
       "description": "Release with debug info preset with Qt and LLVM Clang compiler",
       "cacheVariables": {
         "CMAKE_PREFIX_PATH": "$env{HOME}/dev/qt/qt-6.8.3/6.8.3/macos"
+      }
+    },
+    {
+      "name": "relwithdebinfo-qt-msvc",
+      "inherits": "relwithdebinfo-msvc",
+      "displayName": "RelWithDebInfo with Qt (MSVC)",
+      "description": "Release with debug info preset with Qt and MSVC",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "D:/dev/sdk/qt/qt-6.8.3/6.8.3/msvc2022_64"
+      }
+    },
+    {
+      "name": "relwithdebinfo-qt-clang-cl",
+      "inherits": "relwithdebinfo-clang-cl",
+      "displayName": "RelWithDebInfo with Qt (clang-cl)",
+      "description": "Release with debug info preset with Qt and clang-cl",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "D:/dev/sdk/qt/qt-6.8.3/6.8.3/msvc2022_64"
       }
     }
   ],
@@ -130,6 +166,12 @@
       "jobs": 8
     },
     {
+      "name": "debug-qt-clang-cl",
+      "configurePreset": "debug-qt-clang-cl",
+      "description": "Build debug configuration with Qt and clang-cl",
+      "jobs": 8
+    },
+    {
       "name": "release-qt",
       "configurePreset": "release-qt",
       "description": "Build release configuration with Qt",
@@ -154,6 +196,12 @@
       "jobs": 8
     },
     {
+      "name": "release-qt-clang-cl",
+      "configurePreset": "release-qt-clang-cl",
+      "description": "Build release configuration with Qt and clang-cl",
+      "jobs": 8
+    },
+    {
       "name": "relwithdebinfo-qt",
       "configurePreset": "relwithdebinfo-qt",
       "description": "Build release with debug info configuration with Qt",
@@ -169,6 +217,12 @@
       "name": "relwithdebinfo-qt-llvm-clang",
       "configurePreset": "relwithdebinfo-qt-llvm-clang",
       "description": "Build release with debug info configuration with Qt and LLVM Clang",
+      "jobs": 8
+    },
+    {
+      "name": "relwithdebinfo-qt-clang-cl",
+      "configurePreset": "relwithdebinfo-qt-clang-cl",
+      "description": "Build release with debug info configuration with Qt and clang-cl",
       "jobs": 8
     }
   ],
@@ -194,14 +248,29 @@
       "description": "Run tests for debug configuration with Qt (MSVC)"
     },
     {
+      "name": "debug-qt-clang-cl",
+      "configurePreset": "debug-qt-clang-cl",
+      "description": "Run tests for debug configuration with Qt (clang-cl)"
+    },
+    {
       "name": "release-qt-msvc",
       "configurePreset": "release-qt-msvc",
       "description": "Run tests for release configuration with Qt (MSVC)"
     },
     {
+      "name": "release-qt-clang-cl",
+      "configurePreset": "release-qt-clang-cl",
+      "description": "Run tests for release configuration with Qt (clang-cl)"
+    },
+    {
       "name": "relwithdebinfo-qt-msvc",
       "configurePreset": "relwithdebinfo-qt-msvc",
       "description": "Run tests for release with debug info configuration with Qt (MSVC)"
+    },
+    {
+      "name": "relwithdebinfo-qt-clang-cl",
+      "configurePreset": "relwithdebinfo-qt-clang-cl",
+      "description": "Run tests for release with debug info configuration with Qt (clang-cl)"
     }
   ]
 }

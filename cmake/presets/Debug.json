@@ -44,6 +44,17 @@
         "CMAKE_BUILD_TYPE": "Debug"
       }
     }
+    ,
+    {
+      "name": "debug-clang-cl",
+      "inherits": "common-clang-cl",
+      "displayName": "Debug (clang-cl)",
+      "description": "Debug build with LLVM clang-cl on Windows",
+      "binaryDir": "${sourceDir}/build-debug-clang-cl",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    }
   ],
   "buildPresets": [
     {
@@ -68,6 +79,13 @@
       "name": "debug-msvc",
       "configurePreset": "debug-msvc",
       "description": "Build debug configuration with MSVC",
+      "jobs": 8
+    }
+    ,
+    {
+      "name": "debug-clang-cl",
+      "configurePreset": "debug-clang-cl",
+      "description": "Build debug configuration with clang-cl",
       "jobs": 8
     }
   ]

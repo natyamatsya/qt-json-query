@@ -44,6 +44,17 @@
         "CMAKE_BUILD_TYPE": "RelWithDebInfo"
       }
     }
+    ,
+    {
+      "name": "relwithdebinfo-clang-cl",
+      "inherits": "common-clang-cl",
+      "displayName": "RelWithDebInfo (clang-cl)",
+      "description": "Release build with debug info using clang-cl on Windows",
+      "binaryDir": "${sourceDir}/build-relwithdebinfo-clang-cl",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
+    }
   ],
   "buildPresets": [
     {
@@ -68,6 +79,13 @@
       "name": "relwithdebinfo-msvc",
       "configurePreset": "relwithdebinfo-msvc",
       "description": "Build RelWithDebInfo configuration with MSVC",
+      "jobs": 8
+    }
+    ,
+    {
+      "name": "relwithdebinfo-clang-cl",
+      "configurePreset": "relwithdebinfo-clang-cl",
+      "description": "Build RelWithDebInfo configuration with clang-cl",
       "jobs": 8
     }
   ]

@@ -44,6 +44,17 @@
         "CMAKE_BUILD_TYPE": "Release"
       }
     }
+    ,
+    {
+      "name": "release-clang-cl",
+      "inherits": "common-clang-cl",
+      "displayName": "Release (clang-cl)",
+      "description": "Release build with clang-cl on Windows",
+      "binaryDir": "${sourceDir}/build-release-clang-cl",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    }
   ],
   "buildPresets": [
     {
@@ -68,6 +79,13 @@
       "name": "release-msvc",
       "configurePreset": "release-msvc",
       "description": "Build release configuration with MSVC",
+      "jobs": 8
+    }
+    ,
+    {
+      "name": "release-clang-cl",
+      "configurePreset": "release-clang-cl",
+      "description": "Build release configuration with clang-cl",
       "jobs": 8
     }
   ]

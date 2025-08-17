@@ -33,5 +33,14 @@
       "description": "Shared settings for MSVC builds",
       "toolchainFile": "${sourceDir}/cmake/toolchains/msvc.cmake"
     }
+    ,
+    {
+      "name": "common-clang-cl",
+      "inherits": "common",
+      "hidden": true,
+      "displayName": "Common clang-cl",
+      "description": "Shared settings for Windows builds with clang-cl",
+      "toolchainFile": "${sourceDir}/cmake/toolchains/clang-cl.cmake"
+    }
   ]
 }
