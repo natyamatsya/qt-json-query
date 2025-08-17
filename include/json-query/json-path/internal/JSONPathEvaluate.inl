@@ -37,6 +37,7 @@ std::expected<QJsonValue, EvalError> evaluate(const PathEvalCtx& ctx, const QJso
 QT_QUERY_JSON_ALWAYS_INLINE
 std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src, qsizetype tokenPos)
 {
+    qDebug() << "DEBUG: fanOut called - tokenPos:" << tokenPos << "kind:" << static_cast<int>(tk.kind) << "index:" << tk.index << "src.size():" << src.size();
     // Use ArrayPool for better memory management
     auto pooledArray = acquirePooledArray();
     QJsonArray& result = *pooledArray;
@@ -44,14 +45,35 @@ std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token&
     ResultCollector collector(&result);
     auto streamer = collector.getStreamer();
 
-    // Use TableGen-inspired error handling dispatch directly
-    internal::ErrorHandlingDispatcher::dispatch(tk, tokenPos, ctx, src, streamer);
+    qDebug() << "DEBUG: fanOut - about to call ErrorHandlingDispatcher::dispatch";
+    
+    // PROPER FIX: For Index tokens, bypass ErrorHandlingDispatcher and call dispatchIndex directly
+    if (tk.kind == Token::Kind::Index) {
+        qDebug() << "DEBUG: fanOut - Index token detected, calling dispatchIndex on whole source array";
+        // Convert QJsonArray to QJsonValue and call dispatchIndex once on the whole array
+        QJsonValue srcAsValue(src);
+        auto directResult = json_query::json_path::internal::dispatchIndex(ctx, tk, srcAsValue);
+        qDebug() << "DEBUG: fanOut - direct dispatchIndex result has_value:" << directResult.has_value();
+        if (directResult && !directResult->empty()) {
+            qDebug() << "DEBUG: fanOut - direct dispatchIndex result size:" << directResult->size();
+            // Add results to the collector
+            for (const auto& item : *directResult) {
+                result.append(item);
+            }
+        }
+    } else {
+        // Use TableGen-inspired error handling dispatch directly
+        internal::ErrorHandlingDispatcher::dispatch(tk, tokenPos, ctx, src, streamer);
+    }
+    qDebug() << "DEBUG: fanOut - dispatch completed, result.size():" << result.size();
 
     // Check if an error occurred during processing
     if (QT_QUERY_JSON_UNLIKELY(collector.hasError())) {
+        qDebug() << "DEBUG: fanOut - collector has error:" << static_cast<int>(collector.getLastError());
         return std::unexpected(collector.getLastError());
     }
 
+    qDebug() << "DEBUG: fanOut - returning result with size:" << result.size();
     // Return a copy since pooled array will be returned to pool
     return QJsonArray(result);
 }
