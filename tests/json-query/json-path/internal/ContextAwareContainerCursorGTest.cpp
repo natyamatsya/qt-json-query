@@ -436,7 +436,11 @@ TEST_F(ContextAwareContainerCursorTest, JSONPathIntegrationScenario)
     QJsonValue usersContext = complexRoot["users"];
 
     PathEvalCtx complexCtx{tokens, complexRootValue, FunctionType::None};
-    auto        cursor{makeContextAwareCursor(complexRoot["users"].toArray(), complexCtx, usersContext)};
+    // Important: avoid creating cursor from a temporary QJsonArray returned by toArray().
+    // The cursor holds a pointer to the QJsonArray object, so the referenced
+    // container must outlive the cursor. Bind the array to a local lvalue first.
+    QJsonArray usersArray = complexRoot["users"].toArray();
+    auto       cursor{makeContextAwareCursor(usersArray, complexCtx, usersContext)};
 
     // Simulate filtering users based on root config and user properties
     std::vector<QString> adminUsers;
