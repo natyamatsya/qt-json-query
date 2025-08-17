@@ -16,6 +16,7 @@
 // Order of matched values is ignored as mandated by RFC 9535.
 // -----------------------------------------------------------------------------
 #include <gtest/gtest.h>
+#include <ostream>
 
 #include <QDir>
 #include <QFile>
@@ -74,6 +75,20 @@ struct CtsTestCase
     QList<QJsonArray> resultSets; // one or many expected result arrays
     bool              invalidSelector{false};
 };
+
+// Custom GoogleTest printer to avoid raw-bytes dumping of padding, which
+// triggers Valgrind "uninitialised value" reports. Keep it lightweight.
+inline void PrintTo(const CtsTestCase& tc, std::ostream* os)
+{
+    *os << "CtsTestCase{"
+        << "name='" << tc.name.toStdString() << "'"
+        << ", selector='" << tc.selector.toStdString() << "'"
+        << ", invalidSelector=" << (tc.invalidSelector ? "true" : "false")
+        << ", documentType="
+        << (tc.document.isArray() ? "array" : (tc.document.isObject() ? "object" : "other"))
+        << ", resultSets=" << tc.resultSets.size()
+        << "}";
+}
 
 // ----------------------------------------------------------------------------
 // JSON loader utilities -------------------------------------------------------
@@ -224,25 +239,29 @@ TEST_P(CtsJsonPathTest, EvaluatesPerSpec)
 
     if (!matched)
     {
-        qDebug() << "=== TEST MISMATCH DEBUG ===";
-        qDebug() << "Test name:" << tc.name;
-        qDebug() << "Selector:" << tc.selector;
-        qDebug() << "Document:" << QJsonDocument(tc.document.toObject()).toJson(QJsonDocument::Compact);
-        qDebug() << "Actual result (" << actual.size() << " items):";
-        for (int i = 0; i < actual.size(); ++i)
-            qDebug() << "  [" << i << "]" << QJsonDocument(QJsonArray{actual[i]}).toJson(QJsonDocument::Compact);
-        qDebug() << "Expected result sets:";
-        for (int setIdx = 0; setIdx < tc.resultSets.size(); ++setIdx)
+        const bool ctsDebug = qEnvironmentVariableIsSet("JSON_QUERY_CTS_DEBUG");
+        if (ctsDebug)
         {
-            const QJsonArray& expected = tc.resultSets[setIdx];
-            qDebug() << "  Set" << setIdx << "(" << expected.size() << " items):";
-            for (int i = 0; i < expected.size(); ++i)
+            qDebug() << "=== TEST MISMATCH DEBUG ===";
+            qDebug() << "Test name:" << tc.name;
+            qDebug() << "Selector:" << tc.selector;
+            qDebug() << "Document:" << QJsonDocument(tc.document.toObject()).toJson(QJsonDocument::Compact);
+            qDebug() << "Actual result (" << actual.size() << " items):";
+            for (int i = 0; i < actual.size(); ++i)
+                qDebug() << "  [" << i << "]" << QJsonDocument(QJsonArray{actual[i]}).toJson(QJsonDocument::Compact);
+            qDebug() << "Expected result sets:";
+            for (int setIdx = 0; setIdx < tc.resultSets.size(); ++setIdx)
             {
-                qDebug() << "    [" << i << "]"
-                         << QJsonDocument(QJsonArray{expected[i]}).toJson(QJsonDocument::Compact);
+                const QJsonArray& expected = tc.resultSets[setIdx];
+                qDebug() << "  Set" << setIdx << "(" << expected.size() << " items):";
+                for (int i = 0; i < expected.size(); ++i)
+                {
+                    qDebug() << "    [" << i << "]"
+                             << QJsonDocument(QJsonArray{expected[i]}).toJson(QJsonDocument::Compact);
+                }
             }
+            qDebug() << "=========================";
         }
-        qDebug() << "=========================";
     }
 
     EXPECT_TRUE(matched) << "No expected result set matched for test '" << tc.name.toStdString() << "'";
