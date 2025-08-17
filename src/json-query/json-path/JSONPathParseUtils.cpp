@@ -4,6 +4,7 @@
 #include "json-query/json-path/JSONPathCompile.hpp"
 #include "json-query/json-path/JSONPathLog.hpp"
 #include "json-query/json-path/internal/QtHash.hpp"
+#include "json-query/utils/JSONQueryUtils.hpp"
 
 #include <QDebug>
 #include <limits>
@@ -36,7 +37,7 @@ std::optional<Slice> makeSlice(QStringView v)
         }
 
         // Manual integer-literal validation per RFC 9535 ----------
-        if (!integer_literal_pattern(part.toString().toStdString()))
+        if (!integer_literal_pattern(json_query::utils::to_sv(part.toString())))
         {
             qCDebug(jsonPathLog) << "strictParse(" << part << ") invalid integer literal";
             return false;
@@ -80,9 +81,9 @@ std::optional<Slice> makeSlice(QStringView v)
     static constexpr auto sliceFull =
         ctre::match<"^\\s*(?:(?:0|-[1-9][0-9]*|[1-9][0-9]*))?\\s*(?::\\s*(?:(?:0|-[1-9][0-9]*|[1-9][0-9]*))?\\s*(?:"
                     "\\s*:\\s*(?:(?:0|-[1-9][0-9]*|[1-9][0-9]*))?\\s*)?)?\\s*$">;
-    if (!sliceFull(v.toString().toStdString()))
+    if (!sliceFull(json_query::utils::to_sv(v.toString())))
         qCDebug(jsonPathLog) << "sliceFull regex failed";
-    if (!sliceFull(v.toString().toStdString()))
+    if (!sliceFull(json_query::utils::to_sv(v.toString())))
         return std::nullopt;
     const auto parts{v.split(u':')};
     if (parts.size() > 3)
@@ -338,7 +339,7 @@ bool isValidIndexLiteral(QStringView content)
     if (trimmed.isEmpty())
         return false;
 
-    if (!integer_literal_pattern(trimmed.toString().toStdString()))
+    if (!integer_literal_pattern(json_query::utils::to_sv(trimmed.toString())))
     {
         qCDebug(jsonPathLog) << "isValidIndexLiteral(" << content << ") invalid integer literal";
         return false;

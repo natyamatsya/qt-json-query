@@ -16,6 +16,7 @@
 #include <memory>
 #include <variant>
 #include <vector>
+#include <cstddef>
 
 namespace json_query::json_path
 {
@@ -182,6 +183,8 @@ class CompactFilterStorage
     {
         using FilterType = std::decay_t<Filter>;
         static_assert(sizeof(FilterType) <= BufferSize, "Filter too large for inline storage");
+        static_assert(alignof(FilterType) <= alignof(std::max_align_t),
+                      "Filter alignment too large for inline storage buffer");
 
         InlineStorage storage;
         new (storage.buffer.data()) FilterType(std::forward<Filter>(filter));
@@ -284,7 +287,7 @@ class CompactFilterStorage
     // Inline storage for small filters
     struct InlineStorage
     {
-        std::array<std::byte, BufferSize> buffer;
+        alignas(std::max_align_t) std::array<std::byte, BufferSize> buffer{};
         bool (*evaluator)(const void*, const QJsonValue&) = nullptr;
     };
 
@@ -319,6 +322,8 @@ class CompactContextFilterStorage
     {
         using FilterType = std::decay_t<Filter>;
         static_assert(sizeof(FilterType) <= BufferSize, "Context filter too large for inline storage");
+        static_assert(alignof(FilterType) <= alignof(std::max_align_t),
+                      "Context filter alignment too large for inline storage buffer");
 
         InlineStorage storage;
         new (storage.buffer.data()) FilterType(std::forward<Filter>(filter));
@@ -422,7 +427,7 @@ class CompactContextFilterStorage
     // Inline storage for small filters
     struct InlineStorage
     {
-        std::array<std::byte, BufferSize> buffer;
+        alignas(std::max_align_t) std::array<std::byte, BufferSize> buffer{};
         bool (*evaluator)(const void*, const QJsonValue&, const QJsonValue&) = nullptr;
     };
 
@@ -595,7 +600,7 @@ struct Token
     [[nodiscard]] bool hasLegacyFilter() const noexcept { return filterId < SIZE_MAX || contextFilterId < SIZE_MAX; }
 
     // Legacy filter storage (for backward compatibility during migration)
-    std::size_t filterId{};                // index into filter table
+    std::size_t filterId{SIZE_MAX};        // index into filter table
     std::size_t contextFilterId{SIZE_MAX}; // index into context filter table (SIZE_MAX = not used)
 
     /**

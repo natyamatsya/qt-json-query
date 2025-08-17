@@ -696,7 +696,7 @@ std::optional<Token> parseEmbeddedFunction(const QString& s)
         static std::function<bool(const QJsonValue&)> createRegularFilter(
             const QString& expr,
             const std::function<SideEvaluationResult(const QString&, bool, const QJsonValue&, const QJsonValue&)>&
-                                                                     evaluateExpressionSide,
+                                                                      evaluateExpressionSide,
             const std::function<ComparisonRuleType(const QString&)>& determineComparisonRuleType,
             const std::function<bool(ComparisonRuleType, const SideEvaluationResult&, const SideEvaluationResult&)>&
                 performNothingAwareComparison)
@@ -704,15 +704,18 @@ std::optional<Token> parseEmbeddedFunction(const QString& s)
             return [expr, evaluateExpressionSide, determineComparisonRuleType, performNothingAwareComparison](
                        const QJsonValue& node) -> bool
             {
-                // Re-parse the expression at runtime to avoid capture issues
+                // Re-parse the expression at runtime to avoid capture issues.
+                // IMPORTANT: Do NOT match against a temporary std::string, as CTRE's match object
+                // holds views into the provided buffer. Use QStringView backed by the captured
+                // QString to ensure stable storage during this invocation.
                 constexpr auto funcCompPat = ctll::fixed_string{"^(.*?)\\s*(==|!=|<|>|<=|>=)\\s*(.*?)$"};
-                auto           m           = ctre::match<funcCompPat>(expr.toStdString());
+                auto           m           = ctre::match<funcCompPat>(to_sv(expr));
                 if (!m)
                     return false;
 
-                auto left{QString::fromStdString(std::string(m.template get<1>()))};
-                auto op{QString::fromStdString(std::string(m.template get<2>()))};
-                auto right{QString::fromStdString(std::string(m.template get<3>()))};
+                auto left  = to_qstr(m.template get<1>().to_view());
+                auto op    = to_qstr(m.template get<2>().to_view());
+                auto right = to_qstr(m.template get<3>().to_view());
 
                 auto leftHasFunc =
                     ctre::search<ctll::fixed_string{R"(\b(length|count|match|search|value)\s*\()"}>(to_sv(left));

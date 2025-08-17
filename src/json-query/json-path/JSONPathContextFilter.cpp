@@ -5,6 +5,7 @@
 #include "json-query/json-path/JSONPath.hpp"
 #include "json-query/json-path/internal/ContextAwareContainerCursor.hpp"
 #include "json-query/json-path/internal/ContainerCursor.hpp"
+#include "json-query/utils/JSONQueryUtils.hpp"
 #include <QDebug>
 #include <iostream>
 #include <ctre.hpp>
@@ -59,7 +60,7 @@ struct ContextFilterParsingDef<ContextFilterParsingType::ComparisonPattern>
         // Valid: $==@, $.foo==@.bar, $.a.b==42
         // Invalid: $.*==42, $[*]==42, $..foo==42 (non-singular queries)
         static const auto absComparisonPat{ctre::match<R"(\$(\.[a-zA-Z_][a-zA-Z0-9_]*)*\s*(==|!=|<=|>=|<|>)\s*(.+))">};
-        return absComparisonPat(expr.toStdString());
+        return absComparisonPat(json_query::utils::to_sv(expr));
     }
 
     static QString description() { return "Absolute path comparison pattern"; }
@@ -93,7 +94,7 @@ struct ContextFilterParsingDef<ContextFilterParsingType::ExistencePattern>
         // Check for absolute path existence filters (allow wildcards and complex paths)
         // Valid: $, $.foo, $.*.a, $[0], etc.
         static const auto absExistencePat{ctre::match<R"(\$(\.[a-zA-Z_*][a-zA-Z0-9_]*|\[\d+\]|\[.*\])*)">};
-        return absExistencePat(expr.toStdString());
+        return absExistencePat(json_query::utils::to_sv(expr));
     }
 
     static QString description() { return "Absolute path existence pattern"; }
@@ -553,13 +554,13 @@ struct ComparisonMatchResult
 ComparisonMatchResult extractComparisonComponents(const QString& expr)
 {
     static const auto absComparisonPat{ctre::match<R"(\$(\.[a-zA-Z_][a-zA-Z0-9_]*)*\s*(==|!=|<=|>=|<|>)\s*(.+))">};
-    if (auto match = absComparisonPat(expr.toStdString()))
+    if (auto match = absComparisonPat(json_query::utils::to_sv(expr)))
     {
-        auto leftPath{"$" + std::string(match.get<1>().to_view())};
-        auto op        = std::string(match.get<2>().to_view());
-        auto rightExpr = std::string(match.get<3>().to_view());
+        const QString leftPath   = QStringLiteral("$") + json_query::utils::to_qstr(match.get<1>().to_view());
+        const QString op         = json_query::utils::to_qstr(match.get<2>().to_view());
+        const QString rightExpr  = json_query::utils::to_qstr(match.get<3>().to_view());
 
-        return {QString::fromStdString(leftPath), QString::fromStdString(op), QString::fromStdString(rightExpr), true};
+        return {leftPath, op, rightExpr, true};
     }
 
     return {"", "", "", false};
