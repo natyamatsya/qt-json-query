@@ -33,6 +33,16 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo"
       }
+    },
+    {
+      "name": "relwithdebinfo-msvc",
+      "inherits": "common-msvc",
+      "displayName": "RelWithDebInfo (MSVC)",
+      "description": "Release build with debug info using Microsoft Visual C++",
+      "binaryDir": "${sourceDir}/build-relwithdebinfo-msvc",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
     }
   ],
   "buildPresets": [
@@ -52,6 +62,12 @@
       "name": "relwithdebinfo-llvm-clang",
       "configurePreset": "relwithdebinfo-llvm-clang",
       "description": "Build RelWithDebInfo configuration with LLVM Clang",
+      "jobs": 8
+    },
+    {
+      "name": "relwithdebinfo-msvc",
+      "configurePreset": "relwithdebinfo-msvc",
+      "description": "Build RelWithDebInfo configuration with MSVC",
       "jobs": 8
     }
   ]

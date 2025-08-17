@@ -24,6 +24,14 @@
       "displayName": "Common LLVM Clang",
       "description": "Shared settings for LLVM Clang builds",
       "toolchainFile": "${sourceDir}/cmake/toolchains/llvm-clang.cmake"
+    },
+    {
+      "name": "common-msvc",
+      "inherits": "common",
+      "hidden": true,
+      "displayName": "Common MSVC",
+      "description": "Shared settings for MSVC builds",
+      "toolchainFile": "${sourceDir}/cmake/toolchains/msvc.cmake"
     }
   ]
 }

@@ -32,6 +32,15 @@
       }
     },
     {
+      "name": "debug-qt-msvc",
+      "inherits": "debug-msvc",
+      "displayName": "Debug with Qt (MSVC)",
+      "description": "Debug preset with Qt and MSVC",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "D:/dev/sdk/qt/qt-6.8.3/6.8.3/msvc2022_64"
+      }
+    },
+    {
       "name": "release-qt",
       "inherits": "release",
       "displayName": "Release with Qt",
@@ -56,6 +65,15 @@
       "description": "Release preset with Qt and LLVM Clang compiler",
       "cacheVariables": {
         "CMAKE_PREFIX_PATH": "$env{HOME}/dev/qt/qt-6.8.3/6.8.3/macos"
+      }
+    },
+    {
+      "name": "release-qt-msvc",
+      "inherits": "release-msvc",
+      "displayName": "Release with Qt (MSVC)",
+      "description": "Release preset with Qt and MSVC",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "D:/dev/sdk/qt/qt-6.8.3/6.8.3/msvc2022_64"
       }
     },
     {
@@ -106,6 +124,12 @@
       "jobs": 8
     },
     {
+      "name": "debug-qt-msvc",
+      "configurePreset": "debug-qt-msvc",
+      "description": "Build debug configuration with Qt and MSVC",
+      "jobs": 8
+    },
+    {
       "name": "release-qt",
       "configurePreset": "release-qt",
       "description": "Build release configuration with Qt",
@@ -121,6 +145,12 @@
       "name": "release-qt-llvm-clang",
       "configurePreset": "release-qt-llvm-clang",
       "description": "Build release configuration with Qt and LLVM Clang",
+      "jobs": 8
+    },
+    {
+      "name": "release-qt-msvc",
+      "configurePreset": "release-qt-msvc",
+      "description": "Build release configuration with Qt and MSVC",
       "jobs": 8
     },
     {
@@ -157,6 +187,21 @@
       "name": "relwithdebinfo-qt",
       "configurePreset": "relwithdebinfo-qt",
       "description": "Run tests for release with debug info configuration with Qt"
+    },
+    {
+      "name": "debug-qt-msvc",
+      "configurePreset": "debug-qt-msvc",
+      "description": "Run tests for debug configuration with Qt (MSVC)"
+    },
+    {
+      "name": "release-qt-msvc",
+      "configurePreset": "release-qt-msvc",
+      "description": "Run tests for release configuration with Qt (MSVC)"
+    },
+    {
+      "name": "relwithdebinfo-qt-msvc",
+      "configurePreset": "relwithdebinfo-qt-msvc",
+      "description": "Run tests for release with debug info configuration with Qt (MSVC)"
     }
   ]
 }

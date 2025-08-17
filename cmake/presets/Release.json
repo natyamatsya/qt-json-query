@@ -33,6 +33,16 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
       }
+    },
+    {
+      "name": "release-msvc",
+      "inherits": "common-msvc",
+      "displayName": "Release (MSVC)",
+      "description": "Release build with Microsoft Visual C++",
+      "binaryDir": "${sourceDir}/build-release-msvc",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
     }
   ],
   "buildPresets": [
@@ -52,6 +62,12 @@
       "name": "release-llvm-clang",
       "configurePreset": "release-llvm-clang",
       "description": "Build release configuration with LLVM Clang",
+      "jobs": 8
+    },
+    {
+      "name": "release-msvc",
+      "configurePreset": "release-msvc",
+      "description": "Build release configuration with MSVC",
       "jobs": 8
     }
   ]
