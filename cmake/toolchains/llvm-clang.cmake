@@ -1,8 +1,13 @@
 # LLVM Clang Toolchain This toolchain file configures CMake to use LLVM Clang
 # compiler
 
-set(CMAKE_SYSTEM_NAME Darwin)
-set(CMAKE_SYSTEM_PROCESSOR x86_64)
+# Target platform: default to host to support macOS and Linux
+if(NOT DEFINED CMAKE_SYSTEM_NAME)
+  set(CMAKE_SYSTEM_NAME ${CMAKE_HOST_SYSTEM_NAME})
+endif()
+if(NOT DEFINED CMAKE_SYSTEM_PROCESSOR)
+  set(CMAKE_SYSTEM_PROCESSOR ${CMAKE_HOST_SYSTEM_PROCESSOR})
+endif()
 
 # Try to find LLVM Clang in common locations
 find_program(
@@ -39,11 +44,22 @@ endif()
 set(CMAKE_C_COMPILER ${LLVM_CLANG_C})
 set(CMAKE_CXX_COMPILER ${LLVM_CLANG_CXX})
 
+# Prefer lld when available on non-macOS hosts for faster linking
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  find_program(LLD_LINKER NAMES ld.lld lld)
+  if(LLD_LINKER)
+    set(CMAKE_EXE_LINKER_FLAGS_INIT "-fuse-ld=lld")
+    set(CMAKE_SHARED_LINKER_FLAGS_INIT "-fuse-ld=lld")
+  endif()
+endif()
+
 # Force use of system archiver and ranlib to avoid LLVM archiver compatibility
 # issues on macOS
-set(CMAKE_AR /usr/bin/ar)
-set(CMAKE_RANLIB /usr/bin/ranlib)
-set(CMAKE_NM /usr/bin/nm)
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  set(CMAKE_AR /usr/bin/ar)
+  set(CMAKE_RANLIB /usr/bin/ranlib)
+  set(CMAKE_NM /usr/bin/nm)
+endif()
 
 # Verify we're using LLVM Clang (not Apple Clang)
 execute_process(
@@ -58,8 +74,15 @@ if(CLANG_VERSION_OUTPUT MATCHES "Apple clang")
 endif()
 
 # Set compiler flags specific to LLVM Clang
-set(CMAKE_CXX_FLAGS_INIT "-stdlib=libc++")
-set(CMAKE_C_FLAGS_INIT "")
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  # On macOS use libc++
+  set(CMAKE_CXX_FLAGS_INIT "-stdlib=libc++")
+  set(CMAKE_C_FLAGS_INIT "")
+else()
+  # On Linux use system default (typically libstdc++)
+  set(CMAKE_CXX_FLAGS_INIT "")
+  set(CMAKE_C_FLAGS_INIT "")
+endif()
 
 # Enable modern C++ features
 set(CMAKE_CXX_STANDARD 23)

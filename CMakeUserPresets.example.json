@@ -138,6 +138,33 @@
       "cacheVariables": {
         "CMAKE_PREFIX_PATH": "D:/dev/sdk/qt/qt-6.8.3/6.8.3/msvc2022_64"
       }
+    },
+    {
+      "name": "debug-qt-llvm-clang-nixos",
+      "inherits": "debug-llvm-clang",
+      "displayName": "Debug with Qt (LLVM Clang, NixOS)",
+      "description": "Debug preset with Qt and LLVM Clang on NixOS",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "/nix/store/rb03qkhd4zblrngax7bg5s1711nb9imm-qt-full-6.9.1"
+      }
+    },
+    {
+      "name": "release-qt-llvm-clang-nixos",
+      "inherits": "release-llvm-clang",
+      "displayName": "Release with Qt (LLVM Clang, NixOS)",
+      "description": "Release preset with Qt and LLVM Clang on NixOS",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "/nix/store/rb03qkhd4zblrngax7bg5s1711nb9imm-qt-full-6.9.1"
+      }
+    },
+    {
+      "name": "relwithdebinfo-qt-llvm-clang-nixos",
+      "inherits": "relwithdebinfo-llvm-clang",
+      "displayName": "RelWithDebInfo with Qt (LLVM Clang, NixOS)",
+      "description": "Release with debug info preset with Qt and LLVM Clang on NixOS",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "/nix/store/rb03qkhd4zblrngax7bg5s1711nb9imm-qt-full-6.9.1"
+      }
     }
   ],
   "buildPresets": [
@@ -224,6 +251,24 @@
       "configurePreset": "relwithdebinfo-qt-clang-cl",
       "description": "Build release with debug info configuration with Qt and clang-cl",
       "jobs": 8
+    },
+    {
+      "name": "debug-qt-llvm-clang-nixos",
+      "configurePreset": "debug-qt-llvm-clang-nixos",
+      "description": "Build debug configuration with Qt and LLVM Clang on NixOS",
+      "jobs": 8
+    },
+    {
+      "name": "release-qt-llvm-clang-nixos",
+      "configurePreset": "release-qt-llvm-clang-nixos",
+      "description": "Build release configuration with Qt and LLVM Clang on NixOS",
+      "jobs": 8
+    },
+    {
+      "name": "relwithdebinfo-qt-llvm-clang-nixos",
+      "configurePreset": "relwithdebinfo-qt-llvm-clang-nixos",
+      "description": "Build release with debug info configuration with Qt and LLVM Clang on NixOS",
+      "jobs": 8
     }
   ],
   "testPresets": [
@@ -271,6 +316,21 @@
       "name": "relwithdebinfo-qt-clang-cl",
       "configurePreset": "relwithdebinfo-qt-clang-cl",
       "description": "Run tests for release with debug info configuration with Qt (clang-cl)"
+    },
+    {
+      "name": "debug-qt-llvm-clang-nixos",
+      "configurePreset": "debug-qt-llvm-clang-nixos",
+      "description": "Run tests for debug configuration with Qt (LLVM Clang, NixOS)"
+    },
+    {
+      "name": "release-qt-llvm-clang-nixos",
+      "configurePreset": "release-qt-llvm-clang-nixos",
+      "description": "Run tests for release configuration with Qt (LLVM Clang, NixOS)"
+    },
+    {
+      "name": "relwithdebinfo-qt-llvm-clang-nixos",
+      "configurePreset": "relwithdebinfo-qt-llvm-clang-nixos",
+      "description": "Run tests for release with debug info configuration with Qt (LLVM Clang, NixOS)"
     }
   ]
 }
