@@ -43,11 +43,11 @@ class alignas(32) ContainerCursor
     static constexpr std::uintptr_t TAG_MASK  = 0x1;
     static constexpr std::uintptr_t ARRAY_TAG = 0x1;
 
-    static constexpr const QJsonObject* objPtr(std::uintptr_t p) noexcept
+    static const QJsonObject* objPtr(std::uintptr_t p) noexcept
     {
         return reinterpret_cast<const QJsonObject*>(p & ~TAG_MASK);
     }
-    static constexpr const QJsonArray* arrPtr(std::uintptr_t p) noexcept
+    static const QJsonArray* arrPtr(std::uintptr_t p) noexcept
     {
         return reinterpret_cast<const QJsonArray*>(p & ~TAG_MASK);
     }

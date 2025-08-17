@@ -100,30 +100,6 @@ if(BUILD_BENCHMARKING)
 endif()
 
 # ---------------------------------------------------------------------------
-# Sanitizer Debug Test (for investigating sanitizer-induced test failures)
-# ---------------------------------------------------------------------------
-# Debug test executables for sanitizer compatibility analysis
-add_executable(sanitizer_debug_test sanitizer_debug_test.cpp)
-target_link_libraries(sanitizer_debug_test PRIVATE json_query Qt6::Core)
-set_target_properties(sanitizer_debug_test PROPERTIES CXX_STANDARD 23)
-
-add_executable(jsonpath_debug_test jsonpath_debug_test.cpp)
-target_link_libraries(jsonpath_debug_test PRIVATE json_query Qt6::Core)
-set_target_properties(jsonpath_debug_test PROPERTIES CXX_STANDARD 23)
-
-add_executable(sanitizer_pipeline_debug sanitizer_pipeline_debug.cpp)
-target_link_libraries(sanitizer_pipeline_debug PRIVATE json_query Qt6::Core)
-set_target_properties(sanitizer_pipeline_debug PROPERTIES CXX_STANDARD 23)
-
-add_executable(sanitizer_slice_debug sanitizer_slice_debug.cpp)
-target_link_libraries(sanitizer_slice_debug PRIVATE json_query Qt6::Core)
-set_target_properties(sanitizer_slice_debug PROPERTIES CXX_STANDARD 23)
-
-add_executable(sanitizer_index_debug sanitizer_index_debug.cpp)
-target_link_libraries(sanitizer_index_debug PRIVATE json_query Qt6::Core)
-set_target_properties(sanitizer_index_debug PROPERTIES CXX_STANDARD 23)
-
-# ---------------------------------------------------------------------------
 # Installation (headers and library)
 # ---------------------------------------------------------------------------
 if(JSON_QUERY_ENABLE_INSTALL)

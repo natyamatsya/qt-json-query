@@ -5,14 +5,13 @@
 set(CMAKE_SYSTEM_NAME Windows)
 set(CMAKE_SYSTEM_PROCESSOR x86_64)
 
-# Use MSVC compiler (requires Developer Command Prompt / VsDevCmd environment)
-set(CMAKE_C_COMPILER cl)
-set(CMAKE_CXX_COMPILER cl)
-
-# Ensure we're using MSVC
-if(NOT MSVC)
-  message(FATAL_ERROR "This toolchain requires MSVC (cl.exe) to be available in PATH.")
+# Locate MSVC compiler (requires Developer Command Prompt / VsDevCmd environment)
+find_program(MSVC_CL NAMES cl.exe cl)
+if(NOT MSVC_CL)
+  message(FATAL_ERROR "MSVC compiler 'cl.exe' not found in PATH. Ensure you are using a Developer Command Prompt/PowerShell.")
 endif()
+set(CMAKE_C_COMPILER "${MSVC_CL}")
+set(CMAKE_CXX_COMPILER "${MSVC_CL}")
 
 # Enable modern C++ features
 set(CMAKE_CXX_STANDARD 23)

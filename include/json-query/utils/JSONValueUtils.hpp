@@ -33,7 +33,7 @@ enum class JsonKind
     Undefined
 };
 
-inline constexpr JsonKind kind_of(const QJsonValue& v) noexcept
+inline JsonKind kind_of(const QJsonValue& v) noexcept
 {
     switch (v.type())
     {
@@ -225,7 +225,7 @@ template <JsonTarget T>
 struct AsFn
 {
     // 1) Plain value: domain-agnostic conversion → mapped to QueryError
-    [[nodiscard]] constexpr auto operator()(QJsonValue v) const -> std::expected<T, QueryError>
+    [[nodiscard]] auto operator()(QJsonValue v) const -> std::expected<T, QueryError>
     {
         auto base = detail::as_core<T>(v);         // expected<T, ConvError>
         return base.transform_error(mapConvError); // expected<T, QueryError>
@@ -236,7 +236,7 @@ struct AsFn
     //    for non-expected arguments.
     template <class E>
         requires std::same_as<std::remove_cv_t<E>, QueryError>
-    [[nodiscard]] constexpr auto operator()(const std::expected<QJsonValue, E>& r) const -> std::expected<T, E>
+    [[nodiscard]] auto operator()(const std::expected<QJsonValue, E>& r) const -> std::expected<T, E>
     {
         if (!r)
             return std::unexpected(r.error());
@@ -254,7 +254,7 @@ inline constexpr AsFn<T> as{};
 // Generic overload for everything except QJsonValueRef.
 template <class LHS, JsonTarget T>
     requires(!std::is_same_v<std::remove_cvref_t<LHS>, QJsonValueRef>)
-[[nodiscard]] constexpr auto operator|(LHS&& lhs, const AsFn<T>& f) -> decltype(f(std::forward<LHS>(lhs)))
+[[nodiscard]] auto operator|(LHS&& lhs, const AsFn<T>& f) -> decltype(f(std::forward<LHS>(lhs)))
 {
     return f(std::forward<LHS>(lhs));
 }
