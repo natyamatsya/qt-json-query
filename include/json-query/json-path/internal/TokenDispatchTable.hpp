@@ -78,12 +78,18 @@ class TokenDispatcher
      */
     static std::expected<QJsonArray, EvalError> dispatch(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
     {
-
+        qDebug() << "DEBUG: TokenDispatcher::dispatch called - kind:" << static_cast<int>(tk.kind) << "index:" << tk.index;
         const auto kindIndex = static_cast<std::size_t>(tk.kind);
-        if (kindIndex >= TOKEN_DISPATCH_TABLE.size())
+        qDebug() << "DEBUG: TokenDispatcher::dispatch kindIndex:" << kindIndex << "TABLE size:" << TOKEN_DISPATCH_TABLE.size();
+        if (kindIndex >= TOKEN_DISPATCH_TABLE.size()) {
+            qDebug() << "DEBUG: TokenDispatcher::dispatch ERROR - kindIndex out of bounds";
             return std::unexpected(EvalError::TypeMismatchObject);
+        }
 
-        return TOKEN_DISPATCH_TABLE[kindIndex](ctx, tk, v);
+        qDebug() << "DEBUG: TokenDispatcher::dispatch about to call TOKEN_DISPATCH_TABLE[" << kindIndex << "]";
+        auto result = TOKEN_DISPATCH_TABLE[kindIndex](ctx, tk, v);
+        qDebug() << "DEBUG: TokenDispatcher::dispatch result has_value:" << result.has_value();
+        return result;
     }
 
     /**

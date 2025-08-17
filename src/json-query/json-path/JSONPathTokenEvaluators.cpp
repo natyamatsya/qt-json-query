@@ -45,9 +45,13 @@ template <>
 std::expected<QJsonArray, EvalError>
 eval<Token::Kind::Index>(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
 {
+    qDebug() << "DEBUG: Index token evaluation - index:" << tk.index << "value type:" << v.type() << "value:" << v;
+    
     // RFC 9535 compliance: "Nothing is selected from a value that is not an array"
-    if (!v.isArray())
+    if (!v.isArray()) {
+        qDebug() << "DEBUG: Index token evaluation returning empty - value is not an array";
         return emptyResult(); // Empty result for non-arrays (not an error per RFC 9535)
+    }
 
     // SANITIZER WORKAROUND: Work directly with original array to avoid Qt copy constructor corruption
     // This is the same issue we fixed in JSON Pointer evaluation - sanitizer instrumentation

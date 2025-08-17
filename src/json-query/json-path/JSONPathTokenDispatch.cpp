@@ -24,11 +24,15 @@ using json_query::json_path::internal::TokenDispatcher;
 
 std::expected<QJsonArray, EvalError> evaluateToken(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
 {
+    qDebug() << "DEBUG: evaluateToken called - kind:" << static_cast<int>(tk.kind) << "index:" << tk.index;
     qCDebug(jsonPathLog) << "[stage] token" << (&tk - ctx.tokens.data()) << ": kind=" << static_cast<int>(tk.kind)
                          << "working size=" << 1;
 
+    qDebug() << "DEBUG: evaluateToken about to call TokenDispatcher::dispatch";
     // Use TableGen-inspired dispatch table
-    return TokenDispatcher::dispatch(ctx, tk, v);
+    auto result = TokenDispatcher::dispatch(ctx, tk, v);
+    qDebug() << "DEBUG: evaluateToken result has_value:" << result.has_value();
+    return result;
 }
 
 } // namespace json_query::json_path::detail

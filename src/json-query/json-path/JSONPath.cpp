@@ -37,6 +37,9 @@ JSONPath::EvalResult JSONPath::evaluate(const QJsonValue& value) const
     qDebug() << "DEBUG: JSONPath::evaluate called with" << m_tokens.size() << "tokens";
     for (size_t i = 0; i < m_tokens.size(); ++i) {
         qDebug() << "DEBUG: Token[" << i << "] kind=" << static_cast<int>(m_tokens[i].kind) << "key=" << m_tokens[i].key;
+        if (m_tokens[i].kind == Token::Kind::Index) {
+            qDebug() << "DEBUG: Token[" << i << "] Index value:" << m_tokens[i].index;
+        }
     }
     json_path::detail::PathEvalCtx ctx{m_tokens, value, m_func};
 

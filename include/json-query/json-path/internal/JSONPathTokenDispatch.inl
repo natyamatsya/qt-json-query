@@ -30,7 +30,10 @@ std::expected<QJsonArray, EvalError> dispatchKey(const detail::PathEvalCtx& ctx,
 QT_QUERY_JSON_ALWAYS_INLINE
 std::expected<QJsonArray, EvalError> dispatchIndex(const detail::PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
 {
-    return json_query::json_path::detail::eval<Token::Kind::Index>(ctx, tk, v);
+    qDebug() << "DEBUG: dispatchIndex called - index:" << tk.index << "value type:" << v.type();
+    auto result = json_query::json_path::detail::eval<Token::Kind::Index>(ctx, tk, v);
+    qDebug() << "DEBUG: dispatchIndex result has_value:" << result.has_value();
+    return result;
 }
 
 /**

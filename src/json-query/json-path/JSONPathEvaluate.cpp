@@ -200,13 +200,19 @@ struct TokenProcessingStrategy<TokenProcessingType::StandardFanOut>
         bool multiAfter{multi || addsMultiplicity(tk)};
 
         // C++23 Monadic Chain - Elegant error composition for token evaluation!
+        qDebug() << "DEBUG: StandardFanOut strategy - about to call fanOut for tokenIdx:" << i << "kind:" << static_cast<int>(tk.kind) << "index:" << tk.index;
         auto result =
             fanOut(ctx, tk, working, i)
                 .and_then(
                     [&](QJsonArray&& result) -> std::expected<QJsonArray, EvalError>
                     {
+                        qDebug() << "DEBUG: StandardFanOut strategy - fanOut result size:" << result.size();
                         if (result.empty())
+                        {
+                            qDebug() << "DEBUG: StandardFanOut strategy - fanOut result is empty, returning emptyResult";
                             return emptyResult(); // RFC 9535: empty result list when no matches
+                        }
+                        qDebug() << "DEBUG: StandardFanOut strategy - fanOut result is non-empty, returning result";
                         return std::move(result);
                     })
                 .and_then(
@@ -278,19 +284,23 @@ struct TokenProcessingDispatchTable<FirstType, RestTypes...>
                                                          bool&              multi,
                                                          bool               prevRecursive)
     {
-
+        qDebug() << "DEBUG: TokenProcessingDispatchTable::dispatch - tokenIdx:" << i << "kind:" << static_cast<int>(tk.kind) << "index:" << tk.index;
         if constexpr (TokenProcessingDef<FirstType>::enabled)
         {
+            qDebug() << "DEBUG: TokenProcessingDispatchTable::dispatch - trying strategy (enabled):" << static_cast<int>(FirstType);
             if (TokenProcessingDef<FirstType>::matches(ctx, i, tk, prevRecursive))
             {
+                qDebug() << "DEBUG: TokenProcessingDispatchTable::dispatch - strategy matches, calling process";
                 auto result{
                     TokenProcessingStrategy<FirstType>::process(ctx, i, tk, working, root, multi, prevRecursive)};
+                qDebug() << "DEBUG: TokenProcessingDispatchTable::dispatch - strategy process result has_value:" << result.has_value();
 
                 // Special handling for union detection fallback
                 if constexpr (FirstType == TokenProcessingType::UnionDetection)
                 {
                     if (!result)
                     {
+                        qDebug() << "DEBUG: TokenProcessingDispatchTable::dispatch - UnionDetection failed, falling back to next strategy";
                         // Fall back to next strategy in the dispatch table
                         return TokenProcessingDispatchTable<RestTypes...>::dispatch(
                             ctx, i, tk, working, root, multi, prevRecursive);
@@ -299,8 +309,17 @@ struct TokenProcessingDispatchTable<FirstType, RestTypes...>
 
                 return result;
             }
+            else
+            {
+                qDebug() << "DEBUG: TokenProcessingDispatchTable::dispatch - strategy does not match";
+            }
+        }
+        else
+        {
+            qDebug() << "DEBUG: TokenProcessingDispatchTable::dispatch - strategy not enabled:" << static_cast<int>(FirstType);
         }
 
+        qDebug() << "DEBUG: TokenProcessingDispatchTable::dispatch - trying next strategy in dispatch table";
         // Try next strategy in the dispatch table
         return TokenProcessingDispatchTable<RestTypes...>::dispatch(ctx, i, tk, working, root, multi, prevRecursive);
     }
