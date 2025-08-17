@@ -373,6 +373,7 @@ std::expected<void, ParseError> handlePlaceholder(QStringView content, BracketSi
         Token filterToken;
         filterToken.kind     = Token::Kind::Filter;
         filterToken.filterId = out.filters.size() - 1;
+        filterToken.contextFilterId = SIZE_MAX; // Explicit: not using context filter
         out.pushFilter(filterToken);
         return {};
     }
@@ -389,6 +390,7 @@ std::expected<void, ParseError> handlePlaceholder(QStringView content, BracketSi
             Token filterToken;
             filterToken.kind     = Token::Kind::Filter;
             filterToken.filterId = out.filters.size() - 1;
+            filterToken.contextFilterId = SIZE_MAX; // Explicit: not using context filter
             out.pushFilter(filterToken);
         }
     }

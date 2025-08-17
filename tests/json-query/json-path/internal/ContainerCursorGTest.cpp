@@ -555,9 +555,9 @@ TEST_F(ContainerCursorTest, ComplexNestedStructure)
 
     EXPECT_NE(usersIt, cursor.end());
 
-    // Iterate over users
-    auto usersArray{(*usersIt).toArray()};
-    auto usersCursor{ContainerCursor::array(usersArray)};
+    // Iterate over users (bind QJsonArray lvalue to ensure lifetime and avoid braced auto pitfalls)
+    const QJsonArray usersArray = (*usersIt).toArray();
+    auto             usersCursor = ContainerCursor::array(usersArray);
 
     std::vector<QString> userNames;
     for (const auto& user : usersCursor)
