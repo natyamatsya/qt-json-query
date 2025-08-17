@@ -3,14 +3,24 @@
 # This module defines fuzz testing targets using LibFuzzer for comprehensive
 # robustness testing of the qt-json-query library components.
 
-# Check if fuzzing is enabled and compiler supports it
+# Option handling: always define add_fuzz_tests to avoid configure errors on
+# unsupported toolchains
 if(NOT ENABLE_FUZZ_TESTS)
+  function(add_fuzz_tests)
+    message(STATUS "Fuzz tests disabled (ENABLE_FUZZ_TESTS=OFF). Skipping fuzz targets.")
+  endfunction()
+  set(FUZZ_TESTS_CONFIGURED FALSE CACHE INTERNAL "Fuzz tests have been configured")
   return()
 endif()
 
-# Verify compiler support for LibFuzzer
+# Verify compiler support for LibFuzzer. If unsupported, define a no-op
+# add_fuzz_tests so top-level CMakeLists.txt can call it safely.
 if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  message(WARNING "Fuzz tests require Clang compiler with LibFuzzer support")
+  function(add_fuzz_tests)
+    message(WARNING
+            "Fuzz tests require Clang compiler with LibFuzzer support; current compiler: ${CMAKE_CXX_COMPILER_ID}. No fuzz targets will be created.")
+  endfunction()
+  set(FUZZ_TESTS_CONFIGURED FALSE CACHE INTERNAL "Fuzz tests have been configured")
   return()
 endif()
 
@@ -42,10 +52,11 @@ function(configure_fuzz_target target_name source_file)
             -O1 # Light optimization for better fuzzing performance
   )
 
-  target_link_options(
-    ${target_name} PRIVATE -fsanitize=fuzzer,address,undefined
-    -ld_classic # Fix for Xcode 15 ld-prime compatibility issues
-  )
+  target_link_options(${target_name} PRIVATE -fsanitize=fuzzer,address,undefined)
+  if(APPLE)
+    # Fix for Xcode 15 ld-prime compatibility issues
+    target_link_options(${target_name} PRIVATE -Wl,-ld_classic)
+  endif()
 
   # Add include directories for the library headers
   target_include_directories(${target_name} PRIVATE ${CMAKE_SOURCE_DIR}/include
