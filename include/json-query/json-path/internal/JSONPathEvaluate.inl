@@ -47,19 +47,26 @@ std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token&
 
     qDebug() << "DEBUG: fanOut - about to call ErrorHandlingDispatcher::dispatch";
     
-    // PROPER FIX: For Index tokens, bypass ErrorHandlingDispatcher and call dispatchIndex directly
     if (tk.kind == Token::Kind::Index) {
         qDebug() << "DEBUG: fanOut - Index token detected, calling dispatchIndex on whole source array";
         // Convert QJsonArray to QJsonValue and call dispatchIndex once on the whole array
         QJsonValue srcAsValue(src);
         auto directResult = json_query::json_path::internal::dispatchIndex(ctx, tk, srcAsValue);
         qDebug() << "DEBUG: fanOut - direct dispatchIndex result has_value:" << directResult.has_value();
-        if (directResult && !directResult->empty()) {
+        
+        // CRITICAL: Properly handle errors from dispatchIndex
+        if (!directResult) {
+            qDebug() << "DEBUG: fanOut - dispatchIndex failed with error:" << static_cast<int>(directResult.error());
+            collector.handleError(directResult.error());
+            // Error will be handled by collector.hasError() check below
+        } else if (!directResult->empty()) {
             qDebug() << "DEBUG: fanOut - direct dispatchIndex result size:" << directResult->size();
             // Add results to the collector
             for (const auto& item : *directResult) {
                 result.append(item);
             }
+        } else {
+            qDebug() << "DEBUG: fanOut - dispatchIndex returned empty result (valid for out-of-bounds index)";
         }
     } else {
         // Use TableGen-inspired error handling dispatch directly
