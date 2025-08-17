@@ -733,6 +733,8 @@ bool addsMultiplicity(const Token& tk)
     case Token::Kind::Wildcard:
     case Token::Kind::Recursive:
     case Token::Kind::KeyList:
+    case Token::Kind::Slice:
+    case Token::Kind::Filter:
         return true;
     default:
         return false;
@@ -835,31 +837,40 @@ processSingleUnionToken(const PathEvalCtx& ctx, qsizetype tokenIdx, const QJsonA
         return result;
     };
 
-    // Aggregate results using monadic error handling
+    // Aggregate results across all working values, tolerate per-value errors
     auto aggregateResults = [&]() -> std::expected<QJsonArray, EvalError>
     {
+        bool         anySuccess{false};
+        EvalError    lastError{EvalError::KeyNotFound};
+        bool         sawError{false};
+
         for (qsizetype i = 0; i < working.size(); ++i)
         {
             const auto& workingValue{working[i]};
             qCDebug(jsonPathLog) << "[processSingleUnionToken] Processing working value" << i << "of type"
                                  << static_cast<int>(workingValue.type());
 
-            // Use monadic chaining for token evaluation
             auto tokenResult{processWorkingValue(workingValue)};
             if (!tokenResult)
             {
                 qCDebug(jsonPathLog) << "[processSingleUnionToken] Token evaluation failed with error"
                                      << static_cast<int>(tokenResult.error());
-                return std::unexpected(tokenResult.error());
+                lastError = tokenResult.error();
+                sawError  = true;
+                continue; // keep processing remaining working values
             }
 
             qCDebug(jsonPathLog) << "[processSingleUnionToken] Token evaluation succeeded with" << tokenResult->size()
                                  << "results";
-            // Append results from this token using range-based iteration
             for (const auto& value : *tokenResult)
                 results.append(value);
+            anySuccess = true;
         }
-        return results;
+
+        if (anySuccess)
+            return results;
+        // All working values failed
+        return std::unexpected(lastError);
     };
 
     // Convert std::expected result to TokenProcessingResult using monadic pattern
@@ -885,12 +896,13 @@ QJsonArray mergeTokenResults(const std::vector<QJsonArray>& resultArrays, const 
 {
     QJsonArray collectedResults;
 
-    // Simple concatenation approach - avoid complex cursor logic that may cause infinite loops
+    // Concatenate results from all union tokens
     for (const auto& results : resultArrays)
         for (const auto& value : results)
             collectedResults.append(value);
 
-    return collectedResults;
+    // Deduplicate merged results per RFC expectations
+    return deduplicateJsonValues(collectedResults, root);
 }
 
 // Helper: Check if an object contains all required keys

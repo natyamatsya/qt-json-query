@@ -74,15 +74,23 @@ template <>
 std::expected<QJsonArray, EvalError>
 eval<Token::Kind::Slice>(const PathEvalCtx& /*ctx*/, const Token& tk, const QJsonValue& v)
 {
+    qDebug() << "DEBUG: Slice token evaluation - start:" << tk.slice.start << "end:" << tk.slice.end
+             << "step:" << tk.slice.step << "value type:" << v.type();
+
     // Monadic approach: extract array and apply slice if present
     auto asArray = [&v]() -> std::optional<QJsonArray>
     { return v.isArray() ? std::make_optional(v.toArray()) : std::nullopt; };
 
-    return asArray()
+    auto result = asArray()
         .and_then([&tk](const QJsonArray& arr) -> std::optional<std::expected<QJsonArray, EvalError>>
                   { return std::make_optional(evalSlice(arr, tk.slice)); })
         .value_or(std::expected<QJsonArray, EvalError>{
             emptyResult()}); // Empty result for non-arrays (not an error in JSONPath)
+
+    if (!v.isArray())
+        qDebug() << "DEBUG: Slice token evaluation returning empty - value is not an array";
+
+    return result;
 }
 
 // --- Wildcard --------------------------------------------------------------

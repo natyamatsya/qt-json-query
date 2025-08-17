@@ -141,13 +141,35 @@ struct TokenProcessingStrategy<TokenProcessingType::UnionDetection>
         {
             qDebug() << "[union] processing" << unionDetectionResult.unionTokens.size()
                      << "consecutive selector tokens";
+            // Debug: list token kinds in this union group
+            {
+                QString kinds;
+                kinds.reserve(64);
+                for (qsizetype idx : unionDetectionResult.unionTokens)
+                {
+                    kinds += QString::number(static_cast<int>(ctx.tokens[idx].kind));
+                    kinds += ' ';
+                }
+                qDebug() << "[union] token kinds:" << kinds;
+            }
 
             auto result{processUnionTokens(ctx, unionDetectionResult.unionTokens, working, root)};
 
             // Skip the tokens we just processed
             i = unionDetectionResult.nextIndex - 1;
 
-            bool multiAfter{multi || addsMultiplicity(tk)};
+            // If any token in the union adds multiplicity, the union as a whole is multiplicity-adding.
+            bool unionAddsMultiplicity{false};
+            for (qsizetype idx : unionDetectionResult.unionTokens)
+            {
+                if (addsMultiplicity(ctx.tokens[idx]))
+                {
+                    unionAddsMultiplicity = true;
+                    break;
+                }
+            }
+
+            bool multiAfter{multi || unionAddsMultiplicity};
             if (result && result->empty())
                 return emptyResult(); // RFC 9535: empty result list when no matches
 

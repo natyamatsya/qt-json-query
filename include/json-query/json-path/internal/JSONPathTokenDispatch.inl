@@ -42,7 +42,11 @@ std::expected<QJsonArray, EvalError> dispatchIndex(const detail::PathEvalCtx& ct
 QT_QUERY_JSON_ALWAYS_INLINE
 std::expected<QJsonArray, EvalError> dispatchSlice(const detail::PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
 {
-    return json_query::json_path::detail::eval<Token::Kind::Slice>(ctx, tk, v);
+    qDebug() << "DEBUG: dispatchSlice called - start:" << tk.slice.start << "end:" << tk.slice.end
+             << "step:" << tk.slice.step << "value type:" << v.type();
+    auto result = json_query::json_path::detail::eval<Token::Kind::Slice>(ctx, tk, v);
+    qDebug() << "DEBUG: dispatchSlice result has_value:" << result.has_value();
+    return result;
 }
 
 /**
