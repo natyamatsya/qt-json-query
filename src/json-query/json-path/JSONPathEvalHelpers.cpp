@@ -829,10 +829,11 @@ processSingleUnionToken(const PathEvalCtx& ctx, qsizetype tokenIdx, const QJsonA
 
     // Process each working value using monadic pattern
     auto processWorkingValue = [&](const QJsonValue& workingValue) -> std::expected<QJsonArray, EvalError>
-    { 
-        qDebug() << "DEBUG: processSingleUnionToken lambda - tokenIdx:" << tokenIdx << "kind:" << static_cast<int>(ctx.tokens[tokenIdx].kind) << "index:" << ctx.tokens[tokenIdx].index;
+    {
+        qDebug() << "DEBUG: processSingleUnionToken lambda - tokenIdx:" << tokenIdx
+                 << "kind:" << static_cast<int>(ctx.tokens[tokenIdx].kind) << "index:" << ctx.tokens[tokenIdx].index;
         qDebug() << "DEBUG: processSingleUnionToken lambda - about to call evaluateToken";
-        auto result = evaluateToken(ctx, ctx.tokens[tokenIdx], workingValue); 
+        auto result = evaluateToken(ctx, ctx.tokens[tokenIdx], workingValue);
         qDebug() << "DEBUG: processSingleUnionToken lambda - evaluateToken result has_value:" << result.has_value();
         return result;
     };
@@ -840,9 +841,9 @@ processSingleUnionToken(const PathEvalCtx& ctx, qsizetype tokenIdx, const QJsonA
     // Aggregate results across all working values, tolerate per-value errors
     auto aggregateResults = [&]() -> std::expected<QJsonArray, EvalError>
     {
-        bool         anySuccess{false};
-        EvalError    lastError{EvalError::KeyNotFound};
-        bool         sawError{false};
+        bool      anySuccess{false};
+        EvalError lastError{EvalError::KeyNotFound};
+        bool      sawError{false};
 
         for (qsizetype i = 0; i < working.size(); ++i)
         {
@@ -901,8 +902,8 @@ QJsonArray mergeTokenResults(const std::vector<QJsonArray>& resultArrays, const 
         for (const auto& value : results)
             collectedResults.append(value);
 
-    // Deduplicate merged results per RFC expectations
-    return deduplicateJsonValues(collectedResults, root);
+    // RFC 9535: Unions preserve order and duplicates; do not deduplicate here
+    return collectedResults;
 }
 
 // Helper: Check if an object contains all required keys

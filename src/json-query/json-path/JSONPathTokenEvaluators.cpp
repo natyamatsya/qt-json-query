@@ -46,9 +46,10 @@ std::expected<QJsonArray, EvalError>
 eval<Token::Kind::Index>(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
 {
     qDebug() << "DEBUG: Index token evaluation - index:" << tk.index << "value type:" << v.type() << "value:" << v;
-    
+
     // RFC 9535 compliance: "Nothing is selected from a value that is not an array"
-    if (!v.isArray()) {
+    if (!v.isArray())
+    {
         qDebug() << "DEBUG: Index token evaluation returning empty - value is not an array";
         return emptyResult(); // Empty result for non-arrays (not an error per RFC 9535)
     }
@@ -82,10 +83,10 @@ eval<Token::Kind::Slice>(const PathEvalCtx& /*ctx*/, const Token& tk, const QJso
     { return v.isArray() ? std::make_optional(v.toArray()) : std::nullopt; };
 
     auto result = asArray()
-        .and_then([&tk](const QJsonArray& arr) -> std::optional<std::expected<QJsonArray, EvalError>>
-                  { return std::make_optional(evalSlice(arr, tk.slice)); })
-        .value_or(std::expected<QJsonArray, EvalError>{
-            emptyResult()}); // Empty result for non-arrays (not an error in JSONPath)
+                      .and_then([&tk](const QJsonArray& arr) -> std::optional<std::expected<QJsonArray, EvalError>>
+                                { return std::make_optional(evalSlice(arr, tk.slice)); })
+                      .value_or(std::expected<QJsonArray, EvalError>{
+                          emptyResult()}); // Empty result for non-arrays (not an error in JSONPath)
 
     if (!v.isArray())
         qDebug() << "DEBUG: Slice token evaluation returning empty - value is not an array";
@@ -153,15 +154,16 @@ std::expected<QJsonArray, EvalError>
 eval<Token::Kind::Filter>(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
 {
     qDebug() << "DEBUG: Filter token evaluation called with token key:" << tk.key << "value type:" << v.type();
-    
+
     // First try pattern-aware filter optimization
-    if (auto result = internal::PatternAwareFilterEvaluator::evaluate(ctx, tk, v)) {
+    if (auto result = internal::PatternAwareFilterEvaluator::evaluate(ctx, tk, v))
+    {
         qDebug() << "DEBUG: PatternAwareFilterEvaluator handled filter, returning early";
         return result;
     }
 
     qDebug() << "DEBUG: PatternAwareFilterEvaluator did not handle filter, falling back to embedded filter evaluation";
-    
+
     // Fall back to embedded filter evaluation for complex patterns
     // Use ArrayPool for result to optimize memory allocation
     auto  pooledArray{acquirePooledArray()};
@@ -193,19 +195,21 @@ eval<Token::Kind::Filter>(const PathEvalCtx& ctx, const Token& tk, const QJsonVa
         else if (v.isObject())
         {
             const auto obj{v.toObject()};
-            qDebug() << "DEBUG: Processing single object:" << QJsonValue(obj);
+            qDebug() << "DEBUG: Processing object with" << obj.size() << "members";
 
-            // CRITICAL FIX: Evaluate filter on the whole object, not property values
-            // For JSONPath filters like $[?@.a || @.b && @.c], the filter should be evaluated
-            // once per object with the complete object passed to the embedded filter
-            const QJsonValue objValue{obj};
-            qDebug() << "DEBUG: Evaluating filter on complete object:" << objValue;
-            const bool pass = needsRootContext ? tk.evaluateEmbeddedContextFilter(objValue, ctx.rootDocument)
-                                               : tk.evaluateEmbeddedFilter(objValue);
-            qDebug() << "DEBUG: Object filter result:" << pass;
-            if (pass)
-                out.append(objValue);
-            
+            // RFC 9535: When filtering an object, the filter applies to its children (member values).
+            // Iterate each member value and include those for which the predicate evaluates to true.
+            for (auto it = obj.constBegin(); it != obj.constEnd(); ++it)
+            {
+                const QJsonValue& memberValue = it.value();
+                qDebug() << "DEBUG: Processing object member key:" << it.key() << "value:" << memberValue;
+                const bool pass = needsRootContext ? tk.evaluateEmbeddedContextFilter(memberValue, ctx.rootDocument)
+                                                   : tk.evaluateEmbeddedFilter(memberValue);
+                qDebug() << "DEBUG: Object member filter result:" << pass;
+                if (pass)
+                    out.append(memberValue);
+            }
+
             qDebug() << "DEBUG: Object processing complete, output has" << out.size() << "items";
         }
 

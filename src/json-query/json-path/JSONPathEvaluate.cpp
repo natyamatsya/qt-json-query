@@ -222,7 +222,8 @@ struct TokenProcessingStrategy<TokenProcessingType::StandardFanOut>
         bool multiAfter{multi || addsMultiplicity(tk)};
 
         // C++23 Monadic Chain - Elegant error composition for token evaluation!
-        qDebug() << "DEBUG: StandardFanOut strategy - about to call fanOut for tokenIdx:" << i << "kind:" << static_cast<int>(tk.kind) << "index:" << tk.index;
+        qDebug() << "DEBUG: StandardFanOut strategy - about to call fanOut for tokenIdx:" << i
+                 << "kind:" << static_cast<int>(tk.kind) << "index:" << tk.index;
         auto result =
             fanOut(ctx, tk, working, i)
                 .and_then(
@@ -231,7 +232,8 @@ struct TokenProcessingStrategy<TokenProcessingType::StandardFanOut>
                         qDebug() << "DEBUG: StandardFanOut strategy - fanOut result size:" << result.size();
                         if (result.empty())
                         {
-                            qDebug() << "DEBUG: StandardFanOut strategy - fanOut result is empty, returning emptyResult";
+                            qDebug()
+                                << "DEBUG: StandardFanOut strategy - fanOut result is empty, returning emptyResult";
                             return emptyResult(); // RFC 9535: empty result list when no matches
                         }
                         qDebug() << "DEBUG: StandardFanOut strategy - fanOut result is non-empty, returning result";
@@ -306,23 +308,27 @@ struct TokenProcessingDispatchTable<FirstType, RestTypes...>
                                                          bool&              multi,
                                                          bool               prevRecursive)
     {
-        qDebug() << "DEBUG: TokenProcessingDispatchTable::dispatch - tokenIdx:" << i << "kind:" << static_cast<int>(tk.kind) << "index:" << tk.index;
+        qDebug() << "DEBUG: TokenProcessingDispatchTable::dispatch - tokenIdx:" << i
+                 << "kind:" << static_cast<int>(tk.kind) << "index:" << tk.index;
         if constexpr (TokenProcessingDef<FirstType>::enabled)
         {
-            qDebug() << "DEBUG: TokenProcessingDispatchTable::dispatch - trying strategy (enabled):" << static_cast<int>(FirstType);
+            qDebug() << "DEBUG: TokenProcessingDispatchTable::dispatch - trying strategy (enabled):"
+                     << static_cast<int>(FirstType);
             if (TokenProcessingDef<FirstType>::matches(ctx, i, tk, prevRecursive))
             {
                 qDebug() << "DEBUG: TokenProcessingDispatchTable::dispatch - strategy matches, calling process";
                 auto result{
                     TokenProcessingStrategy<FirstType>::process(ctx, i, tk, working, root, multi, prevRecursive)};
-                qDebug() << "DEBUG: TokenProcessingDispatchTable::dispatch - strategy process result has_value:" << result.has_value();
+                qDebug() << "DEBUG: TokenProcessingDispatchTable::dispatch - strategy process result has_value:"
+                         << result.has_value();
 
                 // Special handling for union detection fallback
                 if constexpr (FirstType == TokenProcessingType::UnionDetection)
                 {
                     if (!result)
                     {
-                        qDebug() << "DEBUG: TokenProcessingDispatchTable::dispatch - UnionDetection failed, falling back to next strategy";
+                        qDebug() << "DEBUG: TokenProcessingDispatchTable::dispatch - UnionDetection failed, falling "
+                                    "back to next strategy";
                         // Fall back to next strategy in the dispatch table
                         return TokenProcessingDispatchTable<RestTypes...>::dispatch(
                             ctx, i, tk, working, root, multi, prevRecursive);
@@ -338,7 +344,8 @@ struct TokenProcessingDispatchTable<FirstType, RestTypes...>
         }
         else
         {
-            qDebug() << "DEBUG: TokenProcessingDispatchTable::dispatch - strategy not enabled:" << static_cast<int>(FirstType);
+            qDebug() << "DEBUG: TokenProcessingDispatchTable::dispatch - strategy not enabled:"
+                     << static_cast<int>(FirstType);
         }
 
         qDebug() << "DEBUG: TokenProcessingDispatchTable::dispatch - trying next strategy in dispatch table";
@@ -388,26 +395,14 @@ std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const 
     // Use ArrayPool for better memory management of working array
     auto  pooledWorkingArray{acquirePooledArray()};
     auto& workingArray = *pooledWorkingArray;
-    
-    // CRITICAL FIX: Handle root document correctly for JSONPath evaluation
-    // For root selector "$", if the root document is an array, we need to populate
-    // the working array with the individual elements, not the array itself as one element
+
+    // Start with the root value as a single node in the working set.
+    // RFC 9535 semantics: the root selector "$" selects the document itself; we must NOT
+    // pre-flatten root arrays into their elements before applying selectors like [index]/[slice].
     qDebug() << "DEBUG: evalStandard - Root document type:" << root.type() << "isArray:" << root.isArray();
-    if (root.isArray()) {
-        // Add individual elements of the root array to working array
-        const auto rootArray = root.toArray();
-        qDebug() << "DEBUG: Root array size:" << rootArray.size();
-        for (qsizetype i = 0; i < rootArray.size(); ++i) {
-            const auto& element = rootArray.at(i);
-            workingArray.append(element);
-            qDebug() << "DEBUG: Added root element[" << i << "]:" << element;
-        }
-        qDebug() << "DEBUG: Root is array, added" << rootArray.size() << "individual elements to working array";
-    } else {
-        // For non-array root, add the root document as a single element
-        workingArray.append(root);
-        qDebug() << "DEBUG: Root is not array (type" << root.type() << "), added single root element to working array";
-    }
+    if (root.isArray())
+        qDebug() << "DEBUG: Root is array; keeping array as a single node in working set";
+    workingArray.append(root);
 
     // SANITIZER WORKAROUND: Avoid QJsonArray copy constructor corruption
     // This is the same issue we fixed in JSON Pointer and array indexing - sanitizer instrumentation
