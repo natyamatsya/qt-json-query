@@ -49,8 +49,12 @@ target_include_directories(
 # Link QtCore (Qt JSON classes live here)
 target_link_libraries(json_query PUBLIC Qt6::Core)
 
-# Compile out qDebug calls for performance optimization
-# target_compile_definitions(json_query PRIVATE QT_NO_DEBUG_OUTPUT)  # Temporarily disabled for debugging
+# Compile-time control over debug logging (category-based)
+option(JSON_QUERY_ENABLE_DEBUG_LOGS "Enable debug logs in the library" OFF)
+if(NOT JSON_QUERY_ENABLE_DEBUG_LOGS)
+  # Strip qDebug/qCDebug at compile time for performance in non-debug builds
+  target_compile_definitions(json_query PRIVATE QT_NO_DEBUG_OUTPUT)
+endif()
 
 # Link CTRE header-only interface when available
 if(TARGET ctre_interface)

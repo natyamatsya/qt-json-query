@@ -139,9 +139,10 @@ struct TokenProcessingStrategy<TokenProcessingType::UnionDetection>
 
         if (unionDetectionResult.shouldUseUnion)
         {
-            qDebug() << "[union] processing" << unionDetectionResult.unionTokens.size()
-                     << "consecutive selector tokens";
-            // Debug: list token kinds in this union group
+            qCDebug(jsonPathLog) << "[union] processing" << unionDetectionResult.unionTokens.size()
+                                 << "consecutive selector tokens";
+            // Debug: list token kinds in this union group (guarded)
+            if (jsonPathLog().isDebugEnabled())
             {
                 QString kinds;
                 kinds.reserve(64);
@@ -150,7 +151,7 @@ struct TokenProcessingStrategy<TokenProcessingType::UnionDetection>
                     kinds += QString::number(static_cast<int>(ctx.tokens[idx].kind));
                     kinds += ' ';
                 }
-                qDebug() << "[union] token kinds:" << kinds;
+                qCDebug(jsonPathLog) << "[union] tokenKinds=" << kinds;
             }
 
             auto result{processUnionTokens(ctx, unionDetectionResult.unionTokens, working, root)};
@@ -222,71 +223,70 @@ struct TokenProcessingStrategy<TokenProcessingType::StandardFanOut>
         bool multiAfter{multi || addsMultiplicity(tk)};
 
         // C++23 Monadic Chain - Elegant error composition for token evaluation!
-        qDebug() << "DEBUG: StandardFanOut strategy - about to call fanOut for tokenIdx:" << i
-                 << "kind:" << static_cast<int>(tk.kind) << "index:" << tk.index;
-        auto result =
-            fanOut(ctx, tk, working, i)
-                .and_then(
-                    [&](QJsonArray&& result) -> std::expected<QJsonArray, EvalError>
-                    {
-                        qDebug() << "DEBUG: StandardFanOut strategy - fanOut result size:" << result.size();
-                        if (result.empty())
-                        {
-                            qDebug()
-                                << "DEBUG: StandardFanOut strategy - fanOut result is empty, returning emptyResult";
-                            return emptyResult(); // RFC 9535: empty result list when no matches
-                        }
-                        qDebug() << "DEBUG: StandardFanOut strategy - fanOut result is non-empty, returning result";
-                        return std::move(result);
-                    })
-                .and_then(
-                    [&](QJsonArray&& result) -> std::expected<QJsonArray, EvalError>
-                    {
-                        // Deduplicate containers after normal fan-out when preceded by Recursive
-                        if (prevRecursive)
-                        {
-                            // Pre-allocate hash set with reasonable capacity to reduce rehashing
-                            QSet<uint> seen;
-                            seen.reserve(result.size()); // Reserve based on input size
+        qCDebug(jsonPathLog) << "StandardFanOut: calling fanOut tokenIdx=" << i << "kind=" << static_cast<int>(tk.kind)
+                             << "index=" << tk.index;
+        auto result = fanOut(ctx, tk, working, i)
+                          .and_then(
+                              [&](QJsonArray&& result) -> std::expected<QJsonArray, EvalError>
+                              {
+                                  qCDebug(jsonPathLog) << "StandardFanOut: fanOut result size=" << result.size();
+                                  if (result.empty())
+                                  {
+                                      qCDebug(jsonPathLog) << "StandardFanOut: fanOut result empty -> emptyResult";
+                                      return emptyResult(); // RFC 9535: empty result list when no matches
+                                  }
+                                  qCDebug(jsonPathLog) << "StandardFanOut: fanOut result non-empty";
+                                  return std::move(result);
+                              })
+                          .and_then(
+                              [&](QJsonArray&& result) -> std::expected<QJsonArray, EvalError>
+                              {
+                                  // Deduplicate containers after normal fan-out when preceded by Recursive
+                                  if (prevRecursive)
+                                  {
+                                      // Pre-allocate hash set with reasonable capacity to reduce rehashing
+                                      QSet<uint> seen;
+                                      seen.reserve(result.size()); // Reserve based on input size
 
-                            // Use ArrayPool for deduplication array
-                            auto  pooledDedup{acquirePooledArray()};
-                            auto& dedup = *pooledDedup;
+                                      // Use ArrayPool for deduplication array
+                                      auto  pooledDedup{acquirePooledArray()};
+                                      auto& dedup = *pooledDedup;
 
-                            for (const auto& v : result)
-                            {
-                                uint h;
-                                if (v.isObject())
-                                {
-                                    h = qHash(QJsonDocument(v.toObject()).toJson());
-                                }
-                                else if (v.isArray())
-                                {
-                                    h = qHash(QJsonDocument(v.toArray()).toJson());
-                                }
-                                else
-                                {
-                                    // For primitive values, add directly without hashing overhead
-                                    dedup.append(v);
-                                    continue;
-                                }
+                                      for (const auto& v : result)
+                                      {
+                                          uint h;
+                                          if (v.isObject())
+                                          {
+                                              h = qHash(QJsonDocument(v.toObject()).toJson());
+                                          }
+                                          else if (v.isArray())
+                                          {
+                                              h = qHash(QJsonDocument(v.toArray()).toJson());
+                                          }
+                                          else
+                                          {
+                                              // For primitive values, add directly without hashing overhead
+                                              dedup.append(v);
+                                              continue;
+                                          }
 
-                                if (!seen.contains(h))
-                                {
-                                    seen.insert(h);
-                                    dedup.append(v);
-                                }
-                            }
-                            return std::move(dedup);
-                        }
-                        return std::move(result);
-                    })
-                .or_else(
-                    [](EvalError error) -> std::expected<QJsonArray, EvalError>
-                    {
-                        qCDebug(jsonPathLog) << "evalStandard: fanOut returned error" << static_cast<int>(error);
-                        return std::unexpected(error);
-                    });
+                                          if (!seen.contains(h))
+                                          {
+                                              seen.insert(h);
+                                              dedup.append(v);
+                                          }
+                                      }
+                                      return std::move(dedup);
+                                  }
+                                  return std::move(result);
+                              })
+                          .or_else(
+                              [](EvalError error) -> std::expected<QJsonArray, EvalError>
+                              {
+                                  qCDebug(jsonPathLog)
+                                      << "evalStandard: fanOut returned error" << static_cast<int>(error);
+                                  return std::unexpected(error);
+                              });
 
         multi = multiAfter;
         return result;
@@ -308,27 +308,24 @@ struct TokenProcessingDispatchTable<FirstType, RestTypes...>
                                                          bool&              multi,
                                                          bool               prevRecursive)
     {
-        qDebug() << "DEBUG: TokenProcessingDispatchTable::dispatch - tokenIdx:" << i
-                 << "kind:" << static_cast<int>(tk.kind) << "index:" << tk.index;
+        qCDebug(jsonPathLog) << "Dispatch: tokenIdx=" << i << "kind=" << static_cast<int>(tk.kind)
+                             << "index=" << tk.index;
         if constexpr (TokenProcessingDef<FirstType>::enabled)
         {
-            qDebug() << "DEBUG: TokenProcessingDispatchTable::dispatch - trying strategy (enabled):"
-                     << static_cast<int>(FirstType);
+            qCDebug(jsonPathLog) << "Dispatch: trying strategy (enabled)=" << static_cast<int>(FirstType);
             if (TokenProcessingDef<FirstType>::matches(ctx, i, tk, prevRecursive))
             {
-                qDebug() << "DEBUG: TokenProcessingDispatchTable::dispatch - strategy matches, calling process";
+                qCDebug(jsonPathLog) << "Dispatch: strategy matches -> process";
                 auto result{
                     TokenProcessingStrategy<FirstType>::process(ctx, i, tk, working, root, multi, prevRecursive)};
-                qDebug() << "DEBUG: TokenProcessingDispatchTable::dispatch - strategy process result has_value:"
-                         << result.has_value();
+                qCDebug(jsonPathLog) << "Dispatch: process result has_value=" << result.has_value();
 
                 // Special handling for union detection fallback
                 if constexpr (FirstType == TokenProcessingType::UnionDetection)
                 {
                     if (!result)
                     {
-                        qDebug() << "DEBUG: TokenProcessingDispatchTable::dispatch - UnionDetection failed, falling "
-                                    "back to next strategy";
+                        qCDebug(jsonPathLog) << "Dispatch: UnionDetection failed -> fallback";
                         // Fall back to next strategy in the dispatch table
                         return TokenProcessingDispatchTable<RestTypes...>::dispatch(
                             ctx, i, tk, working, root, multi, prevRecursive);
@@ -339,16 +336,15 @@ struct TokenProcessingDispatchTable<FirstType, RestTypes...>
             }
             else
             {
-                qDebug() << "DEBUG: TokenProcessingDispatchTable::dispatch - strategy does not match";
+                qCDebug(jsonPathLog) << "Dispatch: strategy does not match";
             }
         }
         else
         {
-            qDebug() << "DEBUG: TokenProcessingDispatchTable::dispatch - strategy not enabled:"
-                     << static_cast<int>(FirstType);
+            qCDebug(jsonPathLog) << "Dispatch: strategy not enabled=" << static_cast<int>(FirstType);
         }
 
-        qDebug() << "DEBUG: TokenProcessingDispatchTable::dispatch - trying next strategy in dispatch table";
+        qCDebug(jsonPathLog) << "Dispatch: trying next strategy";
         // Try next strategy in the dispatch table
         return TokenProcessingDispatchTable<RestTypes...>::dispatch(ctx, i, tk, working, root, multi, prevRecursive);
     }
@@ -399,9 +395,9 @@ std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const 
     // Start with the root value as a single node in the working set.
     // RFC 9535 semantics: the root selector "$" selects the document itself; we must NOT
     // pre-flatten root arrays into their elements before applying selectors like [index]/[slice].
-    qDebug() << "DEBUG: evalStandard - Root document type:" << root.type() << "isArray:" << root.isArray();
+    qCDebug(jsonPathLog) << "evalStandard: root type=" << root.type() << "isArray=" << root.isArray();
     if (root.isArray())
-        qDebug() << "DEBUG: Root is array; keeping array as a single node in working set";
+        qCDebug(jsonPathLog) << "evalStandard: root is array; keeping as single node";
     workingArray.append(root);
 
     // SANITIZER WORKAROUND: Avoid QJsonArray copy constructor corruption
@@ -416,8 +412,8 @@ std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const 
     for (qsizetype i = 1; i < ctx.tokens.size() && working; ++i)
     {
         const auto& tk = ctx.tokens[i];
-        qDebug() << "[stage] token" << i << ": kind=" << static_cast<int>(tk.kind)
-                 << "working size=" << working->size();
+        qCDebug(jsonPathLog) << "[stage] token" << i << ": kind=" << static_cast<int>(tk.kind)
+                             << "working size=" << working->size();
 
         auto prevRecursive{(i > 0 && ctx.tokens[i - 1].kind == Token::Kind::Recursive)};
 

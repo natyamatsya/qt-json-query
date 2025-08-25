@@ -9,6 +9,7 @@
 #include "json-query/json-path/internal/ResultStreamer.hpp"
 #include "json-query/utils/SanitizerCompat.hpp"
 #include "json-query/json-path/JSONPathTokenDispatch.hpp"
+#include "json-query/json-path/JSONPathLog.hpp"
 
 namespace json_query::json_path::detail {
 
@@ -37,7 +38,9 @@ std::expected<QJsonValue, EvalError> evaluate(const PathEvalCtx& ctx, const QJso
 QT_QUERY_JSON_ALWAYS_INLINE
 std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src, qsizetype tokenPos)
 {
-    qDebug() << "DEBUG: fanOut called - tokenPos:" << tokenPos << "kind:" << static_cast<int>(tk.kind) << "index:" << tk.index << "src.size():" << src.size();
+    if (jsonPathLog().isDebugEnabled())
+        qCDebug(jsonPathLog) << "DEBUG: fanOut called - tokenPos:" << tokenPos << "kind:" << static_cast<int>(tk.kind)
+                            << "index:" << tk.index << "src.size():" << src.size();
     // Use ArrayPool for better memory management
     auto pooledArray = acquirePooledArray();
     QJsonArray& result = *pooledArray;
@@ -45,18 +48,22 @@ std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token&
     ResultCollector collector(&result);
     auto streamer = collector.getStreamer();
 
-    qDebug() << "DEBUG: fanOut - about to call ErrorHandlingDispatcher::dispatch";
+    if (jsonPathLog().isDebugEnabled())
+        qCDebug(jsonPathLog) << "DEBUG: fanOut - about to call ErrorHandlingDispatcher::dispatch";
     // Apply token per working element via ErrorHandlingDispatcher (correct serial semantics)
     internal::ErrorHandlingDispatcher::dispatch(tk, tokenPos, ctx, src, streamer);
-    qDebug() << "DEBUG: fanOut - dispatch completed, result.size():" << result.size();
+    if (jsonPathLog().isDebugEnabled())
+        qCDebug(jsonPathLog) << "DEBUG: fanOut - dispatch completed, result.size():" << result.size();
 
     // Check if an error occurred during processing
     if (QT_QUERY_JSON_UNLIKELY(collector.hasError())) {
-        qDebug() << "DEBUG: fanOut - collector has error:" << static_cast<int>(collector.getLastError());
+        if (jsonPathLog().isDebugEnabled())
+            qCDebug(jsonPathLog) << "DEBUG: fanOut - collector has error:" << static_cast<int>(collector.getLastError());
         return std::unexpected(collector.getLastError());
     }
 
-    qDebug() << "DEBUG: fanOut - returning result with size:" << result.size();
+    if (jsonPathLog().isDebugEnabled())
+        qCDebug(jsonPathLog) << "DEBUG: fanOut - returning result with size:" << result.size();
     // Return by move to transfer ownership of the contents out of the pooled array
     // The pooled array instance will be returned to the pool in a moved-from (empty) state
     return std::move(result);

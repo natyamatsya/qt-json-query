@@ -6,6 +6,7 @@
 
 #include "json-query/Common.h"
 #include "json-query/json-path/JSONPathTokenEvaluators.hpp"
+#include "json-query/json-path/JSONPathLog.hpp"
 
 namespace json_query::json_path::internal {
 
@@ -30,9 +31,11 @@ std::expected<QJsonArray, EvalError> dispatchKey(const detail::PathEvalCtx& ctx,
 QT_QUERY_JSON_ALWAYS_INLINE
 std::expected<QJsonArray, EvalError> dispatchIndex(const detail::PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
 {
-    qDebug() << "DEBUG: dispatchIndex called - index:" << tk.index << "value type:" << v.type();
+    if (jsonPathLog().isDebugEnabled())
+        qCDebug(jsonPathLog) << "DEBUG: dispatchIndex called - index:" << tk.index << "value type:" << v.type();
     auto result = json_query::json_path::detail::eval<Token::Kind::Index>(ctx, tk, v);
-    qDebug() << "DEBUG: dispatchIndex result has_value:" << result.has_value();
+    if (jsonPathLog().isDebugEnabled())
+        qCDebug(jsonPathLog) << "DEBUG: dispatchIndex result has_value:" << result.has_value();
     return result;
 }
 
@@ -42,10 +45,12 @@ std::expected<QJsonArray, EvalError> dispatchIndex(const detail::PathEvalCtx& ct
 QT_QUERY_JSON_ALWAYS_INLINE
 std::expected<QJsonArray, EvalError> dispatchSlice(const detail::PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
 {
-    qDebug() << "DEBUG: dispatchSlice called - start:" << tk.slice.start << "end:" << tk.slice.end
-             << "step:" << tk.slice.step << "value type:" << v.type();
+    if (jsonPathLog().isDebugEnabled())
+        qCDebug(jsonPathLog) << "DEBUG: dispatchSlice called - start:" << tk.slice.start << "end:" << tk.slice.end
+                             << "step:" << tk.slice.step << "value type:" << v.type();
     auto result = json_query::json_path::detail::eval<Token::Kind::Slice>(ctx, tk, v);
-    qDebug() << "DEBUG: dispatchSlice result has_value:" << result.has_value();
+    if (jsonPathLog().isDebugEnabled())
+        qCDebug(jsonPathLog) << "DEBUG: dispatchSlice result has_value:" << result.has_value();
     return result;
 }
 

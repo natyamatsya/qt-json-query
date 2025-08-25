@@ -5,6 +5,8 @@
 #include "json-query/json-path/JSONPathEvaluate.hpp"
 #include "json-query/utils/JSONQueryError.hpp"
 
+#include "json-query/json-path/JSONPathLog.hpp"
+
 #include <vector>
 #include <deque>
 
@@ -21,12 +23,13 @@ namespace json_query::json_path
 
 JSONPath::EvalResult JSONPath::evaluate(const QJsonDocument& doc) const
 {
-    qDebug() << "DEBUG: JSONPath::evaluate(QJsonDocument) called with" << m_tokens.size() << "tokens";
-    for (size_t i = 0; i < m_tokens.size(); ++i) {
-        qDebug() << "DEBUG: Token[" << i << "] kind=" << static_cast<int>(m_tokens[i].kind) << "key=" << m_tokens[i].key;
-        if (m_tokens[i].kind == Token::Kind::Filter) {
-            qDebug() << "DEBUG: Token[" << i << "] is a FILTER token";
-        }
+    qCDebug(jsonPathLog) << "DEBUG: JSONPath::evaluate(QJsonDocument) called with" << m_tokens.size() << "tokens";
+    for (size_t i = 0; i < m_tokens.size(); ++i)
+    {
+        qCDebug(jsonPathLog) << "DEBUG: Token[" << i << "] kind=" << static_cast<int>(m_tokens[i].kind)
+                             << "key=" << m_tokens[i].key;
+        if (m_tokens[i].kind == Token::Kind::Filter)
+            qCDebug(jsonPathLog) << "DEBUG: Token[" << i << "] is a FILTER token";
     }
     const QJsonValue root = doc.isArray() ? QJsonValue{doc.array()} : QJsonValue{doc.object()};
     return evaluate(root);
@@ -34,12 +37,13 @@ JSONPath::EvalResult JSONPath::evaluate(const QJsonDocument& doc) const
 
 JSONPath::EvalResult JSONPath::evaluate(const QJsonValue& value) const
 {
-    qDebug() << "DEBUG: JSONPath::evaluate called with" << m_tokens.size() << "tokens";
-    for (size_t i = 0; i < m_tokens.size(); ++i) {
-        qDebug() << "DEBUG: Token[" << i << "] kind=" << static_cast<int>(m_tokens[i].kind) << "key=" << m_tokens[i].key;
-        if (m_tokens[i].kind == Token::Kind::Index) {
-            qDebug() << "DEBUG: Token[" << i << "] Index value:" << m_tokens[i].index;
-        }
+    qCDebug(jsonPathLog) << "DEBUG: JSONPath::evaluate called with" << m_tokens.size() << "tokens";
+    for (size_t i = 0; i < m_tokens.size(); ++i)
+    {
+        qCDebug(jsonPathLog) << "DEBUG: Token[" << i << "] kind=" << static_cast<int>(m_tokens[i].kind)
+                             << "key=" << m_tokens[i].key;
+        if (m_tokens[i].kind == Token::Kind::Index)
+            qCDebug(jsonPathLog) << "DEBUG: Token[" << i << "] Index value:" << m_tokens[i].index;
     }
     json_path::detail::PathEvalCtx ctx{m_tokens, value, m_func};
 
