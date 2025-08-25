@@ -14,6 +14,7 @@
 //   5. Special characters and edge cases work per RFC 6901.
 // -----------------------------------------------------------------------------
 #include <gtest/gtest.h>
+#include <ostream>
 
 #include <QDir>
 #include <QFile>
@@ -45,6 +46,18 @@ struct RFC6901TestCase
     bool       invalidPointer{false}; // true if pointer should be invalid
     bool       shouldFail{false};     // true if evaluation should fail (non-existent path)
 };
+
+// Custom GoogleTest printer to avoid raw-bytes dumping for parameter values.
+inline void PrintTo(const RFC6901TestCase& tc, std::ostream* os)
+{
+    *os << "RFC6901TestCase{"
+        << "name='" << tc.name.toStdString() << "'"
+        << ", pointer='" << tc.pointer.toStdString() << "'"
+        << ", invalidPointer=" << (tc.invalidPointer ? "true" : "false")
+        << ", shouldFail=" << (tc.shouldFail ? "true" : "false")
+        << ", documentType=" << (tc.document.isArray() ? "array" : (tc.document.isObject() ? "object" : "other"))
+        << "}";
+}
 
 // ----------------------------------------------------------------------------
 // JSON loader utilities -------------------------------------------------------
