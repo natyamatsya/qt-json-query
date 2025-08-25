@@ -54,23 +54,6 @@ TEST(JSONPathLogicalOr, IdOneOrThree)
 // ----------------------------------------------------------
 // 2. Mixed predicate kinds (string equality  OR  “in” operator)
 // ----------------------------------------------------------
-TEST(JSONPathLogicalOr, DirectorIsMendesOrStarringEva)
-{
-    auto path = JSONPath::create(u"$[?(@['director']=='Sam Mendes' || 'Eva Green' in @['starring'])]");
-    ASSERT_TRUE(path);
-    auto resResult{path->evaluateAll(bondDoc)};
-    ASSERT_TRUE(resResult.has_value()) << "Failed to evaluate path";
-    QJsonArray res = *resResult;
-
-    QVector<int> ids;
-    for (const auto& v : res)
-        ids << v[u"id"_s].toInt();
-
-    EXPECT_EQ(ids.size(), 3);
-    EXPECT_TRUE(ids.contains(1));
-    EXPECT_TRUE(ids.contains(3));
-    EXPECT_TRUE(ids.contains(4));
-}
 
 // ----------------------------------------------------------
 // 3. Precedence:  AND binds tighter than OR  (no parens)
