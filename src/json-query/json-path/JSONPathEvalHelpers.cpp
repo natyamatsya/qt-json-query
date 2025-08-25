@@ -846,11 +846,13 @@ processSingleUnionToken(const PathEvalCtx& ctx, qsizetype tokenIdx, const QJsonA
     // Process each working value using monadic pattern
     auto processWorkingValue = [&](const QJsonValue& workingValue) -> std::expected<QJsonArray, EvalError>
     {
-        qDebug() << "DEBUG: processSingleUnionToken lambda - tokenIdx:" << tokenIdx
-                 << "kind:" << static_cast<int>(ctx.tokens[tokenIdx].kind) << "index:" << ctx.tokens[tokenIdx].index;
-        qDebug() << "DEBUG: processSingleUnionToken lambda - about to call evaluateToken";
+        qCDebug(jsonPathLog) << "DEBUG: processSingleUnionToken lambda - tokenIdx:" << tokenIdx
+                             << "kind:" << static_cast<int>(ctx.tokens[tokenIdx].kind)
+                             << "index:" << ctx.tokens[tokenIdx].index;
+        qCDebug(jsonPathLog) << "DEBUG: processSingleUnionToken lambda - about to call evaluateToken";
         auto result = evaluateToken(ctx, ctx.tokens[tokenIdx], workingValue);
-        qDebug() << "DEBUG: processSingleUnionToken lambda - evaluateToken result has_value:" << result.has_value();
+        qCDebug(jsonPathLog) << "DEBUG: processSingleUnionToken lambda - evaluateToken result has_value:"
+                             << result.has_value();
         return result;
     };
 

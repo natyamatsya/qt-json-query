@@ -3,6 +3,7 @@
 #include "json-query/json-path/JSONPathFilterExistenceParsers.hpp"
 #include "json-query/json-path/JSONPathFilterHelpers.hpp"
 #include "json-query/utils/JSONQueryUtils.hpp"
+#include "json-query/json-path/JSONPathLog.hpp"
 #include <ctre.hpp>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -488,15 +489,17 @@ struct ExistencePatternStrategy<ExistencePatternType::BasicDot>
                 [prop = std::move(prop)](const QJsonValue& j)
                 {
                     // Basic property existence: @.property - true if object contains property
-                    qDebug() << "DEBUG: BasicDot evaluating property" << prop << "on value:" << j;
-                    qDebug() << "DEBUG: j.isObject():" << j.isObject() << "j.type():" << j.type();
-                    if (j.isObject()) {
-                        const auto obj = j.toObject();
-                        bool hasProperty = obj.contains(prop);
-                        qDebug() << "DEBUG: Object keys:" << obj.keys() << "contains" << prop << "=" << hasProperty;
+                    qCDebug(jsonPathLog) << "DEBUG: BasicDot evaluating property" << prop << "on value:" << j;
+                    qCDebug(jsonPathLog) << "DEBUG: j.isObject():" << j.isObject() << "j.type():" << j.type();
+                    if (j.isObject())
+                    {
+                        const auto obj         = j.toObject();
+                        bool       hasProperty = obj.contains(prop);
+                        qCDebug(jsonPathLog)
+                            << "DEBUG: Object keys:" << obj.keys() << "contains" << prop << "=" << hasProperty;
                         return hasProperty;
                     }
-                    qDebug() << "DEBUG: Not an object, returning false";
+                    qCDebug(jsonPathLog) << "DEBUG: Not an object, returning false";
                     return false; // Non-objects don't have properties
                 });
 

@@ -108,7 +108,7 @@ std::optional<Token> parseIn(const QString& s, std::vector<FilterFn>& out)
 std::optional<Token> parseEmbeddedOr(const QString& s)
 {
     // Simple debug output to verify execution
-    qDebug() << "DEBUG: parseEmbeddedOr called with input:" << s;
+    qCDebug(jsonPathLog) << "DEBUG: parseEmbeddedOr called with input:" << s;
     qCDebug(jsonPathLog) << "parseEmbeddedOr: input=" << s;
     if (auto split = splitTopLevel(s, "||"_L1); split)
     {
@@ -118,8 +118,10 @@ std::optional<Token> parseEmbeddedOr(const QString& s)
         auto leftToken{compileEmbeddedFilter(lhs.trimmed())};
         auto rightToken{compileEmbeddedFilter(rhs.trimmed())};
 
-        if (!leftToken || !rightToken) {
-            qCDebug(jsonPathLog) << "parseEmbeddedOr: failed to compile sub-tokens, leftToken=" << (leftToken ? "valid" : "null") << "rightToken=" << (rightToken ? "valid" : "null");
+        if (!leftToken || !rightToken)
+        {
+            qCDebug(jsonPathLog) << "parseEmbeddedOr: failed to compile sub-tokens, leftToken="
+                                 << (leftToken ? "valid" : "null") << "rightToken=" << (rightToken ? "valid" : "null");
             return std::nullopt;
         }
 
@@ -135,7 +137,8 @@ std::optional<Token> parseEmbeddedOr(const QString& s)
             {
                 auto leftResult{leftToken.evaluateEmbeddedFilter(value)};
                 auto rightResult{rightToken.evaluateEmbeddedFilter(value)};
-                qCDebug(jsonPathLog) << "parseEmbeddedOr: evaluating OR - leftResult=" << leftResult << "rightResult=" << rightResult << "final=" << (leftResult || rightResult);
+                qCDebug(jsonPathLog) << "parseEmbeddedOr: evaluating OR - leftResult=" << leftResult
+                                     << "rightResult=" << rightResult << "final=" << (leftResult || rightResult);
                 return leftResult || rightResult;
             });
 
@@ -156,8 +159,10 @@ std::optional<Token> parseEmbeddedAnd(const QString& s)
         auto leftToken{compileEmbeddedFilter(lhs.trimmed())};
         auto rightToken{compileEmbeddedFilter(rhs.trimmed())};
 
-        if (!leftToken || !rightToken) {
-            qCDebug(jsonPathLog) << "parseEmbeddedAnd: failed to compile sub-tokens, leftToken=" << (leftToken ? "valid" : "null") << "rightToken=" << (rightToken ? "valid" : "null");
+        if (!leftToken || !rightToken)
+        {
+            qCDebug(jsonPathLog) << "parseEmbeddedAnd: failed to compile sub-tokens, leftToken="
+                                 << (leftToken ? "valid" : "null") << "rightToken=" << (rightToken ? "valid" : "null");
             return std::nullopt;
         }
 
@@ -173,7 +178,8 @@ std::optional<Token> parseEmbeddedAnd(const QString& s)
             {
                 auto leftResult{leftToken.evaluateEmbeddedFilter(value)};
                 auto rightResult{rightToken.evaluateEmbeddedFilter(value)};
-                qCDebug(jsonPathLog) << "parseEmbeddedAnd: evaluating AND - leftResult=" << leftResult << "rightResult=" << rightResult << "final=" << (leftResult && rightResult);
+                qCDebug(jsonPathLog) << "parseEmbeddedAnd: evaluating AND - leftResult=" << leftResult
+                                     << "rightResult=" << rightResult << "final=" << (leftResult && rightResult);
                 return leftResult && rightResult;
             });
 
@@ -713,7 +719,7 @@ std::optional<Token> parseEmbeddedFunction(const QString& s)
         static std::function<bool(const QJsonValue&)> createRegularFilter(
             const QString& expr,
             const std::function<SideEvaluationResult(const QString&, bool, const QJsonValue&, const QJsonValue&)>&
-                                                                      evaluateExpressionSide,
+                                                                     evaluateExpressionSide,
             const std::function<ComparisonRuleType(const QString&)>& determineComparisonRuleType,
             const std::function<bool(ComparisonRuleType, const SideEvaluationResult&, const SideEvaluationResult&)>&
                 performNothingAwareComparison)
