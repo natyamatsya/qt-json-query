@@ -11,6 +11,7 @@
 #include <QtCore/QJsonObject>
 #include <QtCore/QJsonArray>
 #include <vector>
+#include <utility>
 
 namespace json_query::json_path::internal
 {
@@ -194,7 +195,7 @@ struct PathPatternEvaluator<PathPattern::SimpleKey>
         QJsonArray& result = *pooledArray;
         result.append(it.value());
 
-        return QJsonArray(result);
+        return std::move(result);
     }
 };
 
@@ -229,7 +230,7 @@ struct PathPatternEvaluator<PathPattern::NestedKeys>
         QJsonArray& result = *pooledArray;
         result.append(current);
 
-        return QJsonArray(result);
+        return std::move(result);
     }
 };
 
@@ -263,7 +264,7 @@ struct PathPatternEvaluator<PathPattern::ArrayIndex>
         QJsonArray& result = *pooledArray;
         result.append(arr[index]);
 
-        return QJsonArray(result);
+        return std::move(result);
     }
 };
 
@@ -289,7 +290,7 @@ struct PathPatternEvaluator<PathPattern::ArrayWildcard>
             for (const auto& item : arr)
                 result.append(item);
 
-            return QJsonArray(result);
+            return std::move(result);
         }
         else if (root.isObject())
         {
@@ -303,7 +304,7 @@ struct PathPatternEvaluator<PathPattern::ArrayWildcard>
             for (auto it = obj.begin(); it != obj.end(); ++it)
                 result.append(it.value());
 
-            return QJsonArray(result);
+            return std::move(result);
         }
 
         return QJsonArray{}; // Empty result for other types
@@ -351,7 +352,7 @@ struct PathPatternEvaluator<PathPattern::KeyThenIndex>
         QJsonArray& result = *pooledArray;
         result.append(arr[index]);
 
-        return QJsonArray(result);
+        return std::move(result);
     }
 };
 
@@ -396,7 +397,7 @@ struct PathPatternEvaluator<PathPattern::IndexThenKey>
         QJsonArray& result = *pooledArray;
         result.append(it.value());
 
-        return QJsonArray(result);
+        return std::move(result);
     }
 };
 
@@ -447,7 +448,7 @@ struct PathPatternEvaluator<PathPattern::WildcardThenKey>
             }
         }
 
-        return QJsonArray(result);
+        return std::move(result);
     }
 };
 

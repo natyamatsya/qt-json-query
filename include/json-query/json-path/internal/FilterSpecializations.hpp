@@ -11,6 +11,7 @@
 #include <QtCore/QJsonObject>
 #include <QtCore/QJsonArray>
 #include <QtCore/QRegularExpression>
+#include <utility>
 
 namespace json_query::json_path::internal
 {
@@ -152,7 +153,7 @@ class FilterPatternEvaluator<FilterPattern::SimpleExistence>
             }
         }
 
-        return QJsonArray(out);
+        return std::move(out);
     }
 };
 
@@ -175,7 +176,7 @@ class FilterPatternEvaluator<FilterPattern::SimpleComparison>
         const auto expr{tk.key};
         const auto eqPos{expr.indexOf("==")};
         if (eqPos == -1)
-            return QJsonArray(out); // Invalid expression
+            return std::move(out); // Invalid expression
 
         auto key{expr.left(eqPos).trimmed()};
         auto value{expr.mid(eqPos + 2).trimmed()};
@@ -218,7 +219,7 @@ class FilterPatternEvaluator<FilterPattern::SimpleComparison>
             }
         }
 
-        return QJsonArray(out);
+        return std::move(out);
     }
 };
 
@@ -290,7 +291,7 @@ class FilterPatternEvaluator<FilterPattern::NumericComparison>
             key = key.mid(2);
 
         if (key.isEmpty() || op.isEmpty())
-            return QJsonArray(out); // Invalid expression
+            return std::move(out); // Invalid expression
 
         if (v.isArray())
         {
@@ -322,7 +323,7 @@ class FilterPatternEvaluator<FilterPattern::NumericComparison>
             }
         }
 
-        return QJsonArray(out);
+        return std::move(out);
     }
 };
 
@@ -345,7 +346,7 @@ class FilterPatternEvaluator<FilterPattern::LengthComparison>
         const auto expr{tk.key};
         const auto lengthPos{expr.indexOf(".length()")};
         if (lengthPos == -1)
-            return QJsonArray(out); // Invalid expression
+            return std::move(out); // Invalid expression
 
         auto    key{expr.left(lengthPos).trimmed()};
         QString remainder{expr.mid(lengthPos + 9).trimmed()}; // Skip ".length()"
@@ -385,7 +386,7 @@ class FilterPatternEvaluator<FilterPattern::LengthComparison>
         }
 
         if (op.isEmpty())
-            return QJsonArray(out); // Invalid expression
+            return std::move(out); // Invalid expression
 
         if (v.isArray())
         {
@@ -419,7 +420,7 @@ class FilterPatternEvaluator<FilterPattern::LengthComparison>
             }
         }
 
-        return QJsonArray(out);
+        return std::move(out);
     }
 };
 

@@ -54,9 +54,9 @@ eval<Token::Kind::Index>(const PathEvalCtx& ctx, const Token& tk, const QJsonVal
         return emptyResult(); // Empty result for non-arrays (not an error per RFC 9535)
     }
 
-    // SANITIZER WORKAROUND: Work directly with original array to avoid Qt copy constructor corruption
-    // This is the same issue we fixed in JSON Pointer evaluation - sanitizer instrumentation
-    // corrupts QJsonArray copy constructor, causing wrong size/content in the copied array.
+    // SANITIZER WORKAROUND: Access the source array and avoid copying result arrays
+    // Sanitizer instrumentation can corrupt QJsonArray (copy/move) constructors. We therefore
+    // construct the result via ArrayPool and return it with std::move to avoid problematic copies.
     const QJsonArray originalArray = v.toArray();
     const auto       idx           = normalizeIndex(tk.index, originalArray.size());
 
@@ -65,9 +65,13 @@ eval<Token::Kind::Index>(const PathEvalCtx& ctx, const Token& tk, const QJsonVal
     if (idx < 0 || idx >= originalArray.size())
         return emptyResult(); // Empty result for out-of-range (not an error per RFC 9535)
 
-    QJsonArray out;
+    // Use ArrayPool for result to optimize memory allocation and avoid copy/move constructor issues
+    auto  pooledArray{acquirePooledArray()};
+    auto& out = *pooledArray;
     out.append(originalArray[idx]);
-    return out;
+
+    // SANITIZER WORKAROUND: Avoid QJsonArray copy constructor corruption by returning via std::move
+    return std::move(out);
 }
 
 // --- Slice -----------------------------------------------------------------

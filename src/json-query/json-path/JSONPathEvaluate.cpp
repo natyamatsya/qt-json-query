@@ -277,7 +277,7 @@ struct TokenProcessingStrategy<TokenProcessingType::StandardFanOut>
                                     dedup.append(v);
                                 }
                             }
-                            return QJsonArray(dedup); // Return copy since pooled array will be returned to pool
+                            return std::move(dedup);
                         }
                         return std::move(result);
                     })

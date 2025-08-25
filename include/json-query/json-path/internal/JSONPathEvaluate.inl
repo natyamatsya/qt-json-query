@@ -57,8 +57,9 @@ std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token&
     }
 
     qDebug() << "DEBUG: fanOut - returning result with size:" << result.size();
-    // Return a copy since pooled array will be returned to pool
-    return QJsonArray(result);
+    // Return by move to transfer ownership of the contents out of the pooled array
+    // The pooled array instance will be returned to the pool in a moved-from (empty) state
+    return std::move(result);
 }
 
 /**

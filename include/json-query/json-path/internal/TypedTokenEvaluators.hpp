@@ -8,6 +8,7 @@
 #include "json-query/json-path/internal/ArrayPool.hpp"
 #include <expected>
 #include <QtCore/QJsonValue>
+#include <utility>
 
 namespace json_query::json_path::internal
 {
@@ -61,7 +62,7 @@ struct TypedTokenEvaluator<Token::Kind::Key, QJsonValue::Object>
         QJsonArray& result = *pooledArray;
         result.append(it.value());
 
-        return QJsonArray(result);
+        return std::move(result);
     }
 };
 
@@ -111,7 +112,7 @@ struct TypedTokenEvaluator<Token::Kind::Index, QJsonValue::Array>
         QJsonArray& result = *pooledArray;
         result.append(arr[normalizedIndex]);
 
-        return QJsonArray(result);
+        return std::move(result);
     }
 };
 
@@ -154,7 +155,7 @@ struct TypedTokenEvaluator<Token::Kind::Wildcard, QJsonValue::Object>
         for (auto it = obj.begin(); it != obj.end(); ++it)
             result.append(it.value());
 
-        return QJsonArray(result);
+        return std::move(result);
     }
 };
 
@@ -178,7 +179,7 @@ struct TypedTokenEvaluator<Token::Kind::Wildcard, QJsonValue::Array>
         for (const auto& item : arr)
             result.append(item);
 
-        return QJsonArray(result);
+        return std::move(result);
     }
 };
 
