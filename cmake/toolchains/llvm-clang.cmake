@@ -9,20 +9,12 @@ if(NOT DEFINED CMAKE_SYSTEM_PROCESSOR)
   set(CMAKE_SYSTEM_PROCESSOR ${CMAKE_HOST_SYSTEM_PROCESSOR})
 endif()
 
-# Try to find LLVM Clang in common locations
-find_program(
-  LLVM_CLANG_CXX
-  NAMES clang++
-  PATHS /usr/local/opt/llvm/bin /opt/homebrew/opt/llvm/bin /usr/local/bin
-        /opt/local/bin
-  NO_DEFAULT_PATH)
+# # Try to find LLVM Clang in common locations find_program( LLVM_CLANG_CXX
+# NAMES clang++ PATHS /usr/local/opt/llvm/bin /opt/homebrew/opt/llvm/bin
+# /usr/local/bin /opt/local/bin NO_DEFAULT_PATH)
 
-find_program(
-  LLVM_CLANG_C
-  NAMES clang
-  PATHS /usr/local/opt/llvm/bin /opt/homebrew/opt/llvm/bin /usr/local/bin
-        /opt/local/bin
-  NO_DEFAULT_PATH)
+# find_program( LLVM_CLANG_C NAMES clang PATHS /usr/local/opt/llvm/bin
+# /opt/homebrew/opt/llvm/bin /usr/local/bin /opt/local/bin NO_DEFAULT_PATH)
 
 # Fallback to system clang if LLVM version not found
 if(NOT LLVM_CLANG_CXX)
