@@ -20,6 +20,7 @@
 #include <QDebug>
 #include <algorithm>
 #include <limits>
+#include <utility>
 
 namespace json_query::json_path::detail
 {
@@ -176,14 +177,22 @@ struct SliceProcessingStrategy<SliceProcessingType::ForwardSlice>
 
         qCDebug(jsonPathLog) << "evalSlice forward: start=" << start << " stop=" << stop << " step=" << step;
 
-        // Forward iteration
-        for (qsizetype i = start; i < stop; i += step)
+        // Forward iteration (overflow-safe)
+        for (qsizetype i = start; i < stop;)
         {
             if (i >= 0 && i < len)
             {
                 qCDebug(jsonPathLog) << "  visiting i=" << i;
                 out.append(array[static_cast<int>(i)]);
             }
+
+            // Prevent signed overflow on i += step when step is very large.
+            // There is no next valid index if adding step would reach or pass stop.
+            const qsizetype remaining = stop - i; // safe: stop >= i here and both are clamped to [0, len]
+            if (remaining <= step)
+                break;
+
+            i += step;
         }
 
         qCDebug(jsonPathLog) << "evalSlice result size=" << out.size();
@@ -237,17 +246,24 @@ struct SliceProcessingStrategy<SliceProcessingType::BackwardSlice>
 
         qCDebug(jsonPathLog) << "evalSlice backward: start=" << start << " stop=" << stop << " step=" << step;
 
-        // Backward iteration
-        for (qsizetype i = start; i > stop; i += step)
+        // Backward iteration (overflow/underflow-safe)
+        for (qsizetype i = start; i > stop;)
         {
             if (i >= 0 && i < len)
             {
                 qCDebug(jsonPathLog) << "  visiting i=" << i;
                 out.append(array[static_cast<int>(i)]);
             }
-            // Prevent underflow when i + step would wrap
-            if (i < std::numeric_limits<qsizetype>::min() - step)
+
+            // Decide termination without risking overflow:
+            // With step < 0 and i > stop, next index would be i + step.
+            // If i + step <= stop, we should stop. Rearranged to avoid overflow:
+            //   i + step <= stop  <=>  step <= stop - i (both sides negative here)
+            const qsizetype delta = stop - i; // negative since i > stop
+            if (step <= delta)
                 break;
+
+            i += step;
         }
 
         qCDebug(jsonPathLog) << "evalSlice result size=" << out.size();
@@ -464,7 +480,7 @@ struct UnionProcessingStrategy<UnionProcessingType::SingleToken>
         {
             qCDebug(jsonPathLog) << "[UnionProcessing::SingleToken] Single token succeeded with"
                                  << tokenResult.results.size() << "results";
-            return tokenResult.results;
+            return std::move(tokenResult.results);
         }
         else
         {
@@ -501,7 +517,7 @@ struct UnionProcessingStrategy<UnionProcessingType::MultipleTokens>
             {
                 qCDebug(jsonPathLog) << "[UnionProcessing::MultipleTokens] Token" << tokenIdx << "succeeded with"
                                      << tokenResult.results.size() << "results";
-                return tokenResult.results;
+                return std::move(tokenResult.results);
             }
             else
             {
@@ -517,7 +533,7 @@ struct UnionProcessingStrategy<UnionProcessingType::MultipleTokens>
         {
             if (auto result = processToken(tokenIdx))
             {
-                resultArrays.push_back(*result);
+                resultArrays.push_back(std::move(*result));
             }
             else
             {
@@ -869,7 +885,7 @@ processSingleUnionToken(const PathEvalCtx& ctx, qsizetype tokenIdx, const QJsonA
         }
 
         if (anySuccess)
-            return results;
+            return std::move(results);
         // All working values failed
         return std::unexpected(lastError);
     };
@@ -877,15 +893,12 @@ processSingleUnionToken(const PathEvalCtx& ctx, qsizetype tokenIdx, const QJsonA
     // Convert std::expected result to TokenProcessingResult using monadic pattern
     return aggregateResults()
         .transform(
-            [&](const QJsonArray& successResults) -> TokenProcessingResult
+            [&](QJsonArray successResults) -> TokenProcessingResult
             {
                 qCDebug(jsonPathLog) << "[processSingleUnionToken] Completed with" << successResults.size()
                                      << "total results";
                 return TokenProcessingResult{
-                    .success = true,
-                    .results = QJsonArray(successResults), // Copy from pooled array
-                    .error   = EvalError::KeyNotFound      // Unused for success case
-                };
+                    .success = true, .results = std::move(successResults), .error = EvalError::KeyNotFound};
             })
         .or_else([](EvalError error) -> std::expected<TokenProcessingResult, EvalError>
                  { return TokenProcessingResult{.success = false, .results = QJsonArray{}, .error = error}; })
