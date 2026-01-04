@@ -33,6 +33,9 @@ option(JSON_QUERY_ENABLE_EXTENSION_TESTS
 
 option(ENABLE_FUZZ_TESTS "Enable LibFuzzer-based fuzz testing" OFF)
 
+option(JSON_QUERY_ENABLE_SCHEMA_TESTS
+       "Build JSON Schema validation tests" ON)
+
 # ---------------------------------------------------------------------------
 # Include Modular Test Suite Configurations
 # ---------------------------------------------------------------------------
@@ -73,6 +76,12 @@ if(ENABLE_FUZZ_TESTS)
   add_fuzz_tests()
 endif()
 
+# JSON Schema validation tests
+if(JSON_QUERY_ENABLE_SCHEMA_TESTS)
+  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/JSONSchemaTests.cmake)
+  add_json_schema_tests()
+endif()
+
 # ---------------------------------------------------------------------------
 # Aggregate Test Target (Optional)
 # ---------------------------------------------------------------------------
@@ -108,6 +117,10 @@ if(JSON_QUERY_CREATE_AGGREGATE_TARGET)
     list(APPEND ALL_TEST_TARGETS json_query_fuzz_tests)
   endif()
 
+  if(JSON_QUERY_ENABLE_SCHEMA_TESTS AND TARGET json_schema_tests)
+    list(APPEND ALL_TEST_TARGETS json_schema_tests)
+  endif()
+
   if(ALL_TEST_TARGETS)
     add_custom_target(all_json_query_tests DEPENDS ${ALL_TEST_TARGETS})
     message(STATUS "Created aggregate target: all_json_query_tests")
@@ -128,5 +141,6 @@ message(
     "Extension Tests: ${JSON_QUERY_ENABLE_EXTENSION_TESTS} (DISABLED by default)"
 )
 message(STATUS "Fuzz Tests:      ${ENABLE_FUZZ_TESTS}")
+message(STATUS "Schema Tests:    ${JSON_QUERY_ENABLE_SCHEMA_TESTS}")
 message(STATUS "Aggregate Target: ${JSON_QUERY_CREATE_AGGREGATE_TARGET}")
 message(STATUS "=============================================")

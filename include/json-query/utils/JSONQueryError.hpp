@@ -3,6 +3,7 @@
 
 #include "../json-path/JSONPathError.hpp"
 #include "../json-pointer/JSONPointerError.hpp"
+#include "../json-schema/JSONSchemaError.hpp"
 
 #include <QtCore/QString>
 #include <QtCore/QStringView>
@@ -74,7 +75,9 @@ enum class ErrorDomain : std::uint8_t
     PointerParse, // JSONPointer parse errors
     PathEval,     // JSONPath evaluation errors
     PointerEval,  // JSONPointer evaluation errors
-    Convert       // General conversion errors
+    Convert,      // General conversion errors
+    SchemaParse,  // JSON Schema parse/compilation errors
+    SchemaEval    // JSON Schema validation errors
 };
 
 // Compile-time mapping from enum type -> domain
@@ -106,12 +109,23 @@ struct error_domain<ConvertError>
 {
     static constexpr ErrorDomain value = ErrorDomain::Convert;
 };
+template <>
+struct error_domain<json_schema::ParseError>
+{
+    static constexpr ErrorDomain value = ErrorDomain::SchemaParse;
+};
+template <>
+struct error_domain<json_schema::EvalError>
+{
+    static constexpr ErrorDomain value = ErrorDomain::SchemaEval;
+};
 
 template <class E>
 inline constexpr bool is_domain_enum_v =
     std::is_same_v<E, json_path::ParseError> || std::is_same_v<E, json_pointer::ParseError> ||
     std::is_same_v<E, json_path::EvalError> || std::is_same_v<E, json_pointer::EvalError> ||
-    std::is_same_v<E, ConvertError>;
+    std::is_same_v<E, ConvertError> || std::is_same_v<E, json_schema::ParseError> ||
+    std::is_same_v<E, json_schema::EvalError>;
 
 // The compact, unified error type
 struct QueryError
@@ -148,6 +162,16 @@ struct QueryError
     {
     }
 
+    constexpr explicit QueryError(json_schema::ParseError e) noexcept
+        : domain(ErrorDomain::SchemaParse), code(static_cast<std::uint8_t>(e))
+    {
+    }
+
+    constexpr explicit QueryError(json_schema::EvalError e) noexcept
+        : domain(ErrorDomain::SchemaEval), code(static_cast<std::uint8_t>(e))
+    {
+    }
+
     // Fallback template for any other enum type that maps to a domain
     template <class E>
         requires is_domain_enum_v<E>
@@ -174,6 +198,8 @@ struct QueryError
     [[nodiscard]] constexpr bool is_path_eval() const noexcept { return domain == ErrorDomain::PathEval; }
     [[nodiscard]] constexpr bool is_pointer_eval() const noexcept { return domain == ErrorDomain::PointerEval; }
     [[nodiscard]] constexpr bool is_convert() const noexcept { return domain == ErrorDomain::Convert; }
+    [[nodiscard]] constexpr bool is_schema_parse() const noexcept { return domain == ErrorDomain::SchemaParse; }
+    [[nodiscard]] constexpr bool is_schema_eval() const noexcept { return domain == ErrorDomain::SchemaEval; }
 
     // Equality (so it works nicely in tests)
     friend constexpr bool operator==(QueryError a, QueryError b) noexcept
@@ -205,6 +231,10 @@ static_assert(sizeof(QueryError) == 2, "QueryError should remain compact (2 byte
         return json_pointer::to_std_sv(static_cast<json_pointer::EvalError>(e.code));
     case Convert:
         return to_std_sv(static_cast<ConvertError>(e.code));
+    case SchemaParse:
+        return json_schema::to_std_sv(static_cast<json_schema::ParseError>(e.code));
+    case SchemaEval:
+        return json_schema::to_std_sv(static_cast<json_schema::EvalError>(e.code));
     default:
         break;
     }
@@ -232,6 +262,10 @@ static_assert(sizeof(QueryError) == 2, "QueryError should remain compact (2 byte
         return json_pointer::to_qt_sv(static_cast<json_pointer::EvalError>(e.code));
     case Convert:
         return to_qt_sv(static_cast<ConvertError>(e.code));
+    case SchemaParse:
+        return json_schema::to_qt_sv(static_cast<json_schema::ParseError>(e.code));
+    case SchemaEval:
+        return json_schema::to_qt_sv(static_cast<json_schema::EvalError>(e.code));
     default:
         break;
     }
