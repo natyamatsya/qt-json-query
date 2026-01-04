@@ -52,6 +52,14 @@ target_include_directories(
 # Link QtCore (Qt JSON classes live here)
 target_link_libraries(json_query PUBLIC Qt6::Core)
 
+# MSVC: Increase template instantiation depth for complex CTRE patterns
+# Applied only to files with deeply nested regex - avoids affecting other TUs
+if(MSVC)
+  set_source_files_properties(
+    json-path/JSONPathParseUtils.cpp
+    PROPERTIES COMPILE_OPTIONS "/templateDepth:2000")
+endif()
+
 # Compile-time control over debug logging (category-based)
 option(JSON_QUERY_ENABLE_DEBUG_LOGS "Enable debug logs in the library" OFF)
 if(NOT JSON_QUERY_ENABLE_DEBUG_LOGS)
