@@ -91,10 +91,13 @@ std::vector<QString> findTestFiles(const QString& testSuiteDir)
 {
     std::vector<QString> files{};
 
-    QDir dir{testSuiteDir + u"/tests/draft2020-12"_qs};
+    const QDir dir{testSuiteDir + u"/tests/draft2020-12"_qs};
     if (!dir.exists())
     {
         qWarning() << "Test suite directory not found:" << dir.path();
+        qWarning() << "Expected location: compliance/json-schema-test-suite/";
+        qWarning() << "To add the submodule, run:";
+        qWarning() << "  git submodule add https://github.com/json-schema-org/JSON-Schema-Test-Suite.git compliance/json-schema-test-suite";
         return files;
     }
 
@@ -114,11 +117,10 @@ class JSONSchemaComplianceTest : public ::testing::TestWithParam<QString>
   protected:
     static QString getTestSuiteDir()
     {
-#ifdef JSON_SCHEMA_TEST_SUITE_DIR
-        return QString::fromUtf8(JSON_SCHEMA_TEST_SUITE_DIR);
-#else
-        return QString{};
+#ifndef JSON_QUERY_SOURCE_DIR
+#define JSON_QUERY_SOURCE_DIR "."
 #endif
+        return QStringLiteral(JSON_QUERY_SOURCE_DIR "/compliance/json-schema-test-suite");
     }
 };
 
