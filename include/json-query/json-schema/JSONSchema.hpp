@@ -127,10 +127,7 @@ class JSONSchema
 
   private:
     JSONSchema() = default;
-    explicit JSONSchema(std::shared_ptr<const internal::CompiledSchema> compiled)
-        : m_compiled(std::move(compiled))
-    {
-    }
+    explicit JSONSchema(std::shared_ptr<const internal::CompiledSchema> compiled) : m_compiled(std::move(compiled)) {}
 
     std::shared_ptr<const internal::CompiledSchema> m_compiled;
 };

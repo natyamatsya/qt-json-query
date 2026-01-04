@@ -45,9 +45,7 @@ struct CompileContext
 std::expected<std::optional<TypeConstraint>, QueryError> parseTypeKeyword(const QJsonValue& typeValue)
 {
     if (typeValue.isUndefined())
-    {
         return std::nullopt;
-    }
 
     TypeConstraint constraint;
 
@@ -55,30 +53,22 @@ std::expected<std::optional<TypeConstraint>, QueryError> parseTypeKeyword(const 
     {
         auto schemaType = stringToSchemaType(typeValue.toString());
         if (!schemaType)
-        {
             return std::unexpected(QueryError(ParseError::InvalidTypeValue));
-        }
         constraint.allowedTypes.push_back(*schemaType);
     }
     else if (typeValue.isArray())
     {
         const QJsonArray typeArray = typeValue.toArray();
         if (typeArray.isEmpty())
-        {
             return std::unexpected(QueryError(ParseError::InvalidTypeValue));
-        }
 
         for (const QJsonValue& typeItem : typeArray)
         {
             if (!typeItem.isString())
-            {
                 return std::unexpected(QueryError(ParseError::InvalidTypeValue));
-            }
             auto schemaType = stringToSchemaType(typeItem.toString());
             if (!schemaType)
-            {
                 return std::unexpected(QueryError(ParseError::InvalidTypeValue));
-            }
             constraint.allowedTypes.push_back(*schemaType);
         }
     }
@@ -96,20 +86,14 @@ std::expected<std::optional<TypeConstraint>, QueryError> parseTypeKeyword(const 
 std::expected<std::optional<QJsonArray>, QueryError> parseEnumKeyword(const QJsonValue& enumValue)
 {
     if (enumValue.isUndefined())
-    {
         return std::nullopt;
-    }
 
     if (!enumValue.isArray())
-    {
         return std::unexpected(QueryError(ParseError::InvalidEnumValue));
-    }
 
     const QJsonArray enumArray = enumValue.toArray();
     if (enumArray.isEmpty())
-    {
         return std::unexpected(QueryError(ParseError::InvalidEnumValue));
-    }
 
     return enumArray;
 }
@@ -120,27 +104,21 @@ std::expected<std::optional<QJsonArray>, QueryError> parseEnumKeyword(const QJso
 std::optional<QJsonValue> parseConstKeyword(const QJsonValue& constValue)
 {
     if (constValue.isUndefined())
-    {
         return std::nullopt;
-    }
     return constValue;
 }
 
 /**
  * @brief Parse numeric keywords (minimum, maximum, etc.)
  */
-std::expected<std::optional<double>, QueryError> parseNumericKeyword(const QJsonValue& value,
+std::expected<std::optional<double>, QueryError> parseNumericKeyword(const QJsonValue&            value,
                                                                      [[maybe_unused]] const char* keywordName)
 {
     if (value.isUndefined())
-    {
         return std::nullopt;
-    }
 
     if (!value.isDouble())
-    {
         return std::unexpected(QueryError(ParseError::InvalidKeywordValue));
-    }
 
     return value.toDouble();
 }
@@ -148,24 +126,18 @@ std::expected<std::optional<double>, QueryError> parseNumericKeyword(const QJson
 /**
  * @brief Parse integer keywords (minLength, maxLength, minItems, etc.)
  */
-std::expected<std::optional<std::size_t>, QueryError> parseIntegerKeyword(const QJsonValue& value,
+std::expected<std::optional<std::size_t>, QueryError> parseIntegerKeyword(const QJsonValue&            value,
                                                                           [[maybe_unused]] const char* keywordName)
 {
     if (value.isUndefined())
-    {
         return std::nullopt;
-    }
 
     if (!value.isDouble())
-    {
         return std::unexpected(QueryError(ParseError::InvalidKeywordValue));
-    }
 
     double d = value.toDouble();
     if (d < 0 || d != static_cast<double>(static_cast<std::size_t>(d)))
-    {
         return std::unexpected(QueryError(ParseError::InvalidKeywordValue));
-    }
 
     return static_cast<std::size_t>(d);
 }
@@ -176,20 +148,14 @@ std::expected<std::optional<std::size_t>, QueryError> parseIntegerKeyword(const 
 std::expected<std::optional<QRegularExpression>, QueryError> parsePatternKeyword(const QJsonValue& patternValue)
 {
     if (patternValue.isUndefined())
-    {
         return std::nullopt;
-    }
 
     if (!patternValue.isString())
-    {
         return std::unexpected(QueryError(ParseError::InvalidKeywordValue));
-    }
 
     QRegularExpression regex(patternValue.toString());
     if (!regex.isValid())
-    {
         return std::unexpected(QueryError(ParseError::InvalidRegexPattern));
-    }
 
     regex.optimize(); // Enable JIT for better performance
     return regex;
@@ -203,14 +169,10 @@ std::expected<std::vector<QString>, QueryError> parseRequiredKeyword(const QJson
     std::vector<QString> result;
 
     if (requiredValue.isUndefined())
-    {
         return result;
-    }
 
     if (!requiredValue.isArray())
-    {
         return std::unexpected(QueryError(ParseError::InvalidKeywordValue));
-    }
 
     const QJsonArray requiredArray = requiredValue.toArray();
     result.reserve(static_cast<std::size_t>(requiredArray.size()));
@@ -218,9 +180,7 @@ std::expected<std::vector<QString>, QueryError> parseRequiredKeyword(const QJson
     for (const QJsonValue& item : requiredArray)
     {
         if (!item.isString())
-        {
             return std::unexpected(QueryError(ParseError::InvalidKeywordValue));
-        }
         result.push_back(item.toString());
     }
 
@@ -233,29 +193,23 @@ std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, co
 /**
  * @brief Compile properties keyword
  */
-std::expected<std::unordered_map<QString, std::size_t>, QueryError> compileProperties(CompileContext& ctx,
-                                                                                       const QJsonValue& propsValue)
+std::expected<std::unordered_map<QString, std::size_t>, QueryError> compileProperties(CompileContext&   ctx,
+                                                                                      const QJsonValue& propsValue)
 {
     std::unordered_map<QString, std::size_t> result;
 
     if (propsValue.isUndefined())
-    {
         return result;
-    }
 
     if (!propsValue.isObject())
-    {
         return std::unexpected(QueryError(ParseError::InvalidKeywordValue));
-    }
 
     const QJsonObject propsObj = propsValue.toObject();
     for (auto it = propsObj.begin(); it != propsObj.end(); ++it)
     {
         auto nodeIndex = compileSchemaNode(ctx, it.value());
         if (!nodeIndex)
-        {
             return std::unexpected(nodeIndex.error());
-        }
         result[it.key()] = *nodeIndex;
     }
 
@@ -271,14 +225,10 @@ std::expected<std::vector<std::size_t>, QueryError> compileSchemaArray(CompileCo
     std::vector<std::size_t> result;
 
     if (arrayValue.isUndefined())
-    {
         return result;
-    }
 
     if (!arrayValue.isArray())
-    {
         return std::unexpected(QueryError(ParseError::InvalidKeywordValue));
-    }
 
     const QJsonArray arr = arrayValue.toArray();
     result.reserve(static_cast<std::size_t>(arr.size()));
@@ -287,9 +237,7 @@ std::expected<std::vector<std::size_t>, QueryError> compileSchemaArray(CompileCo
     {
         auto nodeIndex = compileSchemaNode(ctx, item);
         if (!nodeIndex)
-        {
             return std::unexpected(nodeIndex.error());
-        }
         result.push_back(*nodeIndex);
     }
 
@@ -303,15 +251,11 @@ std::expected<std::optional<std::size_t>, QueryError> compileOptionalSchema(Comp
                                                                             const QJsonValue& schemaValue)
 {
     if (schemaValue.isUndefined())
-    {
         return std::nullopt;
-    }
 
     auto nodeIndex = compileSchemaNode(ctx, schemaValue);
     if (!nodeIndex)
-    {
         return std::unexpected(nodeIndex.error());
-    }
     return *nodeIndex;
 }
 
@@ -322,15 +266,11 @@ std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, co
 {
     // Boolean schema
     if (schemaValue.isBool())
-    {
         return ctx.addNode(BooleanSchema{schemaValue.toBool()});
-    }
 
     // Must be an object
     if (!schemaValue.isObject())
-    {
         return std::unexpected(QueryError(ParseError::InvalidSchemaStructure));
-    }
 
     const QJsonObject schemaObj = schemaValue.toObject();
 
@@ -415,9 +355,7 @@ std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, co
     {
         const QJsonValue uniqueVal = schemaObj[u"uniqueItems"_qs];
         if (uniqueVal.isBool())
-        {
             node.uniqueItems = uniqueVal.toBool();
-        }
     }
 
     // Object keywords
@@ -505,19 +443,13 @@ std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, co
 
     // Metadata
     if (schemaObj.contains(u"title"_qs) && schemaObj[u"title"_qs].isString())
-    {
         node.title = schemaObj[u"title"_qs].toString();
-    }
     if (schemaObj.contains(u"description"_qs) && schemaObj[u"description"_qs].isString())
-    {
         node.description = schemaObj[u"description"_qs].toString();
-    }
 
     // Format (store as string, validation is optional per spec)
     if (schemaObj.contains(u"format"_qs) && schemaObj[u"format"_qs].isString())
-    {
         node.format = schemaObj[u"format"_qs].toString();
-    }
 
     return ctx.addNode(std::move(node));
 }
@@ -527,9 +459,7 @@ std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, co
 std::expected<std::shared_ptr<internal::CompiledSchema>, QueryError> compileSchema(const QJsonValue& schemaValue)
 {
     if (schemaValue.isNull() || schemaValue.isUndefined())
-    {
         return std::unexpected(QueryError(ParseError::EmptySchema));
-    }
 
     auto compiled = std::make_shared<internal::CompiledSchema>();
 
@@ -540,21 +470,15 @@ std::expected<std::shared_ptr<internal::CompiledSchema>, QueryError> compileSche
     {
         const QJsonObject rootObj = schemaValue.toObject();
         if (rootObj.contains(u"$id"_qs) && rootObj[u"$id"_qs].isString())
-        {
             compiled->schemaId = rootObj[u"$id"_qs].toString();
-        }
         if (rootObj.contains(u"$schema"_qs) && rootObj[u"$schema"_qs].isString())
-        {
             compiled->dialect = rootObj[u"$schema"_qs].toString();
-        }
     }
 
     // Compile the root schema
     auto rootResult = compileSchemaNode(ctx, schemaValue);
     if (!rootResult)
-    {
         return std::unexpected(rootResult.error());
-    }
 
     compiled->rootIndex = *rootResult;
 

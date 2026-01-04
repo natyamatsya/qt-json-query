@@ -33,9 +33,7 @@ JSONSchema::ParseResult JSONSchema::create(const QJsonValue& schemaValue)
 {
     auto compileResult = compileSchema(schemaValue);
     if (!compileResult)
-    {
         return std::unexpected(compileResult.error());
-    }
 
     return JSONSchema(std::move(*compileResult));
 }
@@ -55,25 +53,17 @@ ValidationResult JSONSchema::validate(const QJsonValue& instance) const
 ValidationResult JSONSchema::validate(const QJsonDocument& doc) const
 {
     if (doc.isObject())
-    {
         return validate(QJsonValue(doc.object()));
-    }
     else if (doc.isArray())
-    {
         return validate(QJsonValue(doc.array()));
-    }
     else
-    {
         return validate(QJsonValue());
-    }
 }
 
 bool JSONSchema::isValid(const QJsonValue& instance) const
 {
     if (!m_compiled)
-    {
         return false;
-    }
 
     return isInstanceValid(*m_compiled, instance);
 }
@@ -81,18 +71,14 @@ bool JSONSchema::isValid(const QJsonValue& instance) const
 QString JSONSchema::schemaId() const
 {
     if (m_compiled)
-    {
         return m_compiled->schemaId;
-    }
     return {};
 }
 
 QString JSONSchema::schemaVersion() const
 {
     if (m_compiled)
-    {
         return m_compiled->dialect;
-    }
     return {};
 }
 

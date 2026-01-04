@@ -18,10 +18,10 @@ namespace json_query::json_schema
  */
 struct ValidationError
 {
-    QString   instanceLocation;  // JSON Pointer to failing data (e.g., "/address/zip")
-    QString   schemaLocation;    // JSON Pointer within schema (e.g., "#/properties/address")
-    QString   message;           // Human-readable description
-    EvalError code;              // Machine-readable error code
+    QString   instanceLocation; // JSON Pointer to failing data (e.g., "/address/zip")
+    QString   schemaLocation;   // JSON Pointer within schema (e.g., "#/properties/address")
+    QString   message;          // Human-readable description
+    EvalError code;             // Machine-readable error code
 
     // For nested errors (e.g., from allOf/anyOf)
     std::vector<ValidationError> nested;
@@ -29,10 +29,7 @@ struct ValidationError
     ValidationError() = default;
 
     ValidationError(QString instLoc, QString schemaLoc, QString msg, EvalError c)
-        : instanceLocation(std::move(instLoc))
-        , schemaLocation(std::move(schemaLoc))
-        , message(std::move(msg))
-        , code(c)
+        : instanceLocation(std::move(instLoc)), schemaLocation(std::move(schemaLoc)), message(std::move(msg)), code(c)
     {
     }
 
@@ -51,9 +48,7 @@ struct ValidationError
         {
             QJsonArray nestedArr;
             for (const auto& err : nested)
-            {
                 nestedArr.append(err.toJson());
-            }
             obj[u"nested"_qs] = nestedArr;
         }
 
@@ -99,9 +94,7 @@ class ValidationResult
     [[nodiscard]] QString firstError() const
     {
         if (m_errors.empty())
-        {
             return {};
-        }
         return m_errors.front().message;
     }
 
@@ -119,9 +112,7 @@ class ValidationResult
         {
             QJsonArray errorsArr;
             for (const auto& err : m_errors)
-            {
                 errorsArr.append(err.toJson());
-            }
             result[u"errors"_qs] = errorsArr;
         }
 
@@ -134,15 +125,11 @@ class ValidationResult
     [[nodiscard]] QString toString() const
     {
         if (isValid())
-        {
             return u"Valid"_qs;
-        }
 
         QString result = QString(u"Invalid: %1 error(s)\n").arg(m_errors.size());
         for (const auto& err : m_errors)
-        {
             result += QString(u"  - %1 at %2\n").arg(err.message, err.instanceLocation);
-        }
         return result;
     }
 

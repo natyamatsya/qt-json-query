@@ -13,17 +13,17 @@ namespace json_query::json_schema
 // Schema parse-time errors (occur during schema compilation)
 enum class ParseError : std::uint8_t
 {
-    InvalidSchemaStructure,      // Schema must be object or boolean
-    InvalidKeywordValue,         // e.g., "type": 123 instead of string/array
-    InvalidRegexPattern,         // pattern keyword has invalid regex
-    CircularReference,           // $ref creates infinite loop
-    UnresolvedReference,         // $ref target not found
-    InvalidJsonPointer,          // $ref fragment is invalid JSON Pointer
-    UnsupportedDialect,          // $schema specifies unsupported draft
-    DuplicateAnchor,             // Same $anchor defined twice
-    InvalidTypeValue,            // type keyword has invalid value
-    InvalidEnumValue,            // enum must be non-empty array
-    EmptySchema,                 // Schema document is empty
+    InvalidSchemaStructure, // Schema must be object or boolean
+    InvalidKeywordValue,    // e.g., "type": 123 instead of string/array
+    InvalidRegexPattern,    // pattern keyword has invalid regex
+    CircularReference,      // $ref creates infinite loop
+    UnresolvedReference,    // $ref target not found
+    InvalidJsonPointer,     // $ref fragment is invalid JSON Pointer
+    UnsupportedDialect,     // $schema specifies unsupported draft
+    DuplicateAnchor,        // Same $anchor defined twice
+    InvalidTypeValue,       // type keyword has invalid value
+    InvalidEnumValue,       // enum must be non-empty array
+    EmptySchema,            // Schema document is empty
 };
 
 // Schema evaluation-time errors (occur during instance validation)
@@ -121,10 +121,7 @@ inline constexpr auto json_schema_eval_errors = utils::detail::ErrorMap<EvalErro
 /**
  * @brief Convert a ParseError to a QStringView
  */
-[[nodiscard]] constexpr QStringView to_qt_sv(ParseError e) noexcept
-{
-    return json_schema_parse_errors.get_qt_sv(e);
-}
+[[nodiscard]] constexpr QStringView to_qt_sv(ParseError e) noexcept { return json_schema_parse_errors.get_qt_sv(e); }
 
 /**
  * @brief Convert an EvalError to a human-readable string view

@@ -87,23 +87,23 @@ struct ObjectSchema
     std::optional<QJsonValue> constValue;
 
     // Object keywords
-    std::unordered_map<QString, std::size_t> properties;       // property name → node index
+    std::unordered_map<QString, std::size_t>                properties; // property name → node index
     std::vector<std::pair<QRegularExpression, std::size_t>> patternProperties;
-    std::optional<std::size_t>               additionalProperties;
-    std::vector<QString>                     required;
-    std::optional<std::size_t>               minProperties;
-    std::optional<std::size_t>               maxProperties;
-    std::optional<std::size_t>               propertyNames; // schema for property names
+    std::optional<std::size_t>                              additionalProperties;
+    std::vector<QString>                                    required;
+    std::optional<std::size_t>                              minProperties;
+    std::optional<std::size_t>                              maxProperties;
+    std::optional<std::size_t>                              propertyNames; // schema for property names
 
     // Array keywords
-    std::optional<std::size_t>  items;       // node index for items schema (2020-12 style)
-    std::vector<std::size_t>    prefixItems; // node indices for prefix items
-    std::optional<std::size_t>  contains;
-    std::optional<std::size_t>  minContains;
-    std::optional<std::size_t>  maxContains;
-    std::optional<std::size_t>  minItems;
-    std::optional<std::size_t>  maxItems;
-    bool                        uniqueItems = false;
+    std::optional<std::size_t> items;       // node index for items schema (2020-12 style)
+    std::vector<std::size_t>   prefixItems; // node indices for prefix items
+    std::optional<std::size_t> contains;
+    std::optional<std::size_t> minContains;
+    std::optional<std::size_t> maxContains;
+    std::optional<std::size_t> minItems;
+    std::optional<std::size_t> maxItems;
+    bool                       uniqueItems = false;
 
     // String keywords
     std::optional<QRegularExpression> pattern;
@@ -160,8 +160,8 @@ struct CompiledSchema
     std::unordered_map<QString, std::size_t> dynamicAnchors; // $dynamicAnchor → node index
 
     // Schema metadata
-    QString schemaId;  // $id if present
-    QString dialect;   // $schema if present
+    QString schemaId; // $id if present
+    QString dialect;  // $schema if present
 
     /**
      * @brief Get the root schema node
@@ -190,9 +190,7 @@ struct CompiledSchema
         // Check if it's an integer
         double d = value.toDouble();
         if (d == static_cast<double>(static_cast<qint64>(d)))
-        {
             return SchemaType::Integer;
-        }
         return SchemaType::Number;
     }
     case QJsonValue::String:
