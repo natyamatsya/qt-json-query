@@ -36,7 +36,7 @@ enum class SchemaType : std::uint8_t
  */
 struct TypeConstraint
 {
-    std::vector<SchemaType> allowedTypes;
+    std::vector<SchemaType> allowedTypes{};
 
     [[nodiscard]] bool allows(SchemaType t) const noexcept
     {
@@ -90,7 +90,7 @@ struct ObjectSchema
     std::unordered_map<QString, std::size_t>                properties; // property name → node index
     std::vector<std::pair<QRegularExpression, std::size_t>> patternProperties;
     std::optional<std::size_t>                              additionalProperties;
-    std::vector<QString>                                    required;
+    std::vector<QString>                                    required{};
     std::optional<std::size_t>                              minProperties;
     std::optional<std::size_t>                              maxProperties;
     std::optional<std::size_t>                              propertyNames; // schema for property names
@@ -119,9 +119,9 @@ struct ObjectSchema
     std::optional<double> multipleOf;
 
     // Combinators (store node indices)
-    std::vector<std::size_t>   allOf;
-    std::vector<std::size_t>   anyOf;
-    std::vector<std::size_t>   oneOf;
+    std::vector<std::size_t>   allOf{};
+    std::vector<std::size_t>   anyOf{};
+    std::vector<std::size_t>   oneOf{};
     std::optional<std::size_t> notSchema;
 
     // Conditional
@@ -152,7 +152,7 @@ using SchemaNode = std::variant<BooleanSchema, ObjectSchema, RefSchema>;
  */
 struct CompiledSchema
 {
-    std::vector<SchemaNode> nodes;
+    std::vector<SchemaNode> nodes{};
     std::size_t             rootIndex = 0;
 
     // Anchor registry for $ref resolution
@@ -188,7 +188,7 @@ struct CompiledSchema
     case QJsonValue::Double:
     {
         // Check if it's an integer
-        double d = value.toDouble();
+        const auto d{value.toDouble()};
         if (d == static_cast<double>(static_cast<qint64>(d)))
             return SchemaType::Integer;
         return SchemaType::Number;

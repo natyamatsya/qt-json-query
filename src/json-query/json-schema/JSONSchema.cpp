@@ -31,7 +31,7 @@ JSONSchema::ParseResult JSONSchema::create(const QJsonDocument& schemaDoc)
 
 JSONSchema::ParseResult JSONSchema::create(const QJsonValue& schemaValue)
 {
-    auto compileResult = compileSchema(schemaValue);
+    auto compileResult{compileSchema(schemaValue)};
     if (!compileResult)
         return std::unexpected(compileResult.error());
 
@@ -42,7 +42,7 @@ ValidationResult JSONSchema::validate(const QJsonValue& instance) const
 {
     if (!m_compiled)
     {
-        ValidationResult result;
+        ValidationResult result{};
         result.addError(u""_qs, u"#"_qs, u"Schema is not compiled"_qs, EvalError::ConstMismatch);
         return result;
     }

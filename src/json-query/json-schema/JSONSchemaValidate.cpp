@@ -58,8 +58,8 @@ void validateNode(ValidateContext&  ctx,
         return a.toString() == b.toString();
     case QJsonValue::Array:
     {
-        const QJsonArray arrA = a.toArray();
-        const QJsonArray arrB = b.toArray();
+        const auto arrA{a.toArray()};
+        const auto arrB{b.toArray()};
         if (arrA.size() != arrB.size())
             return false;
         for (int i = 0; i < arrA.size(); ++i)
@@ -69,8 +69,8 @@ void validateNode(ValidateContext&  ctx,
     }
     case QJsonValue::Object:
     {
-        const QJsonObject objA = a.toObject();
-        const QJsonObject objB = b.toObject();
+        const auto objA{a.toObject()};
+        const auto objB{b.toObject()};
         if (objA.size() != objB.size())
             return false;
         for (auto it = objA.begin(); it != objA.end(); ++it)
@@ -92,7 +92,7 @@ void validateType(ValidateContext&      ctx,
                   const QString&        instancePath,
                   const QString&        schemaPath)
 {
-    SchemaType actualType = jsonValueToSchemaType(instance);
+    const auto actualType{jsonValueToSchemaType(instance)};
 
     if (!constraint.allows(actualType))
     {
@@ -147,17 +147,17 @@ void validateString(ValidateContext&    ctx,
                     const QString&      instancePath,
                     const QString&      schemaPath)
 {
-    const auto length = static_cast<std::size_t>(str.length());
+    const auto length{static_cast<std::size_t>(str.length())};
 
     if (node.minLength && length < *node.minLength)
     {
-        QString msg = QString(u"String length %1 is less than minimum %2").arg(length).arg(*node.minLength);
+        const auto msg{QString(u"String length %1 is less than minimum %2").arg(length).arg(*node.minLength)};
         ctx.result.addError(instancePath, schemaPath + u"/minLength"_qs, msg, EvalError::MinLengthViolation);
     }
 
     if (node.maxLength && length > *node.maxLength)
     {
-        QString msg = QString(u"String length %1 exceeds maximum %2").arg(length).arg(*node.maxLength);
+        const auto msg{QString(u"String length %1 exceeds maximum %2").arg(length).arg(*node.maxLength)};
         ctx.result.addError(instancePath, schemaPath + u"/maxLength"_qs, msg, EvalError::MaxLengthViolation);
     }
 
@@ -181,37 +181,37 @@ void validateNumber(ValidateContext&    ctx,
 {
     if (node.minimum && value < *node.minimum)
     {
-        QString msg = QString(u"Value %1 is less than minimum %2").arg(value).arg(*node.minimum);
+        const auto msg{QString(u"Value %1 is less than minimum %2").arg(value).arg(*node.minimum)};
         ctx.result.addError(instancePath, schemaPath + u"/minimum"_qs, msg, EvalError::MinimumViolation);
     }
 
     if (node.maximum && value > *node.maximum)
     {
-        QString msg = QString(u"Value %1 exceeds maximum %2").arg(value).arg(*node.maximum);
+        const auto msg{QString(u"Value %1 exceeds maximum %2").arg(value).arg(*node.maximum)};
         ctx.result.addError(instancePath, schemaPath + u"/maximum"_qs, msg, EvalError::MaximumViolation);
     }
 
     if (node.exclusiveMinimum && value <= *node.exclusiveMinimum)
     {
-        QString msg = QString(u"Value %1 must be greater than %2").arg(value).arg(*node.exclusiveMinimum);
+        const auto msg{QString(u"Value %1 must be greater than %2").arg(value).arg(*node.exclusiveMinimum)};
         ctx.result.addError(
             instancePath, schemaPath + u"/exclusiveMinimum"_qs, msg, EvalError::ExclusiveMinimumViolation);
     }
 
     if (node.exclusiveMaximum && value >= *node.exclusiveMaximum)
     {
-        QString msg = QString(u"Value %1 must be less than %2").arg(value).arg(*node.exclusiveMaximum);
+        const auto msg{QString(u"Value %1 must be less than %2").arg(value).arg(*node.exclusiveMaximum)};
         ctx.result.addError(
             instancePath, schemaPath + u"/exclusiveMaximum"_qs, msg, EvalError::ExclusiveMaximumViolation);
     }
 
     if (node.multipleOf)
     {
-        double remainder = std::fmod(value, *node.multipleOf);
+        const auto remainder{std::fmod(value, *node.multipleOf)};
         // Allow for floating point imprecision
         if (std::abs(remainder) > 1e-10 && std::abs(remainder - *node.multipleOf) > 1e-10)
         {
-            QString msg = QString(u"Value %1 is not a multiple of %2").arg(value).arg(*node.multipleOf);
+            const auto msg{QString(u"Value %1 is not a multiple of %2").arg(value).arg(*node.multipleOf)};
             ctx.result.addError(instancePath, schemaPath + u"/multipleOf"_qs, msg, EvalError::MultipleOfViolation);
         }
     }
@@ -226,17 +226,17 @@ void validateArray(ValidateContext&    ctx,
                    const QString&      instancePath,
                    const QString&      schemaPath)
 {
-    const auto size = static_cast<std::size_t>(arr.size());
+    const auto size{static_cast<std::size_t>(arr.size())};
 
     if (node.minItems && size < *node.minItems)
     {
-        QString msg = QString(u"Array has %1 items, minimum is %2").arg(size).arg(*node.minItems);
+        const auto msg{QString(u"Array has %1 items, minimum is %2").arg(size).arg(*node.minItems)};
         ctx.result.addError(instancePath, schemaPath + u"/minItems"_qs, msg, EvalError::MinItemsViolation);
     }
 
     if (node.maxItems && size > *node.maxItems)
     {
-        QString msg = QString(u"Array has %1 items, maximum is %2").arg(size).arg(*node.maxItems);
+        const auto msg{QString(u"Array has %1 items, maximum is %2").arg(size).arg(*node.maxItems)};
         ctx.result.addError(instancePath, schemaPath + u"/maxItems"_qs, msg, EvalError::MaxItemsViolation);
     }
 
@@ -263,18 +263,18 @@ void validateArray(ValidateContext&    ctx,
     for (std::size_t i = 0; i < node.prefixItems.size() && static_cast<int>(i) < arr.size() && ctx.shouldContinue();
          ++i)
     {
-        QString itemPath       = instancePath + u"/"_qs + QString::number(i);
-        QString itemSchemaPath = schemaPath + u"/prefixItems/"_qs + QString::number(i);
+        const auto itemPath{instancePath + u"/"_qs + QString::number(i)};
+        const auto itemSchemaPath{schemaPath + u"/prefixItems/"_qs + QString::number(i)};
         validateNode(ctx, ctx.schema.nodeAt(node.prefixItems[i]), arr[static_cast<int>(i)], itemPath, itemSchemaPath);
     }
 
     // Validate items (for elements after prefixItems)
     if (node.items)
     {
-        const std::size_t startIndex = node.prefixItems.size();
+        const auto startIndex{node.prefixItems.size()};
         for (int i = static_cast<int>(startIndex); i < arr.size() && ctx.shouldContinue(); ++i)
         {
-            QString itemPath = instancePath + u"/"_qs + QString::number(i);
+            const auto itemPath{instancePath + u"/"_qs + QString::number(i)};
             validateNode(ctx, ctx.schema.nodeAt(*node.items), arr[i], itemPath, schemaPath + u"/items"_qs);
         }
     }
@@ -285,7 +285,7 @@ void validateArray(ValidateContext&    ctx,
         bool found = false;
         for (int i = 0; i < arr.size(); ++i)
         {
-            ValidationResult tempResult;
+            ValidationResult tempResult{};
             ValidateContext  tempCtx{ctx.schema, tempResult, true};
             validateNode(tempCtx,
                          ctx.schema.nodeAt(*node.contains),
@@ -317,17 +317,17 @@ void validateObject(ValidateContext&    ctx,
                     const QString&      instancePath,
                     const QString&      schemaPath)
 {
-    const auto size = static_cast<std::size_t>(obj.size());
+    const auto size{static_cast<std::size_t>(obj.size())};
 
     if (node.minProperties && size < *node.minProperties)
     {
-        QString msg = QString(u"Object has %1 properties, minimum is %2").arg(size).arg(*node.minProperties);
+        const auto msg{QString(u"Object has %1 properties, minimum is %2").arg(size).arg(*node.minProperties)};
         ctx.result.addError(instancePath, schemaPath + u"/minProperties"_qs, msg, EvalError::MinPropertiesViolation);
     }
 
     if (node.maxProperties && size > *node.maxProperties)
     {
-        QString msg = QString(u"Object has %1 properties, maximum is %2").arg(size).arg(*node.maxProperties);
+        const auto msg{QString(u"Object has %1 properties, maximum is %2").arg(size).arg(*node.maxProperties)};
         ctx.result.addError(instancePath, schemaPath + u"/maxProperties"_qs, msg, EvalError::MaxPropertiesViolation);
     }
 
@@ -336,7 +336,7 @@ void validateObject(ValidateContext&    ctx,
     {
         if (!obj.contains(req))
         {
-            QString msg = QString(u"Required property '%1' is missing").arg(req);
+            const auto msg{QString(u"Required property '%1' is missing").arg(req)};
             ctx.result.addError(instancePath, schemaPath + u"/required"_qs, msg, EvalError::RequiredMissing);
         }
     }
@@ -346,12 +346,12 @@ void validateObject(ValidateContext&    ctx,
 
     for (auto it = obj.begin(); it != obj.end() && ctx.shouldContinue(); ++it)
     {
-        const QString& propName  = it.key();
-        QString        propPath  = instancePath + u"/"_qs + propName;
+        const QString& propName = it.key();
+        const auto     propPath{instancePath + u"/"_qs + propName};
         bool           evaluated = false;
 
         // Check properties
-        auto propIt = node.properties.find(propName);
+        auto propIt{node.properties.find(propName)};
         if (propIt != node.properties.end())
         {
             validateNode(ctx,
@@ -376,14 +376,14 @@ void validateObject(ValidateContext&    ctx,
         // Check additionalProperties
         if (!evaluated && node.additionalProperties)
         {
-            const SchemaNode& additionalNode = ctx.schema.nodeAt(*node.additionalProperties);
+            const auto& additionalNode = ctx.schema.nodeAt(*node.additionalProperties);
 
             // If additionalProperties is false (BooleanSchema{false}), reject
             if (std::holds_alternative<BooleanSchema>(additionalNode))
             {
                 if (!std::get<BooleanSchema>(additionalNode).value)
                 {
-                    QString msg = QString(u"Additional property '%1' is not allowed").arg(propName);
+                    const auto msg{QString(u"Additional property '%1' is not allowed").arg(propName)};
                     ctx.result.addError(propPath,
                                         schemaPath + u"/additionalProperties"_qs,
                                         msg,
@@ -430,7 +430,7 @@ void validateCombinators(ValidateContext&    ctx,
         bool anyValid = false;
         for (std::size_t i = 0; i < node.anyOf.size(); ++i)
         {
-            ValidationResult tempResult;
+            ValidationResult tempResult{};
             ValidateContext  tempCtx{ctx.schema, tempResult, true};
             validateNode(tempCtx,
                          ctx.schema.nodeAt(node.anyOf[i]),
@@ -458,7 +458,7 @@ void validateCombinators(ValidateContext&    ctx,
         int matchCount = 0;
         for (std::size_t i = 0; i < node.oneOf.size(); ++i)
         {
-            ValidationResult tempResult;
+            ValidationResult tempResult{};
             ValidateContext  tempCtx{ctx.schema, tempResult, true};
             validateNode(tempCtx,
                          ctx.schema.nodeAt(node.oneOf[i]),
@@ -483,7 +483,7 @@ void validateCombinators(ValidateContext&    ctx,
     // not: must not match
     if (node.notSchema)
     {
-        ValidationResult tempResult;
+        ValidationResult tempResult{};
         ValidateContext  tempCtx{ctx.schema, tempResult, true};
         validateNode(tempCtx, ctx.schema.nodeAt(*node.notSchema), instance, instancePath, schemaPath + u"/not"_qs);
         if (tempResult.isValid())
@@ -496,7 +496,7 @@ void validateCombinators(ValidateContext&    ctx,
     // if/then/else
     if (node.ifSchema)
     {
-        ValidationResult ifResult;
+        ValidationResult ifResult{};
         ValidateContext  ifCtx{ctx.schema, ifResult, true};
         validateNode(ifCtx, ctx.schema.nodeAt(*node.ifSchema), instance, instancePath, schemaPath + u"/if"_qs);
 
@@ -593,7 +593,7 @@ void validateNode(ValidateContext&  ctx,
 
 ValidationResult validateInstance(const internal::CompiledSchema& schema, const QJsonValue& instance)
 {
-    ValidationResult result;
+    ValidationResult result{};
     ValidateContext  ctx{schema, result, false};
 
     validateNode(ctx, schema.root(), instance, u""_qs, u"#"_qs);
@@ -603,7 +603,7 @@ ValidationResult validateInstance(const internal::CompiledSchema& schema, const 
 
 bool isInstanceValid(const internal::CompiledSchema& schema, const QJsonValue& instance)
 {
-    ValidationResult result;
+    ValidationResult result{};
     ValidateContext  ctx{schema, result, true}; // Stop on first error
 
     validateNode(ctx, schema.root(), instance, u""_qs, u"#"_qs);

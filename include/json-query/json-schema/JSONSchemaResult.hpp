@@ -24,7 +24,7 @@ struct ValidationError
     EvalError code;             // Machine-readable error code
 
     // For nested errors (e.g., from allOf/anyOf)
-    std::vector<ValidationError> nested;
+    std::vector<ValidationError> nested{};
 
     ValidationError() = default;
 
@@ -38,7 +38,7 @@ struct ValidationError
      */
     [[nodiscard]] QJsonObject toJson() const
     {
-        QJsonObject obj;
+        QJsonObject obj{};
         obj[u"instanceLocation"_qs] = instanceLocation;
         obj[u"schemaLocation"_qs]   = schemaLocation;
         obj[u"message"_qs]          = message;
@@ -46,7 +46,7 @@ struct ValidationError
 
         if (!nested.empty())
         {
-            QJsonArray nestedArr;
+            QJsonArray nestedArr{};
             for (const auto& err : nested)
                 nestedArr.append(err.toJson());
             obj[u"nested"_qs] = nestedArr;
@@ -105,12 +105,12 @@ class ValidationResult
      */
     [[nodiscard]] QJsonObject toJson() const
     {
-        QJsonObject result;
+        QJsonObject result{};
         result[u"valid"_qs] = isValid();
 
         if (!isValid())
         {
-            QJsonArray errorsArr;
+            QJsonArray errorsArr{};
             for (const auto& err : m_errors)
                 errorsArr.append(err.toJson());
             result[u"errors"_qs] = errorsArr;
@@ -160,7 +160,7 @@ class ValidationResult
     void clear() { m_errors.clear(); }
 
   private:
-    std::vector<ValidationError> m_errors;
+    std::vector<ValidationError> m_errors{};
 };
 
 } // namespace json_query::json_schema
