@@ -32,7 +32,8 @@ set(JSON_QUERY_SOURCES
     json-path/internal/IterativeRecursiveDescent.cpp
     json-schema/JSONSchema.cpp
     json-schema/JSONSchemaCompile.cpp
-    json-schema/JSONSchemaValidate.cpp)
+    json-schema/JSONSchemaValidate.cpp
+    json-schema/internal/FormatValidators.cpp)
 
 # ---------------------------------------------------------------------------
 # Library target

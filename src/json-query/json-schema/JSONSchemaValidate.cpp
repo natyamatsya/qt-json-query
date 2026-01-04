@@ -2,6 +2,7 @@
 
 #include "json-query/json-schema/JSONSchemaValidate.hpp"
 #include "json-query/json-schema/JSONSchemaError.hpp"
+#include "json-query/json-schema/internal/FormatValidators.hpp"
 #include "json-query/json-schema/internal/SchemaNode.hpp"
 
 #include <QtCore/QJsonArray>
@@ -167,6 +168,12 @@ void validateString(ValidateContext&    ctx,
                             schemaPath + u"/pattern"_qs,
                             u"String does not match required pattern"_qs,
                             EvalError::PatternMismatch);
+    }
+
+    if (node.format && !FormatValidators::validate(*node.format, str))
+    {
+        const auto msg{QString(u"String does not match format '%1'").arg(*node.format)};
+        ctx.result.addError(instancePath, schemaPath + u"/format"_qs, msg, EvalError::FormatInvalid);
     }
 }
 
