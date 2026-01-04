@@ -274,11 +274,45 @@ std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, co
 
     const auto schemaObj{schemaValue.toObject()};
 
-    // Handle $anchor and $dynamicAnchor
-    if (schemaObj.contains(u"$anchor"_qs))
+    // Handle $ref - if present, it should be the only keyword that matters (per spec)
+    if (schemaObj.contains(u"$ref"_qs))
     {
-        const auto anchor{schemaObj[u"$anchor"_qs].toString()};
-        // We'll register it after we know the node index
+        const auto refString{schemaObj[u"$ref"_qs].toString()};
+        
+        // For now, create a placeholder RefSchema that will be resolved later
+        // In a two-pass system, we'd resolve this after all schemas are compiled
+        // For simplicity, we'll try to resolve it immediately if it's a simple reference
+        
+        // Check if it's a reference to root
+        if (refString == u"#"_qs)
+        {
+            // Reference to root - we'll use index 0 (will be set as rootIndex)
+            return ctx.addNode(RefSchema{0, refString});
+        }
+        
+        // Check if it's a reference to an anchor
+        if (refString.startsWith(u"#"_qs) && !refString.contains(u"/"_qs))
+        {
+            const auto anchorName{refString.mid(1)};
+            if (ctx.anchors.contains(anchorName))
+            {
+                return ctx.addNode(RefSchema{ctx.anchors[anchorName], refString});
+            }
+            // Anchor not found yet - it might be defined later
+            // For now, create a placeholder
+            return ctx.addNode(RefSchema{0, refString});
+        }
+        
+        // For JSON Pointer style references (e.g., #/$defs/foo), we need to defer resolution
+        // Create a RefSchema node with a placeholder index
+        return ctx.addNode(RefSchema{0, refString});
+    }
+
+    // Handle $anchor registration
+    std::optional<QString> anchorName{};
+    if (schemaObj.contains(u"$anchor"_qs) && schemaObj[u"$anchor"_qs].isString())
+    {
+        anchorName = schemaObj[u"$anchor"_qs].toString();
     }
 
     ObjectSchema node{};
@@ -451,7 +485,17 @@ std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, co
     if (schemaObj.contains(u"format"_qs) && schemaObj[u"format"_qs].isString())
         node.format = schemaObj[u"format"_qs].toString();
 
-    return ctx.addNode(std::move(node));
+    // Add the node and register anchor if present
+    const auto nodeIndex{ctx.addNode(std::move(node))};
+    
+    if (anchorName)
+    {
+        if (ctx.anchors.contains(*anchorName))
+            return std::unexpected(QueryError(ParseError::DuplicateAnchor));
+        ctx.anchors[*anchorName] = nodeIndex;
+    }
+    
+    return nodeIndex;
 }
 
 } // anonymous namespace
@@ -473,6 +517,48 @@ std::expected<std::shared_ptr<internal::CompiledSchema>, QueryError> compileSche
             compiled->schemaId = rootObj[u"$id"_qs].toString();
         if (rootObj.contains(u"$schema"_qs) && rootObj[u"$schema"_qs].isString())
             compiled->dialect = rootObj[u"$schema"_qs].toString();
+        
+        // Compile $defs first so they're available for $ref resolution
+        if (rootObj.contains(u"$defs"_qs))
+        {
+            const auto defsValue{rootObj[u"$defs"_qs]};
+            if (defsValue.isObject())
+            {
+                const auto defsObj{defsValue.toObject()};
+                for (auto it = defsObj.begin(); it != defsObj.end(); ++it)
+                {
+                    const auto defName{it.key()};
+                    auto defResult{compileSchemaNode(ctx, it.value())};
+                    if (!defResult)
+                        return std::unexpected(defResult.error());
+                    
+                    // Register the definition with its JSON Pointer path
+                    const auto defPath{u"#/$defs/"_qs + defName};
+                    ctx.anchors[defPath] = *defResult;
+                }
+            }
+        }
+        
+        // Also handle legacy "definitions" keyword
+        if (rootObj.contains(u"definitions"_qs))
+        {
+            const auto defsValue{rootObj[u"definitions"_qs]};
+            if (defsValue.isObject())
+            {
+                const auto defsObj{defsValue.toObject()};
+                for (auto it = defsObj.begin(); it != defsObj.end(); ++it)
+                {
+                    const auto defName{it.key()};
+                    auto defResult{compileSchemaNode(ctx, it.value())};
+                    if (!defResult)
+                        return std::unexpected(defResult.error());
+                    
+                    // Register with legacy path
+                    const auto defPath{u"#/definitions/"_qs + defName};
+                    ctx.anchors[defPath] = *defResult;
+                }
+            }
+        }
     }
 
     // Compile the root schema
@@ -481,6 +567,35 @@ std::expected<std::shared_ptr<internal::CompiledSchema>, QueryError> compileSche
         return std::unexpected(rootResult.error());
 
     compiled->rootIndex = *rootResult;
+    
+    // Second pass: resolve $ref references
+    for (std::size_t i = 0; i < compiled->nodes.size(); ++i)
+    {
+        if (std::holds_alternative<RefSchema>(compiled->nodes[i]))
+        {
+            auto& refNode{std::get<RefSchema>(compiled->nodes[i])};
+            const auto& refString{refNode.originalRef};
+            
+            // Try to resolve the reference
+            if (refString == u"#"_qs)
+            {
+                refNode.targetIndex = compiled->rootIndex;
+            }
+            else if (ctx.anchors.contains(refString))
+            {
+                refNode.targetIndex = ctx.anchors[refString];
+            }
+            else if (refString.startsWith(u"#"_qs))
+            {
+                // Try without the # prefix for anchor lookup
+                const auto anchorName{refString.mid(1)};
+                if (ctx.anchors.contains(anchorName))
+                {
+                    refNode.targetIndex = ctx.anchors[anchorName];
+                }
+            }
+        }
+    }
 
     return compiled;
 }
