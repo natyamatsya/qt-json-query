@@ -10,7 +10,8 @@ function(add_json_schema_tests)
     set(JSON_SCHEMA_TEST_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-schema/JSONSchemaBasicTests.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-schema/JSONSchemaFormatTests.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-schema/JSONSchemaKeywordTests.cpp)
+        ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-schema/JSONSchemaKeywordTests.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-schema/JSONSchemaRefTests.cpp)
 
     add_executable(json_schema_tests ${JSON_SCHEMA_TEST_SOURCES})
 
