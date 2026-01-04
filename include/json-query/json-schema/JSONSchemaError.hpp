@@ -77,7 +77,7 @@ inline constexpr auto json_schema_parse_errors = utils::detail::ErrorMap<ParseEr
     {ParseError::EmptySchema, DEFINE_ERROR_STRING("Schema document is empty")}};
 
 // JSON Schema evaluation error messages
-inline constexpr auto json_schema_eval_errors = utils::detail::ErrorMap<EvalError, 30>{
+inline constexpr auto json_schema_eval_errors = utils::detail::ErrorMap<EvalError, 31>{
     {EvalError::TypeMismatch, DEFINE_ERROR_STRING("Value does not match expected type")},
     {EvalError::RequiredMissing, DEFINE_ERROR_STRING("Required property is missing")},
     {EvalError::AdditionalPropertiesInvalid, DEFINE_ERROR_STRING("Additional properties are not allowed")},

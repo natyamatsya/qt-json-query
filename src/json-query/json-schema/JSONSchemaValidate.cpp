@@ -105,7 +105,7 @@ void validateType(ValidateContext&       ctx,
         QString msg = QString(u"Expected type %1 but got %2")
                           .arg(schemaTypeToString(constraint.allowedTypes.front()))
                           .arg(schemaTypeToString(actualType));
-        ctx.result.addError(instancePath, schemaPath + u"/type", msg, EvalError::TypeMismatch);
+        ctx.result.addError(instancePath, schemaPath + u"/type"_qs, msg, EvalError::TypeMismatch);
     }
 }
 
@@ -126,7 +126,7 @@ void validateEnum(ValidateContext&  ctx,
         }
     }
 
-    ctx.result.addError(instancePath, schemaPath + u"/enum", u"Value is not one of the allowed enum values"_qs,
+    ctx.result.addError(instancePath, schemaPath + u"/enum"_qs, u"Value is not one of the allowed enum values"_qs,
                         EvalError::EnumMismatch);
 }
 
@@ -141,7 +141,7 @@ void validateConst(ValidateContext&  ctx,
 {
     if (!jsonValuesEqual(instance, constValue))
     {
-        ctx.result.addError(instancePath, schemaPath + u"/const", u"Value does not match const"_qs,
+        ctx.result.addError(instancePath, schemaPath + u"/const"_qs, u"Value does not match const"_qs,
                             EvalError::ConstMismatch);
     }
 }
@@ -160,18 +160,18 @@ void validateString(ValidateContext&    ctx,
     if (node.minLength && length < *node.minLength)
     {
         QString msg = QString(u"String length %1 is less than minimum %2").arg(length).arg(*node.minLength);
-        ctx.result.addError(instancePath, schemaPath + u"/minLength", msg, EvalError::MinLengthViolation);
+        ctx.result.addError(instancePath, schemaPath + u"/minLength"_qs, msg, EvalError::MinLengthViolation);
     }
 
     if (node.maxLength && length > *node.maxLength)
     {
         QString msg = QString(u"String length %1 exceeds maximum %2").arg(length).arg(*node.maxLength);
-        ctx.result.addError(instancePath, schemaPath + u"/maxLength", msg, EvalError::MaxLengthViolation);
+        ctx.result.addError(instancePath, schemaPath + u"/maxLength"_qs, msg, EvalError::MaxLengthViolation);
     }
 
     if (node.pattern && !node.pattern->match(str).hasMatch())
     {
-        ctx.result.addError(instancePath, schemaPath + u"/pattern", u"String does not match required pattern"_qs,
+        ctx.result.addError(instancePath, schemaPath + u"/pattern"_qs, u"String does not match required pattern"_qs,
                             EvalError::PatternMismatch);
     }
 }
@@ -188,26 +188,26 @@ void validateNumber(ValidateContext&    ctx,
     if (node.minimum && value < *node.minimum)
     {
         QString msg = QString(u"Value %1 is less than minimum %2").arg(value).arg(*node.minimum);
-        ctx.result.addError(instancePath, schemaPath + u"/minimum", msg, EvalError::MinimumViolation);
+        ctx.result.addError(instancePath, schemaPath + u"/minimum"_qs, msg, EvalError::MinimumViolation);
     }
 
     if (node.maximum && value > *node.maximum)
     {
         QString msg = QString(u"Value %1 exceeds maximum %2").arg(value).arg(*node.maximum);
-        ctx.result.addError(instancePath, schemaPath + u"/maximum", msg, EvalError::MaximumViolation);
+        ctx.result.addError(instancePath, schemaPath + u"/maximum"_qs, msg, EvalError::MaximumViolation);
     }
 
     if (node.exclusiveMinimum && value <= *node.exclusiveMinimum)
     {
         QString msg = QString(u"Value %1 must be greater than %2").arg(value).arg(*node.exclusiveMinimum);
-        ctx.result.addError(instancePath, schemaPath + u"/exclusiveMinimum", msg,
+        ctx.result.addError(instancePath, schemaPath + u"/exclusiveMinimum"_qs, msg,
                             EvalError::ExclusiveMinimumViolation);
     }
 
     if (node.exclusiveMaximum && value >= *node.exclusiveMaximum)
     {
         QString msg = QString(u"Value %1 must be less than %2").arg(value).arg(*node.exclusiveMaximum);
-        ctx.result.addError(instancePath, schemaPath + u"/exclusiveMaximum", msg,
+        ctx.result.addError(instancePath, schemaPath + u"/exclusiveMaximum"_qs, msg,
                             EvalError::ExclusiveMaximumViolation);
     }
 
@@ -218,7 +218,7 @@ void validateNumber(ValidateContext&    ctx,
         if (std::abs(remainder) > 1e-10 && std::abs(remainder - *node.multipleOf) > 1e-10)
         {
             QString msg = QString(u"Value %1 is not a multiple of %2").arg(value).arg(*node.multipleOf);
-            ctx.result.addError(instancePath, schemaPath + u"/multipleOf", msg, EvalError::MultipleOfViolation);
+            ctx.result.addError(instancePath, schemaPath + u"/multipleOf"_qs, msg, EvalError::MultipleOfViolation);
         }
     }
 }
@@ -237,13 +237,13 @@ void validateArray(ValidateContext&    ctx,
     if (node.minItems && size < *node.minItems)
     {
         QString msg = QString(u"Array has %1 items, minimum is %2").arg(size).arg(*node.minItems);
-        ctx.result.addError(instancePath, schemaPath + u"/minItems", msg, EvalError::MinItemsViolation);
+        ctx.result.addError(instancePath, schemaPath + u"/minItems"_qs, msg, EvalError::MinItemsViolation);
     }
 
     if (node.maxItems && size > *node.maxItems)
     {
         QString msg = QString(u"Array has %1 items, maximum is %2").arg(size).arg(*node.maxItems);
-        ctx.result.addError(instancePath, schemaPath + u"/maxItems", msg, EvalError::MaxItemsViolation);
+        ctx.result.addError(instancePath, schemaPath + u"/maxItems"_qs, msg, EvalError::MaxItemsViolation);
     }
 
     if (node.uniqueItems && size > 1)
@@ -255,7 +255,7 @@ void validateArray(ValidateContext&    ctx,
             {
                 if (jsonValuesEqual(arr[i], arr[j]))
                 {
-                    ctx.result.addError(instancePath, schemaPath + u"/uniqueItems",
+                    ctx.result.addError(instancePath, schemaPath + u"/uniqueItems"_qs,
                                         u"Array items are not unique"_qs, EvalError::UniqueItemsViolation);
                     break;
                 }
@@ -267,8 +267,8 @@ void validateArray(ValidateContext&    ctx,
     for (std::size_t i = 0; i < node.prefixItems.size() && static_cast<int>(i) < arr.size() && ctx.shouldContinue();
          ++i)
     {
-        QString itemPath = instancePath + u"/" + QString::number(i);
-        QString itemSchemaPath = schemaPath + u"/prefixItems/" + QString::number(i);
+        QString itemPath = instancePath + u"/"_qs + QString::number(i);
+        QString itemSchemaPath = schemaPath + u"/prefixItems/"_qs + QString::number(i);
         validateNode(ctx, ctx.schema.nodeAt(node.prefixItems[i]), arr[static_cast<int>(i)], itemPath, itemSchemaPath);
     }
 
@@ -278,8 +278,8 @@ void validateArray(ValidateContext&    ctx,
         const std::size_t startIndex = node.prefixItems.size();
         for (int i = static_cast<int>(startIndex); i < arr.size() && ctx.shouldContinue(); ++i)
         {
-            QString itemPath = instancePath + u"/" + QString::number(i);
-            validateNode(ctx, ctx.schema.nodeAt(*node.items), arr[i], itemPath, schemaPath + u"/items");
+            QString itemPath = instancePath + u"/"_qs + QString::number(i);
+            validateNode(ctx, ctx.schema.nodeAt(*node.items), arr[i], itemPath, schemaPath + u"/items"_qs);
         }
     }
 
@@ -291,8 +291,8 @@ void validateArray(ValidateContext&    ctx,
         {
             ValidationResult tempResult;
             ValidateContext  tempCtx{ctx.schema, tempResult, true};
-            validateNode(tempCtx, ctx.schema.nodeAt(*node.contains), arr[i], instancePath + u"/" + QString::number(i),
-                         schemaPath + u"/contains");
+            validateNode(tempCtx, ctx.schema.nodeAt(*node.contains), arr[i], instancePath + u"/"_qs + QString::number(i),
+                         schemaPath + u"/contains"_qs);
             if (tempResult.isValid())
             {
                 found = true;
@@ -301,7 +301,7 @@ void validateArray(ValidateContext&    ctx,
         }
         if (!found)
         {
-            ctx.result.addError(instancePath, schemaPath + u"/contains",
+            ctx.result.addError(instancePath, schemaPath + u"/contains"_qs,
                                 u"Array does not contain required item"_qs, EvalError::ContainsViolation);
         }
     }
@@ -321,13 +321,13 @@ void validateObject(ValidateContext&    ctx,
     if (node.minProperties && size < *node.minProperties)
     {
         QString msg = QString(u"Object has %1 properties, minimum is %2").arg(size).arg(*node.minProperties);
-        ctx.result.addError(instancePath, schemaPath + u"/minProperties", msg, EvalError::MinPropertiesViolation);
+        ctx.result.addError(instancePath, schemaPath + u"/minProperties"_qs, msg, EvalError::MinPropertiesViolation);
     }
 
     if (node.maxProperties && size > *node.maxProperties)
     {
         QString msg = QString(u"Object has %1 properties, maximum is %2").arg(size).arg(*node.maxProperties);
-        ctx.result.addError(instancePath, schemaPath + u"/maxProperties", msg, EvalError::MaxPropertiesViolation);
+        ctx.result.addError(instancePath, schemaPath + u"/maxProperties"_qs, msg, EvalError::MaxPropertiesViolation);
     }
 
     // Check required properties
@@ -336,7 +336,7 @@ void validateObject(ValidateContext&    ctx,
         if (!obj.contains(req))
         {
             QString msg = QString(u"Required property '%1' is missing").arg(req);
-            ctx.result.addError(instancePath, schemaPath + u"/required", msg, EvalError::RequiredMissing);
+            ctx.result.addError(instancePath, schemaPath + u"/required"_qs, msg, EvalError::RequiredMissing);
         }
     }
 
@@ -346,7 +346,7 @@ void validateObject(ValidateContext&    ctx,
     for (auto it = obj.begin(); it != obj.end() && ctx.shouldContinue(); ++it)
     {
         const QString& propName  = it.key();
-        QString        propPath  = instancePath + u"/" + propName;
+        QString        propPath  = instancePath + u"/"_qs + propName;
         bool           evaluated = false;
 
         // Check properties
@@ -354,7 +354,7 @@ void validateObject(ValidateContext&    ctx,
         if (propIt != node.properties.end())
         {
             validateNode(ctx, ctx.schema.nodeAt(propIt->second), it.value(), propPath,
-                         schemaPath + u"/properties/" + propName);
+                         schemaPath + u"/properties/"_qs + propName);
             evaluated = true;
         }
 
@@ -364,7 +364,7 @@ void validateObject(ValidateContext&    ctx,
             if (pattern.match(propName).hasMatch())
             {
                 validateNode(ctx, ctx.schema.nodeAt(schemaIndex), it.value(), propPath,
-                             schemaPath + u"/patternProperties");
+                             schemaPath + u"/patternProperties"_qs);
                 evaluated = true;
             }
         }
@@ -380,14 +380,14 @@ void validateObject(ValidateContext&    ctx,
                 if (!std::get<BooleanSchema>(additionalNode).value)
                 {
                     QString msg = QString(u"Additional property '%1' is not allowed").arg(propName);
-                    ctx.result.addError(propPath, schemaPath + u"/additionalProperties", msg,
+                    ctx.result.addError(propPath, schemaPath + u"/additionalProperties"_qs, msg,
                                         EvalError::AdditionalPropertiesInvalid);
                 }
             }
             else
             {
                 // Validate against additionalProperties schema
-                validateNode(ctx, additionalNode, it.value(), propPath, schemaPath + u"/additionalProperties");
+                validateNode(ctx, additionalNode, it.value(), propPath, schemaPath + u"/additionalProperties"_qs);
             }
         }
 
@@ -413,7 +413,7 @@ void validateCombinators(ValidateContext&    ctx,
         for (std::size_t i = 0; i < node.allOf.size() && ctx.shouldContinue(); ++i)
         {
             validateNode(ctx, ctx.schema.nodeAt(node.allOf[i]), instance, instancePath,
-                         schemaPath + u"/allOf/" + QString::number(i));
+                         schemaPath + u"/allOf/"_qs + QString::number(i));
         }
     }
 
@@ -426,7 +426,7 @@ void validateCombinators(ValidateContext&    ctx,
             ValidationResult tempResult;
             ValidateContext  tempCtx{ctx.schema, tempResult, true};
             validateNode(tempCtx, ctx.schema.nodeAt(node.anyOf[i]), instance, instancePath,
-                         schemaPath + u"/anyOf/" + QString::number(i));
+                         schemaPath + u"/anyOf/"_qs + QString::number(i));
             if (tempResult.isValid())
             {
                 anyValid = true;
@@ -435,7 +435,7 @@ void validateCombinators(ValidateContext&    ctx,
         }
         if (!anyValid)
         {
-            ctx.result.addError(instancePath, schemaPath + u"/anyOf",
+            ctx.result.addError(instancePath, schemaPath + u"/anyOf"_qs,
                                 u"Value does not match any schema in anyOf"_qs, EvalError::AnyOfFailed);
         }
     }
@@ -449,7 +449,7 @@ void validateCombinators(ValidateContext&    ctx,
             ValidationResult tempResult;
             ValidateContext  tempCtx{ctx.schema, tempResult, true};
             validateNode(tempCtx, ctx.schema.nodeAt(node.oneOf[i]), instance, instancePath,
-                         schemaPath + u"/oneOf/" + QString::number(i));
+                         schemaPath + u"/oneOf/"_qs + QString::number(i));
             if (tempResult.isValid())
             {
                 ++matchCount;
@@ -461,7 +461,7 @@ void validateCombinators(ValidateContext&    ctx,
         {
             QString msg = matchCount == 0 ? u"Value does not match any schema in oneOf"_qs
                                           : u"Value matches more than one schema in oneOf"_qs;
-            ctx.result.addError(instancePath, schemaPath + u"/oneOf", msg, EvalError::OneOfFailed);
+            ctx.result.addError(instancePath, schemaPath + u"/oneOf"_qs, msg, EvalError::OneOfFailed);
         }
     }
 
@@ -470,10 +470,10 @@ void validateCombinators(ValidateContext&    ctx,
     {
         ValidationResult tempResult;
         ValidateContext  tempCtx{ctx.schema, tempResult, true};
-        validateNode(tempCtx, ctx.schema.nodeAt(*node.notSchema), instance, instancePath, schemaPath + u"/not");
+        validateNode(tempCtx, ctx.schema.nodeAt(*node.notSchema), instance, instancePath, schemaPath + u"/not"_qs);
         if (tempResult.isValid())
         {
-            ctx.result.addError(instancePath, schemaPath + u"/not", u"Value matches schema in not"_qs,
+            ctx.result.addError(instancePath, schemaPath + u"/not"_qs, u"Value matches schema in not"_qs,
                                 EvalError::NotFailed);
         }
     }
@@ -483,20 +483,20 @@ void validateCombinators(ValidateContext&    ctx,
     {
         ValidationResult ifResult;
         ValidateContext  ifCtx{ctx.schema, ifResult, true};
-        validateNode(ifCtx, ctx.schema.nodeAt(*node.ifSchema), instance, instancePath, schemaPath + u"/if");
+        validateNode(ifCtx, ctx.schema.nodeAt(*node.ifSchema), instance, instancePath, schemaPath + u"/if"_qs);
 
         if (ifResult.isValid())
         {
             if (node.thenSchema)
             {
-                validateNode(ctx, ctx.schema.nodeAt(*node.thenSchema), instance, instancePath, schemaPath + u"/then");
+                validateNode(ctx, ctx.schema.nodeAt(*node.thenSchema), instance, instancePath, schemaPath + u"/then"_qs);
             }
         }
         else
         {
             if (node.elseSchema)
             {
-                validateNode(ctx, ctx.schema.nodeAt(*node.elseSchema), instance, instancePath, schemaPath + u"/else");
+                validateNode(ctx, ctx.schema.nodeAt(*node.elseSchema), instance, instancePath, schemaPath + u"/else"_qs);
             }
         }
     }
