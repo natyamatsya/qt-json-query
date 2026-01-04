@@ -1,3 +1,7 @@
 [submodule "compliance/rfc-9535-jsonpath-test-suite"]
 	path = compliance/rfc-9535-jsonpath-test-suite
 	url = https://github.com/jsonpath-standard/jsonpath-compliance-test-suite.git
+[submodule "inspiration/sigslot26"]
+	path = inspiration/sigslot26
+	url = https://github.com/natyamatsya/sigslot26.git
+	branch = develop
