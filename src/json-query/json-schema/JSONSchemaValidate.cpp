@@ -348,6 +348,20 @@ void validateObject(ValidateContext&    ctx,
         }
     }
 
+    // Validate property names if propertyNames schema is present
+    if (node.propertyNames)
+    {
+        for (auto it = obj.begin(); it != obj.end() && ctx.shouldContinue(); ++it)
+        {
+            const QString& propName{it.key()};
+            validateNode(ctx,
+                         ctx.schema.nodeAt(*node.propertyNames),
+                         QJsonValue(propName),
+                         instancePath,
+                         schemaPath + u"/propertyNames"_qs);
+        }
+    }
+
     // Validate each property
     QSet<QString> evaluatedProperties;
 
@@ -406,6 +420,40 @@ void validateObject(ValidateContext&    ctx,
 
         if (evaluated)
             evaluatedProperties.insert(propName);
+    }
+
+    // Validate dependentRequired
+    for (const auto& [propName, requiredProps] : node.dependentRequired)
+    {
+        if (obj.contains(propName))
+        {
+            for (const QString& requiredProp : requiredProps)
+            {
+                if (!obj.contains(requiredProp))
+                {
+                    const auto msg{QString(u"Property '%1' requires '%2' to be present")
+                                       .arg(propName)
+                                       .arg(requiredProp)};
+                    ctx.result.addError(instancePath,
+                                        schemaPath + u"/dependentRequired"_qs,
+                                        msg,
+                                        EvalError::RequiredMissing);
+                }
+            }
+        }
+    }
+
+    // Validate dependentSchemas
+    for (const auto& [propName, schemaIndex] : node.dependentSchemas)
+    {
+        if (obj.contains(propName))
+        {
+            validateNode(ctx,
+                         ctx.schema.nodeAt(schemaIndex),
+                         obj,
+                         instancePath,
+                         schemaPath + u"/dependentSchemas/"_qs + propName);
+        }
     }
 }
 

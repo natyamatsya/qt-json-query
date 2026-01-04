@@ -52,7 +52,29 @@ bool FormatValidators::isDate(QStringView value) noexcept
 
 bool FormatValidators::isTime(QStringView value) noexcept
 {
-    return timePattern.match(value).hasMatch();
+    const auto match{timePattern.match(value)};
+    if (!match.hasMatch())
+        return false;
+    
+    // Extract and validate hour, minute, second ranges
+    const auto str{value.toString()};
+    if (str.length() < 8)
+        return false;
+    
+    bool ok{};
+    const auto hour{str.mid(0, 2).toInt(&ok)};
+    if (!ok || hour > 23)
+        return false;
+    
+    const auto minute{str.mid(3, 2).toInt(&ok)};
+    if (!ok || minute > 59)
+        return false;
+    
+    const auto second{str.mid(6, 2).toInt(&ok)};
+    if (!ok || second > 59)
+        return false;
+    
+    return true;
 }
 
 bool FormatValidators::isEmail(QStringView value) noexcept

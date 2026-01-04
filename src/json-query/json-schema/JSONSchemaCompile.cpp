@@ -274,40 +274,6 @@ std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, co
 
     const auto schemaObj{schemaValue.toObject()};
 
-    // Handle $ref - if present, it should be the only keyword that matters (per spec)
-    if (schemaObj.contains(u"$ref"_qs))
-    {
-        const auto refString{schemaObj[u"$ref"_qs].toString()};
-        
-        // For now, create a placeholder RefSchema that will be resolved later
-        // In a two-pass system, we'd resolve this after all schemas are compiled
-        // For simplicity, we'll try to resolve it immediately if it's a simple reference
-        
-        // Check if it's a reference to root
-        if (refString == u"#"_qs)
-        {
-            // Reference to root - we'll use index 0 (will be set as rootIndex)
-            return ctx.addNode(RefSchema{0, refString});
-        }
-        
-        // Check if it's a reference to an anchor
-        if (refString.startsWith(u"#"_qs) && !refString.contains(u"/"_qs))
-        {
-            const auto anchorName{refString.mid(1)};
-            if (ctx.anchors.contains(anchorName))
-            {
-                return ctx.addNode(RefSchema{ctx.anchors[anchorName], refString});
-            }
-            // Anchor not found yet - it might be defined later
-            // For now, create a placeholder
-            return ctx.addNode(RefSchema{0, refString});
-        }
-        
-        // For JSON Pointer style references (e.g., #/$defs/foo), we need to defer resolution
-        // Create a RefSchema node with a placeholder index
-        return ctx.addNode(RefSchema{0, refString});
-    }
-
     // Handle $anchor registration
     std::optional<QString> anchorName{};
     if (schemaObj.contains(u"$anchor"_qs) && schemaObj[u"$anchor"_qs].isString())
@@ -315,7 +281,42 @@ std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, co
         anchorName = schemaObj[u"$anchor"_qs].toString();
     }
 
+    // In Draft 2020-12, $ref can be combined with other keywords
+    // If $ref is present without other keywords, use RefSchema
+    // If $ref is present with other keywords, we need to create an allOf with the ref and the additional constraints
+    const auto hasRef{schemaObj.contains(u"$ref"_qs)};
+    const auto refString{hasRef ? schemaObj[u"$ref"_qs].toString() : QString{}};
+    
+    // Check if there are other keywords besides $ref, $anchor, $id, $schema, $defs, title, description
+    const auto hasOtherKeywords{[&]() {
+        for (auto it = schemaObj.begin(); it != schemaObj.end(); ++it)
+        {
+            const auto& key{it.key()};
+            if (key != u"$ref"_qs && key != u"$anchor"_qs && key != u"$id"_qs && 
+                key != u"$schema"_qs && key != u"$defs"_qs && key != u"definitions"_qs &&
+                key != u"title"_qs && key != u"description"_qs && key != u"$comment"_qs)
+            {
+                return true;
+            }
+        }
+        return false;
+    }()};
+
+    // If $ref is present without other keywords, create a simple RefSchema
+    if (hasRef && !hasOtherKeywords)
+    {
+        return ctx.addNode(RefSchema{0, refString});
+    }
+
     ObjectSchema node{};
+    
+    // If $ref is present with other keywords, add the ref to allOf
+    if (hasRef && hasOtherKeywords)
+    {
+        // Create a ref node for the reference
+        const auto refNodeIndex{ctx.addNode(RefSchema{0, refString})};
+        node.allOf.push_back(refNodeIndex);
+    }
 
     // Type constraint
     auto typeResult{parseTypeKeyword(schemaObj[u"type"_qs])};
@@ -420,6 +421,36 @@ std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, co
         return std::unexpected(additionalPropsResult.error());
     node.additionalProperties = *additionalPropsResult;
 
+    // patternProperties
+    if (schemaObj.contains(u"patternProperties"_qs))
+    {
+        const auto patternPropsValue{schemaObj[u"patternProperties"_qs]};
+        if (patternPropsValue.isObject())
+        {
+            const auto patternPropsObj{patternPropsValue.toObject()};
+            for (auto it = patternPropsObj.begin(); it != patternPropsObj.end(); ++it)
+            {
+                const auto patternStr{it.key()};
+                QRegularExpression regex{patternStr};
+                if (!regex.isValid())
+                    return std::unexpected(QueryError(ParseError::InvalidRegexPattern));
+                regex.optimize();
+                
+                auto schemaResult{compileSchemaNode(ctx, it.value())};
+                if (!schemaResult)
+                    return std::unexpected(schemaResult.error());
+                
+                node.patternProperties.emplace_back(std::move(regex), *schemaResult);
+            }
+        }
+    }
+
+    // propertyNames
+    auto propertyNamesResult{compileOptionalSchema(ctx, schemaObj[u"propertyNames"_qs])};
+    if (!propertyNamesResult)
+        return std::unexpected(propertyNamesResult.error());
+    node.propertyNames = *propertyNamesResult;
+
     // items (2020-12 style - single schema)
     auto itemsResult{compileOptionalSchema(ctx, schemaObj[u"items"_qs])};
     if (!itemsResult)
@@ -474,6 +505,48 @@ std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, co
     if (!elseResult)
         return std::unexpected(elseResult.error());
     node.elseSchema = *elseResult;
+
+    // Dependencies
+    if (schemaObj.contains(u"dependentRequired"_qs))
+    {
+        const auto depReqValue{schemaObj[u"dependentRequired"_qs]};
+        if (depReqValue.isObject())
+        {
+            const auto depReqObj{depReqValue.toObject()};
+            for (auto it = depReqObj.begin(); it != depReqObj.end(); ++it)
+            {
+                const auto propName{it.key()};
+                if (it.value().isArray())
+                {
+                    const auto reqArray{it.value().toArray()};
+                    std::vector<QString> requiredProps{};
+                    for (const QJsonValue& req : reqArray)
+                    {
+                        if (req.isString())
+                            requiredProps.push_back(req.toString());
+                    }
+                    node.dependentRequired[propName] = std::move(requiredProps);
+                }
+            }
+        }
+    }
+
+    if (schemaObj.contains(u"dependentSchemas"_qs))
+    {
+        const auto depSchValue{schemaObj[u"dependentSchemas"_qs]};
+        if (depSchValue.isObject())
+        {
+            const auto depSchObj{depSchValue.toObject()};
+            for (auto it = depSchObj.begin(); it != depSchObj.end(); ++it)
+            {
+                const auto propName{it.key()};
+                auto schemaResult{compileSchemaNode(ctx, it.value())};
+                if (!schemaResult)
+                    return std::unexpected(schemaResult.error());
+                node.dependentSchemas[propName] = *schemaResult;
+            }
+        }
+    }
 
     // Metadata
     if (schemaObj.contains(u"title"_qs) && schemaObj[u"title"_qs].isString())
