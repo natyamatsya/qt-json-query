@@ -47,7 +47,7 @@ function(add_extension_tests)
                                          ${PROJECT_SOURCE_DIR}/tests/include)
 
     target_link_libraries(
-      json_query_extension_tests PRIVATE json_query GTest::gtest GTest::gmock
+      json_query_extension_tests PRIVATE json_query GTest::gmock
                                          GTest::gtest_main Qt6::Core)
 
     target_compile_features(json_query_extension_tests PRIVATE cxx_std_23)

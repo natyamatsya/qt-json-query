@@ -17,7 +17,7 @@ function(add_rfc6901_tests)
                                        ${PROJECT_SOURCE_DIR}/tests/include)
 
     target_link_libraries(
-      rfc6901_compliance_tests PRIVATE json_query GTest::gtest GTest::gmock
+      rfc6901_compliance_tests PRIVATE json_query GTest::gmock
                                        GTest::gtest_main Qt6::Core)
 
     # Provide project source dir to tests so they can locate compliance JSON
