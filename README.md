@@ -1,11 +1,12 @@
 # JSON Query for Qt (C++23 Edition)
 
-A high-performance, modern C++ implementation of JSONPointer (RFC 6901) and JSONPath for Qt.
+A high-performance, modern C++ implementation of JSONPointer (RFC 6901), JSONPath (RFC 9535), and JSON Schema validation for Qt.
 
 **Features:**
 
 - Full **RFC 6901 JSONPointer** compliance.
 - Support for common **JSONPath** features for querying JSON structures.
+- **JSON Schema (Draft 2020-12)** validation with comprehensive format support.
 - Utilizes **Compile-Time Regular Expressions (CTRE)** for efficient parsing.
 - Robust error handling using **`std::expected`** (C++23) for object creation/parsing.
 - Modern C++23 design, prioritizing standard library types (`std::vector`, `std::string`, etc.) internally.
@@ -34,6 +35,24 @@ A high-performance, modern C++ implementation of JSONPointer (RFC 6901) and JSON
   - Basic filter expressions (`[?(@.property == value)]`, `[?(@.age > 30)]`, `[?(@.name)]`).
 - **Robust Parsing:** Uses `std::expected` to report syntax errors during creation via `JsonPathParseError`.
 - **Evaluation Results:** Returns a `QJsonArray` containing all matched values (empty array if no matches found).
+
+### JSON Schema (Draft 2020-12)
+
+- **Full Draft 2020-12 compliance** (1994/1994 test suite passing).
+- Supported keywords:
+  - **Type validation:** `type`, `enum`, `const`
+  - **String:** `minLength`, `maxLength`, `pattern`, `format`
+  - **Numeric:** `minimum`, `maximum`, `exclusiveMinimum`, `exclusiveMaximum`, `multipleOf`
+  - **Array:** `minItems`, `maxItems`, `uniqueItems`, `prefixItems`, `items`, `contains`
+  - **Object:** `properties`, `patternProperties`, `additionalProperties`, `required`, `propertyNames`, `minProperties`, `maxProperties`, `dependentRequired`, `dependentSchemas`
+  - **Combinators:** `allOf`, `anyOf`, `oneOf`, `not`, `if`/`then`/`else`
+  - **References:** `$ref`, `$defs`, `$anchor`, `$id`
+- **Format validation** with CTRE + Qt semantic checks:
+  - Date/time: `date-time`, `date`, `time`
+  - Network: `email`, `hostname`, `ipv4`, `ipv6`, `uri`, `uri-reference`, `uri-template`
+  - Other: `uuid`, `json-pointer`, `relative-json-pointer`, `regex`
+- **Detailed error reporting:** Instance path, schema path, error code, and message for each violation.
+- **Two validation modes:** Collect all errors or stop on first error.
 
 ### Performance & Design
 
@@ -186,8 +205,63 @@ if (!invalid_path_exp) {
     qDebug() << "Path creation failed as expected for invalid syntax. Error:"
              << utils::std_string_to_qstring(invalid_path_exp.error().message);
 }
+```
 
+### JSON Schema Validation
 
-Performance Comparison
+```cpp
+#include "json-query/json-schema/JSONSchema.hpp"
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QDebug>
+
+using namespace json_query::json_schema;
+
+// --- Define Schema ---
+const QJsonObject schemaObj{
+    {"type", "object"},
+    {"properties", QJsonObject{
+        {"name", QJsonObject{{"type", "string"}, {"minLength", 1}}},
+        {"age", QJsonObject{{"type", "integer"}, {"minimum", 0}}},
+        {"email", QJsonObject{{"type", "string"}, {"format", "email"}}}
+    }},
+    {"required", QJsonArray{"name", "age"}}
+};
+
+// --- Monadic Style: Compile and Validate in One Expression ---
+const QJsonObject instance{{"name", "Alice"}, {"age", 30}, {"email", "alice@example.com"}};
+
+const auto result{JSONSchema::create(schemaObj).transform([&](const JSONSchema& schema) {
+    return schema.validate(instance);
+})};
+
+if (result && result->isValid()) {
+    qDebug() << "Instance is valid!";
+}
+
+// --- Monadic Chain with Error Handling ---
+JSONSchema::create(schemaObj)
+    .transform([&](const JSONSchema& schema) { return schema.validate(instance); })
+    .transform([&](const ValidationResult& r) {
+        for (const auto& err : r.errors()) {
+            qDebug() << err.instanceLocation << "->" << err.message;
+            
+            // Navigate directly to the failing value using JSONPointer
+            if (auto failingValue = err.navigateTo(instance))
+                qDebug() << "  Value was:" << *failingValue;
+        }
+        return r.isValid();
+    });
+
+// --- Quick Validation (stops on first error) ---
+const auto isValid{JSONSchema::create(schemaObj).transform([&](const JSONSchema& s) {
+    return s.isValid(instance);
+})};
+
+if (isValid.value_or(false))
+    qDebug() << "Valid!";
+```
+
+## Performance Comparison
 
 This implementation leverages compile-time regular expressions (CTRE) for parsing, which generally offers significantly better performance compared to runtime regex engines like QRegularExpression for the patterns used in path segmentation. Actual performance gains depend on the complexity of the paths and the specific operations. Benchmarking against other libraries or approaches is recommended for specific use cases.

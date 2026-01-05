@@ -4,17 +4,24 @@
 #include <QtCore/QString>
 #include <QtCore/QJsonObject>
 #include <QtCore/QJsonArray>
+#include <QtCore/QJsonValue>
 
 #include <vector>
 #include <cstddef>
+#include <expected>
 
 #include "JSONSchemaError.hpp"
+#include "json-query/json-pointer/JSONPointer.hpp"
 
 namespace json_query::json_schema
 {
 
 /**
  * @brief Represents a single validation error with location information
+ *
+ * Provides JSON Pointer locations for both the failing instance data and
+ * the schema location that caused the failure. The instanceLocation can
+ * be used to navigate directly to the failing value.
  */
 struct ValidationError
 {
@@ -31,6 +38,50 @@ struct ValidationError
     ValidationError(QString instLoc, QString schemaLoc, QString msg, EvalError c)
         : instanceLocation(std::move(instLoc)), schemaLocation(std::move(schemaLoc)), message(std::move(msg)), code(c)
     {
+    }
+
+    /**
+     * @brief Get a JSONPointer for navigating to the error location in the instance
+     *
+     * @return JSONPointer if instanceLocation is valid, nullopt for root ("")
+     *
+     * @example
+     * @code
+     * if (auto ptr = error.instancePointer()) {
+     *     auto failingValue = ptr->evaluate(instance);
+     * }
+     * @endcode
+     */
+    [[nodiscard]] std::optional<json_pointer::JSONPointer> instancePointer() const
+    {
+        if (instanceLocation.isEmpty())
+            return std::nullopt; // Root location
+
+        auto result{json_pointer::JSONPointer::create(instanceLocation)};
+        if (result)
+            return *result;
+        return std::nullopt;
+    }
+
+    /**
+     * @brief Navigate directly to the failing value in the instance
+     *
+     * @param instance The JSON instance that was validated
+     * @return The failing value, or nullopt if navigation fails
+     */
+    [[nodiscard]] std::optional<QJsonValue> navigateTo(const QJsonValue& instance) const
+    {
+        if (instanceLocation.isEmpty())
+            return instance; // Root location
+
+        auto ptr{instancePointer()};
+        if (!ptr)
+            return std::nullopt;
+
+        auto result{ptr->evaluate(instance)};
+        if (result)
+            return *result;
+        return std::nullopt;
     }
 
     /**
