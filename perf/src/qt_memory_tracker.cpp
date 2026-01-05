@@ -208,7 +208,8 @@ class StreamingComparisonTest
         // Calculate statistics
         auto avgDuration{std::accumulate(durations.begin(), durations.end(), std::chrono::nanoseconds(0)) /
                          durations.size()};
-        auto avgResultSize{std::accumulate(resultSizes.begin(), resultSizes.end(), 0UL) / resultSizes.size()};
+        auto avgResultSize{std::accumulate(resultSizes.begin(), resultSizes.end(), std::size_t{0}) /
+                           resultSizes.size()};
 
         // Calculate variance to check consistency
         double variance{0.0};
