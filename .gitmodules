@@ -5,3 +5,6 @@
 	path = inspiration/sigslot26
 	url = https://github.com/natyamatsya/sigslot26.git
 	branch = develop
+[submodule "compliance/ietf-json-schema-draft-2020-12"]
+	path = compliance/ietf-json-schema-draft-2020-12
+	url = https://github.com/json-schema-org/JSON-Schema-Test-Suite.git
