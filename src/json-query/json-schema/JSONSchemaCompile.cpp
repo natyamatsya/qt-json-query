@@ -11,6 +11,7 @@
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonObject>
 #include <QtCore/QRegularExpression>
+#include <QtCore/QDebug>
 
 #include <array>
 #include <ranges>
@@ -163,7 +164,23 @@ struct BaseUriScope
 };
 
 /**
- * @brief Compile a single schema node (recursive) - Clean pipeline architecture
+ * @brief Compile a single schema node (recursive worker function)
+ *
+ * This is the core recursive compilation function used throughout all phases.
+ * It compiles a single schema (object or boolean) into a node and registers
+ * any $anchor it contains.
+ *
+ * Called by:
+ * - Phase 1: phase1_BuildSymbolTable() to compile definition schemas
+ * - Phase 2: compileSchema() to compile the root schema
+ * - Recursively: By itself via the keyword dispatcher for nested schemas
+ *
+ * The function handles:
+ * - Boolean schemas (true/false)
+ * - $ref-only schemas (fast path)
+ * - Full object schemas with validation keywords
+ * - $anchor registration
+ * - Base URI scope management
  */
 std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, const QJsonValue& schemaValue)
 {
@@ -307,7 +324,7 @@ void resolveReference(RefSchema&                                      refNode,
 }
 
 /**
- * @brief Second pass: resolve all $ref references in compiled nodes
+ * @brief Resolve all $ref references in compiled nodes
  */
 void resolveAllReferences(internal::CompiledSchema& compiled, const std::unordered_map<QString, std::size_t>& anchors)
 {
@@ -316,12 +333,112 @@ void resolveAllReferences(internal::CompiledSchema& compiled, const std::unorder
             resolveReference(*refNode, compiled.rootIndex, anchors);
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+// Three-Phase Compilation Pipeline
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * @brief Phase 1: Build symbol table from definitions
+ *
+ * Compiles all $defs and definitions, registering them in the anchor table.
+ * This creates a complete symbol table before any schema bodies reference them.
+ *
+ * @param compiled The compiled schema to populate with metadata
+ * @param ctx Compilation context
+ * @param schemaValue The root schema value
+ * @return Success or error
+ */
+[[nodiscard]] std::expected<void, QueryError>
+phase1_BuildSymbolTable(internal::CompiledSchema& compiled, CompileContext& ctx, const QJsonValue& schemaValue)
+{
+    using json_query::literals::operator""_qt_s;
+
+    if (!schemaValue.isObject())
+        return {};
+
+    const auto rootObj{schemaValue.toObject()};
+
+    // Extract root metadata ($id, $schema)
+    extractRootMetadata(rootObj, compiled);
+
+    // Compile all definitions and register them in the anchor table
+    if (auto r{compileDefinitionsBlock(ctx, rootObj, u"$defs"_qt_s, u"#/$defs/"_qt_s)}; !r)
+        return std::unexpected(r.error());
+
+    if (auto r{compileDefinitionsBlock(ctx, rootObj, u"definitions"_qt_s, u"#/definitions/"_qt_s)}; !r)
+        return std::unexpected(r.error());
+
+    return {};
+}
+
+/**
+ * @brief Phase 2: Generate code by compiling schema tree
+ *
+ * Recursively compiles the root schema and all nested schemas.
+ * All definitions are already registered, so $ref can be resolved.
+ *
+ * @param compiled The compiled schema to populate with the root index
+ * @param ctx Compilation context
+ * @param schemaValue The root schema value
+ * @return Success or error
+ */
+[[nodiscard]] std::expected<void, QueryError>
+phase2_CompileSchemaTree(internal::CompiledSchema& compiled, CompileContext& ctx, const QJsonValue& schemaValue)
+{
+    auto rootResult{compileSchemaNode(ctx, schemaValue)};
+    if (!rootResult)
+        return std::unexpected(rootResult.error());
+
+    compiled.rootIndex = *rootResult;
+    return {};
+}
+
+/**
+ * @brief Phase 3: Link references to their targets
+ *
+ * Resolves all $ref references to their target node indices using the anchor table.
+ */
+void phase3_LinkReferences(internal::CompiledSchema& compiled, const std::unordered_map<QString, std::size_t>& anchors)
+{
+    resolveAllReferences(compiled, anchors);
+}
+
 } // anonymous namespace
 
 // ────────────────────────────────────────────────────────────────────────────
 // Public API: compileSchema
 // ────────────────────────────────────────────────────────────────────────────
 
+/**
+ * @brief Compile a JSON Schema into an executable form
+ *
+ * This function implements a three-phase compilation pipeline based on classic
+ * compiler theory for handling forward references and circular dependencies:
+ *
+ * **Phase 1: Symbol Table Construction**
+ * - Extract root metadata ($id, $schema)
+ * - Compile all $defs and register them in the anchor table
+ * - This creates a complete symbol table before any schema bodies are compiled
+ * - Prevents infinite recursion when definitions reference each other
+ *
+ * **Phase 2: Code Generation**
+ * - Recursively compile the root schema and all nested schemas
+ * - All $defs are already registered, so $ref can be resolved
+ * - The keyword dispatcher processes validation keywords but skips $defs
+ *   (since they were already compiled in Phase 1)
+ *
+ * **Phase 3: Reference Resolution (Linking)**
+ * - Resolve all $ref references to their target node indices
+ * - Handle various reference formats: JSON Pointer, anchors, URIs
+ *
+ * This two-pass approach is the standard solution in compiler design for
+ * handling forward references. Attempting to compile $defs through the
+ * recursive dispatcher would cause infinite loops when definitions are
+ * mutually recursive.
+ *
+ * @param schemaValue The JSON Schema document (object or boolean)
+ * @return Compiled schema or error
+ */
 std::expected<std::shared_ptr<internal::CompiledSchema>, QueryError> compileSchema(const QJsonValue& schemaValue)
 {
     using json_query::literals::operator""_qt_s;
@@ -334,28 +451,16 @@ std::expected<std::shared_ptr<internal::CompiledSchema>, QueryError> compileSche
     auto           compiled{std::make_shared<internal::CompiledSchema>()};
     CompileContext ctx{compiled->nodes, compiled->anchors, compiled->dynamicAnchors, {}, {}};
 
-    // Phase 1: Extract metadata and compile definitions
-    if (schemaValue.isObject())
-    {
-        const auto rootObj{schemaValue.toObject()};
+    // Phase 1: Symbol Table Construction
+    if (auto r{phase1_BuildSymbolTable(*compiled, ctx, schemaValue)}; !r)
+        return std::unexpected(r.error());
 
-        extractRootMetadata(rootObj, *compiled);
+    // Phase 2: Code Generation
+    if (auto r{phase2_CompileSchemaTree(*compiled, ctx, schemaValue)}; !r)
+        return std::unexpected(r.error());
 
-        if (auto r{compileDefinitionsBlock(ctx, rootObj, u"$defs"_qt_s, u"#/$defs/"_qt_s)}; !r)
-            return std::unexpected(r.error());
-
-        if (auto r{compileDefinitionsBlock(ctx, rootObj, u"definitions"_qt_s, u"#/definitions/"_qt_s)}; !r)
-            return std::unexpected(r.error());
-    }
-
-    // Phase 2: Compile root schema
-    auto rootResult{compileSchemaNode(ctx, schemaValue)};
-    if (!rootResult)
-        return std::unexpected(rootResult.error());
-    compiled->rootIndex = *rootResult;
-
-    // Phase 3: Resolve $ref references
-    resolveAllReferences(*compiled, ctx.anchors);
+    // Phase 3: Reference Resolution (Linking)
+    phase3_LinkReferences(*compiled, ctx.anchors);
 
     return compiled;
 }

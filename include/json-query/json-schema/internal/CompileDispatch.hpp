@@ -368,22 +368,39 @@ inline void compileMetadataKeywords(const QJsonObject& schemaObj, ObjectSchema& 
 
 /**
  * @brief Process nested $defs for anchor resolution
+ *
+ * **Design Note: Why is this a no-op?**
+ *
+ * This function is intentionally empty because $defs must be handled at the
+ * root level using a two-pass compilation approach (see compileSchema()).
+ *
+ * **The Problem:**
+ * If we compile $defs recursively through the dispatcher, we get infinite
+ * recursion when definitions reference each other:
+ *
+ *   $defs: {
+ *     "A": { "$ref": "#/$defs/B" },  // A references B
+ *     "B": { "$ref": "#/$defs/A" }   // B references A
+ *   }
+ *
+ * Compiling A triggers compilation of B, which triggers compilation of A again.
+ *
+ * **The Solution:**
+ * Use a two-pass approach (standard in compiler theory):
+ * 1. Pass 1: Register all $defs in the anchor table (symbol table construction)
+ * 2. Pass 2: Compile schemas recursively (code generation)
+ *
+ * This ensures all symbols are registered before any schema bodies are compiled,
+ * preventing infinite recursion and allowing forward references.
+ *
+ * This placeholder exists to maintain the dispatch table structure and document
+ * why $defs are NOT processed during recursive schema compilation.
  */
 [[nodiscard]] inline std::expected<void, QueryError>
-compileNestedDefs(CompileContext& ctx, const QJsonObject& schemaObj, CompileSchemaFn& compile)
+compileNestedDefs(CompileContext&, const QJsonObject&, CompileSchemaFn&)
 {
-    using json_query::literals::operator""_qt_s;
-
-    if (schemaObj.contains(u"$defs"_qt_s) && schemaObj[u"$defs"_qt_s].isObject())
-    {
-        const auto defsObj{schemaObj[u"$defs"_qt_s].toObject()};
-        for (auto it = defsObj.begin(); it != defsObj.end(); ++it)
-        {
-            auto r{compile(ctx, it.value())};
-            if (!r)
-                return std::unexpected(r.error());
-        }
-    }
+    // $defs are compiled at root level in Phase 1 (symbol table construction)
+    // before Phase 2 (recursive schema compilation) to prevent infinite recursion
     return {};
 }
 
