@@ -3,12 +3,12 @@
 #include "json-query/json-schema/JSONSchemaCompile.hpp"
 #include "json-query/json-schema/JSONSchemaError.hpp"
 #include "json-query/json-schema/internal/SchemaNode.hpp"
+#include "json-query/json-schema/internal/CompileContext.hpp"
+#include "json-query/json-schema/internal/CompileKeywords.hpp"
 
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonObject>
 #include <QtCore/QRegularExpression>
-
-#include <unordered_map>
 
 namespace json_query::json_schema
 {
@@ -17,184 +17,6 @@ namespace
 {
 
 using namespace internal;
-
-/**
- * @brief Context for schema compilation
- *
- * Maintains state during recursive schema compilation.
- */
-struct CompileContext
-{
-    std::vector<SchemaNode>&                  nodes;
-    std::unordered_map<QString, std::size_t>& anchors;
-    std::unordered_map<QString, std::size_t>& dynamicAnchors;
-    QString                                   basePath{};
-    QString                                   baseUri{};  // Current base URI for anchor scoping
-
-    // Add a node and return its index
-    std::size_t addNode(SchemaNode node)
-    {
-        const auto index{nodes.size()};
-        nodes.push_back(std::move(node));
-        return index;
-    }
-
-    // Get the full anchor key scoped to the current base URI
-    QString scopedAnchorKey(const QString& anchorName) const
-    {
-        if (baseUri.isEmpty())
-            return anchorName;
-        return baseUri + u"#"_qs + anchorName;
-    }
-};
-
-/**
- * @brief Parse the 'type' keyword
- */
-std::expected<std::optional<TypeConstraint>, QueryError> parseTypeKeyword(const QJsonValue& typeValue)
-{
-    if (typeValue.isUndefined())
-        return std::nullopt;
-
-    TypeConstraint constraint{};
-
-    if (typeValue.isString())
-    {
-        auto schemaType{stringToSchemaType(typeValue.toString())};
-        if (!schemaType)
-            return std::unexpected(QueryError(ParseError::InvalidTypeValue));
-        constraint.allowedTypes.push_back(*schemaType);
-    }
-    else if (typeValue.isArray())
-    {
-        const auto typeArray{typeValue.toArray()};
-        if (typeArray.isEmpty())
-            return std::unexpected(QueryError(ParseError::InvalidTypeValue));
-
-        for (const QJsonValue& typeItem : typeArray)
-        {
-            if (!typeItem.isString())
-                return std::unexpected(QueryError(ParseError::InvalidTypeValue));
-            auto schemaType{stringToSchemaType(typeItem.toString())};
-            if (!schemaType)
-                return std::unexpected(QueryError(ParseError::InvalidTypeValue));
-            constraint.allowedTypes.push_back(*schemaType);
-        }
-    }
-    else
-    {
-        return std::unexpected(QueryError(ParseError::InvalidTypeValue));
-    }
-
-    return constraint;
-}
-
-/**
- * @brief Parse the 'enum' keyword
- */
-std::expected<std::optional<QJsonArray>, QueryError> parseEnumKeyword(const QJsonValue& enumValue)
-{
-    if (enumValue.isUndefined())
-        return std::nullopt;
-
-    if (!enumValue.isArray())
-        return std::unexpected(QueryError(ParseError::InvalidEnumValue));
-
-    const auto enumArray{enumValue.toArray()};
-    if (enumArray.isEmpty())
-        return std::unexpected(QueryError(ParseError::InvalidEnumValue));
-
-    return enumArray;
-}
-
-/**
- * @brief Parse the 'const' keyword
- */
-std::optional<QJsonValue> parseConstKeyword(const QJsonValue& constValue)
-{
-    if (constValue.isUndefined())
-        return std::nullopt;
-    return constValue;
-}
-
-/**
- * @brief Parse numeric keywords (minimum, maximum, etc.)
- */
-std::expected<std::optional<double>, QueryError> parseNumericKeyword(const QJsonValue&            value,
-                                                                     [[maybe_unused]] const char* keywordName)
-{
-    if (value.isUndefined())
-        return std::nullopt;
-
-    if (!value.isDouble())
-        return std::unexpected(QueryError(ParseError::InvalidKeywordValue));
-
-    return value.toDouble();
-}
-
-/**
- * @brief Parse integer keywords (minLength, maxLength, minItems, etc.)
- */
-std::expected<std::optional<std::size_t>, QueryError> parseIntegerKeyword(const QJsonValue&            value,
-                                                                          [[maybe_unused]] const char* keywordName)
-{
-    if (value.isUndefined())
-        return std::nullopt;
-
-    if (!value.isDouble())
-        return std::unexpected(QueryError(ParseError::InvalidKeywordValue));
-
-    const auto d{value.toDouble()};
-    if (d < 0 || d != static_cast<double>(static_cast<std::size_t>(d)))
-        return std::unexpected(QueryError(ParseError::InvalidKeywordValue));
-
-    return static_cast<std::size_t>(d);
-}
-
-/**
- * @brief Parse the 'pattern' keyword
- */
-std::expected<std::optional<QRegularExpression>, QueryError> parsePatternKeyword(const QJsonValue& patternValue)
-{
-    if (patternValue.isUndefined())
-        return std::nullopt;
-
-    if (!patternValue.isString())
-        return std::unexpected(QueryError(ParseError::InvalidKeywordValue));
-
-    QRegularExpression regex(patternValue.toString());
-    if (!regex.isValid())
-        return std::unexpected(QueryError(ParseError::InvalidRegexPattern));
-
-    regex.optimize(); // Enable JIT for better performance
-    return regex;
-}
-
-/**
- * @brief Parse the 'required' keyword
- */
-std::expected<std::vector<QString>, QueryError> parseRequiredKeyword(const QJsonValue& requiredValue)
-{
-    std::vector<QString> result{};
-
-    if (requiredValue.isUndefined())
-        return result;
-
-    if (!requiredValue.isArray())
-        return std::unexpected(QueryError(ParseError::InvalidKeywordValue));
-
-    const auto requiredArray{requiredValue.toArray()};
-    result.reserve(static_cast<std::size_t>(requiredArray.size()));
-
-    for (const QJsonValue& item : requiredArray)
-    {
-        if (!item.isString())
-            return std::unexpected(QueryError(ParseError::InvalidKeywordValue));
-        result.push_back(item.toString());
-    }
-
-    return result;
-}
 
 // Forward declaration for recursive compilation
 std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, const QJsonValue& schemaValue);
@@ -307,9 +129,8 @@ std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, co
     
     // Check if there are other keywords besides $ref, $anchor, $id, $schema, $defs, title, description
     const auto hasOtherKeywords{[&]() {
-        for (auto it = schemaObj.begin(); it != schemaObj.end(); ++it)
+        for (const auto& key : schemaObj.keys())
         {
-            const auto& key{it.key()};
             if (key != u"$ref"_qs && key != u"$anchor"_qs && key != u"$id"_qs && 
                 key != u"$schema"_qs && key != u"$defs"_qs && key != u"definitions"_qs &&
                 key != u"title"_qs && key != u"description"_qs && key != u"$comment"_qs)
@@ -358,49 +179,49 @@ std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, co
         return std::unexpected(patternResult.error());
     node.pattern = std::move(*patternResult);
 
-    auto minLengthResult{parseIntegerKeyword(schemaObj[u"minLength"_qs], "minLength")};
+    auto minLengthResult{parseIntegerKeyword(schemaObj[u"minLength"_qs])};
     if (!minLengthResult)
         return std::unexpected(minLengthResult.error());
     node.minLength = *minLengthResult;
 
-    auto maxLengthResult{parseIntegerKeyword(schemaObj[u"maxLength"_qs], "maxLength")};
+    auto maxLengthResult{parseIntegerKeyword(schemaObj[u"maxLength"_qs])};
     if (!maxLengthResult)
         return std::unexpected(maxLengthResult.error());
     node.maxLength = *maxLengthResult;
 
     // Numeric keywords
-    auto minimumResult{parseNumericKeyword(schemaObj[u"minimum"_qs], "minimum")};
+    auto minimumResult{parseNumericKeyword(schemaObj[u"minimum"_qs])};
     if (!minimumResult)
         return std::unexpected(minimumResult.error());
     node.minimum = *minimumResult;
 
-    auto maximumResult{parseNumericKeyword(schemaObj[u"maximum"_qs], "maximum")};
+    auto maximumResult{parseNumericKeyword(schemaObj[u"maximum"_qs])};
     if (!maximumResult)
         return std::unexpected(maximumResult.error());
     node.maximum = *maximumResult;
 
-    auto exclMinResult{parseNumericKeyword(schemaObj[u"exclusiveMinimum"_qs], "exclusiveMinimum")};
+    auto exclMinResult{parseNumericKeyword(schemaObj[u"exclusiveMinimum"_qs])};
     if (!exclMinResult)
         return std::unexpected(exclMinResult.error());
     node.exclusiveMinimum = *exclMinResult;
 
-    auto exclMaxResult{parseNumericKeyword(schemaObj[u"exclusiveMaximum"_qs], "exclusiveMaximum")};
+    auto exclMaxResult{parseNumericKeyword(schemaObj[u"exclusiveMaximum"_qs])};
     if (!exclMaxResult)
         return std::unexpected(exclMaxResult.error());
     node.exclusiveMaximum = *exclMaxResult;
 
-    auto multipleOfResult{parseNumericKeyword(schemaObj[u"multipleOf"_qs], "multipleOf")};
+    auto multipleOfResult{parseNumericKeyword(schemaObj[u"multipleOf"_qs])};
     if (!multipleOfResult)
         return std::unexpected(multipleOfResult.error());
     node.multipleOf = *multipleOfResult;
 
     // Array keywords
-    auto minItemsResult{parseIntegerKeyword(schemaObj[u"minItems"_qs], "minItems")};
+    auto minItemsResult{parseIntegerKeyword(schemaObj[u"minItems"_qs])};
     if (!minItemsResult)
         return std::unexpected(minItemsResult.error());
     node.minItems = *minItemsResult;
 
-    auto maxItemsResult{parseIntegerKeyword(schemaObj[u"maxItems"_qs], "maxItems")};
+    auto maxItemsResult{parseIntegerKeyword(schemaObj[u"maxItems"_qs])};
     if (!maxItemsResult)
         return std::unexpected(maxItemsResult.error());
     node.maxItems = *maxItemsResult;
@@ -418,12 +239,12 @@ std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, co
         return std::unexpected(requiredResult.error());
     node.required = std::move(*requiredResult);
 
-    auto minPropsResult{parseIntegerKeyword(schemaObj[u"minProperties"_qs], "minProperties")};
+    auto minPropsResult{parseIntegerKeyword(schemaObj[u"minProperties"_qs])};
     if (!minPropsResult)
         return std::unexpected(minPropsResult.error());
     node.minProperties = *minPropsResult;
 
-    auto maxPropsResult{parseIntegerKeyword(schemaObj[u"maxProperties"_qs], "maxProperties")};
+    auto maxPropsResult{parseIntegerKeyword(schemaObj[u"maxProperties"_qs])};
     if (!maxPropsResult)
         return std::unexpected(maxPropsResult.error());
     node.maxProperties = *maxPropsResult;
@@ -449,8 +270,7 @@ std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, co
             const auto patternPropsObj{patternPropsValue.toObject()};
             for (auto it = patternPropsObj.begin(); it != patternPropsObj.end(); ++it)
             {
-                const auto patternStr{it.key()};
-                QRegularExpression regex{patternStr};
+                QRegularExpression regex{it.key()};
                 if (!regex.isValid())
                     return std::unexpected(QueryError(ParseError::InvalidRegexPattern));
                 regex.optimize();
@@ -534,7 +354,6 @@ std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, co
             const auto depReqObj{depReqValue.toObject()};
             for (auto it = depReqObj.begin(); it != depReqObj.end(); ++it)
             {
-                const auto propName{it.key()};
                 if (it.value().isArray())
                 {
                     const auto reqArray{it.value().toArray()};
@@ -544,7 +363,7 @@ std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, co
                         if (req.isString())
                             requiredProps.push_back(req.toString());
                     }
-                    node.dependentRequired[propName] = std::move(requiredProps);
+                    node.dependentRequired[it.key()] = std::move(requiredProps);
                 }
             }
         }
@@ -558,11 +377,10 @@ std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, co
             const auto depSchObj{depSchValue.toObject()};
             for (auto it = depSchObj.begin(); it != depSchObj.end(); ++it)
             {
-                const auto propName{it.key()};
                 auto schemaResult{compileSchemaNode(ctx, it.value())};
                 if (!schemaResult)
                     return std::unexpected(schemaResult.error());
-                node.dependentSchemas[propName] = *schemaResult;
+                node.dependentSchemas[it.key()] = *schemaResult;
             }
         }
     }
@@ -639,13 +457,12 @@ std::expected<std::shared_ptr<internal::CompiledSchema>, QueryError> compileSche
                 const auto defsObj{defsValue.toObject()};
                 for (auto it = defsObj.begin(); it != defsObj.end(); ++it)
                 {
-                    const auto defName{it.key()};
                     auto defResult{compileSchemaNode(ctx, it.value())};
                     if (!defResult)
                         return std::unexpected(defResult.error());
                     
                     // Register the definition with its JSON Pointer path
-                    const auto defPath{u"#/$defs/"_qs + defName};
+                    const auto defPath{u"#/$defs/"_qs + it.key()};
                     ctx.anchors[defPath] = *defResult;
                 }
             }
@@ -660,13 +477,12 @@ std::expected<std::shared_ptr<internal::CompiledSchema>, QueryError> compileSche
                 const auto defsObj{defsValue.toObject()};
                 for (auto it = defsObj.begin(); it != defsObj.end(); ++it)
                 {
-                    const auto defName{it.key()};
                     auto defResult{compileSchemaNode(ctx, it.value())};
                     if (!defResult)
                         return std::unexpected(defResult.error());
                     
                     // Register with legacy path
-                    const auto defPath{u"#/definitions/"_qs + defName};
+                    const auto defPath{u"#/definitions/"_qs + it.key()};
                     ctx.anchors[defPath] = *defResult;
                 }
             }

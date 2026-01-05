@@ -95,16 +95,19 @@ void validateNode(ValidateContext&  ctx,
                                         u"Schema is false, all values are invalid"_qs,
                                         EvalError::ConstMismatch);
                 }
-                // true schema accepts everything
+                return;
             }
-            else if constexpr (std::is_same_v<T, ObjectSchema>)
+
+            if constexpr (std::is_same_v<T, ObjectSchema>)
             {
                 validateObjectSchema(ctx, schemaVariant, instance, instancePath, schemaPath);
+                return;
             }
-            else if constexpr (std::is_same_v<T, RefSchema>)
+
+            if constexpr (std::is_same_v<T, RefSchema>)
             {
-                // Follow the reference
                 validateNode(ctx, ctx.schema.nodeAt(schemaVariant.targetIndex), instance, instancePath, schemaPath);
+                return;
             }
         },
         node);
