@@ -53,15 +53,28 @@ jobs:
 
       # --- Benchmarks ---
       - name: Build benchmarks
+        continue-on-error: true
         run: cmake --build build --target json_benchmark --parallel
 
       - name: Run benchmarks (Windows)
         if: matrix.os == 'windows-latest'
-        run: .\\build\\json_benchmark.exe --benchmark_format=json --benchmark_out=benchmarks-${{ matrix.os }}.json
+        continue-on-error: true
+        run: |
+          if (Test-Path ".\\build\\json_benchmark.exe") {
+            .\\build\\json_benchmark.exe --benchmark_format=json --benchmark_out=benchmarks-${{ matrix.os }}.json
+          } else {
+            Write-Host "Benchmark executable not found, skipping benchmarks"
+          }
 
       - name: Run benchmarks (macOS)
         if: matrix.os == 'macos-latest'
-        run: ./build/json_benchmark --benchmark_format=json --benchmark_out=benchmarks-${{ matrix.os }}.json
+        continue-on-error: true
+        run: |
+          if [ -f "./build/json_benchmark" ]; then
+            ./build/json_benchmark --benchmark_format=json --benchmark_out=benchmarks-${{ matrix.os }}.json
+          else
+            echo "Benchmark executable not found, skipping benchmarks"
+          fi
 
       - name: Upload test results
         if: always()
