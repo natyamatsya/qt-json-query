@@ -75,7 +75,7 @@ inline constexpr auto semanticInvalid{std::unexpected(EvalError::FormatSemanticI
 
 } // anonymous namespace
 
-FormatResult isDateTime(QStringView value) noexcept
+FormatValidationResult isDateTime(QStringView value) noexcept
 {
     // CTRE pattern match
     if (!ctre::match<patterns::dateTimePattern>(utils::to_sv(value.toString())))
@@ -87,7 +87,7 @@ FormatResult isDateTime(QStringView value) noexcept
     return {};
 }
 
-FormatResult isDate(QStringView value) noexcept
+FormatValidationResult isDate(QStringView value) noexcept
 {
     // CTRE pattern match
     if (!ctre::match<patterns::datePattern>(utils::to_sv(value.toString())))
@@ -99,7 +99,7 @@ FormatResult isDate(QStringView value) noexcept
     return {};
 }
 
-FormatResult isTime(QStringView value) noexcept
+FormatValidationResult isTime(QStringView value) noexcept
 {
     // CTRE pattern match
     if (!ctre::match<patterns::timePattern>(utils::to_sv(value.toString())))
@@ -126,7 +126,7 @@ FormatResult isTime(QStringView value) noexcept
     return {};
 }
 
-FormatResult isEmail(QStringView value) noexcept
+FormatValidationResult isEmail(QStringView value) noexcept
 {
     if (value.isEmpty() || value.size() > 254)
         return formatInvalid;
@@ -135,7 +135,7 @@ FormatResult isEmail(QStringView value) noexcept
     return {};
 }
 
-FormatResult isHostname(QStringView value) noexcept
+FormatValidationResult isHostname(QStringView value) noexcept
 {
     if (value.isEmpty() || value.size() > 253)
         return formatInvalid;
@@ -144,7 +144,7 @@ FormatResult isHostname(QStringView value) noexcept
     return {};
 }
 
-FormatResult isIpv4(QStringView value) noexcept
+FormatValidationResult isIpv4(QStringView value) noexcept
 {
     // CTRE pattern match for format
     if (!ctre::match<patterns::ipv4Pattern>(utils::to_sv(value.toString())))
@@ -156,7 +156,7 @@ FormatResult isIpv4(QStringView value) noexcept
     return {};
 }
 
-FormatResult isIpv6(QStringView value) noexcept
+FormatValidationResult isIpv6(QStringView value) noexcept
 {
     // Qt handles IPv6 validation (complex compression format)
     const QHostAddress addr{value.toString()};
@@ -165,7 +165,7 @@ FormatResult isIpv6(QStringView value) noexcept
     return {};
 }
 
-FormatResult isUri(QStringView value) noexcept
+FormatValidationResult isUri(QStringView value) noexcept
 {
     // Qt handles URI validation
     const QUrl url{value.toString()};
@@ -176,7 +176,7 @@ FormatResult isUri(QStringView value) noexcept
     return {};
 }
 
-FormatResult isUriReference(QStringView value) noexcept
+FormatValidationResult isUriReference(QStringView value) noexcept
 {
     // Qt handles URI-reference validation
     const QUrl url{value.toString()};
@@ -185,35 +185,35 @@ FormatResult isUriReference(QStringView value) noexcept
     return {};
 }
 
-FormatResult isUriTemplate(QStringView value) noexcept
+FormatValidationResult isUriTemplate(QStringView value) noexcept
 {
     if (!ctre::match<patterns::uriTemplatePattern>(utils::to_sv(value.toString())))
         return formatInvalid;
     return {};
 }
 
-FormatResult isUuid(QStringView value) noexcept
+FormatValidationResult isUuid(QStringView value) noexcept
 {
     if (!ctre::match<patterns::uuidPattern>(utils::to_sv(value.toString())))
         return formatInvalid;
     return {};
 }
 
-FormatResult isJsonPointer(QStringView value) noexcept
+FormatValidationResult isJsonPointer(QStringView value) noexcept
 {
     if (!ctre::match<patterns::jsonPointerPattern>(utils::to_sv(value.toString())))
         return formatInvalid;
     return {};
 }
 
-FormatResult isRelativeJsonPointer(QStringView value) noexcept
+FormatValidationResult isRelativeJsonPointer(QStringView value) noexcept
 {
     if (!ctre::match<patterns::relativeJsonPointerPattern>(utils::to_sv(value.toString())))
         return formatInvalid;
     return {};
 }
 
-FormatResult isRegex(QStringView value) noexcept
+FormatValidationResult isRegex(QStringView value) noexcept
 {
     // Qt validates regex syntax
     const QRegularExpression regex{value.toString()};
@@ -222,7 +222,7 @@ FormatResult isRegex(QStringView value) noexcept
     return {};
 }
 
-FormatResult validateFormat(QStringView format, QStringView value) noexcept
+FormatValidationResult validateFormat(QStringView format, QStringView value) noexcept
 {
     if (format == u"date-time")
         return isDateTime(value);
