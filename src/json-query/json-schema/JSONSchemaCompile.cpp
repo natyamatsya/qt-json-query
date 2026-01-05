@@ -94,8 +94,70 @@ std::expected<std::optional<std::size_t>, QueryError> compileOptionalSchema(Comp
     return *nodeIndex;
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+// Schema Node Compilation - Modular Helpers
+// ────────────────────────────────────────────────────────────────────────────
+
+/// Metadata-only keywords that don't affect validation
+static constexpr std::array kMetadataOnlyKeys{
+    u"$ref", u"$anchor", u"$id", u"$schema", u"$defs", u"definitions", u"title", u"description", u"$comment"};
+
 /**
- * @brief Compile a single schema node (recursive) - TableGen-inspired dispatch architecture
+ * @brief Check if schema contains validation keywords beyond metadata
+ */
+[[nodiscard]] bool hasValidationKeywords(const QJsonObject& schemaObj)
+{
+    return std::ranges::any_of(schemaObj.keys(), [](const QString& key)
+                               { return std::ranges::none_of(kMetadataOnlyKeys, [&](const char16_t* mk)
+                                                             { return key == mk; }); });
+}
+
+/**
+ * @brief Extract $id and update base URI if present
+ */
+void processSchemaId(CompileContext& ctx, const QJsonObject& schemaObj)
+{
+    if (schemaObj.contains(u"$id"_qs) && schemaObj[u"$id"_qs].isString())
+        ctx.baseUri = schemaObj[u"$id"_qs].toString();
+}
+
+/**
+ * @brief Extract $anchor name if present
+ */
+[[nodiscard]] std::optional<QString> extractAnchorName(const QJsonObject& schemaObj)
+{
+    if (schemaObj.contains(u"$anchor"_qs) && schemaObj[u"$anchor"_qs].isString())
+        return schemaObj[u"$anchor"_qs].toString();
+    return std::nullopt;
+}
+
+/**
+ * @brief Register anchor in context, checking for duplicates
+ */
+[[nodiscard]] std::expected<void, QueryError>
+registerAnchor(CompileContext& ctx, const QString& anchorName, std::size_t nodeIndex)
+{
+    const auto scopedKey{ctx.scopedAnchorKey(anchorName)};
+    if (ctx.anchors.contains(scopedKey))
+        return std::unexpected(QueryError(ParseError::DuplicateAnchor));
+    ctx.anchors[scopedKey] = nodeIndex;
+    return {};
+}
+
+/**
+ * @brief RAII guard for base URI scope management
+ */
+struct BaseUriScope
+{
+    CompileContext& ctx;
+    QString         saved;
+
+    explicit BaseUriScope(CompileContext& c) : ctx{c}, saved{c.baseUri} {}
+    ~BaseUriScope() { ctx.baseUri = saved; }
+};
+
+/**
+ * @brief Compile a single schema node (recursive) - Clean pipeline architecture
  */
 std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, const QJsonValue& schemaValue)
 {
@@ -103,192 +165,181 @@ std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, co
     if (schemaValue.isBool())
         return ctx.addNode(BooleanSchema{schemaValue.toBool()});
 
-    // Must be an object
     if (!schemaValue.isObject())
         return std::unexpected(QueryError(ParseError::InvalidSchemaStructure));
 
     const auto schemaObj{schemaValue.toObject()};
 
-    // RAII-style base URI management
-    const auto savedBaseUri{ctx.baseUri};
-    struct BaseUriRestorer
-    {
-        CompileContext& ctx;
-        const QString&  saved;
-        ~BaseUriRestorer() { ctx.baseUri = saved; }
-    } restorer{ctx, savedBaseUri};
+    // Phase 1: Scope management
+    BaseUriScope uriScope{ctx};
+    processSchemaId(ctx, schemaObj);
+    const auto anchorName{extractAnchorName(schemaObj)};
 
-    // Handle $id - changes the base URI for this subschema and descendants
-    if (schemaObj.contains(u"$id"_qs) && schemaObj[u"$id"_qs].isString())
-        ctx.baseUri = schemaObj[u"$id"_qs].toString();
-
-    // Handle $anchor registration (scoped to current base URI)
-    std::optional<QString> anchorName{};
-    if (schemaObj.contains(u"$anchor"_qs) && schemaObj[u"$anchor"_qs].isString())
-        anchorName = schemaObj[u"$anchor"_qs].toString();
-
-    // Fast path: $ref without other keywords → simple RefSchema
+    // Phase 2: Fast path for $ref-only schemas
     const auto hasRef{schemaObj.contains(u"$ref"_qs)};
-    if (hasRef)
-    {
-        const auto refString{schemaObj[u"$ref"_qs].toString()};
+    if (hasRef && !hasValidationKeywords(schemaObj))
+        return ctx.addNode(RefSchema{0, schemaObj[u"$ref"_qs].toString()});
 
-        // Check for other validation keywords
-        static constexpr std::array metadataKeys{
-            u"$ref", u"$anchor", u"$id", u"$schema", u"$defs", u"definitions", u"title", u"description", u"$comment"};
-
-        const auto hasOtherKeywords{std::ranges::any_of(schemaObj.keys(), [](const QString& key)
-                                                        { return std::ranges::none_of(metadataKeys, [&](const char16_t* mk)
-                                                                                       { return key == mk; }); })};
-
-        if (!hasOtherKeywords)
-            return ctx.addNode(RefSchema{0, refString});
-    }
-
-    // ────────────────────────────────────────────────────────────────────────
-    // TableGen-inspired dispatch: compile all keyword categories
-    // ────────────────────────────────────────────────────────────────────────
+    // Phase 3: Build ObjectSchema via dispatch
     ObjectSchema node{};
 
-    // If $ref with other keywords, add ref to allOf (Draft 2020-12 behavior)
     if (hasRef)
-    {
-        const auto refNodeIndex{ctx.addNode(RefSchema{0, schemaObj[u"$ref"_qs].toString()})};
-        node.allOf.push_back(refNodeIndex);
-    }
+        node.allOf.push_back(ctx.addNode(RefSchema{0, schemaObj[u"$ref"_qs].toString()}));
 
-    // Dispatch to all keyword category handlers (pass compileSchemaNode as callback)
     if (auto r{FullKeywordDispatcher::dispatch(ctx, schemaObj, node, compileSchemaNode)}; !r)
         return std::unexpected(r.error());
 
-    // Add the node and register anchor if present
+    // Phase 4: Register node and anchor
     const auto nodeIndex{ctx.addNode(std::move(node))};
 
     if (anchorName)
     {
-        const auto scopedKey{ctx.scopedAnchorKey(*anchorName)};
-        if (ctx.anchors.contains(scopedKey))
-            return std::unexpected(QueryError(ParseError::DuplicateAnchor));
-        ctx.anchors[scopedKey] = nodeIndex;
+        if (auto r{registerAnchor(ctx, *anchorName, nodeIndex)}; !r)
+            return std::unexpected(r.error());
     }
 
     return nodeIndex;
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+// Schema Compilation Pipeline - Modular Helpers
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * @brief Extract root schema metadata ($id, $schema)
+ */
+void extractRootMetadata(const QJsonObject& rootObj, internal::CompiledSchema& compiled)
+{
+    if (rootObj.contains(u"$id"_qs) && rootObj[u"$id"_qs].isString())
+        compiled.schemaId = rootObj[u"$id"_qs].toString();
+
+    if (rootObj.contains(u"$schema"_qs) && rootObj[u"$schema"_qs].isString())
+        compiled.dialect = rootObj[u"$schema"_qs].toString();
+}
+
+/**
+ * @brief Compile definitions block ($defs or definitions)
+ */
+[[nodiscard]] std::expected<void, QueryError>
+compileDefinitionsBlock(CompileContext& ctx, const QJsonObject& rootObj, const QString& keyword, const QString& pathPrefix)
+{
+    if (!rootObj.contains(keyword))
+        return {};
+
+    const auto defsValue{rootObj[keyword]};
+    if (!defsValue.isObject())
+        return {};
+
+    const auto defsObj{defsValue.toObject()};
+    for (auto it = defsObj.begin(); it != defsObj.end(); ++it)
+    {
+        auto defResult{compileSchemaNode(ctx, it.value())};
+        if (!defResult)
+            return std::unexpected(defResult.error());
+
+        ctx.anchors[pathPrefix + it.key()] = *defResult;
+    }
+
+    return {};
+}
+
+/**
+ * @brief Resolve a single $ref reference
+ */
+void resolveReference(RefSchema& refNode, std::size_t rootIndex, const std::unordered_map<QString, std::size_t>& anchors)
+{
+    const auto& ref{refNode.originalRef};
+
+    // Root reference
+    if (ref == u"#"_qs)
+    {
+        refNode.targetIndex = rootIndex;
+        return;
+    }
+
+    // Direct anchor match
+    if (anchors.contains(ref))
+    {
+        refNode.targetIndex = anchors.at(ref);
+        return;
+    }
+
+    // Anchor with # prefix (e.g., "#foo" → lookup "foo")
+    if (ref.startsWith(u"#"_qs))
+    {
+        const auto anchorName{ref.mid(1)};
+        if (anchors.contains(anchorName))
+            refNode.targetIndex = anchors.at(anchorName);
+        return;
+    }
+
+    // URI with fragment (e.g., "http://example.com/nested.json#foo")
+    if (ref.contains(u'#'))
+    {
+        const auto hashPos{ref.lastIndexOf(u'#')};
+        const auto baseUri{ref.left(hashPos)};
+        const auto fragment{ref.mid(hashPos + 1)};
+
+        // Extract filename and build scoped key
+        const auto lastSlash{baseUri.lastIndexOf(u'/')};
+        const auto filename{lastSlash >= 0 ? baseUri.mid(lastSlash + 1) : baseUri};
+        const auto scopedKey{filename + u"#"_qs + fragment};
+
+        if (anchors.contains(scopedKey))
+            refNode.targetIndex = anchors.at(scopedKey);
+    }
+}
+
+/**
+ * @brief Second pass: resolve all $ref references in compiled nodes
+ */
+void resolveAllReferences(internal::CompiledSchema& compiled, const std::unordered_map<QString, std::size_t>& anchors)
+{
+    for (auto& node : compiled.nodes)
+    {
+        if (auto* refNode = std::get_if<RefSchema>(&node))
+            resolveReference(*refNode, compiled.rootIndex, anchors);
+    }
+}
+
 } // anonymous namespace
+
+// ────────────────────────────────────────────────────────────────────────────
+// Public API: compileSchema
+// ────────────────────────────────────────────────────────────────────────────
 
 std::expected<std::shared_ptr<internal::CompiledSchema>, QueryError> compileSchema(const QJsonValue& schemaValue)
 {
+    // Validate input
     if (schemaValue.isNull() || schemaValue.isUndefined())
         return std::unexpected(QueryError(ParseError::EmptySchema));
 
+    // Initialize compilation context
     auto compiled{std::make_shared<internal::CompiledSchema>()};
-
     CompileContext ctx{compiled->nodes, compiled->anchors, compiled->dynamicAnchors, {}, {}};
 
-    // Extract metadata from root schema if it's an object
+    // Phase 1: Extract metadata and compile definitions
     if (schemaValue.isObject())
     {
         const auto rootObj{schemaValue.toObject()};
-        if (rootObj.contains(u"$id"_qs) && rootObj[u"$id"_qs].isString())
-            compiled->schemaId = rootObj[u"$id"_qs].toString();
-        if (rootObj.contains(u"$schema"_qs) && rootObj[u"$schema"_qs].isString())
-            compiled->dialect = rootObj[u"$schema"_qs].toString();
-        
-        // Compile $defs first so they're available for $ref resolution
-        if (rootObj.contains(u"$defs"_qs))
-        {
-            const auto defsValue{rootObj[u"$defs"_qs]};
-            if (defsValue.isObject())
-            {
-                const auto defsObj{defsValue.toObject()};
-                for (auto it = defsObj.begin(); it != defsObj.end(); ++it)
-                {
-                    auto defResult{compileSchemaNode(ctx, it.value())};
-                    if (!defResult)
-                        return std::unexpected(defResult.error());
-                    
-                    // Register the definition with its JSON Pointer path
-                    const auto defPath{u"#/$defs/"_qs + it.key()};
-                    ctx.anchors[defPath] = *defResult;
-                }
-            }
-        }
-        
-        // Also handle legacy "definitions" keyword
-        if (rootObj.contains(u"definitions"_qs))
-        {
-            const auto defsValue{rootObj[u"definitions"_qs]};
-            if (defsValue.isObject())
-            {
-                const auto defsObj{defsValue.toObject()};
-                for (auto it = defsObj.begin(); it != defsObj.end(); ++it)
-                {
-                    auto defResult{compileSchemaNode(ctx, it.value())};
-                    if (!defResult)
-                        return std::unexpected(defResult.error());
-                    
-                    // Register with legacy path
-                    const auto defPath{u"#/definitions/"_qs + it.key()};
-                    ctx.anchors[defPath] = *defResult;
-                }
-            }
-        }
+
+        extractRootMetadata(rootObj, *compiled);
+
+        if (auto r{compileDefinitionsBlock(ctx, rootObj, u"$defs"_qs, u"#/$defs/"_qs)}; !r)
+            return std::unexpected(r.error());
+
+        if (auto r{compileDefinitionsBlock(ctx, rootObj, u"definitions"_qs, u"#/definitions/"_qs)}; !r)
+            return std::unexpected(r.error());
     }
 
-    // Compile the root schema
+    // Phase 2: Compile root schema
     auto rootResult{compileSchemaNode(ctx, schemaValue)};
     if (!rootResult)
         return std::unexpected(rootResult.error());
-
     compiled->rootIndex = *rootResult;
-    
-    // Second pass: resolve $ref references
-    for (std::size_t i = 0; i < compiled->nodes.size(); ++i)
-    {
-        if (std::holds_alternative<RefSchema>(compiled->nodes[i]))
-        {
-            auto& refNode{std::get<RefSchema>(compiled->nodes[i])};
-            const auto& refString{refNode.originalRef};
-            
-            // Try to resolve the reference
-            if (refString == u"#"_qs)
-            {
-                refNode.targetIndex = compiled->rootIndex;
-            }
-            else if (ctx.anchors.contains(refString))
-            {
-                refNode.targetIndex = ctx.anchors[refString];
-            }
-            else if (refString.startsWith(u"#"_qs))
-            {
-                // Try without the # prefix for anchor lookup
-                const auto anchorName{refString.mid(1)};
-                if (ctx.anchors.contains(anchorName))
-                {
-                    refNode.targetIndex = ctx.anchors[anchorName];
-                }
-            }
-            else if (refString.contains(u'#'))
-            {
-                // URI with fragment - try to resolve using the base URI and anchor
-                // e.g., "http://example.com/nested.json#foo" -> look for "nested.json#foo"
-                const auto hashPos{refString.lastIndexOf(u'#')};
-                const auto baseUri{refString.left(hashPos)};
-                const auto fragment{refString.mid(hashPos + 1)};
-                
-                // Try scoped lookup: extract just the filename from the URI and combine with fragment
-                const auto lastSlash{baseUri.lastIndexOf(u'/')};
-                const auto filename{lastSlash >= 0 ? baseUri.mid(lastSlash + 1) : baseUri};
-                const auto scopedKey{filename + u"#"_qs + fragment};
-                
-                if (ctx.anchors.contains(scopedKey))
-                {
-                    refNode.targetIndex = ctx.anchors[scopedKey];
-                }
-            }
-        }
-    }
+
+    // Phase 3: Resolve $ref references
+    resolveAllReferences(*compiled, ctx.anchors);
 
     return compiled;
 }

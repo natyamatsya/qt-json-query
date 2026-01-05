@@ -222,44 +222,47 @@ FormatValidationResult isRegex(QStringView value) noexcept
     return {};
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+// Format Dispatch Table
+// ────────────────────────────────────────────────────────────────────────────
+
+using FormatValidatorFn = FormatValidationResult (*)(QStringView) noexcept;
+
+struct FormatEntry
+{
+    QStringView       name;
+    FormatValidatorFn validator;
+};
+
+/// Compile-time dispatch table for format validators
+static constexpr std::array kFormatTable{
+    FormatEntry{u"date-time", isDateTime},
+    FormatEntry{u"date", isDate},
+    FormatEntry{u"time", isTime},
+    FormatEntry{u"email", isEmail},
+    FormatEntry{u"idn-email", isEmail},
+    FormatEntry{u"hostname", isHostname},
+    FormatEntry{u"idn-hostname", isHostname},
+    FormatEntry{u"ipv4", isIpv4},
+    FormatEntry{u"ipv6", isIpv6},
+    FormatEntry{u"uri", isUri},
+    FormatEntry{u"uri-reference", isUriReference},
+    FormatEntry{u"iri", isUri},
+    FormatEntry{u"iri-reference", isUriReference},
+    FormatEntry{u"uri-template", isUriTemplate},
+    FormatEntry{u"uuid", isUuid},
+    FormatEntry{u"json-pointer", isJsonPointer},
+    FormatEntry{u"relative-json-pointer", isRelativeJsonPointer},
+    FormatEntry{u"regex", isRegex},
+};
+
 FormatValidationResult validateFormat(QStringView format, QStringView value) noexcept
 {
-    if (format == u"date-time")
-        return isDateTime(value);
-    if (format == u"date")
-        return isDate(value);
-    if (format == u"time")
-        return isTime(value);
-    if (format == u"email")
-        return isEmail(value);
-    if (format == u"idn-email")
-        return isEmail(value);
-    if (format == u"hostname")
-        return isHostname(value);
-    if (format == u"idn-hostname")
-        return isHostname(value);
-    if (format == u"ipv4")
-        return isIpv4(value);
-    if (format == u"ipv6")
-        return isIpv6(value);
-    if (format == u"uri")
-        return isUri(value);
-    if (format == u"uri-reference")
-        return isUriReference(value);
-    if (format == u"iri")
-        return isUri(value);
-    if (format == u"iri-reference")
-        return isUriReference(value);
-    if (format == u"uri-template")
-        return isUriTemplate(value);
-    if (format == u"uuid")
-        return isUuid(value);
-    if (format == u"json-pointer")
-        return isJsonPointer(value);
-    if (format == u"relative-json-pointer")
-        return isRelativeJsonPointer(value);
-    if (format == u"regex")
-        return isRegex(value);
+    for (const auto& [name, validator] : kFormatTable)
+    {
+        if (format == name)
+            return validator(value);
+    }
 
     // Unknown format - pass validation (per JSON Schema spec)
     return {};

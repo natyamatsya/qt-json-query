@@ -8,26 +8,24 @@
 #include "json-query/json-pointer/JSONPointerUtils.hpp"
 
 #include <QJsonObject>
-#include <QSet>
 #include <QString>
 
 namespace json_query::json_schema::internal
 {
 
-/**
- * @brief Validate object constraints (properties, required, additionalProperties, etc.)
- *
- * @param validateNode Callback for recursive validation of property values
- */
-inline void validateObject(ValidateContext&    ctx,
-                           const ObjectSchema& node,
-                           const QJsonObject&  obj,
-                           const QString&      instancePath,
-                           const QString&      schemaPath,
-                           ValidateNodeFn&     validateNode)
-{
-    const auto size{static_cast<std::size_t>(obj.size())};
+// ────────────────────────────────────────────────────────────────────────────
+// Object Validation - Modular Helpers
+// ────────────────────────────────────────────────────────────────────────────
 
+/**
+ * @brief Validate min/max properties constraints
+ */
+inline void validatePropertyCount(ValidateContext&    ctx,
+                                  const ObjectSchema& node,
+                                  std::size_t         size,
+                                  const QString&      instancePath,
+                                  const QString&      schemaPath)
+{
     if (node.minProperties && size < *node.minProperties)
     {
         const auto msg{QString(u"Object has %1 properties, minimum is %2").arg(size).arg(*node.minProperties)};
@@ -39,8 +37,17 @@ inline void validateObject(ValidateContext&    ctx,
         const auto msg{QString(u"Object has %1 properties, maximum is %2").arg(size).arg(*node.maxProperties)};
         ctx.result.addError(instancePath, schemaPath + u"/maxProperties"_qs, msg, EvalError::MaxPropertiesViolation);
     }
+}
 
-    // Check required properties
+/**
+ * @brief Validate required properties
+ */
+inline void validateRequired(ValidateContext&    ctx,
+                             const ObjectSchema& node,
+                             const QJsonObject&  obj,
+                             const QString&      instancePath,
+                             const QString&      schemaPath)
+{
     for (const QString& req : node.required)
     {
         if (!obj.contains(req))
@@ -49,103 +56,132 @@ inline void validateObject(ValidateContext&    ctx,
             ctx.result.addError(instancePath, schemaPath + u"/required"_qs, msg, EvalError::RequiredMissing);
         }
     }
+}
 
-    // Validate property names if propertyNames schema is present
-    if (node.propertyNames)
-    {
-        for (auto it = obj.begin(); it != obj.end() && ctx.shouldContinue(); ++it)
-        {
-            const QString& propName{it.key()};
-            validateNode(ctx,
-                         ctx.schema.nodeAt(*node.propertyNames),
-                         QJsonValue(propName),
-                         instancePath,
-                         schemaPath + u"/propertyNames"_qs);
-        }
-    }
-
-    // Validate each property
-    QSet<QString> evaluatedProperties{};
+/**
+ * @brief Validate property names against propertyNames schema
+ */
+inline void validatePropertyNames(ValidateContext&    ctx,
+                                  const ObjectSchema& node,
+                                  const QJsonObject&  obj,
+                                  const QString&      instancePath,
+                                  const QString&      schemaPath,
+                                  ValidateNodeFn&     validateNode)
+{
+    if (!node.propertyNames)
+        return;
 
     for (auto it = obj.begin(); it != obj.end() && ctx.shouldContinue(); ++it)
     {
-        const QString& propName{it.key()};
-        const auto     propPath{json_pointer::appendToken(instancePath, propName)};
-        bool           evaluated{false};
+        validateNode(ctx,
+                     ctx.schema.nodeAt(*node.propertyNames),
+                     QJsonValue(it.key()),
+                     instancePath,
+                     schemaPath + u"/propertyNames"_qs);
+    }
+}
 
-        // Check properties
-        auto propIt{node.properties.find(propName)};
-        if (propIt != node.properties.end())
+/**
+ * @brief Check if property matches additionalProperties=false
+ */
+inline void rejectAdditionalProperty(ValidateContext& ctx,
+                                     const QString&   propName,
+                                     const QString&   propPath,
+                                     const QString&   schemaPath)
+{
+    const auto msg{QString(u"Additional property '%1' is not allowed").arg(propName)};
+    ctx.result.addError(propPath, schemaPath + u"/additionalProperties"_qs, msg, EvalError::AdditionalPropertiesInvalid);
+}
+
+/**
+ * @brief Validate a single property against all applicable schemas
+ * @return true if property was evaluated by properties or patternProperties
+ */
+inline bool validateSingleProperty(ValidateContext&    ctx,
+                                   const ObjectSchema& node,
+                                   const QString&      propName,
+                                   const QJsonValue&   propValue,
+                                   const QString&      propPath,
+                                   const QString&      schemaPath,
+                                   ValidateNodeFn&     validateNode)
+{
+    bool evaluated{false};
+
+    // Check properties
+    if (auto propIt = node.properties.find(propName); propIt != node.properties.end())
+    {
+        validateNode(ctx,
+                     ctx.schema.nodeAt(propIt->second),
+                     propValue,
+                     propPath,
+                     json_pointer::appendToken(schemaPath + u"/properties"_qs, propName));
+        evaluated = true;
+    }
+
+    // Check patternProperties
+    for (const auto& [pattern, schemaIndex] : node.patternProperties)
+    {
+        if (pattern.match(propName).hasMatch())
         {
-            validateNode(ctx,
-                         ctx.schema.nodeAt(propIt->second),
-                         it.value(),
-                         propPath,
-                         json_pointer::appendToken(schemaPath + u"/properties"_qs, propName));
+            validateNode(ctx, ctx.schema.nodeAt(schemaIndex), propValue, propPath, schemaPath + u"/patternProperties"_qs);
             evaluated = true;
         }
-
-        // Check patternProperties
-        for (const auto& [pattern, schemaIndex] : node.patternProperties)
-        {
-            if (pattern.match(propName).hasMatch())
-            {
-                validateNode(
-                    ctx, ctx.schema.nodeAt(schemaIndex), it.value(), propPath, schemaPath + u"/patternProperties"_qs);
-                evaluated = true;
-            }
-        }
-
-        // Check additionalProperties
-        if (!evaluated && node.additionalProperties)
-        {
-            const auto& additionalNode{ctx.schema.nodeAt(*node.additionalProperties)};
-
-            // If additionalProperties is false (BooleanSchema{false}), reject
-            if (std::holds_alternative<BooleanSchema>(additionalNode))
-            {
-                if (!std::get<BooleanSchema>(additionalNode).value)
-                {
-                    const auto msg{QString(u"Additional property '%1' is not allowed").arg(propName)};
-                    ctx.result.addError(propPath,
-                                        schemaPath + u"/additionalProperties"_qs,
-                                        msg,
-                                        EvalError::AdditionalPropertiesInvalid);
-                }
-            }
-            else
-            {
-                // Validate against additionalProperties schema
-                validateNode(ctx, additionalNode, it.value(), propPath, schemaPath + u"/additionalProperties"_qs);
-            }
-        }
-
-        if (evaluated)
-            evaluatedProperties.insert(propName);
     }
 
-    // Validate dependentRequired
+    // Check additionalProperties (only if not evaluated)
+    if (!evaluated && node.additionalProperties)
+    {
+        const auto& additionalNode{ctx.schema.nodeAt(*node.additionalProperties)};
+
+        if (const auto* boolSchema = std::get_if<BooleanSchema>(&additionalNode))
+        {
+            if (!boolSchema->value)
+                rejectAdditionalProperty(ctx, propName, propPath, schemaPath);
+        }
+        else
+        {
+            validateNode(ctx, additionalNode, propValue, propPath, schemaPath + u"/additionalProperties"_qs);
+        }
+    }
+
+    return evaluated;
+}
+
+/**
+ * @brief Validate dependentRequired constraints
+ */
+inline void validateDependentRequired(ValidateContext&    ctx,
+                                      const ObjectSchema& node,
+                                      const QJsonObject&  obj,
+                                      const QString&      instancePath,
+                                      const QString&      schemaPath)
+{
     for (const auto& [propName, requiredProps] : node.dependentRequired)
     {
-        if (obj.contains(propName))
+        if (!obj.contains(propName))
+            continue;
+
+        for (const QString& requiredProp : requiredProps)
         {
-            for (const QString& requiredProp : requiredProps)
+            if (!obj.contains(requiredProp))
             {
-                if (!obj.contains(requiredProp))
-                {
-                    const auto msg{QString(u"Property '%1' requires '%2' to be present")
-                                       .arg(propName)
-                                       .arg(requiredProp)};
-                    ctx.result.addError(instancePath,
-                                        schemaPath + u"/dependentRequired"_qs,
-                                        msg,
-                                        EvalError::RequiredMissing);
-                }
+                const auto msg{QString(u"Property '%1' requires '%2' to be present").arg(propName, requiredProp)};
+                ctx.result.addError(instancePath, schemaPath + u"/dependentRequired"_qs, msg, EvalError::RequiredMissing);
             }
         }
     }
+}
 
-    // Validate dependentSchemas
+/**
+ * @brief Validate dependentSchemas constraints
+ */
+inline void validateDependentSchemas(ValidateContext&    ctx,
+                                     const ObjectSchema& node,
+                                     const QJsonObject&  obj,
+                                     const QString&      instancePath,
+                                     const QString&      schemaPath,
+                                     ValidateNodeFn&     validateNode)
+{
     for (const auto& [propName, schemaIndex] : node.dependentSchemas)
     {
         if (obj.contains(propName))
@@ -157,6 +193,41 @@ inline void validateObject(ValidateContext&    ctx,
                          json_pointer::appendToken(schemaPath + u"/dependentSchemas"_qs, propName));
         }
     }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Main Object Validator - Clean Pipeline
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * @brief Validate object constraints (properties, required, additionalProperties, etc.)
+ */
+inline void validateObject(ValidateContext&    ctx,
+                           const ObjectSchema& node,
+                           const QJsonObject&  obj,
+                           const QString&      instancePath,
+                           const QString&      schemaPath,
+                           ValidateNodeFn&     validateNode)
+{
+    // Phase 1: Size constraints
+    validatePropertyCount(ctx, node, static_cast<std::size_t>(obj.size()), instancePath, schemaPath);
+
+    // Phase 2: Required properties
+    validateRequired(ctx, node, obj, instancePath, schemaPath);
+
+    // Phase 3: Property names
+    validatePropertyNames(ctx, node, obj, instancePath, schemaPath, validateNode);
+
+    // Phase 4: Validate each property
+    for (auto it = obj.begin(); it != obj.end() && ctx.shouldContinue(); ++it)
+    {
+        const auto propPath{json_pointer::appendToken(instancePath, it.key())};
+        validateSingleProperty(ctx, node, it.key(), it.value(), propPath, schemaPath, validateNode);
+    }
+
+    // Phase 5: Dependent constraints
+    validateDependentRequired(ctx, node, obj, instancePath, schemaPath);
+    validateDependentSchemas(ctx, node, obj, instancePath, schemaPath, validateNode);
 }
 
 } // namespace json_query::json_schema::internal
