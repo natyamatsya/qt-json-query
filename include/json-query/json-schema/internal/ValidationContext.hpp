@@ -31,15 +31,16 @@ struct ValidateContext
 };
 
 /**
- * @brief Forward declaration for recursive validation
+ * @brief Callback type for recursive validation
  *
- * This function pointer type allows modular validators to call back
- * into the main validation dispatcher for recursive validation.
+ * This function reference type allows modular validators to call back
+ * into the main validation dispatcher for recursive validation,
+ * breaking the circular dependency.
  */
-using ValidateNodeFn = void (*)(ValidateContext&,
-                                const SchemaNode&,
-                                const QJsonValue&,
-                                const QString&,
-                                const QString&);
+using ValidateNodeFn = void(ValidateContext&,
+                            const SchemaNode&,
+                            const QJsonValue&,
+                            const QString&,
+                            const QString&);
 
 } // namespace json_query::json_schema::internal
