@@ -66,4 +66,3 @@ using FormatValidationResult = std::expected<void, EvalError>;
 [[nodiscard]] FormatValidationResult validateFormat(QStringView format, QStringView value) noexcept;
 
 } // namespace json_query::json_schema::internal
-

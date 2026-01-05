@@ -35,12 +35,12 @@ namespace
 // ----------------------------------------------------------------------------
 struct SchemaTestCase
 {
-    QString     fileName;        // source file name
-    QString     groupDesc;       // test group description
-    QString     testDesc;        // individual test description
-    QJsonValue  schema;          // the schema to compile
-    QJsonValue  data;            // instance data to validate
-    bool        expectedValid;   // expected validation result
+    QString    fileName;      // source file name
+    QString    groupDesc;     // test group description
+    QString    testDesc;      // individual test description
+    QJsonValue schema;        // the schema to compile
+    QJsonValue data;          // instance data to validate
+    bool       expectedValid; // expected validation result
 };
 
 // Custom GoogleTest printer for readable test output
@@ -50,8 +50,7 @@ inline void PrintTo(const SchemaTestCase& tc, std::ostream* os)
         << "file='" << tc.fileName.toStdString() << "'"
         << ", group='" << tc.groupDesc.toStdString() << "'"
         << ", test='" << tc.testDesc.toStdString() << "'"
-        << ", expected=" << (tc.expectedValid ? "valid" : "invalid")
-        << "}";
+        << ", expected=" << (tc.expectedValid ? "valid" : "invalid") << "}";
 }
 
 // ----------------------------------------------------------------------------
@@ -74,7 +73,7 @@ static QList<SchemaTestCase> loadTestFile(const QString& filePath)
     }
 
     QJsonParseError parseError{};
-    const auto doc{QJsonDocument::fromJson(file.readAll(), &parseError)};
+    const auto      doc{QJsonDocument::fromJson(file.readAll(), &parseError)};
     if (parseError.error != QJsonParseError::NoError)
     {
         qWarning("JSON parse error in %s: %s", qPrintable(filePath), qPrintable(parseError.errorString()));
@@ -125,17 +124,19 @@ static QList<SchemaTestCase> loadTestFile(const QString& filePath)
 
 static QList<SchemaTestCase> collectAllTestCases()
 {
-    const QString baseDir{QStringLiteral(JSON_QUERY_SOURCE_DIR "/compliance/ietf-json-schema-draft-2020-12/tests/draft2020-12")};
+    const QString baseDir{
+        QStringLiteral(JSON_QUERY_SOURCE_DIR "/compliance/ietf-json-schema-draft-2020-12/tests/draft2020-12")};
 
     QList<SchemaTestCase> all{};
-    QDir dir{baseDir};
+    QDir                  dir{baseDir};
 
     if (!dir.exists())
     {
         qWarning("Test suite directory not found: %s", qPrintable(baseDir));
         qWarning("Expected location: compliance/ietf-json-schema-draft-2020-12/");
         qWarning("To add the submodule, run:");
-        qWarning("  git submodule add https://github.com/json-schema-org/JSON-Schema-Test-Suite.git compliance/ietf-json-schema-draft-2020-12");
+        qWarning("  git submodule add https://github.com/json-schema-org/JSON-Schema-Test-Suite.git "
+                 "compliance/ietf-json-schema-draft-2020-12");
         return all;
     }
 
@@ -143,7 +144,7 @@ static QList<SchemaTestCase> collectAllTestCases()
     while (it.hasNext())
     {
         const auto filePath{it.next()};
-        auto cases{loadTestFile(filePath)};
+        auto       cases{loadTestFile(filePath)};
         all.append(cases);
     }
 
@@ -200,10 +201,8 @@ TEST_P(IETFJsonSchemaTest, ValidatesPerSpec)
     }
 
     EXPECT_EQ(isValid, tc.expectedValid)
-        << "Test: " << tc.testDesc.toStdString()
-        << "\nGroup: " << tc.groupDesc.toStdString()
-        << "\nExpected: " << (tc.expectedValid ? "valid" : "invalid")
-        << "\nGot: " << (isValid ? "valid" : "invalid");
+        << "Test: " << tc.testDesc.toStdString() << "\nGroup: " << tc.groupDesc.toStdString()
+        << "\nExpected: " << (tc.expectedValid ? "valid" : "invalid") << "\nGot: " << (isValid ? "valid" : "invalid");
 }
 
 // Parameter instantiation -----------------------------------------------------
@@ -212,10 +211,11 @@ static QList<SchemaTestCase> g_allCases{collectAllTestCases()};
 INSTANTIATE_TEST_SUITE_P(IETF_JSONSchema,
                          IETFJsonSchemaTest,
                          ::testing::ValuesIn(g_allCases),
-                         [](const ::testing::TestParamInfo<SchemaTestCase>& info) {
+                         [](const ::testing::TestParamInfo<SchemaTestCase>& info)
+                         {
                              // Build unique test name: file_group_test_index
                              QString name{info.param.fileName};
-                             name = name.section(u'.', 0, 0);  // Remove .json extension
+                             name = name.section(u'.', 0, 0); // Remove .json extension
                              name += u"_"_qs + info.param.groupDesc.left(30);
                              name += u"_"_qs + QString::number(info.index);
 

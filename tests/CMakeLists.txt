@@ -33,8 +33,7 @@ option(JSON_QUERY_ENABLE_EXTENSION_TESTS
 
 option(ENABLE_FUZZ_TESTS "Enable LibFuzzer-based fuzz testing" OFF)
 
-option(JSON_QUERY_ENABLE_SCHEMA_TESTS
-       "Build JSON Schema validation tests" ON)
+option(JSON_QUERY_ENABLE_SCHEMA_TESTS "Build JSON Schema validation tests" ON)
 
 option(JSON_QUERY_ENABLE_IETF_JSON_SCHEMA_DRAFT_2020_12_TESTS
        "Build IETF JSON Schema Draft 2020-12 compliance tests" ON)
@@ -87,7 +86,8 @@ endif()
 
 # IETF JSON Schema Draft 2020-12 compliance tests
 if(JSON_QUERY_ENABLE_IETF_JSON_SCHEMA_DRAFT_2020_12_TESTS)
-  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/IETFJSONSchemaDraft2020_12Tests.cmake)
+  include(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/IETFJSONSchemaDraft2020_12Tests.cmake)
   add_ietf_json_schema_draft_2020_12_tests()
 endif()
 
@@ -130,8 +130,10 @@ if(JSON_QUERY_CREATE_AGGREGATE_TARGET)
     list(APPEND ALL_TEST_TARGETS json_schema_tests)
   endif()
 
-  if(JSON_QUERY_ENABLE_IETF_JSON_SCHEMA_DRAFT_2020_12_TESTS AND TARGET ietf_json_schema_draft_2020_12_compliance_tests)
-    list(APPEND ALL_TEST_TARGETS ietf_json_schema_draft_2020_12_compliance_tests)
+  if(JSON_QUERY_ENABLE_IETF_JSON_SCHEMA_DRAFT_2020_12_TESTS
+     AND TARGET ietf_json_schema_draft_2020_12_compliance_tests)
+    list(APPEND ALL_TEST_TARGETS
+         ietf_json_schema_draft_2020_12_compliance_tests)
   endif()
 
   if(ALL_TEST_TARGETS)
@@ -155,6 +157,9 @@ message(
 )
 message(STATUS "Fuzz Tests:      ${ENABLE_FUZZ_TESTS}")
 message(STATUS "Schema Tests:    ${JSON_QUERY_ENABLE_SCHEMA_TESTS}")
-message(STATUS "IETF JSON Schema Draft 2020-12: ${JSON_QUERY_ENABLE_IETF_JSON_SCHEMA_DRAFT_2020_12_TESTS}")
+message(
+  STATUS
+    "IETF JSON Schema Draft 2020-12: ${JSON_QUERY_ENABLE_IETF_JSON_SCHEMA_DRAFT_2020_12_TESTS}"
+)
 message(STATUS "Aggregate Target: ${JSON_QUERY_CREATE_AGGREGATE_TARGET}")
 message(STATUS "=============================================")

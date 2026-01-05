@@ -70,12 +70,9 @@ if(JSON_QUERY_FETCH_GPERFTOOLS)
     gperftools
     GIT_REPOSITORY https://github.com/gperftools/gperftools.git
     GIT_TAG master
-    CMAKE_ARGS
-      -DGPERFTOOLS_BUILD_CPU_PROFILER=${JSON_QUERY_GPERFTOOLS_CPU}
-      -DGPERFTOOLS_BUILD_HEAP_PROFILER=OFF
-      -DGPERFTOOLS_BUILD_DEBUGALLOC=OFF
-      -Dgperftools_build_minimal=OFF
-      -DBUILD_TESTING=OFF)
+    CMAKE_ARGS -DGPERFTOOLS_BUILD_CPU_PROFILER=${JSON_QUERY_GPERFTOOLS_CPU}
+    -DGPERFTOOLS_BUILD_HEAP_PROFILER=OFF -DGPERFTOOLS_BUILD_DEBUGALLOC=OFF
+    -Dgperftools_build_minimal=OFF -DBUILD_TESTING=OFF)
   FetchContent_MakeAvailable(gperftools)
 endif()
 
@@ -84,12 +81,15 @@ if(TARGET profiler)
   # Use fetched/built profiler target
   target_link_libraries(profile_test PRIVATE profiler)
   target_compile_definitions(profile_test PRIVATE HAVE_GPERFTOOLS)
-  # Upstream CMake uses directory-level include_directories; ensure headers are visible here
+  # Upstream CMake uses directory-level include_directories; ensure headers are
+  # visible here
   if(DEFINED gperftools_SOURCE_DIR)
-    target_include_directories(profile_test PRIVATE ${gperftools_SOURCE_DIR}/src)
+    target_include_directories(profile_test
+                               PRIVATE ${gperftools_SOURCE_DIR}/src)
   endif()
 else()
-  find_path(GPERFTOOLS_INCLUDE_DIR gperftools/profiler.h HINTS /opt/homebrew/include)
+  find_path(GPERFTOOLS_INCLUDE_DIR gperftools/profiler.h
+            HINTS /opt/homebrew/include)
   find_library(GPERFTOOLS_PROFILER_LIB profiler HINTS /opt/homebrew/lib)
   if(GPERFTOOLS_INCLUDE_DIR AND GPERFTOOLS_PROFILER_LIB)
     target_include_directories(profile_test PRIVATE ${GPERFTOOLS_INCLUDE_DIR})
@@ -107,9 +107,11 @@ if(TARGET profiler)
   target_compile_definitions(cache_analysis_tool PRIVATE HAVE_GPERFTOOLS)
   target_link_libraries(cache_analysis_tool PRIVATE profiler)
   if(DEFINED gperftools_SOURCE_DIR)
-    target_include_directories(cache_analysis_tool PRIVATE ${gperftools_SOURCE_DIR}/src)
+    target_include_directories(cache_analysis_tool
+                               PRIVATE ${gperftools_SOURCE_DIR}/src)
   endif()
-  message(STATUS "Using fetched gperftools profiler target for cache_analysis_tool")
+  message(
+    STATUS "Using fetched gperftools profiler target for cache_analysis_tool")
 else()
   # Find and link Google perftools (gperftools) - improved detection
   set(GPERFTOOLS_ROOT_DIR "/opt/homebrew/Cellar/gperftools/2.16")
@@ -125,7 +127,8 @@ else()
   find_path(
     GPERFTOOLS_INCLUDE_DIR
     NAMES gperftools/profiler.h
-    PATHS ${GPERFTOOLS_ROOT_DIR}/include /opt/homebrew/include /usr/local/include
+    PATHS ${GPERFTOOLS_ROOT_DIR}/include /opt/homebrew/include
+          /usr/local/include
     NO_DEFAULT_PATH)
 
   if(PROFILER_LIB AND GPERFTOOLS_INCLUDE_DIR)

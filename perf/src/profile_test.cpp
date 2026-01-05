@@ -10,7 +10,7 @@
 #include <QJsonArray>
 
 #ifdef HAVE_GPERFTOOLS
-#  include <gperftools/profiler.h>
+#include <gperftools/profiler.h>
 #endif
 
 using namespace json_query;
@@ -75,9 +75,9 @@ int main()
         // Profile evaluation
         auto start{high_resolution_clock::now()};
 
-        #ifdef HAVE_GPERFTOOLS
+#ifdef HAVE_GPERFTOOLS
         ProfilerStart("profile.prof");
-        #endif
+#endif
 
         for (int i = 0; i < iterations; ++i)
         {
@@ -87,9 +87,9 @@ int main()
             (void)dummy;
         }
 
-        #ifdef HAVE_GPERFTOOLS
+#ifdef HAVE_GPERFTOOLS
         ProfilerStop();
-        #endif
+#endif
 
         auto end{high_resolution_clock::now()};
         auto duration{duration_cast<nanoseconds>(end - start).count()};

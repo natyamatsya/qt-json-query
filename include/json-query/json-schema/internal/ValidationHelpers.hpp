@@ -42,10 +42,8 @@ namespace json_query::json_schema::internal
         if (arrA.size() != arrB.size())
             return false;
         for (const auto& [itemA, itemB] : std::views::zip(arrA, arrB))
-        {
             if (!jsonValuesEqual(itemA, itemB))
                 return false;
-        }
         return true;
     }
     case QJsonValue::Object:
@@ -55,10 +53,8 @@ namespace json_query::json_schema::internal
         if (objA.size() != objB.size())
             return false;
         for (auto it = objA.begin(); it != objA.end(); ++it)
-        {
             if (!objB.contains(it.key()) || !jsonValuesEqual(it.value(), objB[it.key()]))
                 return false;
-        }
         return true;
     }
     default:

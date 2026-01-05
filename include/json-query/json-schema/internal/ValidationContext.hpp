@@ -24,10 +24,7 @@ struct ValidateContext
      *
      * Returns false if stopOnFirstError is set and an error has been recorded.
      */
-    [[nodiscard]] bool shouldContinue() const noexcept
-    {
-        return !stopOnFirstError || result.isValid();
-    }
+    [[nodiscard]] bool shouldContinue() const noexcept { return !stopOnFirstError || result.isValid(); }
 };
 
 /**
@@ -37,10 +34,6 @@ struct ValidateContext
  * into the main validation dispatcher for recursive validation,
  * breaking the circular dependency.
  */
-using ValidateNodeFn = void(ValidateContext&,
-                            const SchemaNode&,
-                            const QJsonValue&,
-                            const QString&,
-                            const QString&);
+using ValidateNodeFn = void(ValidateContext&, const SchemaNode&, const QJsonValue&, const QString&, const QString&);
 
 } // namespace json_query::json_schema::internal

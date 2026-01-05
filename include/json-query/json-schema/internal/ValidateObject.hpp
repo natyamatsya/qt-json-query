@@ -90,7 +90,8 @@ inline void rejectAdditionalProperty(ValidateContext& ctx,
                                      const QString&   schemaPath)
 {
     const auto msg{QString(u"Additional property '%1' is not allowed").arg(propName)};
-    ctx.result.addError(propPath, schemaPath + u"/additionalProperties"_qs, msg, EvalError::AdditionalPropertiesInvalid);
+    ctx.result.addError(
+        propPath, schemaPath + u"/additionalProperties"_qs, msg, EvalError::AdditionalPropertiesInvalid);
 }
 
 /**
@@ -123,7 +124,8 @@ inline bool validateSingleProperty(ValidateContext&    ctx,
     {
         if (pattern.match(propName).hasMatch())
         {
-            validateNode(ctx, ctx.schema.nodeAt(schemaIndex), propValue, propPath, schemaPath + u"/patternProperties"_qs);
+            validateNode(
+                ctx, ctx.schema.nodeAt(schemaIndex), propValue, propPath, schemaPath + u"/patternProperties"_qs);
             evaluated = true;
         }
     }
@@ -166,7 +168,8 @@ inline void validateDependentRequired(ValidateContext&    ctx,
             if (!obj.contains(requiredProp))
             {
                 const auto msg{QString(u"Property '%1' requires '%2' to be present").arg(propName, requiredProp)};
-                ctx.result.addError(instancePath, schemaPath + u"/dependentRequired"_qs, msg, EvalError::RequiredMissing);
+                ctx.result.addError(
+                    instancePath, schemaPath + u"/dependentRequired"_qs, msg, EvalError::RequiredMissing);
             }
         }
     }

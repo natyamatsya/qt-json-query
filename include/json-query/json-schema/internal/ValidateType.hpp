@@ -44,10 +44,8 @@ inline void validateEnum(ValidateContext&  ctx,
                          const QString&    schemaPath)
 {
     for (const QJsonValue& allowed : enumValues)
-    {
         if (jsonValuesEqual(instance, allowed))
             return; // Match found
-    }
 
     ctx.result.addError(instancePath,
                         schemaPath + u"/enum"_qs,

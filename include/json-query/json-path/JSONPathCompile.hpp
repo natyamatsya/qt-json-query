@@ -632,13 +632,17 @@ struct Token
      */
     [[nodiscard]] bool evaluateEmbeddedFilter(const QJsonValue& value) const
     {
-        qDebug() << "DEBUG: evaluateEmbeddedFilter called for token key:" << key << "embeddedFilter:" << (embeddedFilter ? "set" : "null");
+        qDebug() << "DEBUG: evaluateEmbeddedFilter called for token key:" << key
+                 << "embeddedFilter:" << (embeddedFilter ? "set" : "null");
         qDebug() << "DEBUG: evaluateEmbeddedFilter value passed:" << value << "type:" << value.type();
-        if (embeddedFilter) {
+        if (embeddedFilter)
+        {
             bool result = embeddedFilter->evaluate(value);
             qDebug() << "DEBUG: evaluateEmbeddedFilter result:" << result;
             return result;
-        } else {
+        }
+        else
+        {
             qDebug() << "DEBUG: evaluateEmbeddedFilter returning false (no embeddedFilter)";
             return false;
         }

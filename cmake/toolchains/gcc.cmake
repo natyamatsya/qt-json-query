@@ -1,4 +1,5 @@
-# GCC Toolchain - Configures CMake to use GCC on Linux (and other Unix-like hosts)
+# GCC Toolchain - Configures CMake to use GCC on Linux (and other Unix-like
+# hosts)
 
 # Default target to host OS/arch unless cross-compiling
 if(NOT DEFINED CMAKE_SYSTEM_NAME)
@@ -9,11 +10,20 @@ if(NOT DEFINED CMAKE_SYSTEM_PROCESSOR)
 endif()
 
 # Locate GCC compilers
-find_program(GCC_CXX NAMES g++ c++ PATHS /usr/bin /usr/local/bin /bin)
-find_program(GCC_C NAMES gcc cc PATHS /usr/bin /usr/local/bin /bin)
+find_program(
+  GCC_CXX
+  NAMES g++ c++
+  PATHS /usr/bin /usr/local/bin /bin)
+find_program(
+  GCC_C
+  NAMES gcc cc
+  PATHS /usr/bin /usr/local/bin /bin)
 
 if(NOT GCC_CXX OR NOT GCC_C)
-  message(FATAL_ERROR "GCC not found. Please install GCC or set CMAKE_CXX_COMPILER/CMAKE_C_COMPILER manually.")
+  message(
+    FATAL_ERROR
+      "GCC not found. Please install GCC or set CMAKE_CXX_COMPILER/CMAKE_C_COMPILER manually."
+  )
 endif()
 
 # Set the compilers

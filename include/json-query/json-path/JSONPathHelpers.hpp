@@ -58,7 +58,7 @@ inline std::optional<std::pair<QString, QString>> splitTopLevel(QStringView sv, 
             }
             if (c == quoteChar)
             {
-                inQuote = false;
+                inQuote   = false;
                 quoteChar = QChar{};
             }
             continue; // ignore structural chars inside quotes
@@ -67,13 +67,13 @@ inline std::optional<std::pair<QString, QString>> splitTopLevel(QStringView sv, 
         // Not in quotes: track structural nesting
         if (c == u'\'')
         {
-            inQuote = true;
+            inQuote   = true;
             quoteChar = u'\'';
             continue;
         }
         if (c == u'"')
         {
-            inQuote = true;
+            inQuote   = true;
             quoteChar = u'"';
             continue;
         }
@@ -95,9 +95,10 @@ inline std::optional<std::pair<QString, QString>> splitTopLevel(QStringView sv, 
         {
             if (i + nDelim <= N && sv.mid(i, nDelim) == delim)
             {
-                auto left = QString(sv.left(i));
+                auto left  = QString(sv.left(i));
                 auto right = QString(sv.mid(i + nDelim));
-                qCDebug(jsonPathLog) << "splitTopLevel: found split at position" << i << "left=" << left << "right=" << right;
+                qCDebug(jsonPathLog) << "splitTopLevel: found split at position" << i << "left=" << left
+                                     << "right=" << right;
                 return std::pair<QString, QString>{left, right};
             }
         }
@@ -139,7 +140,7 @@ inline std::optional<std::vector<QString>> splitTopLevelMultiple(QStringView sv,
             }
             if (c == quoteChar)
             {
-                inQuote = false;
+                inQuote   = false;
                 quoteChar = QChar{};
             }
             continue;
@@ -147,13 +148,13 @@ inline std::optional<std::vector<QString>> splitTopLevelMultiple(QStringView sv,
 
         if (c == u'\'')
         {
-            inQuote = true;
+            inQuote   = true;
             quoteChar = u'\'';
             continue;
         }
         if (c == u'"')
         {
-            inQuote = true;
+            inQuote   = true;
             quoteChar = u'"';
             continue;
         }

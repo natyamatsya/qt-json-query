@@ -53,7 +53,7 @@ enum class EvalError : std::uint8_t
     NotFailed,
     IfThenElseFailed,
     FormatInvalid,         ///< Value does not match format pattern
-    FormatSemanticInvalid,  ///< Value matches pattern but fails semantic validation (e.g., Feb 30)
+    FormatSemanticInvalid, ///< Value matches pattern but fails semantic validation (e.g., Feb 30)
     ContentEncodingInvalid,
     UnevaluatedPropertiesInvalid,
     UnevaluatedItemsInvalid,

@@ -54,7 +54,7 @@ Status of This Memo
 
 
 Wright, et al.            Expires June 11, 2021                 [Page 1]
-
+
 Internet-Draft           JSON Schema Validation            December 2020
 
 
@@ -110,7 +110,7 @@ Table of Contents
 
 
 Wright, et al.            Expires June 11, 2021                 [Page 2]
-
+
 Internet-Draft           JSON Schema Validation            December 2020
 
 
@@ -166,7 +166,7 @@ Internet-Draft           JSON Schema Validation            December 2020
 
 
 Wright, et al.            Expires June 11, 2021                 [Page 3]
-
+
 Internet-Draft           JSON Schema Validation            December 2020
 
 
@@ -222,7 +222,7 @@ Internet-Draft           JSON Schema Validation            December 2020
 
 
 Wright, et al.            Expires June 11, 2021                 [Page 4]
-
+
 Internet-Draft           JSON Schema Validation            December 2020
 
 
@@ -278,7 +278,7 @@ Internet-Draft           JSON Schema Validation            December 2020
 
 
 Wright, et al.            Expires June 11, 2021                 [Page 5]
-
+
 Internet-Draft           JSON Schema Validation            December 2020
 
 
@@ -334,7 +334,7 @@ Internet-Draft           JSON Schema Validation            December 2020
 
 
 Wright, et al.            Expires June 11, 2021                 [Page 6]
-
+
 Internet-Draft           JSON Schema Validation            December 2020
 
 
@@ -390,7 +390,7 @@ Internet-Draft           JSON Schema Validation            December 2020
 
 
 Wright, et al.            Expires June 11, 2021                 [Page 7]
-
+
 Internet-Draft           JSON Schema Validation            December 2020
 
 
@@ -446,7 +446,7 @@ Internet-Draft           JSON Schema Validation            December 2020
 
 
 Wright, et al.            Expires June 11, 2021                 [Page 8]
-
+
 Internet-Draft           JSON Schema Validation            December 2020
 
 
@@ -502,7 +502,7 @@ Internet-Draft           JSON Schema Validation            December 2020
 
 
 Wright, et al.            Expires June 11, 2021                 [Page 9]
-
+
 Internet-Draft           JSON Schema Validation            December 2020
 
 
@@ -558,7 +558,7 @@ Internet-Draft           JSON Schema Validation            December 2020
 
 
 Wright, et al.            Expires June 11, 2021                [Page 10]
-
+
 Internet-Draft           JSON Schema Validation            December 2020
 
 
@@ -614,7 +614,7 @@ Internet-Draft           JSON Schema Validation            December 2020
 
 
 Wright, et al.            Expires June 11, 2021                [Page 11]
-
+
 Internet-Draft           JSON Schema Validation            December 2020
 
 
@@ -670,7 +670,7 @@ Internet-Draft           JSON Schema Validation            December 2020
 
 
 Wright, et al.            Expires June 11, 2021                [Page 12]
-
+
 Internet-Draft           JSON Schema Validation            December 2020
 
 
@@ -726,7 +726,7 @@ Internet-Draft           JSON Schema Validation            December 2020
 
 
 Wright, et al.            Expires June 11, 2021                [Page 13]
-
+
 Internet-Draft           JSON Schema Validation            December 2020
 
 
@@ -782,7 +782,7 @@ Internet-Draft           JSON Schema Validation            December 2020
 
 
 Wright, et al.            Expires June 11, 2021                [Page 14]
-
+
 Internet-Draft           JSON Schema Validation            December 2020
 
 
@@ -838,7 +838,7 @@ Internet-Draft           JSON Schema Validation            December 2020
 
 
 Wright, et al.            Expires June 11, 2021                [Page 15]
-
+
 Internet-Draft           JSON Schema Validation            December 2020
 
 
@@ -894,7 +894,7 @@ Internet-Draft           JSON Schema Validation            December 2020
 
 
 Wright, et al.            Expires June 11, 2021                [Page 16]
-
+
 Internet-Draft           JSON Schema Validation            December 2020
 
 
@@ -950,7 +950,7 @@ Internet-Draft           JSON Schema Validation            December 2020
 
 
 Wright, et al.            Expires June 11, 2021                [Page 17]
-
+
 Internet-Draft           JSON Schema Validation            December 2020
 
 
@@ -1006,7 +1006,7 @@ Internet-Draft           JSON Schema Validation            December 2020
 
 
 Wright, et al.            Expires June 11, 2021                [Page 18]
-
+
 Internet-Draft           JSON Schema Validation            December 2020
 
 
@@ -1062,7 +1062,7 @@ Internet-Draft           JSON Schema Validation            December 2020
 
 
 Wright, et al.            Expires June 11, 2021                [Page 19]
-
+
 Internet-Draft           JSON Schema Validation            December 2020
 
 
@@ -1118,7 +1118,7 @@ Internet-Draft           JSON Schema Validation            December 2020
 
 
 Wright, et al.            Expires June 11, 2021                [Page 20]
-
+
 Internet-Draft           JSON Schema Validation            December 2020
 
 
@@ -1174,7 +1174,7 @@ Internet-Draft           JSON Schema Validation            December 2020
 
 
 Wright, et al.            Expires June 11, 2021                [Page 21]
-
+
 Internet-Draft           JSON Schema Validation            December 2020
 
 
@@ -1230,7 +1230,7 @@ Internet-Draft           JSON Schema Validation            December 2020
 
 
 Wright, et al.            Expires June 11, 2021                [Page 22]
-
+
 Internet-Draft           JSON Schema Validation            December 2020
 
 
@@ -1286,7 +1286,7 @@ Internet-Draft           JSON Schema Validation            December 2020
 
 
 Wright, et al.            Expires June 11, 2021                [Page 23]
-
+
 Internet-Draft           JSON Schema Validation            December 2020
 
 
@@ -1342,7 +1342,7 @@ Internet-Draft           JSON Schema Validation            December 2020
 
 
 Wright, et al.            Expires June 11, 2021                [Page 24]
-
+
 Internet-Draft           JSON Schema Validation            December 2020
 
 
@@ -1398,7 +1398,7 @@ Internet-Draft           JSON Schema Validation            December 2020
 
 
 Wright, et al.            Expires June 11, 2021                [Page 25]
-
+
 Internet-Draft           JSON Schema Validation            December 2020
 
 
@@ -1454,7 +1454,7 @@ Appendix B.  Acknowledgments
 
 
 Wright, et al.            Expires June 11, 2021                [Page 26]
-
+
 Internet-Draft           JSON Schema Validation            December 2020
 
 
@@ -1510,7 +1510,7 @@ Appendix C.  ChangeLog
 
 
 Wright, et al.            Expires June 11, 2021                [Page 27]
-
+
 Internet-Draft           JSON Schema Validation            December 2020
 
 
@@ -1566,7 +1566,7 @@ Internet-Draft           JSON Schema Validation            December 2020
 
 
 Wright, et al.            Expires June 11, 2021                [Page 28]
-
+
 Internet-Draft           JSON Schema Validation            December 2020
 
 
@@ -1622,7 +1622,7 @@ Internet-Draft           JSON Schema Validation            December 2020
 
 
 Wright, et al.            Expires June 11, 2021                [Page 29]
-
+
 Internet-Draft           JSON Schema Validation            December 2020
 
 

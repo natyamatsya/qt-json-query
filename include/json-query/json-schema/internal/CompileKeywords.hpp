@@ -61,8 +61,7 @@ parseTypeKeyword(const QJsonValue& typeValue)
 /**
  * @brief Parse the 'enum' keyword
  */
-[[nodiscard]] inline std::expected<std::optional<QJsonArray>, QueryError>
-parseEnumKeyword(const QJsonValue& enumValue)
+[[nodiscard]] inline std::expected<std::optional<QJsonArray>, QueryError> parseEnumKeyword(const QJsonValue& enumValue)
 {
     if (enumValue.isUndefined())
         return std::nullopt;
@@ -90,8 +89,7 @@ parseEnumKeyword(const QJsonValue& enumValue)
 /**
  * @brief Parse numeric keywords (minimum, maximum, etc.)
  */
-[[nodiscard]] inline std::expected<std::optional<double>, QueryError>
-parseNumericKeyword(const QJsonValue& value)
+[[nodiscard]] inline std::expected<std::optional<double>, QueryError> parseNumericKeyword(const QJsonValue& value)
 {
     if (value.isUndefined())
         return std::nullopt;
@@ -105,8 +103,7 @@ parseNumericKeyword(const QJsonValue& value)
 /**
  * @brief Parse integer keywords (minLength, maxLength, minItems, etc.)
  */
-[[nodiscard]] inline std::expected<std::optional<std::size_t>, QueryError>
-parseIntegerKeyword(const QJsonValue& value)
+[[nodiscard]] inline std::expected<std::optional<std::size_t>, QueryError> parseIntegerKeyword(const QJsonValue& value)
 {
     if (value.isUndefined())
         return std::nullopt;

@@ -23,14 +23,12 @@ namespace json_query::json_pointer
     QString out{};
     out.reserve(token.size());
     for (const QChar c : token)
-    {
         if (c == u'~')
             out += u"~0"_qs;
         else if (c == u'/')
             out += u"~1"_qs;
         else
             out += c;
-    }
     return out;
 }
 

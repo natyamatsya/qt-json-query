@@ -42,35 +42,40 @@ namespace
 // - CTRE docs: https://compile-time-regular-expressions.readthedocs.io/
 // - PCRE syntax: https://www.pcre.org/current/doc/html/pcre2syntax.html
 // ============================================================================
-namespace patterns {
-    // Date/Time patterns (RFC 3339)
-    static constexpr ctll::fixed_string datePattern{R"(^[0-9]{4}-[0-9]{2}-[0-9]{2}$)"};
-    static constexpr ctll::fixed_string dateTimePattern{R"(^[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?([Zz]|[\+\-][0-9]{2}:[0-9]{2})$)"};
-    static constexpr ctll::fixed_string timePattern{R"(^[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?([Zz]|[\+\-][0-9]{2}:[0-9]{2})?$)"};
-    
-    // Email pattern (simplified RFC 5322) - use \- for literal hyphen
-    static constexpr ctll::fixed_string emailPattern{R"(^[a-zA-Z0-9._%\+\-]+@[a-zA-Z0-9][a-zA-Z0-9.\-]*[a-zA-Z0-9]$)"};
-    
-    // Hostname pattern (RFC 1123) - each label: start/end alphanumeric, hyphens in middle
-    // Pattern: (label.)* label where label = [a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?
-    static constexpr ctll::fixed_string hostnamePattern{R"(^([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)*[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?$)"};
-    
-    // IPv4 pattern - simplified, Qt validates semantics
-    static constexpr ctll::fixed_string ipv4Pattern{R"(^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$)"};
-    
-    // UUID pattern (RFC 4122)
-    static constexpr ctll::fixed_string uuidPattern{R"(^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$)"};
-    
-    // JSON Pointer patterns (RFC 6901) - ~ must be followed by 0 or 1
-    static constexpr ctll::fixed_string jsonPointerPattern{R"(^(/([^~/]|~[01])*)*$)"};
-    static constexpr ctll::fixed_string relativeJsonPointerPattern{R"(^[0-9]+(#|(/([^~/]|~[01])*)*)$)"};
-    
-    // URI template pattern (RFC 6570)
-    static constexpr ctll::fixed_string uriTemplatePattern{R"(^[^{}]*(\{[^{}]+\}[^{}]*)*$)"};
-}
+namespace patterns
+{
+// Date/Time patterns (RFC 3339)
+static constexpr ctll::fixed_string datePattern{R"(^[0-9]{4}-[0-9]{2}-[0-9]{2}$)"};
+static constexpr ctll::fixed_string dateTimePattern{
+    R"(^[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?([Zz]|[\+\-][0-9]{2}:[0-9]{2})$)"};
+static constexpr ctll::fixed_string timePattern{
+    R"(^[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?([Zz]|[\+\-][0-9]{2}:[0-9]{2})?$)"};
+
+// Email pattern (simplified RFC 5322) - use \- for literal hyphen
+static constexpr ctll::fixed_string emailPattern{R"(^[a-zA-Z0-9._%\+\-]+@[a-zA-Z0-9][a-zA-Z0-9.\-]*[a-zA-Z0-9]$)"};
+
+// Hostname pattern (RFC 1123) - each label: start/end alphanumeric, hyphens in middle
+// Pattern: (label.)* label where label = [a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?
+static constexpr ctll::fixed_string hostnamePattern{
+    R"(^([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)*[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?$)"};
+
+// IPv4 pattern - simplified, Qt validates semantics
+static constexpr ctll::fixed_string ipv4Pattern{R"(^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$)"};
+
+// UUID pattern (RFC 4122)
+static constexpr ctll::fixed_string uuidPattern{
+    R"(^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$)"};
+
+// JSON Pointer patterns (RFC 6901) - ~ must be followed by 0 or 1
+static constexpr ctll::fixed_string jsonPointerPattern{R"(^(/([^~/]|~[01])*)*$)"};
+static constexpr ctll::fixed_string relativeJsonPointerPattern{R"(^[0-9]+(#|(/([^~/]|~[01])*)*)$)"};
+
+// URI template pattern (RFC 6570)
+static constexpr ctll::fixed_string uriTemplatePattern{R"(^[^{}]*(\{[^{}]+\}[^{}]*)*$)"};
+} // namespace patterns
 
 // Helpers for returning differentiated format validation errors
-inline constexpr auto formatInvalid{std::unexpected(EvalError::FormatInvalid)};          // Pattern mismatch
+inline constexpr auto formatInvalid{std::unexpected(EvalError::FormatInvalid)};           // Pattern mismatch
 inline constexpr auto semanticInvalid{std::unexpected(EvalError::FormatSemanticInvalid)}; // Qt semantic check failed
 
 } // anonymous namespace
@@ -104,25 +109,25 @@ FormatValidationResult isTime(QStringView value) noexcept
     // CTRE pattern match
     if (!ctre::match<patterns::timePattern>(utils::to_sv(value.toString())))
         return formatInvalid;
-    
+
     // Manual range validation (hour 0-23, minute 0-59, second 0-59)
     const auto str{value.toString()};
     if (str.length() < 8)
         return formatInvalid;
-    
-    bool ok{};
+
+    bool       ok{};
     const auto hour{str.mid(0, 2).toInt(&ok)};
     if (!ok || hour > 23)
         return formatInvalid;
-    
+
     const auto minute{str.mid(3, 2).toInt(&ok)};
     if (!ok || minute > 59)
         return formatInvalid;
-    
+
     const auto second{str.mid(6, 2).toInt(&ok)};
     if (!ok || second > 59)
         return formatInvalid;
-    
+
     return {};
 }
 
@@ -259,10 +264,8 @@ static constexpr std::array kFormatTable{
 FormatValidationResult validateFormat(QStringView format, QStringView value) noexcept
 {
     for (const auto& [name, validator] : kFormatTable)
-    {
         if (format == name)
             return validator(value);
-    }
 
     // Unknown format - pass validation (per JSON Schema spec)
     return {};

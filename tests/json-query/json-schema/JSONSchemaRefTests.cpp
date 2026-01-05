@@ -91,10 +91,10 @@ TEST_F(JSONSchemaRefTest, RefToNestedDefinition)
 
     QJsonObject validAddress{};
     validAddress[u"street"_qs] = u"123 Main St"_qs;
-    validAddress[u"city"_qs] = u"Springfield"_qs;
+    validAddress[u"city"_qs]   = u"Springfield"_qs;
 
     QJsonObject valid{};
-    valid[u"billingAddress"_qs] = validAddress;
+    valid[u"billingAddress"_qs]  = validAddress;
     valid[u"shippingAddress"_qs] = validAddress;
     EXPECT_TRUE(schemaResult->validate(valid).isValid());
 
@@ -122,14 +122,14 @@ TEST_F(JSONSchemaRefTest, MultipleRefsToSameDefinition)
     ASSERT_TRUE(schemaResult.has_value());
 
     QJsonObject valid{};
-    valid[u"firstName"_qs] = u"John"_qs;
-    valid[u"lastName"_qs] = u"Doe"_qs;
+    valid[u"firstName"_qs]  = u"John"_qs;
+    valid[u"lastName"_qs]   = u"Doe"_qs;
     valid[u"middleName"_qs] = u"Q"_qs;
     EXPECT_TRUE(schemaResult->validate(valid).isValid());
 
     QJsonObject invalid{};
     invalid[u"firstName"_qs] = u"John"_qs;
-    invalid[u"lastName"_qs] = 42;
+    invalid[u"lastName"_qs]  = 42;
     EXPECT_FALSE(schemaResult->validate(invalid).isValid());
 }
 
@@ -184,7 +184,7 @@ TEST_F(JSONSchemaRefTest, RecursiveSchema)
     QJsonObject child2{};
     child2[u"name"_qs] = u"Grandchild"_qs;
 
-    QJsonArray children{};
+    QJsonArray  children{};
     QJsonObject child1{};
     child1[u"name"_qs] = u"Child"_qs;
     QJsonArray grandchildren{};
@@ -193,7 +193,7 @@ TEST_F(JSONSchemaRefTest, RecursiveSchema)
     children.append(child1);
 
     QJsonObject root{};
-    root[u"name"_qs] = u"Root"_qs;
+    root[u"name"_qs]     = u"Root"_qs;
     root[u"children"_qs] = children;
 
     EXPECT_TRUE(schemaResult->validate(root).isValid());
@@ -220,11 +220,11 @@ TEST_F(JSONSchemaRefTest, MutuallyRecursiveSchemas)
 
     QJsonObject node2{};
     node2[u"value"_qs] = 2;
-    node2[u"next"_qs] = node3;
+    node2[u"next"_qs]  = node3;
 
     QJsonObject node1{};
     node1[u"value"_qs] = 1;
-    node1[u"next"_qs] = node2;
+    node1[u"next"_qs]  = node2;
 
     EXPECT_TRUE(schemaResult->validate(node1).isValid());
 
@@ -289,7 +289,7 @@ TEST_F(JSONSchemaRefTest, RefInConditional)
     EXPECT_TRUE(schemaResult->validate(usValid).isValid());
 
     QJsonObject caValid{};
-    caValid[u"country"_qs] = u"CA"_qs;
+    caValid[u"country"_qs]    = u"CA"_qs;
     caValid[u"postalCode"_qs] = u"K1A 0B1"_qs;
     EXPECT_TRUE(schemaResult->validate(caValid).isValid());
 }
@@ -313,12 +313,12 @@ TEST_F(JSONSchemaRefTest, NestedRefs)
 
     QJsonObject valid{};
     valid[u"firstName"_qs] = u"John"_qs;
-    valid[u"lastName"_qs] = u"Doe"_qs;
+    valid[u"lastName"_qs]  = u"Doe"_qs;
     EXPECT_TRUE(schemaResult->validate(valid).isValid());
 
     QJsonObject invalid{};
     invalid[u"firstName"_qs] = 42;
-    invalid[u"lastName"_qs] = u"Doe"_qs;
+    invalid[u"lastName"_qs]  = u"Doe"_qs;
     EXPECT_FALSE(schemaResult->validate(invalid).isValid());
 }
 

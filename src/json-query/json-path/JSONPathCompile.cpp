@@ -358,55 +358,64 @@ std::optional<Token> compileEmbeddedFilter(const QString& expr)
 
     // Try embedded filter parsing functions in priority order (lowest precedence first)
     qCDebug(jsonPathLog) << "compileEmbeddedFilter: trying parseEmbeddedOr (lowest precedence)";
-    if (auto token = detail::parseEmbeddedOr(s)) {
+    if (auto token = detail::parseEmbeddedOr(s))
+    {
         qCDebug(jsonPathLog) << "compileEmbeddedFilter: parseEmbeddedOr succeeded, returning OR token";
         return token; // Lowest precedence
     }
-    
+
     qCDebug(jsonPathLog) << "compileEmbeddedFilter: trying parseEmbeddedAnd (higher precedence)";
-    if (auto token = detail::parseEmbeddedAnd(s)) {
+    if (auto token = detail::parseEmbeddedAnd(s))
+    {
         qCDebug(jsonPathLog) << "compileEmbeddedFilter: parseEmbeddedAnd succeeded, returning AND token";
         return token; // Higher precedence
     }
-    
+
     qCDebug(jsonPathLog) << "compileEmbeddedFilter: trying parseEmbeddedNot (negation)";
-    if (auto token = detail::parseEmbeddedNot(s)) {
+    if (auto token = detail::parseEmbeddedNot(s))
+    {
         qCDebug(jsonPathLog) << "compileEmbeddedFilter: parseEmbeddedNot succeeded";
         return token; // Negation
     }
-    
+
     qCDebug(jsonPathLog) << "compileEmbeddedFilter: trying parseEmbeddedIn (in operator)";
-    if (auto token = detail::parseEmbeddedIn(s)) {
+    if (auto token = detail::parseEmbeddedIn(s))
+    {
         qCDebug(jsonPathLog) << "compileEmbeddedFilter: parseEmbeddedIn succeeded";
         return token; // In operator
     }
-    
+
     qCDebug(jsonPathLog) << "compileEmbeddedFilter: trying parseEmbeddedExists (existence checks)";
-    if (auto token = detail::parseEmbeddedExists(s)) {
+    if (auto token = detail::parseEmbeddedExists(s))
+    {
         qCDebug(jsonPathLog) << "compileEmbeddedFilter: parseEmbeddedExists succeeded";
         return token; // Existence checks
     }
-    
+
     qCDebug(jsonPathLog) << "compileEmbeddedFilter: trying parseEmbeddedSelfCmp (self comparisons)";
-    if (auto token = detail::parseEmbeddedSelfCmp(s)) {
+    if (auto token = detail::parseEmbeddedSelfCmp(s))
+    {
         qCDebug(jsonPathLog) << "compileEmbeddedFilter: parseEmbeddedSelfCmp succeeded";
         return token; // Self comparisons
     }
-    
+
     qCDebug(jsonPathLog) << "compileEmbeddedFilter: trying parseEmbeddedFunction (function calls)";
-    if (auto token = detail::parseEmbeddedFunction(s)) {
+    if (auto token = detail::parseEmbeddedFunction(s))
+    {
         qCDebug(jsonPathLog) << "compileEmbeddedFilter: parseEmbeddedFunction succeeded";
         return token; // Function calls
     }
-    
+
     qCDebug(jsonPathLog) << "compileEmbeddedFilter: trying parseEmbeddedCompare (basic comparisons)";
-    if (auto token = detail::parseEmbeddedCompare(s)) {
+    if (auto token = detail::parseEmbeddedCompare(s))
+    {
         qCDebug(jsonPathLog) << "compileEmbeddedFilter: parseEmbeddedCompare succeeded";
         return token; // Basic comparisons
     }
-    
+
     qCDebug(jsonPathLog) << "compileEmbeddedFilter: trying parseEmbeddedRegex (regex patterns)";
-    if (auto token = detail::parseEmbeddedRegex(s)) {
+    if (auto token = detail::parseEmbeddedRegex(s))
+    {
         qCDebug(jsonPathLog) << "compileEmbeddedFilter: parseEmbeddedRegex succeeded";
         return token; // Regex patterns
     }

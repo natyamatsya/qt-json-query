@@ -84,10 +84,8 @@ inline void PrintTo(const CtsTestCase& tc, std::ostream* os)
         << "name='" << tc.name.toStdString() << "'"
         << ", selector='" << tc.selector.toStdString() << "'"
         << ", invalidSelector=" << (tc.invalidSelector ? "true" : "false")
-        << ", documentType="
-        << (tc.document.isArray() ? "array" : (tc.document.isObject() ? "object" : "other"))
-        << ", resultSets=" << tc.resultSets.size()
-        << "}";
+        << ", documentType=" << (tc.document.isArray() ? "array" : (tc.document.isObject() ? "object" : "other"))
+        << ", resultSets=" << tc.resultSets.size() << "}";
 }
 
 // ----------------------------------------------------------------------------
@@ -198,7 +196,7 @@ TEST_P(CtsJsonPathTest, EvaluatesPerSpec)
 
     const JSONPath& path = *maybePath;
     qDebug() << "DEBUG: About to evaluate with document";
-    auto            result{path.evaluate(doc)};
+    auto result{path.evaluate(doc)};
     qDebug() << "DEBUG: Evaluation result has_value:" << result.has_value();
     if (!result.has_value())
     {

@@ -13,10 +13,7 @@ namespace json_query::json_path::detail
 
 // Escapes a JSON Pointer segment according to RFC 6901 (~ -> ~0, / -> ~1)
 // Uses the shared implementation from json_pointer module
-inline QString escapePointerSegment(const QString& seg)
-{
-    return json_pointer::escapeToken(seg);
-}
+inline QString escapePointerSegment(const QString& seg) { return json_pointer::escapeToken(seg); }
 
 // Build a JSON Pointer string (without leading '/') from the token list starting at index 1
 // Returns empty string if any token kind is unsupported for pointer conversion.

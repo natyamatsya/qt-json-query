@@ -13,10 +13,7 @@ using namespace json_query::json_schema;
 class JSONSchemaBasicTest : public ::testing::Test
 {
   protected:
-    static QJsonObject parseSchema(const char* json)
-    {
-        return QJsonDocument::fromJson(json).object();
-    }
+    static QJsonObject parseSchema(const char* json) { return QJsonDocument::fromJson(json).object(); }
 };
 
 // ============================================================================
@@ -477,11 +474,11 @@ TEST_F(JSONSchemaBasicTest, OneOf)
     })"));
     ASSERT_TRUE(schemaResult.has_value());
 
-    EXPECT_TRUE(schemaResult->validate(QJsonValue(2)).isValid());   // 2 only
-    EXPECT_TRUE(schemaResult->validate(QJsonValue(3)).isValid());   // 3 only
-    EXPECT_TRUE(schemaResult->validate(QJsonValue(4)).isValid());   // 2 only
-    EXPECT_FALSE(schemaResult->validate(QJsonValue(6)).isValid());  // Both 2 and 3
-    EXPECT_FALSE(schemaResult->validate(QJsonValue(1)).isValid());  // Neither
+    EXPECT_TRUE(schemaResult->validate(QJsonValue(2)).isValid());  // 2 only
+    EXPECT_TRUE(schemaResult->validate(QJsonValue(3)).isValid());  // 3 only
+    EXPECT_TRUE(schemaResult->validate(QJsonValue(4)).isValid());  // 2 only
+    EXPECT_FALSE(schemaResult->validate(QJsonValue(6)).isValid()); // Both 2 and 3
+    EXPECT_FALSE(schemaResult->validate(QJsonValue(1)).isValid()); // Neither
 }
 
 TEST_F(JSONSchemaBasicTest, Not)
@@ -557,11 +554,11 @@ TEST_F(JSONSchemaBasicTest, MultipleErrors)
     })"));
     ASSERT_TRUE(schemaResult.has_value());
 
-    QJsonObject invalid{{"name", 123}};  // wrong type and missing age
+    QJsonObject invalid{{"name", 123}}; // wrong type and missing age
     auto        result = schemaResult->validate(QJsonValue(invalid));
 
     ASSERT_FALSE(result.isValid());
-    EXPECT_GE(result.errorCount(), 2u);  // At least type error + required error
+    EXPECT_GE(result.errorCount(), 2u); // At least type error + required error
 }
 
 // ============================================================================

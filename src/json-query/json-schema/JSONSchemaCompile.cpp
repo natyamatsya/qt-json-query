@@ -107,9 +107,10 @@ static constexpr std::array kMetadataOnlyKeys{
  */
 [[nodiscard]] bool hasValidationKeywords(const QJsonObject& schemaObj)
 {
-    return std::ranges::any_of(schemaObj.keys(), [](const QString& key)
-                               { return std::ranges::none_of(kMetadataOnlyKeys, [&](const char16_t* mk)
-                                                             { return key == mk; }); });
+    return std::ranges::any_of(
+        schemaObj.keys(),
+        [](const QString& key)
+        { return std::ranges::none_of(kMetadataOnlyKeys, [&](const char16_t* mk) { return key == mk; }); });
 }
 
 /**
@@ -220,8 +221,10 @@ void extractRootMetadata(const QJsonObject& rootObj, internal::CompiledSchema& c
 /**
  * @brief Compile definitions block ($defs or definitions)
  */
-[[nodiscard]] std::expected<void, QueryError>
-compileDefinitionsBlock(CompileContext& ctx, const QJsonObject& rootObj, const QString& keyword, const QString& pathPrefix)
+[[nodiscard]] std::expected<void, QueryError> compileDefinitionsBlock(CompileContext&    ctx,
+                                                                      const QJsonObject& rootObj,
+                                                                      const QString&     keyword,
+                                                                      const QString&     pathPrefix)
 {
     if (!rootObj.contains(keyword))
         return {};
@@ -246,7 +249,9 @@ compileDefinitionsBlock(CompileContext& ctx, const QJsonObject& rootObj, const Q
 /**
  * @brief Resolve a single $ref reference
  */
-void resolveReference(RefSchema& refNode, std::size_t rootIndex, const std::unordered_map<QString, std::size_t>& anchors)
+void resolveReference(RefSchema&                                      refNode,
+                      std::size_t                                     rootIndex,
+                      const std::unordered_map<QString, std::size_t>& anchors)
 {
     const auto& ref{refNode.originalRef};
 
@@ -296,10 +301,8 @@ void resolveReference(RefSchema& refNode, std::size_t rootIndex, const std::unor
 void resolveAllReferences(internal::CompiledSchema& compiled, const std::unordered_map<QString, std::size_t>& anchors)
 {
     for (auto& node : compiled.nodes)
-    {
         if (auto* refNode = std::get_if<RefSchema>(&node))
             resolveReference(*refNode, compiled.rootIndex, anchors);
-    }
 }
 
 } // anonymous namespace
@@ -315,7 +318,7 @@ std::expected<std::shared_ptr<internal::CompiledSchema>, QueryError> compileSche
         return std::unexpected(QueryError(ParseError::EmptySchema));
 
     // Initialize compilation context
-    auto compiled{std::make_shared<internal::CompiledSchema>()};
+    auto           compiled{std::make_shared<internal::CompiledSchema>()};
     CompileContext ctx{compiled->nodes, compiled->anchors, compiled->dynamicAnchors, {}, {}};
 
     // Phase 1: Extract metadata and compile definitions

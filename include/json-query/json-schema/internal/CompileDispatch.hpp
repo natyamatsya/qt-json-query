@@ -39,8 +39,8 @@ tryParseKeyword(const QJsonObject& obj, const QString& key, std::optional<T>& ta
 /**
  * @brief Compile string-related keywords (pattern, minLength, maxLength, format)
  */
-[[nodiscard]] inline std::expected<void, QueryError>
-compileStringKeywords(const QJsonObject& schemaObj, ObjectSchema& node)
+[[nodiscard]] inline std::expected<void, QueryError> compileStringKeywords(const QJsonObject& schemaObj,
+                                                                           ObjectSchema&      node)
 {
     if (auto r{parsePatternKeyword(schemaObj[u"pattern"_qs])}; !r)
         return std::unexpected(r.error());
@@ -67,8 +67,8 @@ compileStringKeywords(const QJsonObject& schemaObj, ObjectSchema& node)
 /**
  * @brief Compile numeric-related keywords (minimum, maximum, exclusiveMinimum, exclusiveMaximum, multipleOf)
  */
-[[nodiscard]] inline std::expected<void, QueryError>
-compileNumericKeywords(const QJsonObject& schemaObj, ObjectSchema& node)
+[[nodiscard]] inline std::expected<void, QueryError> compileNumericKeywords(const QJsonObject& schemaObj,
+                                                                            ObjectSchema&      node)
 {
     if (auto r{parseNumericKeyword(schemaObj[u"minimum"_qs])}; !r)
         return std::unexpected(r.error());
@@ -237,10 +237,8 @@ compileObjectKeywords(CompileContext& ctx, const QJsonObject& schemaObj, ObjectS
             {
                 std::vector<QString> requiredProps{};
                 for (const QJsonValue& req : it.value().toArray())
-                {
                     if (req.isString())
                         requiredProps.push_back(req.toString());
-                }
                 node.dependentRequired[it.key()] = std::move(requiredProps);
             }
         }
@@ -265,8 +263,10 @@ compileObjectKeywords(CompileContext& ctx, const QJsonObject& schemaObj, ObjectS
 /**
  * @brief Compile combinator keywords (allOf, anyOf, oneOf, not, if/then/else)
  */
-[[nodiscard]] inline std::expected<void, QueryError>
-compileCombinatorKeywords(CompileContext& ctx, const QJsonObject& schemaObj, ObjectSchema& node, CompileSchemaFn& compile)
+[[nodiscard]] inline std::expected<void, QueryError> compileCombinatorKeywords(CompileContext&    ctx,
+                                                                               const QJsonObject& schemaObj,
+                                                                               ObjectSchema&      node,
+                                                                               CompileSchemaFn&   compile)
 {
     // allOf
     if (schemaObj.contains(u"allOf"_qs) && schemaObj[u"allOf"_qs].isArray())
@@ -378,14 +378,14 @@ compileNestedDefs(CompileContext& ctx, const QJsonObject& schemaObj, CompileSche
 
 enum class KeywordCategory
 {
-    TypeConstraints,  // type, enum, const
-    StringKeywords,   // pattern, minLength, maxLength, format
-    NumericKeywords,  // minimum, maximum, exclusiveMinimum, exclusiveMaximum, multipleOf
-    ArrayKeywords,    // minItems, maxItems, uniqueItems, prefixItems, items, contains
-    ObjectKeywords,   // properties, required, additionalProperties, patternProperties, etc.
-    Combinators,      // allOf, anyOf, oneOf, not, if/then/else
-    Metadata,         // title, description
-    NestedDefs        // $defs processing
+    TypeConstraints, // type, enum, const
+    StringKeywords,  // pattern, minLength, maxLength, format
+    NumericKeywords, // minimum, maximum, exclusiveMinimum, exclusiveMaximum, multipleOf
+    ArrayKeywords,   // minItems, maxItems, uniqueItems, prefixItems, items, contains
+    ObjectKeywords,  // properties, required, additionalProperties, patternProperties, etc.
+    Combinators,     // allOf, anyOf, oneOf, not, if/then/else
+    Metadata,        // title, description
+    NestedDefs       // $defs processing
 };
 
 template <KeywordCategory Category>
@@ -518,12 +518,12 @@ struct KeywordDispatchTable<>
 
 // Full keyword dispatch chain
 using FullKeywordDispatcher = KeywordDispatchTable<KeywordCategory::TypeConstraints,
-                                                    KeywordCategory::StringKeywords,
-                                                    KeywordCategory::NumericKeywords,
-                                                    KeywordCategory::ArrayKeywords,
-                                                    KeywordCategory::ObjectKeywords,
-                                                    KeywordCategory::Combinators,
-                                                    KeywordCategory::Metadata,
-                                                    KeywordCategory::NestedDefs>;
+                                                   KeywordCategory::StringKeywords,
+                                                   KeywordCategory::NumericKeywords,
+                                                   KeywordCategory::ArrayKeywords,
+                                                   KeywordCategory::ObjectKeywords,
+                                                   KeywordCategory::Combinators,
+                                                   KeywordCategory::Metadata,
+                                                   KeywordCategory::NestedDefs>;
 
 } // namespace json_query::json_schema::internal
