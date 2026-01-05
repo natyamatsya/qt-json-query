@@ -50,8 +50,8 @@ target_include_directories(
          $<BUILD_INTERFACE:${ctre_SOURCE_DIR}/single-header>
          $<INSTALL_INTERFACE:include>)
 
-# Link QtCore (Qt JSON classes live here)
-target_link_libraries(json_query PUBLIC Qt6::Core)
+# Link QtCore (Qt JSON classes live here) and QtNetwork (for QHostAddress)
+target_link_libraries(json_query PUBLIC Qt6::Core Qt6::Network)
 
 # MSVC: Increase template instantiation depth for complex CTRE patterns
 # Applied only to files with deeply nested regex - avoids affecting other TUs

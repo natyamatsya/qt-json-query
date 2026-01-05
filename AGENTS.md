@@ -6,6 +6,20 @@ Guidelines for AI agents working on this codebase.
 
 **qt-json-query** is a C++23 library providing JSONPath (RFC 9535) and JSON Pointer (RFC 6901) implementations for Qt. It also includes JSON Schema validation support.
 
+## API Design Philosophy
+
+**This library is unreleased and pre-1.0. Backwards compatibility is not a concern.**
+
+The goal is to design a great, well-thought-out API for the initial public release. This means:
+
+- ✅ **Breaking changes are acceptable** - Focus on getting the API right, not maintaining compatibility
+- ✅ **Refactor freely** - Improve code structure, naming, and interfaces without hesitation
+- ✅ **Experiment with better designs** - Try `std::expected`, dispatch tables, and modern C++ patterns
+- ✅ **Optimize without constraints** - Performance improvements that change APIs are encouraged
+- ✅ **Learn from mistakes** - If an API design isn't working well, change it now before release
+
+**Once the library reaches v1.0 and goes public, we will maintain backwards compatibility. Until then, the focus is on quality over compatibility.**
+
 ## Build System
 
 - **CMake** with Ninja generator

@@ -27,7 +27,7 @@ option(WITH_REFACTORING_TOOLS "Build C++ modernization refactoring tools" OFF)
 # ---------------------------------------------------------------------------
 # Dependencies
 # ---------------------------------------------------------------------------
-find_package(Qt6 REQUIRED COMPONENTS Core)
+find_package(Qt6 REQUIRED COMPONENTS Core Network)
 
 # ---------------------------------------------------------------------------
 # Library target
