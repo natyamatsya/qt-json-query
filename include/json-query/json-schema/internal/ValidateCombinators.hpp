@@ -29,12 +29,12 @@ inline void validateCombinators(ValidateContext&    ctx,
     using json_query::literals::operator""_qt_s;
 
     // allOf: must match all schemas
-    for (const auto [i, schemaIndex] : std::views::enumerate(node.allOf))
+    for (std::size_t i{0}; i < node.allOf.size(); ++i)
     {
         if (!ctx.shouldContinue())
             break;
         validateNode(ctx,
-                     ctx.schema.nodeAt(schemaIndex),
+                     ctx.schema.nodeAt(node.allOf[i]),
                      instance,
                      instancePath,
                      schemaPath + u"/allOf/"_qt_s + QString::number(i));
@@ -44,12 +44,12 @@ inline void validateCombinators(ValidateContext&    ctx,
     if (!node.anyOf.empty())
     {
         bool anyValid{false};
-        for (const auto [i, schemaIndex] : std::views::enumerate(node.anyOf))
+        for (std::size_t i{0}; i < node.anyOf.size(); ++i)
         {
             ValidationResult tempResult{};
             ValidateContext  tempCtx{ctx.schema, tempResult, true};
             validateNode(tempCtx,
-                         ctx.schema.nodeAt(schemaIndex),
+                         ctx.schema.nodeAt(node.anyOf[i]),
                          instance,
                          instancePath,
                          schemaPath + u"/anyOf/"_qt_s + QString::number(i));
@@ -72,12 +72,12 @@ inline void validateCombinators(ValidateContext&    ctx,
     if (!node.oneOf.empty())
     {
         int matchCount{0};
-        for (const auto [i, schemaIndex] : std::views::enumerate(node.oneOf))
+        for (std::size_t i{0}; i < node.oneOf.size(); ++i)
         {
             ValidationResult tempResult{};
             ValidateContext  tempCtx{ctx.schema, tempResult, true};
             validateNode(tempCtx,
-                         ctx.schema.nodeAt(schemaIndex),
+                         ctx.schema.nodeAt(node.oneOf[i]),
                          instance,
                          instancePath,
                          schemaPath + u"/oneOf/"_qt_s + QString::number(i));
