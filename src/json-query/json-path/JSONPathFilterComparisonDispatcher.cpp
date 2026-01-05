@@ -6,7 +6,7 @@
 namespace json_query::json_path::detail
 {
 
-using utils::to_qstr;
+using utils::to_qt_s;
 using utils::to_sv;
 
 // ============================================================================
@@ -127,8 +127,8 @@ struct ComparisonTokenFactory<ComparisonFilterType::NullPropertyDot>
     {
         if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::NullPropertyDot>::pattern>(to_sv(s)))
         {
-            auto&& prop{to_qstr(m.template get<1>().to_view())};
-            auto&& op{to_qstr(m.template get<2>().to_view())};
+            auto&& prop{to_qt_s(m.template get<1>().to_view())};
+            auto&& op{to_qt_s(m.template get<2>().to_view())};
 
             Builder b{out};
             return b.add(
@@ -151,8 +151,8 @@ struct ComparisonTokenFactory<ComparisonFilterType::NullPropertyBracket>
     {
         if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::NullPropertyBracket>::pattern>(to_sv(s)))
         {
-            auto&& prop{to_qstr(m.template get<1>().to_view())};
-            auto&& op{to_qstr(m.template get<2>().to_view())};
+            auto&& prop{to_qt_s(m.template get<1>().to_view())};
+            auto&& op{to_qt_s(m.template get<2>().to_view())};
 
             Builder b{out};
             return b.add(
@@ -175,8 +175,8 @@ struct ComparisonTokenFactory<ComparisonFilterType::NullArrayIndex>
     {
         if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::NullArrayIndex>::pattern>(to_sv(s)))
         {
-            auto&& prop{to_qstr(m.template get<1>().to_view())};
-            auto&& op{to_qstr(m.template get<2>().to_view())};
+            auto&& prop{to_qt_s(m.template get<1>().to_view())};
+            auto&& op{to_qt_s(m.template get<2>().to_view())};
 
             Builder b{out};
             return b.add(
@@ -223,7 +223,7 @@ struct ComparisonTokenFactory<ComparisonFilterType::DirectSelf>
     {
         if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::DirectSelf>::pattern>(to_sv(s)))
         {
-            auto&& op{to_qstr(m.template get<1>().to_view())};
+            auto&& op{to_qt_s(m.template get<1>().to_view())};
 
             Builder b{out};
             return b.add([op = std::move(op)](const QJsonValue& j) { return performComparison(j, op, j); },
@@ -240,8 +240,8 @@ struct ComparisonTokenFactory<ComparisonFilterType::SelfPropertyDot>
     {
         if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::SelfPropertyDot>::pattern>(to_sv(s)))
         {
-            auto&& prop{to_qstr(m.template get<1>().to_view())};
-            auto&& op{to_qstr(m.template get<2>().to_view())};
+            auto&& prop{to_qt_s(m.template get<1>().to_view())};
+            auto&& op{to_qt_s(m.template get<2>().to_view())};
 
             Builder b{out};
             return b.add(
@@ -264,8 +264,8 @@ struct ComparisonTokenFactory<ComparisonFilterType::SelfPropertyBracket>
     {
         if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::SelfPropertyBracket>::pattern>(to_sv(s)))
         {
-            auto&& prop{to_qstr(m.template get<1>().to_view())};
-            auto&& op{to_qstr(m.template get<2>().to_view())};
+            auto&& prop{to_qt_s(m.template get<1>().to_view())};
+            auto&& op{to_qt_s(m.template get<2>().to_view())};
 
             Builder b{out};
             return b.add(
@@ -288,8 +288,8 @@ struct ComparisonTokenFactory<ComparisonFilterType::SelfArrayIndex>
     {
         if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::SelfArrayIndex>::pattern>(to_sv(s)))
         {
-            auto&& prop{to_qstr(m.template get<1>().to_view())};
-            auto&& op{to_qstr(m.template get<2>().to_view())};
+            auto&& prop{to_qt_s(m.template get<1>().to_view())};
+            auto&& op{to_qt_s(m.template get<2>().to_view())};
 
             Builder b{out};
             return b.add(
@@ -335,8 +335,8 @@ struct ComparisonTokenFactory<ComparisonFilterType::SelfValue>
     {
         if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::SelfValue>::pattern>(to_sv(s)))
         {
-            auto&& op{to_qstr(m.template get<1>().to_view())};
-            auto&& rhs{to_qstr(m.template get<2>().to_view())};
+            auto&& op{to_qt_s(m.template get<1>().to_view())};
+            auto&& rhs{to_qt_s(m.template get<2>().to_view())};
 
             // Parse RHS value using existing comparison context logic
             auto ctx{parseRhsValue(op, rhs)};
@@ -358,9 +358,9 @@ struct ComparisonTokenFactory<ComparisonFilterType::BasicPropertyDot>
     {
         if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::BasicPropertyDot>::pattern>(to_sv(s)))
         {
-            auto&& prop{to_qstr(m.template get<1>().to_view())};
-            auto&& op{to_qstr(m.template get<2>().to_view())};
-            auto&& rhs{to_qstr(m.template get<3>().to_view())};
+            auto&& prop{to_qt_s(m.template get<1>().to_view())};
+            auto&& op{to_qt_s(m.template get<2>().to_view())};
+            auto&& rhs{to_qt_s(m.template get<3>().to_view())};
 
             // Parse RHS value using existing comparison context logic
             auto ctx{parseRhsValue(op, rhs)};
@@ -388,9 +388,9 @@ struct ComparisonTokenFactory<ComparisonFilterType::BasicPropertyBracket>
     {
         if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::BasicPropertyBracket>::pattern>(to_sv(s)))
         {
-            auto&& prop{to_qstr(m.template get<1>().to_view())};
-            auto&& op{to_qstr(m.template get<2>().to_view())};
-            auto&& rhs{to_qstr(m.template get<3>().to_view())};
+            auto&& prop{to_qt_s(m.template get<1>().to_view())};
+            auto&& op{to_qt_s(m.template get<2>().to_view())};
+            auto&& rhs{to_qt_s(m.template get<3>().to_view())};
 
             // Parse RHS value using existing comparison context logic
             auto ctx{parseRhsValue(op, rhs)};
@@ -418,9 +418,9 @@ struct ComparisonTokenFactory<ComparisonFilterType::BasicArrayIndex>
     {
         if (auto m = ctre::match<ComparisonPatternDef<ComparisonFilterType::BasicArrayIndex>::pattern>(to_sv(s)))
         {
-            auto&& prop{to_qstr(m.template get<1>().to_view())};
-            auto&& op{to_qstr(m.template get<2>().to_view())};
-            auto&& rhs{to_qstr(m.template get<3>().to_view())};
+            auto&& prop{to_qt_s(m.template get<1>().to_view())};
+            auto&& op{to_qt_s(m.template get<2>().to_view())};
+            auto&& rhs{to_qt_s(m.template get<3>().to_view())};
 
             // Parse RHS value using existing comparison context logic
             auto ctx{parseRhsValue(op, rhs)};

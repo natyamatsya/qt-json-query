@@ -557,9 +557,9 @@ ComparisonMatchResult extractComparisonComponents(const QString& expr)
     static const auto absComparisonPat{ctre::match<R"(\$(\.[a-zA-Z_][a-zA-Z0-9_]*)*\s*(==|!=|<=|>=|<|>)\s*(.+))">};
     if (auto match = absComparisonPat(json_query::utils::to_sv(expr)))
     {
-        const QString leftPath  = QStringLiteral("$") + json_query::utils::to_qstr(match.get<1>().to_view());
-        const QString op        = json_query::utils::to_qstr(match.get<2>().to_view());
-        const QString rightExpr = json_query::utils::to_qstr(match.get<3>().to_view());
+        const QString leftPath  = QStringLiteral("$") + json_query::utils::to_qt_s(match.get<1>().to_view());
+        const QString op        = json_query::utils::to_qt_s(match.get<2>().to_view());
+        const QString rightExpr = json_query::utils::to_qt_s(match.get<3>().to_view());
 
         return {leftPath, op, rightExpr, true};
     }

@@ -14,7 +14,7 @@ namespace json_query::json_path::detail
 {
 
 using json_query::json_path::detail::parseJsonLiteral;
-using json_query::utils::to_qstr;
+using json_query::utils::to_qt_s;
 using json_query::utils::to_sv;
 
 // Helper function to evaluate function calls like length(@.a) or value($..c)
@@ -163,9 +163,9 @@ std::optional<Token> parseFunction(const QString& s, std::vector<FilterFn>& out)
 
     if (auto m = ctre::match<funcCompPat>(to_sv(s)))
     {
-        const auto left{to_qstr(m.template get<1>().to_view()).trimmed()};
-        const auto op{to_qstr(m.template get<2>().to_view())};
-        const auto right{to_qstr(m.template get<3>().to_view()).trimmed()};
+        const auto left{to_qt_s(m.template get<1>().to_view()).trimmed()};
+        const auto op{to_qt_s(m.template get<2>().to_view())};
+        const auto right{to_qt_s(m.template get<3>().to_view()).trimmed()};
 
         // Check if either side contains a function call
         auto leftHasFunc{left.contains("(") && left.contains(")")};

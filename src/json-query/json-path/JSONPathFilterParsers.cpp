@@ -16,7 +16,7 @@
 namespace json_query::json_path::detail
 {
 
-using utils::to_qstr;
+using utils::to_qt_s;
 using utils::to_sv;
 
 // Existence filter type enumeration for compile-time dispatch
@@ -144,7 +144,7 @@ struct ExistenceTokenFactory<ExistenceFilterType::PropertyDot>
         {
             if (auto m = ctre::match<ExistencePatternDef<ExistenceFilterType::PropertyDot>::pattern>(to_sv(input)))
             {
-                auto    prop = to_qstr(m.template get<1>().to_view());
+                auto    prop = to_qt_s(m.template get<1>().to_view());
                 Builder b{out};
                 return b.add([prop](const QJsonValue& j) -> bool { return j.toObject().contains(prop); },
                              QString("@.%1").arg(prop));
@@ -164,7 +164,7 @@ struct ExistenceTokenFactory<ExistenceFilterType::NegPropertyDot>
         {
             if (auto m = ctre::match<ExistencePatternDef<ExistenceFilterType::NegPropertyDot>::pattern>(to_sv(input)))
             {
-                auto    prop = to_qstr(m.template get<1>().to_view());
+                auto    prop = to_qt_s(m.template get<1>().to_view());
                 Builder b{out};
                 return b.add([prop](const QJsonValue& j) -> bool { return !j.toObject().contains(prop); },
                              QString("!@.%1").arg(prop));
@@ -184,7 +184,7 @@ struct ExistenceTokenFactory<ExistenceFilterType::PropertyBracket>
         {
             if (auto m = ctre::match<ExistencePatternDef<ExistenceFilterType::PropertyBracket>::pattern>(to_sv(input)))
             {
-                auto    prop = to_qstr(m.template get<1>().to_view());
+                auto    prop = to_qt_s(m.template get<1>().to_view());
                 Builder b{out};
                 return b.add([prop](const QJsonValue& j) -> bool { return j.toObject().contains(prop); },
                              QString("@[\"%1\"]").arg(prop));
@@ -205,7 +205,7 @@ struct ExistenceTokenFactory<ExistenceFilterType::NegPropertyBracket>
             if (auto m =
                     ctre::match<ExistencePatternDef<ExistenceFilterType::NegPropertyBracket>::pattern>(to_sv(input)))
             {
-                auto    prop = to_qstr(m.template get<1>().to_view());
+                auto    prop = to_qt_s(m.template get<1>().to_view());
                 Builder b{out};
                 return b.add([prop](const QJsonValue& j) -> bool { return !j.toObject().contains(prop); },
                              QString("!@[\"%1\"]").arg(prop));
@@ -225,8 +225,8 @@ struct ExistenceTokenFactory<ExistenceFilterType::ArraySlice>
         {
             if (auto m = ctre::match<ExistencePatternDef<ExistenceFilterType::ArraySlice>::pattern>(to_sv(input)))
             {
-                auto    startStr = to_qstr(m.template get<1>().to_view());
-                auto    endStr   = to_qstr(m.template get<2>().to_view());
+                auto    startStr = to_qt_s(m.template get<1>().to_view());
+                auto    endStr   = to_qt_s(m.template get<2>().to_view());
                 auto    start    = startStr.isEmpty() ? -1 : startStr.toInt();
                 auto    end      = endStr.isEmpty() ? -1 : endStr.toInt();
                 Builder b{out};
@@ -255,8 +255,8 @@ struct ExistenceTokenFactory<ExistenceFilterType::NegArraySlice>
         {
             if (auto m = ctre::match<ExistencePatternDef<ExistenceFilterType::NegArraySlice>::pattern>(to_sv(input)))
             {
-                auto    startStr = to_qstr(m.template get<1>().to_view());
-                auto    endStr   = to_qstr(m.template get<2>().to_view());
+                auto    startStr = to_qt_s(m.template get<1>().to_view());
+                auto    endStr   = to_qt_s(m.template get<2>().to_view());
                 auto    start    = startStr.isEmpty() ? -1 : startStr.toInt();
                 auto    end      = endStr.isEmpty() ? -1 : endStr.toInt();
                 Builder b{out};
@@ -285,7 +285,7 @@ struct ExistenceTokenFactory<ExistenceFilterType::MultiSelector>
         {
             if (auto m = ctre::match<ExistencePatternDef<ExistenceFilterType::MultiSelector>::pattern>(to_sv(input)))
             {
-                auto    selectorsStr = to_qstr(m.template get<1>().to_view());
+                auto    selectorsStr = to_qt_s(m.template get<1>().to_view());
                 Builder b{out};
                 return b.add(
                     [selectorsStr](const QJsonValue& j) -> bool
@@ -334,7 +334,7 @@ struct ExistenceTokenFactory<ExistenceFilterType::NegMultiSelector>
             if (auto m =
                     ctre::match<ExistencePatternDef<ExistenceFilterType::NegMultiSelector>::pattern>(to_sv(input)))
             {
-                auto    selectorsStr = to_qstr(m.template get<1>().to_view());
+                auto    selectorsStr = to_qt_s(m.template get<1>().to_view());
                 Builder b{out};
                 return b.add(
                     [selectorsStr](const QJsonValue& j) -> bool
@@ -382,7 +382,7 @@ struct ExistenceTokenFactory<ExistenceFilterType::NestedFilter>
         {
             if (auto m = ctre::match<ExistencePatternDef<ExistenceFilterType::NestedFilter>::pattern>(to_sv(input)))
             {
-                auto    filterExpr = to_qstr(m.template get<1>().to_view());
+                auto    filterExpr = to_qt_s(m.template get<1>().to_view());
                 Builder b{out};
                 return b.add(
                     [filterExpr](const QJsonValue& j) -> bool
@@ -419,7 +419,7 @@ struct ExistenceTokenFactory<ExistenceFilterType::NegNestedFilter>
         {
             if (auto m = ctre::match<ExistencePatternDef<ExistenceFilterType::NegNestedFilter>::pattern>(to_sv(input)))
             {
-                auto    filterExpr = to_qstr(m.template get<1>().to_view());
+                auto    filterExpr = to_qt_s(m.template get<1>().to_view());
                 Builder b{out};
                 return b.add(
                     [filterExpr](const QJsonValue& j) -> bool
@@ -531,7 +531,7 @@ std::optional<json_query::json_path::Token> parseSelfCmp(const QString&         
 
     if (auto m = ctre::match<pat>(to_sv(s)))
     {
-        const auto op = to_qstr(m.template get<1>().to_view());
+        const auto op = to_qt_s(m.template get<1>().to_view());
 
         Builder b{out};
         return b.add(
@@ -557,7 +557,7 @@ std::optional<json_query::json_path::Token> parseNot(const QString&             
     constexpr auto negParenPat = ctll::fixed_string{R"(^!\s*\(\s*(.*)\s*\)$)"};
     if (auto m = ctre::match<negParenPat>(to_sv(s)))
     {
-        auto                                         innerExpr = to_qstr(m.template get<1>().to_view()).trimmed();
+        auto                                         innerExpr = to_qt_s(m.template get<1>().to_view()).trimmed();
         std::vector<json_query::json_path::FilterFn> innerFilters;
         if (auto innerToken = json_query::json_path::compileFilter(innerExpr, innerFilters))
         {

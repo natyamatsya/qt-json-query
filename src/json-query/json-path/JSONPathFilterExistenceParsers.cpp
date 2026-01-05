@@ -12,7 +12,7 @@
 namespace json_query::json_path::detail
 {
 
-using json_query::utils::to_qstr;
+using json_query::utils::to_qt_s;
 using json_query::utils::to_sv;
 
 // ============================================================================
@@ -188,7 +188,7 @@ struct ExistencePatternStrategy<ExistencePatternType::NestedFilter>
         constexpr auto nestedFilterPat = ctll::fixed_string{R"(@\[\?(.+)\])"};
         if (auto m = ctre::match<nestedFilterPat>(to_sv(s)))
         {
-            auto&& filterExpr{to_qstr(m.template get<1>().to_view())};
+            auto&& filterExpr{to_qt_s(m.template get<1>().to_view())};
 
             Token token;
             token.kind = Token::Kind::Filter;
@@ -409,7 +409,7 @@ struct ExistencePatternStrategy<ExistencePatternType::AbsoluteComplex>
         constexpr auto absComplexPat = ctll::fixed_string{R"(\$\.\*\.([\w$]+))"};
         if (auto m = ctre::match<absComplexPat>(to_sv(s)))
         {
-            auto&& prop{to_qstr(m.template get<1>().to_view())};
+            auto&& prop{to_qt_s(m.template get<1>().to_view())};
 
             Token token;
             token.kind = Token::Kind::Filter;
@@ -452,7 +452,7 @@ struct ExistencePatternStrategy<ExistencePatternType::AbsoluteDot>
         constexpr auto absDotExistsPat = ctll::fixed_string{R"(\$\.([\w$]+))"};
         if (auto m = ctre::match<absDotExistsPat>(to_sv(s)))
         {
-            auto&& prop{to_qstr(m.template get<1>().to_view())};
+            auto&& prop{to_qt_s(m.template get<1>().to_view())};
 
             Token token;
             token.kind = Token::Kind::Filter;
@@ -480,7 +480,7 @@ struct ExistencePatternStrategy<ExistencePatternType::BasicDot>
         constexpr auto dotExistsPat = ctll::fixed_string{R"(@\.([\w$]+))"};
         if (auto m = ctre::match<dotExistsPat>(to_sv(s)))
         {
-            auto&& prop{to_qstr(m.template get<1>().to_view())};
+            auto&& prop{to_qt_s(m.template get<1>().to_view())};
             Token  token;
             token.kind = Token::Kind::Filter;
             token.key  = s;
@@ -518,7 +518,7 @@ struct ExistencePatternStrategy<ExistencePatternType::BracketProperty>
         constexpr auto brkExistsPat = ctll::fixed_string{R"(@\[['\"]([^'"]+)['\"]\])"};
         if (auto m = ctre::match<brkExistsPat>(to_sv(s)))
         {
-            auto&& prop{to_qstr(m.template get<1>().to_view())};
+            auto&& prop{to_qt_s(m.template get<1>().to_view())};
             Token  token;
             token.kind = Token::Kind::Filter;
             token.key  = s;
@@ -547,7 +547,7 @@ struct ExistencePatternStrategy<ExistencePatternType::IndexPattern>
         constexpr auto idxExistsPat = ctll::fixed_string{R"(@\[(-?\d+)\])"};
         if (auto m = ctre::match<idxExistsPat>(to_sv(s)))
         {
-            auto&&     indexStr{to_qstr(m.template get<1>().to_view())};
+            auto&&     indexStr{to_qt_s(m.template get<1>().to_view())};
             bool       ok;
             const auto index{indexStr.toInt(&ok)};
             if (!ok)
@@ -609,7 +609,7 @@ std::optional<Token> parseEmbeddedExists(const QString& s)
     // Try nested filter pattern first (most specific)
     if (auto m = ctre::match<nestedFilterPat>(to_sv(localS)))
     {
-        auto&& filterExpr{to_qstr(m.template get<1>().to_view())};
+        auto&& filterExpr{to_qt_s(m.template get<1>().to_view())};
 
         Token token;
         token.kind = Token::Kind::Filter;
@@ -796,7 +796,7 @@ std::optional<Token> parseEmbeddedExists(const QString& s)
 
     if (auto m = ctre::match<absComplexPat>(to_sv(localS)))
     {
-        auto&& prop{to_qstr(m.template get<1>().to_view())};
+        auto&& prop{to_qt_s(m.template get<1>().to_view())};
 
         Token token;
         token.kind = Token::Kind::Filter;
@@ -829,7 +829,7 @@ std::optional<Token> parseEmbeddedExists(const QString& s)
 
     if (auto m = ctre::match<absDotExistsPat>(to_sv(localS)))
     {
-        auto&& prop{to_qstr(m.template get<1>().to_view())};
+        auto&& prop{to_qt_s(m.template get<1>().to_view())};
 
         Token token;
         token.kind = Token::Kind::Filter;
@@ -848,7 +848,7 @@ std::optional<Token> parseEmbeddedExists(const QString& s)
     // Try basic property existence pattern: @.property
     if (auto m = ctre::match<dotExistsPat>(to_sv(localS)))
     {
-        auto&& prop{to_qstr(m.template get<1>().to_view())};
+        auto&& prop{to_qt_s(m.template get<1>().to_view())};
         Token  token;
         token.kind = Token::Kind::Filter;
         token.key  = localS;
@@ -868,7 +868,7 @@ std::optional<Token> parseEmbeddedExists(const QString& s)
     // Try bracket property existence pattern: @['property'] or @["property"]
     if (auto m = ctre::match<brkExistsPat>(to_sv(localS)))
     {
-        auto&& prop{to_qstr(m.template get<1>().to_view())};
+        auto&& prop{to_qt_s(m.template get<1>().to_view())};
         Token  token;
         token.kind = Token::Kind::Filter;
         token.key  = localS;
@@ -888,7 +888,7 @@ std::optional<Token> parseEmbeddedExists(const QString& s)
     // Try index existence pattern: @[index]
     if (auto m = ctre::match<idxExistsPat>(to_sv(localS)))
     {
-        auto&&     indexStr{to_qstr(m.template get<1>().to_view())};
+        auto&&     indexStr{to_qt_s(m.template get<1>().to_view())};
         bool       ok;
         const auto index{indexStr.toInt(&ok)};
         if (!ok)

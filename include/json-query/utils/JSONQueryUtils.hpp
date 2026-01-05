@@ -43,6 +43,6 @@ namespace json_query::utils
     return std::string_view{storage};
 }
 
-[[nodiscard]] inline QString to_qstr(std::string_view sv) { return std_string_view_to_qstring(sv); }
+[[nodiscard]] inline QString to_qt_s(std::string_view sv) { return std_string_view_to_qstring(sv); }
 
 } // namespace json_query::utils

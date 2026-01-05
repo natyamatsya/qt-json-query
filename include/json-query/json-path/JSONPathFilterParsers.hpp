@@ -26,7 +26,7 @@ struct Token;
 namespace json_query::json_path::detail
 {
 
-using json_query::utils::to_qstr;
+using json_query::utils::to_qt_s;
 using json_query::utils::to_sv;
 
 // Forward declarations

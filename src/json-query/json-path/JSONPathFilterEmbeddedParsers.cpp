@@ -25,7 +25,7 @@ using json_query::json_path::detail::parseRegex1;
 using json_query::json_path::detail::performComparison;
 using json_query::json_path::detail::splitTopLevel;
 using json_query::json_path::detail::stripOuterParens;
-using json_query::utils::to_qstr;
+using json_query::utils::to_qt_s;
 using json_query::utils::to_sv;
 
 // ============================================================================
@@ -77,8 +77,8 @@ std::optional<Token> parseIn(const QString& s, std::vector<FilterFn>& out)
     constexpr auto pat = ctll::fixed_string{R"('\s*([^']+?)\s*'\s+in\s+@\[['\"]([^'"]+)['\"]\])"};
     if (auto m = ctre::match<pat>(to_sv(s)))
     {
-        auto&& want{to_qstr(m.template get<1>().to_view())};
-        auto&& array{to_qstr(m.template get<2>().to_view())};
+        auto&& want{to_qt_s(m.template get<1>().to_view())};
+        auto&& array{to_qt_s(m.template get<2>().to_view())};
 
         Builder b{out};
         return b.add(
@@ -200,9 +200,9 @@ std::optional<Token> parseEmbeddedComparePropToProp(const QString& s)
 {
     if (auto m = ctre::match<Pattern>(to_sv(s)))
     {
-        auto&& leftProp{to_qstr(m.template get<1>().to_view())};
-        auto&& op{to_qstr(m.template get<2>().to_view())};
-        auto&& rightProp{to_qstr(m.template get<3>().to_view())};
+        auto&& leftProp{to_qt_s(m.template get<1>().to_view())};
+        auto&& op{to_qt_s(m.template get<2>().to_view())};
+        auto&& rightProp{to_qt_s(m.template get<3>().to_view())};
 
         Token token;
         token.kind = Token::Kind::Filter;
@@ -294,10 +294,10 @@ std::optional<Token> parseEmbeddedComparePropToArrayIdx(const QString& s)
 {
     if (auto m = ctre::match<Pattern>(to_sv(s)))
     {
-        auto&& leftProp{to_qstr(m.template get<1>().to_view())};
-        auto&& op{to_qstr(m.template get<2>().to_view())};
-        auto&& rightProp{to_qstr(m.template get<3>().to_view())};
-        auto&& rightIndex{to_qstr(m.template get<4>().to_view())};
+        auto&& leftProp{to_qt_s(m.template get<1>().to_view())};
+        auto&& op{to_qt_s(m.template get<2>().to_view())};
+        auto&& rightProp{to_qt_s(m.template get<3>().to_view())};
+        auto&& rightIndex{to_qt_s(m.template get<4>().to_view())};
 
         Token token;
         token.kind = Token::Kind::Filter;
@@ -421,9 +421,9 @@ std::optional<Token> parseEmbeddedCompare(const QString& s)
     // Try self-comparison pattern first (more specific)
     if (auto m = ctre::match<selfSelfPat>(to_sv(localS)))
     {
-        auto&& leftSide{to_qstr(m.template get<1>().to_view())};
-        auto&& op{to_qstr(m.template get<2>().to_view())};
-        auto&& rightSide{to_qstr(m.template get<3>().to_view())};
+        auto&& leftSide{to_qt_s(m.template get<1>().to_view())};
+        auto&& op{to_qt_s(m.template get<2>().to_view())};
+        auto&& rightSide{to_qt_s(m.template get<3>().to_view())};
 
         // Only handle true self-comparison where both sides are the same
         if (leftSide == rightSide)
@@ -564,9 +564,9 @@ std::optional<Token> parseEmbeddedFunction(const QString& s)
 
         if (auto m = ctre::match<funcCompPat>(to_sv(s)))
         {
-            auto left  = to_qstr(m.template get<1>().to_view()).trimmed();
-            auto op    = to_qstr(m.template get<2>().to_view());
-            auto right = to_qstr(m.template get<3>().to_view()).trimmed();
+            auto left  = to_qt_s(m.template get<1>().to_view()).trimmed();
+            auto op    = to_qt_s(m.template get<2>().to_view());
+            auto right = to_qt_s(m.template get<3>().to_view()).trimmed();
 
             auto leftHasFunc  = left.contains("(") && left.contains(")");
             auto rightHasFunc = right.contains("(") && right.contains(")");
@@ -736,9 +736,9 @@ std::optional<Token> parseEmbeddedFunction(const QString& s)
                 if (!m)
                     return false;
 
-                auto left  = to_qstr(m.template get<1>().to_view());
-                auto op    = to_qstr(m.template get<2>().to_view());
-                auto right = to_qstr(m.template get<3>().to_view());
+                auto left  = to_qt_s(m.template get<1>().to_view());
+                auto op    = to_qt_s(m.template get<2>().to_view());
+                auto right = to_qt_s(m.template get<3>().to_view());
 
                 auto leftHasFunc =
                     ctre::search<ctll::fixed_string{R"(\b(length|count|match|search|value)\s*\()"}>(to_sv(left));

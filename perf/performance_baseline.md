@@ -74,7 +74,7 @@ BM_Plain_Recursive                14386 ns        14378 ns        48205
 
 ### Phase 3: Local Variable Optimization with Move Semantics
 - Replaced `const auto&` (unsafe) with `auto&&` + `std::move()` (safe + fast)
-- Eliminated copies from `to_qstr()` temporary results
+- Eliminated copies from `to_qt_s()` temporary results
 - Maintained lifetime safety while achieving optimal performance
 
 ### ArrayPool Consistency Optimization

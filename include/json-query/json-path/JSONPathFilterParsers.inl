@@ -23,8 +23,8 @@ parseSelfValue(QString s, std::vector<FilterFn>& out)
 {
     if (const auto match = ctre::match<PAT>(to_sv(s)))
     {
-        const auto op  = to_qstr(match.template get<1>().to_view());
-        const auto rhs = to_qstr(match.template get<2>().to_view());
+        const auto op  = to_qt_s(match.template get<1>().to_view());
+        const auto rhs = to_qt_s(match.template get<2>().to_view());
 
         return parseRhsValue(op, rhs).and_then(
             [&](const ComparisonContext& ctx) -> std::optional<Token>
@@ -51,9 +51,9 @@ parseCompare1(QString s, std::vector<FilterFn>& out)
 {
     if (const auto match = ctre::match<PAT>(to_sv(s)))
     {
-        const auto prop = to_qstr(match.template get<1>().to_view());
-        const auto op   = to_qstr(match.template get<2>().to_view());
-        const auto rhs  = to_qstr(match.template get<3>().to_view());
+        const auto prop = to_qt_s(match.template get<1>().to_view());
+        const auto op   = to_qt_s(match.template get<2>().to_view());
+        const auto rhs  = to_qt_s(match.template get<3>().to_view());
 
         return parseRhsValue(op, rhs).and_then(
             [&](const ComparisonContext& ctx) -> std::optional<Token>
@@ -78,9 +78,9 @@ parseCompareIndex(QString s, std::vector<FilterFn>& out)
 {
     if (const auto match = ctre::match<PAT>(to_sv(s)))
     {
-        const auto prop = to_qstr(match.template get<1>().to_view());
-        const auto op   = to_qstr(match.template get<2>().to_view());
-        const auto rhs  = to_qstr(match.template get<3>().to_view());
+        const auto prop = to_qt_s(match.template get<1>().to_view());
+        const auto op   = to_qt_s(match.template get<2>().to_view());
+        const auto rhs  = to_qt_s(match.template get<3>().to_view());
 
         return parseRhsValue(op, rhs).and_then(
             [&](const ComparisonContext& ctx) -> std::optional<Token>
@@ -131,8 +131,8 @@ std::optional<Token> parseRegex1(QString s, std::vector<FilterFn>& out)
 {
     if (const auto match = ctre::match<PAT>(to_sv(s)))
     {
-        const auto prop = to_qstr(match.template get<1>().to_view());
-        auto pattern = to_qstr(match.template get<2>().to_view());
+        const auto prop = to_qt_s(match.template get<1>().to_view());
+        auto pattern = to_qt_s(match.template get<2>().to_view());
 
         // Validate regex pattern
         const QRegularExpression regex(pattern);
@@ -163,8 +163,8 @@ parseSelfCompare(QString s, std::vector<FilterFn>& out)
 {
     if (const auto match = ctre::match<PAT>(to_sv(s)))
     {
-        const auto prop = to_qstr(match.template get<1>().to_view());
-        const auto op   = to_qstr(match.template get<2>().to_view());
+        const auto prop = to_qt_s(match.template get<1>().to_view());
+        const auto op   = to_qt_s(match.template get<2>().to_view());
 
         Builder b{out};
         return b.add(
@@ -185,8 +185,8 @@ parseSelfCompareIndex(QString s, std::vector<FilterFn>& out)
 {
     if (const auto match = ctre::match<PAT>(to_sv(s)))
     {
-        const auto prop = to_qstr(match.template get<1>().to_view());
-        const auto op   = to_qstr(match.template get<2>().to_view());
+        const auto prop = to_qt_s(match.template get<1>().to_view());
+        const auto op   = to_qt_s(match.template get<2>().to_view());
 
         Builder b{out};
         return b.add(
@@ -234,8 +234,8 @@ parseNullCompare(QString s, std::vector<FilterFn>& out)
 {
     if (const auto match = ctre::match<PAT>(to_sv(s)))
     {
-        const auto prop = to_qstr(match.template get<1>().to_view());
-        const auto op   = to_qstr(match.template get<2>().to_view());
+        const auto prop = to_qt_s(match.template get<1>().to_view());
+        const auto op   = to_qt_s(match.template get<2>().to_view());
 
         Builder b{out};
         return b.add(
@@ -256,8 +256,8 @@ parseNullCompareIndex(QString s, std::vector<FilterFn>& out)
 {
     if (const auto match = ctre::match<PAT>(to_sv(s)))
     {
-        const auto prop = to_qstr(match.template get<1>().to_view());
-        const auto op   = to_qstr(match.template get<2>().to_view());
+        const auto prop = to_qt_s(match.template get<1>().to_view());
+        const auto op   = to_qt_s(match.template get<2>().to_view());
 
         Builder b{out};
         return b.add(
@@ -304,9 +304,9 @@ std::optional<Token> parseEmbeddedCompare1(const QString& s)
 {
     if (auto m = ctre::match<Pattern>(to_sv(s)))
     {
-        const auto prop = to_qstr(m.template get<1>().to_view());
-        const auto op   = to_qstr(m.template get<2>().to_view());
-        const auto rhs  = to_qstr(m.template get<3>().to_view());
+        const auto prop = to_qt_s(m.template get<1>().to_view());
+        const auto op   = to_qt_s(m.template get<2>().to_view());
+        const auto rhs  = to_qt_s(m.template get<3>().to_view());
 
         // Parse RHS value using existing comparison context logic
         auto ctx{parseRhsValue(op, rhs)};
@@ -336,9 +336,9 @@ std::optional<Token> parseEmbeddedCompareIndex(const QString& s)
 {
     if (auto m = ctre::match<Pattern>(to_sv(s)))
     {
-        const auto prop = to_qstr(m.template get<1>().to_view());
-        const auto op   = to_qstr(m.template get<2>().to_view());
-        const auto rhs  = to_qstr(m.template get<3>().to_view());
+        const auto prop = to_qt_s(m.template get<1>().to_view());
+        const auto op   = to_qt_s(m.template get<2>().to_view());
+        const auto rhs  = to_qt_s(m.template get<3>().to_view());
 
         // Parse RHS value using existing comparison context logic
         auto ctx{parseRhsValue(op, rhs)};
@@ -391,8 +391,8 @@ std::optional<Token> parseEmbeddedSelfValue(const QString& s)
 {
     if (auto m = ctre::match<Pattern>(to_sv(s)))
     {
-        const auto op  = to_qstr(m.template get<1>().to_view());
-        const auto rhs = to_qstr(m.template get<2>().to_view());
+        const auto op  = to_qt_s(m.template get<1>().to_view());
+        const auto rhs = to_qt_s(m.template get<2>().to_view());
 
         // Parse RHS value using existing comparison context logic
         auto ctx{parseRhsValue(op, rhs)};
@@ -416,8 +416,8 @@ std::optional<Token> parseEmbeddedRegex1(const QString& s)
 {
     if (auto m = ctre::match<Pattern>(to_sv(s)))
     {
-        const auto prop = to_qstr(m.template get<1>().to_view());
-        auto pattern = to_qstr(m.template get<2>().to_view());
+        const auto prop = to_qt_s(m.template get<1>().to_view());
+        auto pattern = to_qt_s(m.template get<2>().to_view());
 
         // Validate regex pattern
         const QRegularExpression regex(pattern);
