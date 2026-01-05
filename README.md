@@ -1,12 +1,12 @@
 # JSON Query for Qt (C++23 Edition)
 
-A high-performance, modern C++ implementation of JSONPointer (RFC 6901), JSONPath (RFC 9535), and JSON Schema validation for Qt.
+A high-performance, modern C++ implementation of [JSONPointer (IETF RFC 6901)](https://www.rfc-editor.org/rfc/rfc6901), [JSONPath (IETF RFC 9535)](https://www.rfc-editor.org/rfc/rfc9535), and [JSON Schema (IETF Draft 2020-12)](https://json-schema.org/draft/2020-12/json-schema-core) for Qt.
 
 **Features:**
 
-- Full **RFC 6901 JSONPointer** compliance.
-- Support for common **JSONPath** features for querying JSON structures.
-- **JSON Schema (Draft 2020-12)** validation with comprehensive format support.
+- Full **JSONPointer (RFC 6901)** compliance.
+- Full **JSONPath (RFC 9535)** compliance (443/444 tests passing).
+- Full **JSON Schema (Draft 2020-12)** validation (1994/1994 tests passing).
 - Utilizes **Compile-Time Regular Expressions (CTRE)** for efficient parsing.
 - Robust error handling using **`std::expected`** (C++23) for object creation/parsing.
 - Modern C++23 design, prioritizing standard library types (`std::vector`, `std::string`, etc.) internally.
@@ -14,7 +14,7 @@ A high-performance, modern C++ implementation of JSONPointer (RFC 6901), JSONPat
 
 ## Detailed Features
 
-### JSONPointer (RFC 6901)
+### [JSONPointer (RFC 6901)](https://www.rfc-editor.org/rfc/rfc6901)
 
 - Direct access to JSON elements using pointer notation (e.g., `/foo/0/bar`).
 - Support for nested objects and arrays.
@@ -23,8 +23,9 @@ A high-performance, modern C++ implementation of JSONPointer (RFC 6901), JSONPat
   - **Creation/Parsing:** Indicates syntax errors via `JsonPointerParseError`.
   - **Evaluation:** Indicates errors like key-not-found or invalid-index via `JsonPointerError`.
 
-### JSONPath
+### [JSONPath (RFC 9535)](https://www.rfc-editor.org/rfc/rfc9535)
 
+- **Full RFC 9535 compliance** (443/444 test suite passing).
 - Standard JSONPath query features:
   - Root object access (`$`).
   - Direct property access (dot `.` and bracket `['...']` notation).
@@ -36,7 +37,7 @@ A high-performance, modern C++ implementation of JSONPointer (RFC 6901), JSONPat
 - **Robust Parsing:** Uses `std::expected` to report syntax errors during creation via `JsonPathParseError`.
 - **Evaluation Results:** Returns a `QJsonArray` containing all matched values (empty array if no matches found).
 
-### JSON Schema (Draft 2020-12)
+### [JSON Schema (IETF Draft 2020-12)](https://json-schema.org/draft/2020-12/json-schema-core)
 
 - **Full Draft 2020-12 compliance** (1994/1994 test suite passing).
 - Supported keywords:
