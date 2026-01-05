@@ -69,11 +69,13 @@ jobs:
       - name: Run benchmarks (macOS)
         if: matrix.os == 'macos-latest'
         continue-on-error: true
+        shell: bash
         run: |
           if [ -f "./build/json_benchmark" ]; then
             ./build/json_benchmark --benchmark_format=json --benchmark_out=benchmarks-${{ matrix.os }}.json
           else
             echo "Benchmark executable not found, skipping benchmarks"
+            exit 0
           fi
 
       - name: Upload test results
