@@ -137,6 +137,33 @@ struct ObjectSchema {
 };
 ```
 
+### 8. Avoid Raw Index-Based For Loops
+
+Prefer range-based for loops, algorithms, or `std::views` over raw index-based iteration:
+
+```cpp
+// ✅ Correct - range-based for
+for (const auto& item : container)
+    process(item);
+
+// ✅ Correct - algorithm
+std::ranges::any_of(container, predicate);
+
+// ✅ Correct - indexed iteration with enumerate (C++23)
+for (auto [i, item] : std::views::enumerate(container))
+    process(i, item);
+
+// ❌ Avoid - raw index loop
+for (std::size_t i = 0; i < container.size(); ++i)
+    process(container[i]);
+
+// ❌ Avoid - C-style index loop
+for (int i = 0; i < arr.size(); ++i)
+    process(arr[i]);
+```
+
+When index access is truly needed (e.g., comparing adjacent elements), prefer `std::views::enumerate` or document why the raw loop is necessary.
+
 ## Formatting
 
 Run clang-format before committing:

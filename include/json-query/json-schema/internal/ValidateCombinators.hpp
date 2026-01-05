@@ -8,6 +8,7 @@
 
 #include <QJsonValue>
 #include <QString>
+#include <ranges>
 
 namespace json_query::json_schema::internal
 {
@@ -25,28 +26,27 @@ inline void validateCombinators(ValidateContext&    ctx,
                                 ValidateNodeFn&     validateNode)
 {
     // allOf: must match all schemas
-    if (!node.allOf.empty())
+    for (const auto [i, schemaIndex] : std::views::enumerate(node.allOf))
     {
-        for (std::size_t i = 0; i < node.allOf.size() && ctx.shouldContinue(); ++i)
-        {
-            validateNode(ctx,
-                         ctx.schema.nodeAt(node.allOf[i]),
-                         instance,
-                         instancePath,
-                         schemaPath + u"/allOf/"_qs + QString::number(i));
-        }
+        if (!ctx.shouldContinue())
+            break;
+        validateNode(ctx,
+                     ctx.schema.nodeAt(schemaIndex),
+                     instance,
+                     instancePath,
+                     schemaPath + u"/allOf/"_qs + QString::number(i));
     }
 
     // anyOf: must match at least one schema
     if (!node.anyOf.empty())
     {
         bool anyValid{false};
-        for (std::size_t i = 0; i < node.anyOf.size(); ++i)
+        for (const auto [i, schemaIndex] : std::views::enumerate(node.anyOf))
         {
             ValidationResult tempResult{};
             ValidateContext  tempCtx{ctx.schema, tempResult, true};
             validateNode(tempCtx,
-                         ctx.schema.nodeAt(node.anyOf[i]),
+                         ctx.schema.nodeAt(schemaIndex),
                          instance,
                          instancePath,
                          schemaPath + u"/anyOf/"_qs + QString::number(i));
@@ -69,12 +69,12 @@ inline void validateCombinators(ValidateContext&    ctx,
     if (!node.oneOf.empty())
     {
         int matchCount{0};
-        for (std::size_t i = 0; i < node.oneOf.size(); ++i)
+        for (const auto [i, schemaIndex] : std::views::enumerate(node.oneOf))
         {
             ValidationResult tempResult{};
             ValidateContext  tempCtx{ctx.schema, tempResult, true};
             validateNode(tempCtx,
-                         ctx.schema.nodeAt(node.oneOf[i]),
+                         ctx.schema.nodeAt(schemaIndex),
                          instance,
                          instancePath,
                          schemaPath + u"/oneOf/"_qs + QString::number(i));

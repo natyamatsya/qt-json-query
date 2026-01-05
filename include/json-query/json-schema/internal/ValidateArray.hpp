@@ -9,6 +9,7 @@
 
 #include <QJsonArray>
 #include <QString>
+#include <ranges>
 
 namespace json_query::json_schema::internal
 {
@@ -59,22 +60,27 @@ inline void validateArray(ValidateContext&    ctx,
     }
 
     // Validate prefixItems
-    for (std::size_t i = 0; i < node.prefixItems.size() && static_cast<int>(i) < arr.size() && ctx.shouldContinue();
-         ++i)
+    for (const auto [i, schemaIndex] : std::views::enumerate(node.prefixItems))
     {
+        if (i >= arr.size() || !ctx.shouldContinue())
+            break;
         const auto itemPath{instancePath + u"/"_qs + QString::number(i)};
         const auto itemSchemaPath{schemaPath + u"/prefixItems/"_qs + QString::number(i)};
-        validateNode(ctx, ctx.schema.nodeAt(node.prefixItems[i]), arr[static_cast<int>(i)], itemPath, itemSchemaPath);
+        validateNode(ctx, ctx.schema.nodeAt(schemaIndex), arr[static_cast<int>(i)], itemPath, itemSchemaPath);
     }
 
     // Validate items (for elements after prefixItems)
     if (node.items)
     {
         const auto startIndex{node.prefixItems.size()};
-        for (int i = static_cast<int>(startIndex); i < arr.size() && ctx.shouldContinue(); ++i)
+        for (const auto [i, item] : std::views::enumerate(arr))
         {
+            if (static_cast<std::size_t>(i) < startIndex)
+                continue;
+            if (!ctx.shouldContinue())
+                break;
             const auto itemPath{instancePath + u"/"_qs + QString::number(i)};
-            validateNode(ctx, ctx.schema.nodeAt(*node.items), arr[i], itemPath, schemaPath + u"/items"_qs);
+            validateNode(ctx, ctx.schema.nodeAt(*node.items), item, itemPath, schemaPath + u"/items"_qs);
         }
     }
 
@@ -82,13 +88,13 @@ inline void validateArray(ValidateContext&    ctx,
     if (node.contains)
     {
         bool found{false};
-        for (int i = 0; i < arr.size(); ++i)
+        for (const auto [i, item] : std::views::enumerate(arr))
         {
             ValidationResult tempResult{};
             ValidateContext  tempCtx{ctx.schema, tempResult, true};
             validateNode(tempCtx,
                          ctx.schema.nodeAt(*node.contains),
-                         arr[i],
+                         item,
                          instancePath + u"/"_qs + QString::number(i),
                          schemaPath + u"/contains"_qs);
             if (tempResult.isValid())

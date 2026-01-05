@@ -5,6 +5,7 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QJsonValue>
+#include <ranges>
 
 namespace json_query::json_schema::internal
 {
@@ -40,9 +41,9 @@ namespace json_query::json_schema::internal
         const auto arrB{b.toArray()};
         if (arrA.size() != arrB.size())
             return false;
-        for (int i = 0; i < arrA.size(); ++i)
+        for (const auto& [itemA, itemB] : std::views::zip(arrA, arrB))
         {
-            if (!jsonValuesEqual(arrA[i], arrB[i]))
+            if (!jsonValuesEqual(itemA, itemB))
                 return false;
         }
         return true;
