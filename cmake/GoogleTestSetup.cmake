@@ -14,3 +14,11 @@ set(gtest_force_shared_crt
     ON
     CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
+
+# Suppress -Wundef warnings from GoogleTest headers when using Clang
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  target_compile_options(gtest PRIVATE -Wno-undef)
+  target_compile_options(gtest_main PRIVATE -Wno-undef)
+  target_compile_options(gmock PRIVATE -Wno-undef)
+  target_compile_options(gmock_main PRIVATE -Wno-undef)
+endif()
