@@ -10,19 +10,7 @@ using namespace Qt::StringLiterals;
 namespace json_query::json_path::detail
 {
 
-QString escapePointerSegment(const QString& seg)
-{
-    QString out;
-    out.reserve(seg.size());
-    for (QChar c : seg)
-        if (c == u'~')
-            out += QStringLiteral("~0");
-        else if (c == u'/')
-            out += QStringLiteral("~1");
-        else
-            out += c;
-    return out;
-}
+// escapePointerSegment is now inline in the header, delegating to json_pointer::escapeToken
 
 QString tokensToPointer(QStringList& segments, const std::vector<Token>& tokens)
 {

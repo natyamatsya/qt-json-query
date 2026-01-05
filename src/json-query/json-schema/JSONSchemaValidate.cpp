@@ -4,6 +4,7 @@
 #include "json-query/json-schema/JSONSchemaError.hpp"
 #include "json-query/json-schema/internal/FormatValidators.hpp"
 #include "json-query/json-schema/internal/SchemaNode.hpp"
+#include "json-query/json-pointer/JSONPointerUtils.hpp"
 
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonObject>
@@ -368,7 +369,7 @@ void validateObject(ValidateContext&    ctx,
     for (auto it = obj.begin(); it != obj.end() && ctx.shouldContinue(); ++it)
     {
         const QString& propName = it.key();
-        const auto     propPath{instancePath + u"/"_qs + propName};
+        const auto propPath{json_pointer::appendToken(instancePath, propName)};
         bool           evaluated = false;
 
         // Check properties
@@ -379,7 +380,7 @@ void validateObject(ValidateContext&    ctx,
                          ctx.schema.nodeAt(propIt->second),
                          it.value(),
                          propPath,
-                         schemaPath + u"/properties/"_qs + propName);
+                         json_pointer::appendToken(schemaPath + u"/properties"_qs, propName));
             evaluated = true;
         }
 
@@ -452,7 +453,7 @@ void validateObject(ValidateContext&    ctx,
                          ctx.schema.nodeAt(schemaIndex),
                          obj,
                          instancePath,
-                         schemaPath + u"/dependentSchemas/"_qs + propName);
+                         json_pointer::appendToken(schemaPath + u"/dependentSchemas"_qs, propName));
         }
     }
 }
