@@ -5,10 +5,14 @@
 #include "json-query/json-schema/internal/SchemaNode.hpp"
 #include "json-query/json-schema/internal/CompileContext.hpp"
 #include "json-query/json-schema/internal/CompileKeywords.hpp"
+#include "json-query/json-schema/internal/CompileDispatch.hpp"
 
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonObject>
 #include <QtCore/QRegularExpression>
+
+#include <array>
+#include <ranges>
 
 namespace json_query::json_schema
 {
@@ -91,11 +95,11 @@ std::expected<std::optional<std::size_t>, QueryError> compileOptionalSchema(Comp
 }
 
 /**
- * @brief Compile a single schema node (recursive)
+ * @brief Compile a single schema node (recursive) - TableGen-inspired dispatch architecture
  */
 std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, const QJsonValue& schemaValue)
 {
-    // Boolean schema
+    // Fast path: Boolean schema
     if (schemaValue.isBool())
         return ctx.addNode(BooleanSchema{schemaValue.toBool()});
 
@@ -105,315 +109,61 @@ std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, co
 
     const auto schemaObj{schemaValue.toObject()};
 
-    // Save current base URI to restore after processing this subschema
+    // RAII-style base URI management
     const auto savedBaseUri{ctx.baseUri};
+    struct BaseUriRestorer
+    {
+        CompileContext& ctx;
+        const QString&  saved;
+        ~BaseUriRestorer() { ctx.baseUri = saved; }
+    } restorer{ctx, savedBaseUri};
 
     // Handle $id - changes the base URI for this subschema and descendants
     if (schemaObj.contains(u"$id"_qs) && schemaObj[u"$id"_qs].isString())
-    {
         ctx.baseUri = schemaObj[u"$id"_qs].toString();
-    }
 
     // Handle $anchor registration (scoped to current base URI)
     std::optional<QString> anchorName{};
     if (schemaObj.contains(u"$anchor"_qs) && schemaObj[u"$anchor"_qs].isString())
-    {
         anchorName = schemaObj[u"$anchor"_qs].toString();
-    }
 
-    // In Draft 2020-12, $ref can be combined with other keywords
-    // If $ref is present without other keywords, use RefSchema
-    // If $ref is present with other keywords, we need to create an allOf with the ref and the additional constraints
+    // Fast path: $ref without other keywords → simple RefSchema
     const auto hasRef{schemaObj.contains(u"$ref"_qs)};
-    const auto refString{hasRef ? schemaObj[u"$ref"_qs].toString() : QString{}};
-    
-    // Check if there are other keywords besides $ref, $anchor, $id, $schema, $defs, title, description
-    const auto hasOtherKeywords{[&]() {
-        for (const auto& key : schemaObj.keys())
-        {
-            if (key != u"$ref"_qs && key != u"$anchor"_qs && key != u"$id"_qs && 
-                key != u"$schema"_qs && key != u"$defs"_qs && key != u"definitions"_qs &&
-                key != u"title"_qs && key != u"description"_qs && key != u"$comment"_qs)
-            {
-                return true;
-            }
-        }
-        return false;
-    }()};
-
-    // If $ref is present without other keywords, create a simple RefSchema
-    if (hasRef && !hasOtherKeywords)
+    if (hasRef)
     {
-        ctx.baseUri = savedBaseUri;  // Restore before returning
-        return ctx.addNode(RefSchema{0, refString});
+        const auto refString{schemaObj[u"$ref"_qs].toString()};
+
+        // Check for other validation keywords
+        static constexpr std::array metadataKeys{
+            u"$ref", u"$anchor", u"$id", u"$schema", u"$defs", u"definitions", u"title", u"description", u"$comment"};
+
+        const auto hasOtherKeywords{std::ranges::any_of(schemaObj.keys(), [](const QString& key)
+                                                        { return std::ranges::none_of(metadataKeys, [&](const char16_t* mk)
+                                                                                       { return key == mk; }); })};
+
+        if (!hasOtherKeywords)
+            return ctx.addNode(RefSchema{0, refString});
     }
 
+    // ────────────────────────────────────────────────────────────────────────
+    // TableGen-inspired dispatch: compile all keyword categories
+    // ────────────────────────────────────────────────────────────────────────
     ObjectSchema node{};
-    
-    // If $ref is present with other keywords, add the ref to allOf
-    if (hasRef && hasOtherKeywords)
+
+    // If $ref with other keywords, add ref to allOf (Draft 2020-12 behavior)
+    if (hasRef)
     {
-        // Create a ref node for the reference
-        const auto refNodeIndex{ctx.addNode(RefSchema{0, refString})};
+        const auto refNodeIndex{ctx.addNode(RefSchema{0, schemaObj[u"$ref"_qs].toString()})};
         node.allOf.push_back(refNodeIndex);
     }
 
-    // Type constraint
-    auto typeResult{parseTypeKeyword(schemaObj[u"type"_qs])};
-    if (!typeResult)
-        return std::unexpected(typeResult.error());
-    node.type = *typeResult;
-
-    // Enum constraint
-    auto enumResult{parseEnumKeyword(schemaObj[u"enum"_qs])};
-    if (!enumResult)
-        return std::unexpected(enumResult.error());
-    node.enumValues = *enumResult;
-
-    // Const constraint
-    node.constValue = parseConstKeyword(schemaObj[u"const"_qs]);
-
-    // String keywords
-    auto patternResult{parsePatternKeyword(schemaObj[u"pattern"_qs])};
-    if (!patternResult)
-        return std::unexpected(patternResult.error());
-    node.pattern = std::move(*patternResult);
-
-    auto minLengthResult{parseIntegerKeyword(schemaObj[u"minLength"_qs])};
-    if (!minLengthResult)
-        return std::unexpected(minLengthResult.error());
-    node.minLength = *minLengthResult;
-
-    auto maxLengthResult{parseIntegerKeyword(schemaObj[u"maxLength"_qs])};
-    if (!maxLengthResult)
-        return std::unexpected(maxLengthResult.error());
-    node.maxLength = *maxLengthResult;
-
-    // Numeric keywords
-    auto minimumResult{parseNumericKeyword(schemaObj[u"minimum"_qs])};
-    if (!minimumResult)
-        return std::unexpected(minimumResult.error());
-    node.minimum = *minimumResult;
-
-    auto maximumResult{parseNumericKeyword(schemaObj[u"maximum"_qs])};
-    if (!maximumResult)
-        return std::unexpected(maximumResult.error());
-    node.maximum = *maximumResult;
-
-    auto exclMinResult{parseNumericKeyword(schemaObj[u"exclusiveMinimum"_qs])};
-    if (!exclMinResult)
-        return std::unexpected(exclMinResult.error());
-    node.exclusiveMinimum = *exclMinResult;
-
-    auto exclMaxResult{parseNumericKeyword(schemaObj[u"exclusiveMaximum"_qs])};
-    if (!exclMaxResult)
-        return std::unexpected(exclMaxResult.error());
-    node.exclusiveMaximum = *exclMaxResult;
-
-    auto multipleOfResult{parseNumericKeyword(schemaObj[u"multipleOf"_qs])};
-    if (!multipleOfResult)
-        return std::unexpected(multipleOfResult.error());
-    node.multipleOf = *multipleOfResult;
-
-    // Array keywords
-    auto minItemsResult{parseIntegerKeyword(schemaObj[u"minItems"_qs])};
-    if (!minItemsResult)
-        return std::unexpected(minItemsResult.error());
-    node.minItems = *minItemsResult;
-
-    auto maxItemsResult{parseIntegerKeyword(schemaObj[u"maxItems"_qs])};
-    if (!maxItemsResult)
-        return std::unexpected(maxItemsResult.error());
-    node.maxItems = *maxItemsResult;
-
-    if (schemaObj.contains(u"uniqueItems"_qs))
-    {
-        const auto uniqueVal{schemaObj[u"uniqueItems"_qs]};
-        if (uniqueVal.isBool())
-            node.uniqueItems = uniqueVal.toBool();
-    }
-
-    // Object keywords
-    auto requiredResult{parseRequiredKeyword(schemaObj[u"required"_qs])};
-    if (!requiredResult)
-        return std::unexpected(requiredResult.error());
-    node.required = std::move(*requiredResult);
-
-    auto minPropsResult{parseIntegerKeyword(schemaObj[u"minProperties"_qs])};
-    if (!minPropsResult)
-        return std::unexpected(minPropsResult.error());
-    node.minProperties = *minPropsResult;
-
-    auto maxPropsResult{parseIntegerKeyword(schemaObj[u"maxProperties"_qs])};
-    if (!maxPropsResult)
-        return std::unexpected(maxPropsResult.error());
-    node.maxProperties = *maxPropsResult;
-
-    // Properties (requires recursive compilation)
-    auto propertiesResult{compileProperties(ctx, schemaObj[u"properties"_qs])};
-    if (!propertiesResult)
-        return std::unexpected(propertiesResult.error());
-    node.properties = std::move(*propertiesResult);
-
-    // additionalProperties
-    auto additionalPropsResult{compileOptionalSchema(ctx, schemaObj[u"additionalProperties"_qs])};
-    if (!additionalPropsResult)
-        return std::unexpected(additionalPropsResult.error());
-    node.additionalProperties = *additionalPropsResult;
-
-    // patternProperties
-    if (schemaObj.contains(u"patternProperties"_qs))
-    {
-        const auto patternPropsValue{schemaObj[u"patternProperties"_qs]};
-        if (patternPropsValue.isObject())
-        {
-            const auto patternPropsObj{patternPropsValue.toObject()};
-            for (auto it = patternPropsObj.begin(); it != patternPropsObj.end(); ++it)
-            {
-                QRegularExpression regex{it.key()};
-                if (!regex.isValid())
-                    return std::unexpected(QueryError(ParseError::InvalidRegexPattern));
-                regex.optimize();
-                
-                auto schemaResult{compileSchemaNode(ctx, it.value())};
-                if (!schemaResult)
-                    return std::unexpected(schemaResult.error());
-                
-                node.patternProperties.emplace_back(std::move(regex), *schemaResult);
-            }
-        }
-    }
-
-    // propertyNames
-    auto propertyNamesResult{compileOptionalSchema(ctx, schemaObj[u"propertyNames"_qs])};
-    if (!propertyNamesResult)
-        return std::unexpected(propertyNamesResult.error());
-    node.propertyNames = *propertyNamesResult;
-
-    // items (2020-12 style - single schema)
-    auto itemsResult{compileOptionalSchema(ctx, schemaObj[u"items"_qs])};
-    if (!itemsResult)
-        return std::unexpected(itemsResult.error());
-    node.items = *itemsResult;
-
-    // prefixItems
-    auto prefixItemsResult{compileSchemaArray(ctx, schemaObj[u"prefixItems"_qs])};
-    if (!prefixItemsResult)
-        return std::unexpected(prefixItemsResult.error());
-    node.prefixItems = std::move(*prefixItemsResult);
-
-    // contains
-    auto containsResult{compileOptionalSchema(ctx, schemaObj[u"contains"_qs])};
-    if (!containsResult)
-        return std::unexpected(containsResult.error());
-    node.contains = *containsResult;
-
-    // Combinators
-    auto allOfResult{compileSchemaArray(ctx, schemaObj[u"allOf"_qs])};
-    if (!allOfResult)
-        return std::unexpected(allOfResult.error());
-    node.allOf = std::move(*allOfResult);
-
-    auto anyOfResult{compileSchemaArray(ctx, schemaObj[u"anyOf"_qs])};
-    if (!anyOfResult)
-        return std::unexpected(anyOfResult.error());
-    node.anyOf = std::move(*anyOfResult);
-
-    auto oneOfResult{compileSchemaArray(ctx, schemaObj[u"oneOf"_qs])};
-    if (!oneOfResult)
-        return std::unexpected(oneOfResult.error());
-    node.oneOf = std::move(*oneOfResult);
-
-    auto notResult{compileOptionalSchema(ctx, schemaObj[u"not"_qs])};
-    if (!notResult)
-        return std::unexpected(notResult.error());
-    node.notSchema = *notResult;
-
-    // Conditional
-    auto ifResult{compileOptionalSchema(ctx, schemaObj[u"if"_qs])};
-    if (!ifResult)
-        return std::unexpected(ifResult.error());
-    node.ifSchema = *ifResult;
-
-    auto thenResult{compileOptionalSchema(ctx, schemaObj[u"then"_qs])};
-    if (!thenResult)
-        return std::unexpected(thenResult.error());
-    node.thenSchema = *thenResult;
-
-    auto elseResult{compileOptionalSchema(ctx, schemaObj[u"else"_qs])};
-    if (!elseResult)
-        return std::unexpected(elseResult.error());
-    node.elseSchema = *elseResult;
-
-    // Dependencies
-    if (schemaObj.contains(u"dependentRequired"_qs))
-    {
-        const auto depReqValue{schemaObj[u"dependentRequired"_qs]};
-        if (depReqValue.isObject())
-        {
-            const auto depReqObj{depReqValue.toObject()};
-            for (auto it = depReqObj.begin(); it != depReqObj.end(); ++it)
-            {
-                if (it.value().isArray())
-                {
-                    const auto reqArray{it.value().toArray()};
-                    std::vector<QString> requiredProps{};
-                    for (const QJsonValue& req : reqArray)
-                    {
-                        if (req.isString())
-                            requiredProps.push_back(req.toString());
-                    }
-                    node.dependentRequired[it.key()] = std::move(requiredProps);
-                }
-            }
-        }
-    }
-
-    if (schemaObj.contains(u"dependentSchemas"_qs))
-    {
-        const auto depSchValue{schemaObj[u"dependentSchemas"_qs]};
-        if (depSchValue.isObject())
-        {
-            const auto depSchObj{depSchValue.toObject()};
-            for (auto it = depSchObj.begin(); it != depSchObj.end(); ++it)
-            {
-                auto schemaResult{compileSchemaNode(ctx, it.value())};
-                if (!schemaResult)
-                    return std::unexpected(schemaResult.error());
-                node.dependentSchemas[it.key()] = *schemaResult;
-            }
-        }
-    }
-
-    // Process nested $defs (required for proper anchor resolution)
-    if (schemaObj.contains(u"$defs"_qs))
-    {
-        const auto defsValue{schemaObj[u"$defs"_qs]};
-        if (defsValue.isObject())
-        {
-            const auto defsObj{defsValue.toObject()};
-            for (auto it = defsObj.begin(); it != defsObj.end(); ++it)
-            {
-                auto defResult{compileSchemaNode(ctx, it.value())};
-                if (!defResult)
-                    return std::unexpected(defResult.error());
-            }
-        }
-    }
-
-    // Metadata
-    if (schemaObj.contains(u"title"_qs) && schemaObj[u"title"_qs].isString())
-        node.title = schemaObj[u"title"_qs].toString();
-    if (schemaObj.contains(u"description"_qs) && schemaObj[u"description"_qs].isString())
-        node.description = schemaObj[u"description"_qs].toString();
-
-    // Format (store as string, validation is optional per spec)
-    if (schemaObj.contains(u"format"_qs) && schemaObj[u"format"_qs].isString())
-        node.format = schemaObj[u"format"_qs].toString();
+    // Dispatch to all keyword category handlers (pass compileSchemaNode as callback)
+    if (auto r{FullKeywordDispatcher::dispatch(ctx, schemaObj, node, compileSchemaNode)}; !r)
+        return std::unexpected(r.error());
 
     // Add the node and register anchor if present
     const auto nodeIndex{ctx.addNode(std::move(node))};
-    
+
     if (anchorName)
     {
         const auto scopedKey{ctx.scopedAnchorKey(*anchorName)};
@@ -422,9 +172,6 @@ std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, co
         ctx.anchors[scopedKey] = nodeIndex;
     }
 
-    // Restore base URI before returning so sibling schemas get correct scope
-    ctx.baseUri = savedBaseUri;
-    
     return nodeIndex;
 }
 
