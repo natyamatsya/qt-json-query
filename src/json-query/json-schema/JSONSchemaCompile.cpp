@@ -29,6 +29,7 @@ struct CompileContext
     std::unordered_map<QString, std::size_t>& anchors;
     std::unordered_map<QString, std::size_t>& dynamicAnchors;
     QString                                   basePath{};
+    QString                                   baseUri{};  // Current base URI for anchor scoping
 
     // Add a node and return its index
     std::size_t addNode(SchemaNode node)
@@ -36,6 +37,14 @@ struct CompileContext
         const auto index{nodes.size()};
         nodes.push_back(std::move(node));
         return index;
+    }
+
+    // Get the full anchor key scoped to the current base URI
+    QString scopedAnchorKey(const QString& anchorName) const
+    {
+        if (baseUri.isEmpty())
+            return anchorName;
+        return baseUri + u"#"_qs + anchorName;
     }
 };
 
@@ -274,7 +283,16 @@ std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, co
 
     const auto schemaObj{schemaValue.toObject()};
 
-    // Handle $anchor registration
+    // Save current base URI to restore after processing this subschema
+    const auto savedBaseUri{ctx.baseUri};
+
+    // Handle $id - changes the base URI for this subschema and descendants
+    if (schemaObj.contains(u"$id"_qs) && schemaObj[u"$id"_qs].isString())
+    {
+        ctx.baseUri = schemaObj[u"$id"_qs].toString();
+    }
+
+    // Handle $anchor registration (scoped to current base URI)
     std::optional<QString> anchorName{};
     if (schemaObj.contains(u"$anchor"_qs) && schemaObj[u"$anchor"_qs].isString())
     {
@@ -305,6 +323,7 @@ std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, co
     // If $ref is present without other keywords, create a simple RefSchema
     if (hasRef && !hasOtherKeywords)
     {
+        ctx.baseUri = savedBaseUri;  // Restore before returning
         return ctx.addNode(RefSchema{0, refString});
     }
 
@@ -548,6 +567,22 @@ std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, co
         }
     }
 
+    // Process nested $defs (required for proper anchor resolution)
+    if (schemaObj.contains(u"$defs"_qs))
+    {
+        const auto defsValue{schemaObj[u"$defs"_qs]};
+        if (defsValue.isObject())
+        {
+            const auto defsObj{defsValue.toObject()};
+            for (auto it = defsObj.begin(); it != defsObj.end(); ++it)
+            {
+                auto defResult{compileSchemaNode(ctx, it.value())};
+                if (!defResult)
+                    return std::unexpected(defResult.error());
+            }
+        }
+    }
+
     // Metadata
     if (schemaObj.contains(u"title"_qs) && schemaObj[u"title"_qs].isString())
         node.title = schemaObj[u"title"_qs].toString();
@@ -563,10 +598,14 @@ std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, co
     
     if (anchorName)
     {
-        if (ctx.anchors.contains(*anchorName))
+        const auto scopedKey{ctx.scopedAnchorKey(*anchorName)};
+        if (ctx.anchors.contains(scopedKey))
             return std::unexpected(QueryError(ParseError::DuplicateAnchor));
-        ctx.anchors[*anchorName] = nodeIndex;
+        ctx.anchors[scopedKey] = nodeIndex;
     }
+
+    // Restore base URI before returning so sibling schemas get correct scope
+    ctx.baseUri = savedBaseUri;
     
     return nodeIndex;
 }
@@ -580,7 +619,7 @@ std::expected<std::shared_ptr<internal::CompiledSchema>, QueryError> compileSche
 
     auto compiled{std::make_shared<internal::CompiledSchema>()};
 
-    CompileContext ctx{compiled->nodes, compiled->anchors, compiled->dynamicAnchors, {}};
+    CompileContext ctx{compiled->nodes, compiled->anchors, compiled->dynamicAnchors, {}, {}};
 
     // Extract metadata from root schema if it's an object
     if (schemaValue.isObject())
@@ -665,6 +704,24 @@ std::expected<std::shared_ptr<internal::CompiledSchema>, QueryError> compileSche
                 if (ctx.anchors.contains(anchorName))
                 {
                     refNode.targetIndex = ctx.anchors[anchorName];
+                }
+            }
+            else if (refString.contains(u'#'))
+            {
+                // URI with fragment - try to resolve using the base URI and anchor
+                // e.g., "http://example.com/nested.json#foo" -> look for "nested.json#foo"
+                const auto hashPos{refString.lastIndexOf(u'#')};
+                const auto baseUri{refString.left(hashPos)};
+                const auto fragment{refString.mid(hashPos + 1)};
+                
+                // Try scoped lookup: extract just the filename from the URI and combine with fragment
+                const auto lastSlash{baseUri.lastIndexOf(u'/')};
+                const auto filename{lastSlash >= 0 ? baseUri.mid(lastSlash + 1) : baseUri};
+                const auto scopedKey{filename + u"#"_qs + fragment};
+                
+                if (ctx.anchors.contains(scopedKey))
+                {
+                    refNode.targetIndex = ctx.anchors[scopedKey];
                 }
             }
         }
