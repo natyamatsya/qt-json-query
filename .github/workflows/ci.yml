@@ -50,7 +50,6 @@ jobs:
 
       - name: Run unit tests
         working-directory: build
-        continue-on-error: true
         run: ctest --output-on-failure --output-junit tests-${{ matrix.os }}.xml
 
       # --- Benchmarks ---
