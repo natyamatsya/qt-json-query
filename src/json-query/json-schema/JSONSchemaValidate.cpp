@@ -2,8 +2,12 @@
 
 #include "json-query/json-schema/JSONSchemaValidate.hpp"
 #include "json-query/json-schema/JSONSchemaError.hpp"
-#include "json-query/json-schema/internal/FormatValidators.hpp"
 #include "json-query/json-schema/internal/SchemaNode.hpp"
+#include "json-query/json-schema/internal/ValidationContext.hpp"
+#include "json-query/json-schema/internal/ValidationHelpers.hpp"
+#include "json-query/json-schema/internal/ValidateType.hpp"
+#include "json-query/json-schema/internal/ValidateString.hpp"
+#include "json-query/json-schema/internal/ValidateNumeric.hpp"
 #include "json-query/json-pointer/JSONPointerUtils.hpp"
 
 #include <QtCore/QJsonArray>
@@ -21,18 +25,6 @@ namespace
 
 using namespace internal;
 
-/**
- * @brief Context for validation
- */
-struct ValidateContext
-{
-    const CompiledSchema& schema;
-    ValidationResult&     result;
-    bool                  stopOnFirstError = false;
-
-    [[nodiscard]] bool shouldContinue() const { return !stopOnFirstError || result.isValid(); }
-};
-
 // Forward declaration
 void validateNode(ValidateContext&  ctx,
                   const SchemaNode& node,
@@ -40,190 +32,7 @@ void validateNode(ValidateContext&  ctx,
                   const QString&    instancePath,
                   const QString&    schemaPath);
 
-/**
- * @brief Check if two QJsonValues are equal (for enum/const)
- */
-[[nodiscard]] bool jsonValuesEqual(const QJsonValue& a, const QJsonValue& b)
-{
-    if (a.type() != b.type())
-        return false;
-
-    switch (a.type())
-    {
-    case QJsonValue::Null:
-        return true;
-    case QJsonValue::Bool:
-        return a.toBool() == b.toBool();
-    case QJsonValue::Double:
-        return a.toDouble() == b.toDouble();
-    case QJsonValue::String:
-        return a.toString() == b.toString();
-    case QJsonValue::Array:
-    {
-        const auto arrA{a.toArray()};
-        const auto arrB{b.toArray()};
-        if (arrA.size() != arrB.size())
-            return false;
-        for (int i = 0; i < arrA.size(); ++i)
-            if (!jsonValuesEqual(arrA[i], arrB[i]))
-                return false;
-        return true;
-    }
-    case QJsonValue::Object:
-    {
-        const auto objA{a.toObject()};
-        const auto objB{b.toObject()};
-        if (objA.size() != objB.size())
-            return false;
-        for (auto it = objA.begin(); it != objA.end(); ++it)
-            if (!objB.contains(it.key()) || !jsonValuesEqual(it.value(), objB[it.key()]))
-                return false;
-        return true;
-    }
-    default:
-        return false;
-    }
-}
-
-/**
- * @brief Validate type constraint
- */
-void validateType(ValidateContext&      ctx,
-                  const TypeConstraint& constraint,
-                  const QJsonValue&     instance,
-                  const QString&        instancePath,
-                  const QString&        schemaPath)
-{
-    const auto actualType{jsonValueToSchemaType(instance)};
-
-    if (!constraint.allows(actualType))
-    {
-        QString msg = QString(u"Expected type %1 but got %2")
-                          .arg(schemaTypeToString(constraint.allowedTypes.front()))
-                          .arg(schemaTypeToString(actualType));
-        ctx.result.addError(instancePath, schemaPath + u"/type"_qs, msg, EvalError::TypeMismatch);
-    }
-}
-
-/**
- * @brief Validate enum constraint
- */
-void validateEnum(ValidateContext&  ctx,
-                  const QJsonArray& enumValues,
-                  const QJsonValue& instance,
-                  const QString&    instancePath,
-                  const QString&    schemaPath)
-{
-    for (const QJsonValue& allowed : enumValues)
-        if (jsonValuesEqual(instance, allowed))
-            return; // Match found
-
-    ctx.result.addError(instancePath,
-                        schemaPath + u"/enum"_qs,
-                        u"Value is not one of the allowed enum values"_qs,
-                        EvalError::EnumMismatch);
-}
-
-/**
- * @brief Validate const constraint
- */
-void validateConst(ValidateContext&  ctx,
-                   const QJsonValue& constValue,
-                   const QJsonValue& instance,
-                   const QString&    instancePath,
-                   const QString&    schemaPath)
-{
-    if (!jsonValuesEqual(instance, constValue))
-    {
-        ctx.result.addError(
-            instancePath, schemaPath + u"/const"_qs, u"Value does not match const"_qs, EvalError::ConstMismatch);
-    }
-}
-
-/**
- * @brief Validate string constraints
- */
-void validateString(ValidateContext&    ctx,
-                    const ObjectSchema& node,
-                    const QString&      str,
-                    const QString&      instancePath,
-                    const QString&      schemaPath)
-{
-    const auto length{static_cast<std::size_t>(str.length())};
-
-    if (node.minLength && length < *node.minLength)
-    {
-        const auto msg{QString(u"String length %1 is less than minimum %2").arg(length).arg(*node.minLength)};
-        ctx.result.addError(instancePath, schemaPath + u"/minLength"_qs, msg, EvalError::MinLengthViolation);
-    }
-
-    if (node.maxLength && length > *node.maxLength)
-    {
-        const auto msg{QString(u"String length %1 exceeds maximum %2").arg(length).arg(*node.maxLength)};
-        ctx.result.addError(instancePath, schemaPath + u"/maxLength"_qs, msg, EvalError::MaxLengthViolation);
-    }
-
-    if (node.pattern && !node.pattern->match(str).hasMatch())
-    {
-        ctx.result.addError(instancePath,
-                            schemaPath + u"/pattern"_qs,
-                            u"String does not match required pattern"_qs,
-                            EvalError::PatternMismatch);
-    }
-
-    if (node.format && !internal::validateFormat(*node.format, str))
-    {
-        const auto msg{QString(u"String does not match format '%1'").arg(*node.format)};
-        ctx.result.addError(instancePath, schemaPath + u"/format"_qs, msg, EvalError::FormatInvalid);
-    }
-}
-
-/**
- * @brief Validate numeric constraints
- */
-void validateNumber(ValidateContext&    ctx,
-                    const ObjectSchema& node,
-                    double              value,
-                    const QString&      instancePath,
-                    const QString&      schemaPath)
-{
-    if (node.minimum && value < *node.minimum)
-    {
-        const auto msg{QString(u"Value %1 is less than minimum %2").arg(value).arg(*node.minimum)};
-        ctx.result.addError(instancePath, schemaPath + u"/minimum"_qs, msg, EvalError::MinimumViolation);
-    }
-
-    if (node.maximum && value > *node.maximum)
-    {
-        const auto msg{QString(u"Value %1 exceeds maximum %2").arg(value).arg(*node.maximum)};
-        ctx.result.addError(instancePath, schemaPath + u"/maximum"_qs, msg, EvalError::MaximumViolation);
-    }
-
-    if (node.exclusiveMinimum && value <= *node.exclusiveMinimum)
-    {
-        const auto msg{QString(u"Value %1 must be greater than %2").arg(value).arg(*node.exclusiveMinimum)};
-        ctx.result.addError(
-            instancePath, schemaPath + u"/exclusiveMinimum"_qs, msg, EvalError::ExclusiveMinimumViolation);
-    }
-
-    if (node.exclusiveMaximum && value >= *node.exclusiveMaximum)
-    {
-        const auto msg{QString(u"Value %1 must be less than %2").arg(value).arg(*node.exclusiveMaximum)};
-        ctx.result.addError(
-            instancePath, schemaPath + u"/exclusiveMaximum"_qs, msg, EvalError::ExclusiveMaximumViolation);
-    }
-
-    if (node.multipleOf)
-    {
-        const auto remainder{std::fmod(value, *node.multipleOf)};
-        // Allow for floating point imprecision
-        if (std::abs(remainder) > 1e-10 && std::abs(remainder - *node.multipleOf) > 1e-10)
-        {
-            const auto msg{QString(u"Value %1 is not a multiple of %2").arg(value).arg(*node.multipleOf)};
-            ctx.result.addError(instancePath, schemaPath + u"/multipleOf"_qs, msg, EvalError::MultipleOfViolation);
-        }
-    }
-}
+// Validators from modular headers (ValidateType.hpp, ValidateString.hpp, ValidateNumeric.hpp)
 
 /**
  * @brief Validate array constraints
@@ -596,7 +405,7 @@ void validateObjectSchema(ValidateContext&    ctx,
     if (instance.isString() && ctx.shouldContinue())
         validateString(ctx, node, instance.toString(), instancePath, schemaPath);
     else if (instance.isDouble() && ctx.shouldContinue())
-        validateNumber(ctx, node, instance.toDouble(), instancePath, schemaPath);
+        validateNumeric(ctx, node, instance.toDouble(), instancePath, schemaPath);
     else if (instance.isArray() && ctx.shouldContinue())
         validateArray(ctx, node, instance.toArray(), instancePath, schemaPath);
     else if (instance.isObject() && ctx.shouldContinue())
