@@ -4,10 +4,10 @@
 
 #include <QString>
 #include <QStringView>
+#include "json-query/utils/QtStringLiterals.hpp"
 
 namespace json_query::json_pointer
 {
-
 /**
  * @brief Escape a JSON Pointer token according to RFC 6901
  *
@@ -20,13 +20,15 @@ namespace json_query::json_pointer
  */
 [[nodiscard]] inline QString escapeToken(QStringView token) noexcept
 {
+    using json_query::literals::operator""_qt_s;
+
     QString out{};
     out.reserve(token.size());
     for (const QChar c : token)
         if (c == u'~')
-            out += u"~0"_qs;
+            out += u"~0"_qt_s;
         else if (c == u'/')
-            out += u"~1"_qs;
+            out += u"~1"_qt_s;
         else
             out += c;
     return out;

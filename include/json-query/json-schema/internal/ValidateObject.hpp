@@ -6,6 +6,7 @@
 #include "json-query/json-schema/internal/SchemaNode.hpp"
 #include "json-query/json-schema/JSONSchemaError.hpp"
 #include "json-query/json-pointer/JSONPointerUtils.hpp"
+#include "json-query/utils/QtStringLiterals.hpp"
 
 #include <QJsonObject>
 #include <QString>
@@ -26,16 +27,18 @@ inline void validatePropertyCount(ValidateContext&    ctx,
                                   const QString&      instancePath,
                                   const QString&      schemaPath)
 {
+    using json_query::literals::operator""_qt_s;
+
     if (node.minProperties && size < *node.minProperties)
     {
         const auto msg{QString(u"Object has %1 properties, minimum is %2").arg(size).arg(*node.minProperties)};
-        ctx.result.addError(instancePath, schemaPath + u"/minProperties"_qs, msg, EvalError::MinPropertiesViolation);
+        ctx.result.addError(instancePath, schemaPath + u"/minProperties"_qt_s, msg, EvalError::MinPropertiesViolation);
     }
 
     if (node.maxProperties && size > *node.maxProperties)
     {
         const auto msg{QString(u"Object has %1 properties, maximum is %2").arg(size).arg(*node.maxProperties)};
-        ctx.result.addError(instancePath, schemaPath + u"/maxProperties"_qs, msg, EvalError::MaxPropertiesViolation);
+        ctx.result.addError(instancePath, schemaPath + u"/maxProperties"_qt_s, msg, EvalError::MaxPropertiesViolation);
     }
 }
 
@@ -48,12 +51,14 @@ inline void validateRequired(ValidateContext&    ctx,
                              const QString&      instancePath,
                              const QString&      schemaPath)
 {
+    using json_query::literals::operator""_qt_s;
+
     for (const QString& req : node.required)
     {
         if (!obj.contains(req))
         {
             const auto msg{QString(u"Required property '%1' is missing").arg(req)};
-            ctx.result.addError(instancePath, schemaPath + u"/required"_qs, msg, EvalError::RequiredMissing);
+            ctx.result.addError(instancePath, schemaPath + u"/required"_qt_s, msg, EvalError::RequiredMissing);
         }
     }
 }
@@ -68,6 +73,8 @@ inline void validatePropertyNames(ValidateContext&    ctx,
                                   const QString&      schemaPath,
                                   ValidateNodeFn&     validateNode)
 {
+    using json_query::literals::operator""_qt_s;
+
     if (!node.propertyNames)
         return;
 
@@ -77,7 +84,7 @@ inline void validatePropertyNames(ValidateContext&    ctx,
                      ctx.schema.nodeAt(*node.propertyNames),
                      QJsonValue(it.key()),
                      instancePath,
-                     schemaPath + u"/propertyNames"_qs);
+                     schemaPath + u"/propertyNames"_qt_s);
     }
 }
 
@@ -89,9 +96,11 @@ inline void rejectAdditionalProperty(ValidateContext& ctx,
                                      const QString&   propPath,
                                      const QString&   schemaPath)
 {
+    using json_query::literals::operator""_qt_s;
+
     const auto msg{QString(u"Additional property '%1' is not allowed").arg(propName)};
     ctx.result.addError(
-        propPath, schemaPath + u"/additionalProperties"_qs, msg, EvalError::AdditionalPropertiesInvalid);
+        propPath, schemaPath + u"/additionalProperties"_qt_s, msg, EvalError::AdditionalPropertiesInvalid);
 }
 
 /**
@@ -106,6 +115,8 @@ inline bool validateSingleProperty(ValidateContext&    ctx,
                                    const QString&      schemaPath,
                                    ValidateNodeFn&     validateNode)
 {
+    using json_query::literals::operator""_qt_s;
+
     bool evaluated{false};
 
     // Check properties
@@ -115,7 +126,7 @@ inline bool validateSingleProperty(ValidateContext&    ctx,
                      ctx.schema.nodeAt(propIt->second),
                      propValue,
                      propPath,
-                     json_pointer::appendToken(schemaPath + u"/properties"_qs, propName));
+                     json_pointer::appendToken(schemaPath + u"/properties"_qt_s, propName));
         evaluated = true;
     }
 
@@ -125,7 +136,7 @@ inline bool validateSingleProperty(ValidateContext&    ctx,
         if (pattern.match(propName).hasMatch())
         {
             validateNode(
-                ctx, ctx.schema.nodeAt(schemaIndex), propValue, propPath, schemaPath + u"/patternProperties"_qs);
+                ctx, ctx.schema.nodeAt(schemaIndex), propValue, propPath, schemaPath + u"/patternProperties"_qt_s);
             evaluated = true;
         }
     }
@@ -142,7 +153,7 @@ inline bool validateSingleProperty(ValidateContext&    ctx,
         }
         else
         {
-            validateNode(ctx, additionalNode, propValue, propPath, schemaPath + u"/additionalProperties"_qs);
+            validateNode(ctx, additionalNode, propValue, propPath, schemaPath + u"/additionalProperties"_qt_s);
         }
     }
 
@@ -158,6 +169,8 @@ inline void validateDependentRequired(ValidateContext&    ctx,
                                       const QString&      instancePath,
                                       const QString&      schemaPath)
 {
+    using json_query::literals::operator""_qt_s;
+
     for (const auto& [propName, requiredProps] : node.dependentRequired)
     {
         if (!obj.contains(propName))
@@ -169,7 +182,7 @@ inline void validateDependentRequired(ValidateContext&    ctx,
             {
                 const auto msg{QString(u"Property '%1' requires '%2' to be present").arg(propName, requiredProp)};
                 ctx.result.addError(
-                    instancePath, schemaPath + u"/dependentRequired"_qs, msg, EvalError::RequiredMissing);
+                    instancePath, schemaPath + u"/dependentRequired"_qt_s, msg, EvalError::RequiredMissing);
             }
         }
     }
@@ -185,6 +198,8 @@ inline void validateDependentSchemas(ValidateContext&    ctx,
                                      const QString&      schemaPath,
                                      ValidateNodeFn&     validateNode)
 {
+    using json_query::literals::operator""_qt_s;
+
     for (const auto& [propName, schemaIndex] : node.dependentSchemas)
     {
         if (obj.contains(propName))
@@ -193,7 +208,7 @@ inline void validateDependentSchemas(ValidateContext&    ctx,
                          ctx.schema.nodeAt(schemaIndex),
                          obj,
                          instancePath,
-                         json_pointer::appendToken(schemaPath + u"/dependentSchemas"_qs, propName));
+                         json_pointer::appendToken(schemaPath + u"/dependentSchemas"_qt_s, propName));
         }
     }
 }

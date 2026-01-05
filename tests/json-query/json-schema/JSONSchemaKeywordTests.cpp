@@ -7,8 +7,10 @@
 #include <QJsonArray>
 
 #include "json-query/json-schema/JSONSchema.hpp"
+#include "json-query/utils/QtStringLiterals.hpp"
 
 using namespace json_query::json_schema;
+using json_query::literals::operator""_qt_s;
 
 class JSONSchemaKeywordTest : public ::testing::Test
 {
@@ -103,18 +105,18 @@ TEST_F(JSONSchemaKeywordTest, IfThenElseSuccess)
     ASSERT_TRUE(schemaResult.has_value());
 
     QJsonObject usaValid{};
-    usaValid[u"country"_qs]    = u"USA"_qs;
-    usaValid[u"postalCode"_qs] = u"12345"_qs;
+    usaValid[u"country"_qt_s]    = u"USA"_qt_s;
+    usaValid[u"postalCode"_qt_s] = u"12345"_qt_s;
     EXPECT_TRUE(schemaResult->validate(usaValid).isValid());
 
     QJsonObject usaInvalid{};
-    usaInvalid[u"country"_qs]    = u"USA"_qs;
-    usaInvalid[u"postalCode"_qs] = u"ABC"_qs;
+    usaInvalid[u"country"_qt_s]    = u"USA"_qt_s;
+    usaInvalid[u"postalCode"_qt_s] = u"ABC"_qt_s;
     EXPECT_FALSE(schemaResult->validate(usaInvalid).isValid());
 
     QJsonObject otherValid{};
-    otherValid[u"country"_qs]    = u"Canada"_qs;
-    otherValid[u"postalCode"_qs] = u"K1A 0B1"_qs;
+    otherValid[u"country"_qt_s]    = u"Canada"_qt_s;
+    otherValid[u"postalCode"_qt_s] = u"K1A 0B1"_qt_s;
     EXPECT_TRUE(schemaResult->validate(otherValid).isValid());
 }
 
@@ -135,16 +137,16 @@ TEST_F(JSONSchemaKeywordTest, PropertiesAndRequired)
     ASSERT_TRUE(schemaResult.has_value());
 
     QJsonObject valid{};
-    valid[u"name"_qs] = u"Alice"_qs;
-    valid[u"age"_qs]  = 30;
+    valid[u"name"_qt_s] = u"Alice"_qt_s;
+    valid[u"age"_qt_s]  = 30;
     EXPECT_TRUE(schemaResult->validate(valid).isValid());
 
     QJsonObject validNoAge{};
-    validNoAge[u"name"_qs] = u"Bob"_qs;
+    validNoAge[u"name"_qt_s] = u"Bob"_qt_s;
     EXPECT_TRUE(schemaResult->validate(validNoAge).isValid());
 
     QJsonObject invalid{};
-    invalid[u"age"_qs] = 25;
+    invalid[u"age"_qt_s] = 25;
     EXPECT_FALSE(schemaResult->validate(invalid).isValid());
 }
 
@@ -160,12 +162,12 @@ TEST_F(JSONSchemaKeywordTest, AdditionalPropertiesFalse)
     ASSERT_TRUE(schemaResult.has_value());
 
     QJsonObject valid{};
-    valid[u"name"_qs] = u"Alice"_qs;
+    valid[u"name"_qt_s] = u"Alice"_qt_s;
     EXPECT_TRUE(schemaResult->validate(valid).isValid());
 
     QJsonObject invalid{};
-    invalid[u"name"_qs] = u"Alice"_qs;
-    invalid[u"age"_qs]  = 30;
+    invalid[u"name"_qt_s] = u"Alice"_qt_s;
+    invalid[u"age"_qt_s]  = 30;
     EXPECT_FALSE(schemaResult->validate(invalid).isValid());
 }
 
@@ -181,12 +183,12 @@ TEST_F(JSONSchemaKeywordTest, PatternProperties)
     ASSERT_TRUE(schemaResult.has_value());
 
     QJsonObject valid{};
-    valid[u"S_name"_qs] = u"Alice"_qs;
-    valid[u"I_age"_qs]  = 30;
+    valid[u"S_name"_qt_s] = u"Alice"_qt_s;
+    valid[u"I_age"_qt_s]  = 30;
     EXPECT_TRUE(schemaResult->validate(valid).isValid());
 
     QJsonObject invalid{};
-    invalid[u"S_name"_qs] = 42;
+    invalid[u"S_name"_qt_s] = 42;
     EXPECT_FALSE(schemaResult->validate(invalid).isValid());
 }
 
@@ -200,20 +202,20 @@ TEST_F(JSONSchemaKeywordTest, MinMaxProperties)
     ASSERT_TRUE(schemaResult.has_value());
 
     QJsonObject tooFew{};
-    tooFew[u"a"_qs] = 1;
+    tooFew[u"a"_qt_s] = 1;
     EXPECT_FALSE(schemaResult->validate(tooFew).isValid());
 
     QJsonObject valid{};
-    valid[u"a"_qs] = 1;
-    valid[u"b"_qs] = 2;
+    valid[u"a"_qt_s] = 1;
+    valid[u"b"_qt_s] = 2;
     EXPECT_TRUE(schemaResult->validate(valid).isValid());
 
     QJsonObject tooMany{};
-    tooMany[u"a"_qs] = 1;
-    tooMany[u"b"_qs] = 2;
-    tooMany[u"c"_qs] = 3;
-    tooMany[u"d"_qs] = 4;
-    tooMany[u"e"_qs] = 5;
+    tooMany[u"a"_qt_s] = 1;
+    tooMany[u"b"_qt_s] = 2;
+    tooMany[u"c"_qt_s] = 3;
+    tooMany[u"d"_qt_s] = 4;
+    tooMany[u"e"_qt_s] = 5;
     EXPECT_FALSE(schemaResult->validate(tooMany).isValid());
 }
 
@@ -228,12 +230,12 @@ TEST_F(JSONSchemaKeywordTest, PropertyNames)
     ASSERT_TRUE(schemaResult.has_value());
 
     QJsonObject valid{};
-    valid[u"Name"_qs] = u"Alice"_qs;
-    valid[u"Age"_qs]  = 30;
+    valid[u"Name"_qt_s] = u"Alice"_qt_s;
+    valid[u"Age"_qt_s]  = 30;
     EXPECT_TRUE(schemaResult->validate(valid).isValid());
 
     QJsonObject invalid{};
-    invalid[u"name"_qs] = u"Alice"_qs;
+    invalid[u"name"_qt_s] = u"Alice"_qt_s;
     EXPECT_FALSE(schemaResult->validate(invalid).isValid());
 }
 
@@ -253,13 +255,13 @@ TEST_F(JSONSchemaKeywordTest, PrefixItems)
     ASSERT_TRUE(schemaResult.has_value());
 
     QJsonArray valid{};
-    valid.append(u"hello"_qs);
+    valid.append(u"hello"_qt_s);
     valid.append(42);
     EXPECT_TRUE(schemaResult->validate(valid).isValid());
 
     QJsonArray invalid{};
     invalid.append(42);
-    invalid.append(u"hello"_qs);
+    invalid.append(u"hello"_qt_s);
     EXPECT_FALSE(schemaResult->validate(invalid).isValid());
 }
 
@@ -314,7 +316,7 @@ TEST_F(JSONSchemaKeywordTest, Contains)
 
     QJsonArray valid{};
     valid.append(1);
-    valid.append(u"hello"_qs);
+    valid.append(u"hello"_qt_s);
     valid.append(3);
     EXPECT_TRUE(schemaResult->validate(valid).isValid());
 
@@ -468,18 +470,18 @@ TEST_F(JSONSchemaKeywordTest, DependentRequired)
     ASSERT_TRUE(schemaResult.has_value());
 
     QJsonObject validNoCreditCard{};
-    validNoCreditCard[u"name"_qs] = u"Alice"_qs;
+    validNoCreditCard[u"name"_qt_s] = u"Alice"_qt_s;
     EXPECT_TRUE(schemaResult->validate(validNoCreditCard).isValid());
 
     QJsonObject validWithBilling{};
-    validWithBilling[u"name"_qs]           = u"Alice"_qs;
-    validWithBilling[u"creditCard"_qs]     = u"1234"_qs;
-    validWithBilling[u"billingAddress"_qs] = u"123 Main St"_qs;
+    validWithBilling[u"name"_qt_s]           = u"Alice"_qt_s;
+    validWithBilling[u"creditCard"_qt_s]     = u"1234"_qt_s;
+    validWithBilling[u"billingAddress"_qt_s] = u"123 Main St"_qt_s;
     EXPECT_TRUE(schemaResult->validate(validWithBilling).isValid());
 
     QJsonObject invalidMissingBilling{};
-    invalidMissingBilling[u"name"_qs]       = u"Alice"_qs;
-    invalidMissingBilling[u"creditCard"_qs] = u"1234"_qs;
+    invalidMissingBilling[u"name"_qt_s]       = u"Alice"_qt_s;
+    invalidMissingBilling[u"creditCard"_qt_s] = u"1234"_qt_s;
     EXPECT_FALSE(schemaResult->validate(invalidMissingBilling).isValid());
 }
 
@@ -503,17 +505,17 @@ TEST_F(JSONSchemaKeywordTest, DependentSchemas)
     ASSERT_TRUE(schemaResult.has_value());
 
     QJsonObject validNoCreditCard{};
-    validNoCreditCard[u"name"_qs] = u"Alice"_qs;
+    validNoCreditCard[u"name"_qt_s] = u"Alice"_qt_s;
     EXPECT_TRUE(schemaResult->validate(validNoCreditCard).isValid());
 
     QJsonObject validWithBilling{};
-    validWithBilling[u"name"_qs]           = u"Alice"_qs;
-    validWithBilling[u"creditCard"_qs]     = u"1234"_qs;
-    validWithBilling[u"billingAddress"_qs] = u"123 Main St"_qs;
+    validWithBilling[u"name"_qt_s]           = u"Alice"_qt_s;
+    validWithBilling[u"creditCard"_qt_s]     = u"1234"_qt_s;
+    validWithBilling[u"billingAddress"_qt_s] = u"123 Main St"_qt_s;
     EXPECT_TRUE(schemaResult->validate(validWithBilling).isValid());
 
     QJsonObject invalidMissingBilling{};
-    invalidMissingBilling[u"name"_qs]       = u"Alice"_qs;
-    invalidMissingBilling[u"creditCard"_qs] = u"1234"_qs;
+    invalidMissingBilling[u"name"_qt_s]       = u"Alice"_qt_s;
+    invalidMissingBilling[u"creditCard"_qt_s] = u"1234"_qt_s;
     EXPECT_FALSE(schemaResult->validate(invalidMissingBilling).isValid());
 }

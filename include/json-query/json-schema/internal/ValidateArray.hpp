@@ -6,6 +6,7 @@
 #include "json-query/json-schema/internal/ValidationHelpers.hpp"
 #include "json-query/json-schema/internal/SchemaNode.hpp"
 #include "json-query/json-schema/JSONSchemaError.hpp"
+#include "json-query/utils/QtStringLiterals.hpp"
 
 #include <QJsonArray>
 #include <QString>
@@ -26,18 +27,20 @@ inline void validateArray(ValidateContext&    ctx,
                           const QString&      schemaPath,
                           ValidateNodeFn&     validateNode)
 {
+    using json_query::literals::operator""_qt_s;
+
     const auto size{static_cast<std::size_t>(arr.size())};
 
     if (node.minItems && size < *node.minItems)
     {
         const auto msg{QString(u"Array has %1 items, minimum is %2").arg(size).arg(*node.minItems)};
-        ctx.result.addError(instancePath, schemaPath + u"/minItems"_qs, msg, EvalError::MinItemsViolation);
+        ctx.result.addError(instancePath, schemaPath + u"/minItems"_qt_s, msg, EvalError::MinItemsViolation);
     }
 
     if (node.maxItems && size > *node.maxItems)
     {
         const auto msg{QString(u"Array has %1 items, maximum is %2").arg(size).arg(*node.maxItems)};
-        ctx.result.addError(instancePath, schemaPath + u"/maxItems"_qs, msg, EvalError::MaxItemsViolation);
+        ctx.result.addError(instancePath, schemaPath + u"/maxItems"_qt_s, msg, EvalError::MaxItemsViolation);
     }
 
     if (node.uniqueItems && size > 1)
@@ -50,8 +53,8 @@ inline void validateArray(ValidateContext&    ctx,
                 if (jsonValuesEqual(arr[i], arr[j]))
                 {
                     ctx.result.addError(instancePath,
-                                        schemaPath + u"/uniqueItems"_qs,
-                                        u"Array items are not unique"_qs,
+                                        schemaPath + u"/uniqueItems"_qt_s,
+                                        u"Array items are not unique"_qt_s,
                                         EvalError::UniqueItemsViolation);
                     break;
                 }
@@ -64,8 +67,8 @@ inline void validateArray(ValidateContext&    ctx,
     {
         if (i >= arr.size() || !ctx.shouldContinue())
             break;
-        const auto itemPath{instancePath + u"/"_qs + QString::number(i)};
-        const auto itemSchemaPath{schemaPath + u"/prefixItems/"_qs + QString::number(i)};
+        const auto itemPath{instancePath + u"/"_qt_s + QString::number(i)};
+        const auto itemSchemaPath{schemaPath + u"/prefixItems/"_qt_s + QString::number(i)};
         validateNode(ctx, ctx.schema.nodeAt(schemaIndex), arr[static_cast<int>(i)], itemPath, itemSchemaPath);
     }
 
@@ -79,8 +82,8 @@ inline void validateArray(ValidateContext&    ctx,
                 continue;
             if (!ctx.shouldContinue())
                 break;
-            const auto itemPath{instancePath + u"/"_qs + QString::number(i)};
-            validateNode(ctx, ctx.schema.nodeAt(*node.items), item, itemPath, schemaPath + u"/items"_qs);
+            const auto itemPath{instancePath + u"/"_qt_s + QString::number(i)};
+            validateNode(ctx, ctx.schema.nodeAt(*node.items), item, itemPath, schemaPath + u"/items"_qt_s);
         }
     }
 
@@ -95,8 +98,8 @@ inline void validateArray(ValidateContext&    ctx,
             validateNode(tempCtx,
                          ctx.schema.nodeAt(*node.contains),
                          item,
-                         instancePath + u"/"_qs + QString::number(i),
-                         schemaPath + u"/contains"_qs);
+                         instancePath + u"/"_qt_s + QString::number(i),
+                         schemaPath + u"/contains"_qt_s);
             if (tempResult.isValid())
             {
                 found = true;
@@ -106,8 +109,8 @@ inline void validateArray(ValidateContext&    ctx,
         if (!found)
         {
             ctx.result.addError(instancePath,
-                                schemaPath + u"/contains"_qs,
-                                u"Array does not contain required item"_qs,
+                                schemaPath + u"/contains"_qt_s,
+                                u"Array does not contain required item"_qt_s,
                                 EvalError::ContainsViolation);
         }
     }

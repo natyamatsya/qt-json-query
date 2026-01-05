@@ -24,8 +24,10 @@
 #include <QtDebug>
 
 #include "json-query/json-schema/JSONSchema.hpp"
+#include "json-query/utils/QtStringLiterals.hpp"
 
 using namespace json_query::json_schema;
+using json_query::literals::operator""_qt_s;
 
 namespace
 {
@@ -96,10 +98,10 @@ static QList<SchemaTestCase> loadTestFile(const QString& filePath)
             continue;
 
         const auto groupObj{groupValue.toObject()};
-        const auto groupDesc{groupObj[u"description"_qs].toString()};
-        const auto schema{groupObj[u"schema"_qs]};
+        const auto groupDesc{groupObj[u"description"_qt_s].toString()};
+        const auto schema{groupObj[u"schema"_qt_s]};
 
-        const auto testsArray{groupObj[u"tests"_qs].toArray()};
+        const auto testsArray{groupObj[u"tests"_qt_s].toArray()};
         for (const QJsonValue& testValue : testsArray)
         {
             if (!testValue.isObject())
@@ -110,10 +112,10 @@ static QList<SchemaTestCase> loadTestFile(const QString& filePath)
             SchemaTestCase tc{};
             tc.fileName      = fileName;
             tc.groupDesc     = groupDesc;
-            tc.testDesc      = testObj[u"description"_qs].toString();
+            tc.testDesc      = testObj[u"description"_qt_s].toString();
             tc.schema        = schema;
-            tc.data          = testObj[u"data"_qs];
-            tc.expectedValid = testObj[u"valid"_qs].toBool();
+            tc.data          = testObj[u"data"_qt_s];
+            tc.expectedValid = testObj[u"valid"_qt_s].toBool();
 
             cases.append(std::move(tc));
         }
@@ -140,7 +142,7 @@ static QList<SchemaTestCase> collectAllTestCases()
         return all;
     }
 
-    QDirIterator it{dir.path(), QStringList{} << u"*.json"_qs, QDir::Files, QDirIterator::Subdirectories};
+    QDirIterator it{dir.path(), QStringList{} << u"*.json"_qt_s, QDir::Files, QDirIterator::Subdirectories};
     while (it.hasNext())
     {
         const auto filePath{it.next()};
@@ -216,8 +218,8 @@ INSTANTIATE_TEST_SUITE_P(IETF_JSONSchema,
                              // Build unique test name: file_group_test_index
                              QString name{info.param.fileName};
                              name = name.section(u'.', 0, 0); // Remove .json extension
-                             name += u"_"_qs + info.param.groupDesc.left(30);
-                             name += u"_"_qs + QString::number(info.index);
+                             name += u"_"_qt_s + info.param.groupDesc.left(30);
+                             name += u"_"_qt_s + QString::number(info.index);
 
                              // Replace forbidden characters with underscore
                              for (auto& ch : name)

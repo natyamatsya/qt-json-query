@@ -14,38 +14,38 @@
  * provides clean aliases that avoid namespace pollution in headers.
  *
  * Available suffixes:
- * - _qt_s   : Creates QString (wraps Qt::StringLiterals::_s)
- * - _qt_sv  : Creates QStringView (wraps Qt::StringLiterals::_sv)
- * - _qt_l1  : Creates QLatin1String (wraps Qt::StringLiterals::_L1)
+ * - _qt_s  : Creates QString from UTF-16 literal
+ * - _qt_sv : Creates QStringView from UTF-16 literal (zero-copy)
+ * - _qt_l1 : Creates QLatin1String from ASCII literal (zero-copy)
  *
  * Usage:
  *   using json_query::literals::operator""_qt_s;
  *   using json_query::literals::operator""_qt_sv;
  *   using json_query::literals::operator""_qt_l1;
  *
- *   auto str = u"hello"_qt_s;   // QString
- *   auto view = u"hello"_qt_sv; // QStringView
- *   auto l1 = "hello"_qt_l1;    // QLatin1String
+ *   auto str  = u"hello"_qt_s;   // QString
+ *   auto view = u"hello"_qt_sv;  // QStringView
+ *   auto l1   = "hello"_qt_l1;   // QLatin1String
  */
 namespace json_query::literals
 {
 
-/// Creates QString - alias for Qt::StringLiterals::operator""_s
+/// Creates QString from UTF-16 string literal
 inline QString operator""_qt_s(const char16_t* str, std::size_t size)
 {
     return Qt::StringLiterals::operator""_s(str, size);
 }
 
-/// Creates QStringView - alias for Qt::StringLiterals::operator""_sv
-inline QStringView operator""_qt_sv(const char16_t* str, std::size_t size) noexcept
+/// Creates QStringView from UTF-16 string literal (zero-copy, non-owning)
+constexpr QStringView operator""_qt_sv(const char16_t* str, std::size_t size) noexcept
 {
-    return Qt::StringLiterals::operator""_sv(str, size);
+    return QStringView(str, static_cast<qsizetype>(size));
 }
 
-/// Creates QLatin1String - alias for Qt::StringLiterals::operator""_L1
-inline QLatin1String operator""_qt_l1(const char* str, std::size_t size) noexcept
+/// Creates QLatin1String from ASCII string literal (zero-copy, non-owning)
+constexpr QLatin1String operator""_qt_l1(const char* str, std::size_t size) noexcept
 {
-    return Qt::StringLiterals::operator""_L1(str, size);
+    return QLatin1String(str, static_cast<qsizetype>(size));
 }
 
 } // namespace json_query::literals

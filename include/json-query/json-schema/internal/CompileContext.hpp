@@ -3,8 +3,10 @@
 #pragma once
 
 #include "json-query/json-schema/internal/SchemaNode.hpp"
+#include "json-query/utils/QtStringLiterals.hpp"
 
 #include <QString>
+#include <QStringView>
 #include <unordered_map>
 #include <vector>
 
@@ -39,9 +41,11 @@ struct CompileContext
      */
     [[nodiscard]] QString scopedAnchorKey(const QString& anchorName) const
     {
+        using json_query::literals::operator""_qt_s;
+
         if (baseUri.isEmpty())
             return anchorName;
-        return baseUri + u"#"_qs + anchorName;
+        return baseUri + u"#"_qt_s + anchorName;
     }
 };
 

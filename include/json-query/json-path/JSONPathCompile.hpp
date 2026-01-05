@@ -3,6 +3,7 @@
 #pragma once
 
 #include "JSONPathError.hpp"
+#include "json-query/config/Portability.hpp"
 
 #include <QJsonValue>
 #include <QJsonArray>
@@ -98,7 +99,7 @@ class FilterToken
     }
 
   private:
-    [[no_unique_address]] Filter filter_; // Zero overhead with empty base optimization
+    QT_JSON_QUERY_NO_UNIQUE_ADDRESS Filter filter_; // Zero overhead with empty base optimization
 };
 
 /**
@@ -143,7 +144,7 @@ class ContextFilterToken
     }
 
   private:
-    [[no_unique_address]] ContextFilter filter_; // Zero overhead with empty base optimization
+    QT_JSON_QUERY_NO_UNIQUE_ADDRESS ContextFilter filter_; // Zero overhead with empty base optimization
 };
 
 enum class FunctionType

@@ -12,6 +12,7 @@
 
 #include "JSONSchemaError.hpp"
 #include "json-query/json-pointer/JSONPointer.hpp"
+#include "json-query/utils/QtStringLiterals.hpp"
 
 namespace json_query::json_schema
 {
@@ -89,18 +90,20 @@ struct ValidationError
      */
     [[nodiscard]] QJsonObject toJson() const
     {
+        using json_query::literals::operator""_qt_s;
+
         QJsonObject obj{};
-        obj[u"instanceLocation"_qs] = instanceLocation;
-        obj[u"schemaLocation"_qs]   = schemaLocation;
-        obj[u"message"_qs]          = message;
-        obj[u"code"_qs]             = static_cast<int>(code);
+        obj[u"instanceLocation"_qt_s] = instanceLocation;
+        obj[u"schemaLocation"_qt_s]   = schemaLocation;
+        obj[u"message"_qt_s]          = message;
+        obj[u"code"_qt_s]             = static_cast<int>(code);
 
         if (!nested.empty())
         {
             QJsonArray nestedArr{};
             for (const auto& err : nested)
                 nestedArr.append(err.toJson());
-            obj[u"nested"_qs] = nestedArr;
+            obj[u"nested"_qt_s] = nestedArr;
         }
 
         return obj;
@@ -156,15 +159,17 @@ class ValidationResult
      */
     [[nodiscard]] QJsonObject toJson() const
     {
+        using json_query::literals::operator""_qt_s;
+
         QJsonObject result{};
-        result[u"valid"_qs] = isValid();
+        result[u"valid"_qt_s] = isValid();
 
         if (!isValid())
         {
             QJsonArray errorsArr{};
             for (const auto& err : m_errors)
                 errorsArr.append(err.toJson());
-            result[u"errors"_qs] = errorsArr;
+            result[u"errors"_qt_s] = errorsArr;
         }
 
         return result;
@@ -175,8 +180,10 @@ class ValidationResult
      */
     [[nodiscard]] QString toString() const
     {
+        using json_query::literals::operator""_qt_s;
+
         if (isValid())
-            return u"Valid"_qs;
+            return u"Valid"_qt_s;
 
         QString result = QString(u"Invalid: %1 error(s)\n").arg(m_errors.size());
         for (const auto& err : m_errors)

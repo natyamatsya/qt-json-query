@@ -40,10 +40,12 @@ JSONSchema::ParseResult JSONSchema::create(const QJsonValue& schemaValue)
 
 ValidationResult JSONSchema::validate(const QJsonValue& instance) const
 {
+    using json_query::literals::operator""_qt_s;
+
     if (!m_compiled)
     {
         ValidationResult result{};
-        result.addError(u""_qs, u"#"_qs, u"Schema is not compiled"_qs, EvalError::ConstMismatch);
+        result.addError(u""_qt_s, u"#"_qt_s, u"Schema is not compiled"_qt_s, EvalError::ConstMismatch);
         return result;
     }
 

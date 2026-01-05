@@ -7,8 +7,10 @@
 #include <QJsonArray>
 
 #include "json-query/json-schema/JSONSchema.hpp"
+#include "json-query/utils/QtStringLiterals.hpp"
 
 using namespace json_query::json_schema;
+using json_query::literals::operator""_qt_s;
 
 class JSONSchemaRefTest : public ::testing::Test
 {
@@ -37,15 +39,15 @@ TEST_F(JSONSchemaRefTest, RefToDefinitions)
     ASSERT_TRUE(schemaResult.has_value());
 
     QJsonObject valid{};
-    valid[u"age"_qs] = 25;
+    valid[u"age"_qt_s] = 25;
     EXPECT_TRUE(schemaResult->validate(valid).isValid());
 
     QJsonObject invalidNegative{};
-    invalidNegative[u"age"_qs] = -5;
+    invalidNegative[u"age"_qt_s] = -5;
     EXPECT_FALSE(schemaResult->validate(invalidNegative).isValid());
 
     QJsonObject invalidType{};
-    invalidType[u"age"_qs] = u"not a number"_qs;
+    invalidType[u"age"_qt_s] = u"not a number"_qt_s;
     EXPECT_FALSE(schemaResult->validate(invalidType).isValid());
 }
 
@@ -90,19 +92,19 @@ TEST_F(JSONSchemaRefTest, RefToNestedDefinition)
     ASSERT_TRUE(schemaResult.has_value());
 
     QJsonObject validAddress{};
-    validAddress[u"street"_qs] = u"123 Main St"_qs;
-    validAddress[u"city"_qs]   = u"Springfield"_qs;
+    validAddress[u"street"_qt_s] = u"123 Main St"_qt_s;
+    validAddress[u"city"_qt_s]   = u"Springfield"_qt_s;
 
     QJsonObject valid{};
-    valid[u"billingAddress"_qs]  = validAddress;
-    valid[u"shippingAddress"_qs] = validAddress;
+    valid[u"billingAddress"_qt_s]  = validAddress;
+    valid[u"shippingAddress"_qt_s] = validAddress;
     EXPECT_TRUE(schemaResult->validate(valid).isValid());
 
     QJsonObject invalidAddress{};
-    invalidAddress[u"street"_qs] = u"123 Main St"_qs;
+    invalidAddress[u"street"_qt_s] = u"123 Main St"_qt_s;
 
     QJsonObject invalid{};
-    invalid[u"billingAddress"_qs] = invalidAddress;
+    invalid[u"billingAddress"_qt_s] = invalidAddress;
     EXPECT_FALSE(schemaResult->validate(invalid).isValid());
 }
 
@@ -122,14 +124,14 @@ TEST_F(JSONSchemaRefTest, MultipleRefsToSameDefinition)
     ASSERT_TRUE(schemaResult.has_value());
 
     QJsonObject valid{};
-    valid[u"firstName"_qs]  = u"John"_qs;
-    valid[u"lastName"_qs]   = u"Doe"_qs;
-    valid[u"middleName"_qs] = u"Q"_qs;
+    valid[u"firstName"_qt_s]  = u"John"_qt_s;
+    valid[u"lastName"_qt_s]   = u"Doe"_qt_s;
+    valid[u"middleName"_qt_s] = u"Q"_qt_s;
     EXPECT_TRUE(schemaResult->validate(valid).isValid());
 
     QJsonObject invalid{};
-    invalid[u"firstName"_qs] = u"John"_qs;
-    invalid[u"lastName"_qs]  = 42;
+    invalid[u"firstName"_qt_s] = u"John"_qt_s;
+    invalid[u"lastName"_qt_s]  = 42;
     EXPECT_FALSE(schemaResult->validate(invalid).isValid());
 }
 
@@ -155,11 +157,11 @@ TEST_F(JSONSchemaRefTest, AnchorReference)
     ASSERT_TRUE(schemaResult.has_value());
 
     QJsonObject valid{};
-    valid[u"count"_qs] = 10;
+    valid[u"count"_qt_s] = 10;
     EXPECT_TRUE(schemaResult->validate(valid).isValid());
 
     QJsonObject invalid{};
-    invalid[u"count"_qs] = -5;
+    invalid[u"count"_qt_s] = -5;
     EXPECT_FALSE(schemaResult->validate(invalid).isValid());
 }
 
@@ -182,19 +184,19 @@ TEST_F(JSONSchemaRefTest, RecursiveSchema)
     ASSERT_TRUE(schemaResult.has_value());
 
     QJsonObject child2{};
-    child2[u"name"_qs] = u"Grandchild"_qs;
+    child2[u"name"_qt_s] = u"Grandchild"_qt_s;
 
     QJsonArray  children{};
     QJsonObject child1{};
-    child1[u"name"_qs] = u"Child"_qs;
+    child1[u"name"_qt_s] = u"Child"_qt_s;
     QJsonArray grandchildren{};
     grandchildren.append(child2);
-    child1[u"children"_qs] = grandchildren;
+    child1[u"children"_qt_s] = grandchildren;
     children.append(child1);
 
     QJsonObject root{};
-    root[u"name"_qs]     = u"Root"_qs;
-    root[u"children"_qs] = children;
+    root[u"name"_qt_s]     = u"Root"_qt_s;
+    root[u"children"_qt_s] = children;
 
     EXPECT_TRUE(schemaResult->validate(root).isValid());
 }
@@ -216,20 +218,20 @@ TEST_F(JSONSchemaRefTest, MutuallyRecursiveSchemas)
     ASSERT_TRUE(schemaResult.has_value());
 
     QJsonObject node3{};
-    node3[u"value"_qs] = 3;
+    node3[u"value"_qt_s] = 3;
 
     QJsonObject node2{};
-    node2[u"value"_qs] = 2;
-    node2[u"next"_qs]  = node3;
+    node2[u"value"_qt_s] = 2;
+    node2[u"next"_qt_s]  = node3;
 
     QJsonObject node1{};
-    node1[u"value"_qs] = 1;
-    node1[u"next"_qs]  = node2;
+    node1[u"value"_qt_s] = 1;
+    node1[u"next"_qt_s]  = node2;
 
     EXPECT_TRUE(schemaResult->validate(node1).isValid());
 
     QJsonObject invalidNode{};
-    invalidNode[u"value"_qs] = u"not a number"_qs;
+    invalidNode[u"value"_qt_s] = u"not a number"_qt_s;
     EXPECT_FALSE(schemaResult->validate(invalidNode).isValid());
 }
 
@@ -284,13 +286,13 @@ TEST_F(JSONSchemaRefTest, RefInConditional)
     ASSERT_TRUE(schemaResult.has_value());
 
     QJsonObject usValid{};
-    usValid[u"country"_qs] = u"US"_qs;
-    usValid[u"zipCode"_qs] = u"12345"_qs;
+    usValid[u"country"_qt_s] = u"US"_qt_s;
+    usValid[u"zipCode"_qt_s] = u"12345"_qt_s;
     EXPECT_TRUE(schemaResult->validate(usValid).isValid());
 
     QJsonObject caValid{};
-    caValid[u"country"_qs]    = u"CA"_qs;
-    caValid[u"postalCode"_qs] = u"K1A 0B1"_qs;
+    caValid[u"country"_qt_s]    = u"CA"_qt_s;
+    caValid[u"postalCode"_qt_s] = u"K1A 0B1"_qt_s;
     EXPECT_TRUE(schemaResult->validate(caValid).isValid());
 }
 
@@ -312,13 +314,13 @@ TEST_F(JSONSchemaRefTest, NestedRefs)
     ASSERT_TRUE(schemaResult.has_value());
 
     QJsonObject valid{};
-    valid[u"firstName"_qs] = u"John"_qs;
-    valid[u"lastName"_qs]  = u"Doe"_qs;
+    valid[u"firstName"_qt_s] = u"John"_qt_s;
+    valid[u"lastName"_qt_s]  = u"Doe"_qt_s;
     EXPECT_TRUE(schemaResult->validate(valid).isValid());
 
     QJsonObject invalid{};
-    invalid[u"firstName"_qs] = 42;
-    invalid[u"lastName"_qs]  = u"Doe"_qs;
+    invalid[u"firstName"_qt_s] = 42;
+    invalid[u"lastName"_qt_s]  = u"Doe"_qt_s;
     EXPECT_FALSE(schemaResult->validate(invalid).isValid());
 }
 
@@ -357,10 +359,10 @@ TEST_F(JSONSchemaRefTest, RefWithAdditionalKeywords)
     ASSERT_TRUE(schemaResult.has_value());
 
     QJsonObject valid{};
-    valid[u"name"_qs] = u"John"_qs;
+    valid[u"name"_qt_s] = u"John"_qt_s;
     EXPECT_TRUE(schemaResult->validate(valid).isValid());
 
     QJsonObject tooShort{};
-    tooShort[u"name"_qs] = u"Jo"_qs;
+    tooShort[u"name"_qt_s] = u"Jo"_qt_s;
     EXPECT_FALSE(schemaResult->validate(tooShort).isValid());
 }

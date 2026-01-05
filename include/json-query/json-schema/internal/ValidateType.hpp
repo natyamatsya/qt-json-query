@@ -6,6 +6,7 @@
 #include "json-query/json-schema/internal/SchemaNode.hpp"
 #include "json-query/json-schema/internal/ValidationHelpers.hpp"
 #include "json-query/json-schema/JSONSchemaError.hpp"
+#include "json-query/utils/QtStringLiterals.hpp"
 
 #include <QJsonArray>
 #include <QJsonValue>
@@ -23,6 +24,8 @@ inline void validateType(ValidateContext&      ctx,
                          const QString&        instancePath,
                          const QString&        schemaPath)
 {
+    using json_query::literals::operator""_qt_s;
+
     const auto actualType{jsonValueToSchemaType(instance)};
 
     if (!constraint.allows(actualType))
@@ -30,7 +33,7 @@ inline void validateType(ValidateContext&      ctx,
         const auto msg{QString(u"Expected type %1 but got %2")
                            .arg(schemaTypeToString(constraint.allowedTypes.front()))
                            .arg(schemaTypeToString(actualType))};
-        ctx.result.addError(instancePath, schemaPath + u"/type"_qs, msg, EvalError::TypeMismatch);
+        ctx.result.addError(instancePath, schemaPath + u"/type"_qt_s, msg, EvalError::TypeMismatch);
     }
 }
 
@@ -43,13 +46,15 @@ inline void validateEnum(ValidateContext&  ctx,
                          const QString&    instancePath,
                          const QString&    schemaPath)
 {
+    using json_query::literals::operator""_qt_s;
+
     for (const QJsonValue& allowed : enumValues)
         if (jsonValuesEqual(instance, allowed))
             return; // Match found
 
     ctx.result.addError(instancePath,
-                        schemaPath + u"/enum"_qs,
-                        u"Value is not one of the allowed enum values"_qs,
+                        schemaPath + u"/enum"_qt_s,
+                        u"Value is not one of the allowed enum values"_qt_s,
                         EvalError::EnumMismatch);
 }
 
@@ -62,10 +67,12 @@ inline void validateConst(ValidateContext&  ctx,
                           const QString&    instancePath,
                           const QString&    schemaPath)
 {
+    using json_query::literals::operator""_qt_s;
+
     if (!jsonValuesEqual(instance, constValue))
     {
         ctx.result.addError(
-            instancePath, schemaPath + u"/const"_qs, u"Value does not match const"_qs, EvalError::ConstMismatch);
+            instancePath, schemaPath + u"/const"_qt_s, u"Value does not match const"_qt_s, EvalError::ConstMismatch);
     }
 }
 

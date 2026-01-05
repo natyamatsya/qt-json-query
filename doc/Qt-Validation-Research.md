@@ -155,7 +155,7 @@ bool FormatValidators::isHostname(QStringView value) noexcept
         return false;
     
     // Use QUrl to validate hostname
-    const QUrl url{u"http://"_qs + value.toString()};
+    const QUrl url{u"http://"_qt_s + value.toString()};
     if (!url.isValid())
         return false;
     

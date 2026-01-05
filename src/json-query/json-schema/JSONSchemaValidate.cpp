@@ -11,6 +11,7 @@
 #include "json-query/json-schema/internal/ValidateArray.hpp"
 #include "json-query/json-schema/internal/ValidateObject.hpp"
 #include "json-query/json-schema/internal/ValidateCombinators.hpp"
+#include "json-query/utils/QtStringLiterals.hpp"
 
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonObject>
@@ -81,6 +82,8 @@ void validateNode(ValidateContext&  ctx,
                   const QString&    instancePath,
                   const QString&    schemaPath)
 {
+    using json_query::literals::operator""_qt_s;
+
     std::visit(
         [&](const auto& schemaVariant)
         {
@@ -92,7 +95,7 @@ void validateNode(ValidateContext&  ctx,
                 {
                     ctx.result.addError(instancePath,
                                         schemaPath,
-                                        u"Schema is false, all values are invalid"_qs,
+                                        u"Schema is false, all values are invalid"_qt_s,
                                         EvalError::ConstMismatch);
                 }
                 return;
@@ -117,20 +120,24 @@ void validateNode(ValidateContext&  ctx,
 
 ValidationResult validateInstance(const internal::CompiledSchema& schema, const QJsonValue& instance)
 {
+    using json_query::literals::operator""_qt_s;
+
     ValidationResult result{};
     ValidateContext  ctx{schema, result, false};
 
-    validateNode(ctx, schema.root(), instance, u""_qs, u"#"_qs);
+    validateNode(ctx, schema.root(), instance, u""_qt_s, u"#"_qt_s);
 
     return result;
 }
 
 bool isInstanceValid(const internal::CompiledSchema& schema, const QJsonValue& instance)
 {
+    using json_query::literals::operator""_qt_s;
+
     ValidationResult result{};
     ValidateContext  ctx{schema, result, true}; // Stop on first error
 
-    validateNode(ctx, schema.root(), instance, u""_qs, u"#"_qs);
+    validateNode(ctx, schema.root(), instance, u""_qt_s, u"#"_qt_s);
 
     return result.isValid();
 }

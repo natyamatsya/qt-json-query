@@ -99,12 +99,12 @@ inline constexpr auto error_map = utils::detail::ErrorMap<...>{...};
 
 ### 5. Qt String Literals
 
-Use `u"..."_qs` for Qt string literals in concatenation:
+Use `u"..."_qt_s` for Qt string literals in concatenation:
 
 ```cpp
 // ✅ Correct
-schemaPath + u"/type"_qs
-instancePath + u"/"_qs + propName
+schemaPath + u"/type"_qt_s
+instancePath + u"/"_qt_s + propName
 
 // ❌ Incorrect
 schemaPath + u"/type"

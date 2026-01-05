@@ -5,6 +5,7 @@
 #include "json-query/json-schema/internal/ValidationContext.hpp"
 #include "json-query/json-schema/internal/SchemaNode.hpp"
 #include "json-query/json-schema/JSONSchemaError.hpp"
+#include "json-query/utils/QtStringLiterals.hpp"
 
 #include <QJsonValue>
 #include <QString>
@@ -25,6 +26,8 @@ inline void validateCombinators(ValidateContext&    ctx,
                                 const QString&      schemaPath,
                                 ValidateNodeFn&     validateNode)
 {
+    using json_query::literals::operator""_qt_s;
+
     // allOf: must match all schemas
     for (const auto [i, schemaIndex] : std::views::enumerate(node.allOf))
     {
@@ -34,7 +37,7 @@ inline void validateCombinators(ValidateContext&    ctx,
                      ctx.schema.nodeAt(schemaIndex),
                      instance,
                      instancePath,
-                     schemaPath + u"/allOf/"_qs + QString::number(i));
+                     schemaPath + u"/allOf/"_qt_s + QString::number(i));
     }
 
     // anyOf: must match at least one schema
@@ -49,7 +52,7 @@ inline void validateCombinators(ValidateContext&    ctx,
                          ctx.schema.nodeAt(schemaIndex),
                          instance,
                          instancePath,
-                         schemaPath + u"/anyOf/"_qs + QString::number(i));
+                         schemaPath + u"/anyOf/"_qt_s + QString::number(i));
             if (tempResult.isValid())
             {
                 anyValid = true;
@@ -59,8 +62,8 @@ inline void validateCombinators(ValidateContext&    ctx,
         if (!anyValid)
         {
             ctx.result.addError(instancePath,
-                                schemaPath + u"/anyOf"_qs,
-                                u"Value does not match any schema in anyOf"_qs,
+                                schemaPath + u"/anyOf"_qt_s,
+                                u"Value does not match any schema in anyOf"_qt_s,
                                 EvalError::AnyOfFailed);
         }
     }
@@ -77,7 +80,7 @@ inline void validateCombinators(ValidateContext&    ctx,
                          ctx.schema.nodeAt(schemaIndex),
                          instance,
                          instancePath,
-                         schemaPath + u"/oneOf/"_qs + QString::number(i));
+                         schemaPath + u"/oneOf/"_qt_s + QString::number(i));
             if (tempResult.isValid())
             {
                 ++matchCount;
@@ -87,9 +90,9 @@ inline void validateCombinators(ValidateContext&    ctx,
         }
         if (matchCount != 1)
         {
-            const auto msg{matchCount == 0 ? u"Value does not match any schema in oneOf"_qs
-                                           : u"Value matches more than one schema in oneOf"_qs};
-            ctx.result.addError(instancePath, schemaPath + u"/oneOf"_qs, msg, EvalError::OneOfFailed);
+            const auto msg{matchCount == 0 ? u"Value does not match any schema in oneOf"_qt_s
+                                           : u"Value matches more than one schema in oneOf"_qt_s};
+            ctx.result.addError(instancePath, schemaPath + u"/oneOf"_qt_s, msg, EvalError::OneOfFailed);
         }
     }
 
@@ -98,11 +101,11 @@ inline void validateCombinators(ValidateContext&    ctx,
     {
         ValidationResult tempResult{};
         ValidateContext  tempCtx{ctx.schema, tempResult, true};
-        validateNode(tempCtx, ctx.schema.nodeAt(*node.notSchema), instance, instancePath, schemaPath + u"/not"_qs);
+        validateNode(tempCtx, ctx.schema.nodeAt(*node.notSchema), instance, instancePath, schemaPath + u"/not"_qt_s);
         if (tempResult.isValid())
         {
             ctx.result.addError(
-                instancePath, schemaPath + u"/not"_qs, u"Value matches schema in not"_qs, EvalError::NotFailed);
+                instancePath, schemaPath + u"/not"_qt_s, u"Value matches schema in not"_qt_s, EvalError::NotFailed);
         }
     }
 
@@ -111,19 +114,19 @@ inline void validateCombinators(ValidateContext&    ctx,
     {
         ValidationResult ifResult{};
         ValidateContext  ifCtx{ctx.schema, ifResult, true};
-        validateNode(ifCtx, ctx.schema.nodeAt(*node.ifSchema), instance, instancePath, schemaPath + u"/if"_qs);
+        validateNode(ifCtx, ctx.schema.nodeAt(*node.ifSchema), instance, instancePath, schemaPath + u"/if"_qt_s);
 
         if (ifResult.isValid())
         {
             if (node.thenSchema)
             {
                 validateNode(
-                    ctx, ctx.schema.nodeAt(*node.thenSchema), instance, instancePath, schemaPath + u"/then"_qs);
+                    ctx, ctx.schema.nodeAt(*node.thenSchema), instance, instancePath, schemaPath + u"/then"_qt_s);
             }
         }
         else if (node.elseSchema)
         {
-            validateNode(ctx, ctx.schema.nodeAt(*node.elseSchema), instance, instancePath, schemaPath + u"/else"_qs);
+            validateNode(ctx, ctx.schema.nodeAt(*node.elseSchema), instance, instancePath, schemaPath + u"/else"_qt_s);
         }
     }
 }

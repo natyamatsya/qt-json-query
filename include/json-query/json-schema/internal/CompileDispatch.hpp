@@ -5,6 +5,7 @@
 #include "json-query/json-schema/internal/CompileContext.hpp"
 #include "json-query/json-schema/internal/CompileKeywords.hpp"
 #include "json-query/json-schema/internal/SchemaNode.hpp"
+#include "json-query/utils/QtStringLiterals.hpp"
 
 #include <QJsonObject>
 #include <expected>
@@ -42,24 +43,26 @@ tryParseKeyword(const QJsonObject& obj, const QString& key, std::optional<T>& ta
 [[nodiscard]] inline std::expected<void, QueryError> compileStringKeywords(const QJsonObject& schemaObj,
                                                                            ObjectSchema&      node)
 {
-    if (auto r{parsePatternKeyword(schemaObj[u"pattern"_qs])}; !r)
+    using json_query::literals::operator""_qt_s;
+
+    if (auto r{parsePatternKeyword(schemaObj[u"pattern"_qt_s])}; !r)
         return std::unexpected(r.error());
     else
         node.pattern = std::move(*r);
 
-    if (auto r{parseIntegerKeyword(schemaObj[u"minLength"_qs])}; !r)
+    if (auto r{parseIntegerKeyword(schemaObj[u"minLength"_qt_s])}; !r)
         return std::unexpected(r.error());
     else
         node.minLength = *r;
 
-    if (auto r{parseIntegerKeyword(schemaObj[u"maxLength"_qs])}; !r)
+    if (auto r{parseIntegerKeyword(schemaObj[u"maxLength"_qt_s])}; !r)
         return std::unexpected(r.error());
     else
         node.maxLength = *r;
 
     // Format is just a string, no parsing needed
-    if (schemaObj.contains(u"format"_qs) && schemaObj[u"format"_qs].isString())
-        node.format = schemaObj[u"format"_qs].toString();
+    if (schemaObj.contains(u"format"_qt_s) && schemaObj[u"format"_qt_s].isString())
+        node.format = schemaObj[u"format"_qt_s].toString();
 
     return {};
 }
@@ -70,27 +73,29 @@ tryParseKeyword(const QJsonObject& obj, const QString& key, std::optional<T>& ta
 [[nodiscard]] inline std::expected<void, QueryError> compileNumericKeywords(const QJsonObject& schemaObj,
                                                                             ObjectSchema&      node)
 {
-    if (auto r{parseNumericKeyword(schemaObj[u"minimum"_qs])}; !r)
+    using json_query::literals::operator""_qt_s;
+
+    if (auto r{parseNumericKeyword(schemaObj[u"minimum"_qt_s])}; !r)
         return std::unexpected(r.error());
     else
         node.minimum = *r;
 
-    if (auto r{parseNumericKeyword(schemaObj[u"maximum"_qs])}; !r)
+    if (auto r{parseNumericKeyword(schemaObj[u"maximum"_qt_s])}; !r)
         return std::unexpected(r.error());
     else
         node.maximum = *r;
 
-    if (auto r{parseNumericKeyword(schemaObj[u"exclusiveMinimum"_qs])}; !r)
+    if (auto r{parseNumericKeyword(schemaObj[u"exclusiveMinimum"_qt_s])}; !r)
         return std::unexpected(r.error());
     else
         node.exclusiveMinimum = *r;
 
-    if (auto r{parseNumericKeyword(schemaObj[u"exclusiveMaximum"_qs])}; !r)
+    if (auto r{parseNumericKeyword(schemaObj[u"exclusiveMaximum"_qt_s])}; !r)
         return std::unexpected(r.error());
     else
         node.exclusiveMaximum = *r;
 
-    if (auto r{parseNumericKeyword(schemaObj[u"multipleOf"_qs])}; !r)
+    if (auto r{parseNumericKeyword(schemaObj[u"multipleOf"_qt_s])}; !r)
         return std::unexpected(r.error());
     else
         node.multipleOf = *r;
@@ -104,27 +109,29 @@ tryParseKeyword(const QJsonObject& obj, const QString& key, std::optional<T>& ta
 [[nodiscard]] inline std::expected<void, QueryError>
 compileArrayKeywords(CompileContext& ctx, const QJsonObject& schemaObj, ObjectSchema& node, CompileSchemaFn& compile)
 {
-    if (auto r{parseIntegerKeyword(schemaObj[u"minItems"_qs])}; !r)
+    using json_query::literals::operator""_qt_s;
+
+    if (auto r{parseIntegerKeyword(schemaObj[u"minItems"_qt_s])}; !r)
         return std::unexpected(r.error());
     else
         node.minItems = *r;
 
-    if (auto r{parseIntegerKeyword(schemaObj[u"maxItems"_qs])}; !r)
+    if (auto r{parseIntegerKeyword(schemaObj[u"maxItems"_qt_s])}; !r)
         return std::unexpected(r.error());
     else
         node.maxItems = *r;
 
-    if (schemaObj.contains(u"uniqueItems"_qs))
+    if (schemaObj.contains(u"uniqueItems"_qt_s))
     {
-        const auto uniqueVal{schemaObj[u"uniqueItems"_qs]};
+        const auto uniqueVal{schemaObj[u"uniqueItems"_qt_s]};
         if (uniqueVal.isBool())
             node.uniqueItems = uniqueVal.toBool();
     }
 
     // prefixItems - array of schemas
-    if (schemaObj.contains(u"prefixItems"_qs) && schemaObj[u"prefixItems"_qs].isArray())
+    if (schemaObj.contains(u"prefixItems"_qt_s) && schemaObj[u"prefixItems"_qt_s].isArray())
     {
-        for (const auto& item : schemaObj[u"prefixItems"_qs].toArray())
+        for (const auto& item : schemaObj[u"prefixItems"_qt_s].toArray())
         {
             auto r{compile(ctx, item)};
             if (!r)
@@ -134,18 +141,18 @@ compileArrayKeywords(CompileContext& ctx, const QJsonObject& schemaObj, ObjectSc
     }
 
     // items - single schema for additional items
-    if (schemaObj.contains(u"items"_qs))
+    if (schemaObj.contains(u"items"_qt_s))
     {
-        auto r{compile(ctx, schemaObj[u"items"_qs])};
+        auto r{compile(ctx, schemaObj[u"items"_qt_s])};
         if (!r)
             return std::unexpected(r.error());
         node.items = *r;
     }
 
     // contains
-    if (schemaObj.contains(u"contains"_qs))
+    if (schemaObj.contains(u"contains"_qt_s))
     {
-        auto r{compile(ctx, schemaObj[u"contains"_qs])};
+        auto r{compile(ctx, schemaObj[u"contains"_qt_s])};
         if (!r)
             return std::unexpected(r.error());
         node.contains = *r;
@@ -160,27 +167,29 @@ compileArrayKeywords(CompileContext& ctx, const QJsonObject& schemaObj, ObjectSc
 [[nodiscard]] inline std::expected<void, QueryError>
 compileObjectKeywords(CompileContext& ctx, const QJsonObject& schemaObj, ObjectSchema& node, CompileSchemaFn& compile)
 {
+    using json_query::literals::operator""_qt_s;
+
     // required
-    if (auto r{parseRequiredKeyword(schemaObj[u"required"_qs])}; !r)
+    if (auto r{parseRequiredKeyword(schemaObj[u"required"_qt_s])}; !r)
         return std::unexpected(r.error());
     else
         node.required = std::move(*r);
 
     // minProperties, maxProperties
-    if (auto r{parseIntegerKeyword(schemaObj[u"minProperties"_qs])}; !r)
+    if (auto r{parseIntegerKeyword(schemaObj[u"minProperties"_qt_s])}; !r)
         return std::unexpected(r.error());
     else
         node.minProperties = *r;
 
-    if (auto r{parseIntegerKeyword(schemaObj[u"maxProperties"_qs])}; !r)
+    if (auto r{parseIntegerKeyword(schemaObj[u"maxProperties"_qt_s])}; !r)
         return std::unexpected(r.error());
     else
         node.maxProperties = *r;
 
     // properties - map of property schemas
-    if (schemaObj.contains(u"properties"_qs) && schemaObj[u"properties"_qs].isObject())
+    if (schemaObj.contains(u"properties"_qt_s) && schemaObj[u"properties"_qt_s].isObject())
     {
-        const auto propsObj{schemaObj[u"properties"_qs].toObject()};
+        const auto propsObj{schemaObj[u"properties"_qt_s].toObject()};
         for (auto it = propsObj.begin(); it != propsObj.end(); ++it)
         {
             auto r{compile(ctx, it.value())};
@@ -191,18 +200,18 @@ compileObjectKeywords(CompileContext& ctx, const QJsonObject& schemaObj, ObjectS
     }
 
     // additionalProperties
-    if (schemaObj.contains(u"additionalProperties"_qs))
+    if (schemaObj.contains(u"additionalProperties"_qt_s))
     {
-        auto r{compile(ctx, schemaObj[u"additionalProperties"_qs])};
+        auto r{compile(ctx, schemaObj[u"additionalProperties"_qt_s])};
         if (!r)
             return std::unexpected(r.error());
         node.additionalProperties = *r;
     }
 
     // patternProperties
-    if (schemaObj.contains(u"patternProperties"_qs) && schemaObj[u"patternProperties"_qs].isObject())
+    if (schemaObj.contains(u"patternProperties"_qt_s) && schemaObj[u"patternProperties"_qt_s].isObject())
     {
-        const auto patternPropsObj{schemaObj[u"patternProperties"_qs].toObject()};
+        const auto patternPropsObj{schemaObj[u"patternProperties"_qt_s].toObject()};
         for (auto it = patternPropsObj.begin(); it != patternPropsObj.end(); ++it)
         {
             QRegularExpression regex{it.key()};
@@ -219,18 +228,18 @@ compileObjectKeywords(CompileContext& ctx, const QJsonObject& schemaObj, ObjectS
     }
 
     // propertyNames
-    if (schemaObj.contains(u"propertyNames"_qs))
+    if (schemaObj.contains(u"propertyNames"_qt_s))
     {
-        auto r{compile(ctx, schemaObj[u"propertyNames"_qs])};
+        auto r{compile(ctx, schemaObj[u"propertyNames"_qt_s])};
         if (!r)
             return std::unexpected(r.error());
         node.propertyNames = *r;
     }
 
     // dependentRequired
-    if (schemaObj.contains(u"dependentRequired"_qs) && schemaObj[u"dependentRequired"_qs].isObject())
+    if (schemaObj.contains(u"dependentRequired"_qt_s) && schemaObj[u"dependentRequired"_qt_s].isObject())
     {
-        const auto depReqObj{schemaObj[u"dependentRequired"_qs].toObject()};
+        const auto depReqObj{schemaObj[u"dependentRequired"_qt_s].toObject()};
         for (auto it = depReqObj.begin(); it != depReqObj.end(); ++it)
         {
             if (it.value().isArray())
@@ -245,9 +254,9 @@ compileObjectKeywords(CompileContext& ctx, const QJsonObject& schemaObj, ObjectS
     }
 
     // dependentSchemas
-    if (schemaObj.contains(u"dependentSchemas"_qs) && schemaObj[u"dependentSchemas"_qs].isObject())
+    if (schemaObj.contains(u"dependentSchemas"_qt_s) && schemaObj[u"dependentSchemas"_qt_s].isObject())
     {
-        const auto depSchObj{schemaObj[u"dependentSchemas"_qs].toObject()};
+        const auto depSchObj{schemaObj[u"dependentSchemas"_qt_s].toObject()};
         for (auto it = depSchObj.begin(); it != depSchObj.end(); ++it)
         {
             auto r{compile(ctx, it.value())};
@@ -268,10 +277,12 @@ compileObjectKeywords(CompileContext& ctx, const QJsonObject& schemaObj, ObjectS
                                                                                ObjectSchema&      node,
                                                                                CompileSchemaFn&   compile)
 {
+    using json_query::literals::operator""_qt_s;
+
     // allOf
-    if (schemaObj.contains(u"allOf"_qs) && schemaObj[u"allOf"_qs].isArray())
+    if (schemaObj.contains(u"allOf"_qt_s) && schemaObj[u"allOf"_qt_s].isArray())
     {
-        for (const auto& item : schemaObj[u"allOf"_qs].toArray())
+        for (const auto& item : schemaObj[u"allOf"_qt_s].toArray())
         {
             auto r{compile(ctx, item)};
             if (!r)
@@ -281,9 +292,9 @@ compileObjectKeywords(CompileContext& ctx, const QJsonObject& schemaObj, ObjectS
     }
 
     // anyOf
-    if (schemaObj.contains(u"anyOf"_qs) && schemaObj[u"anyOf"_qs].isArray())
+    if (schemaObj.contains(u"anyOf"_qt_s) && schemaObj[u"anyOf"_qt_s].isArray())
     {
-        for (const auto& item : schemaObj[u"anyOf"_qs].toArray())
+        for (const auto& item : schemaObj[u"anyOf"_qt_s].toArray())
         {
             auto r{compile(ctx, item)};
             if (!r)
@@ -293,9 +304,9 @@ compileObjectKeywords(CompileContext& ctx, const QJsonObject& schemaObj, ObjectS
     }
 
     // oneOf
-    if (schemaObj.contains(u"oneOf"_qs) && schemaObj[u"oneOf"_qs].isArray())
+    if (schemaObj.contains(u"oneOf"_qt_s) && schemaObj[u"oneOf"_qt_s].isArray())
     {
-        for (const auto& item : schemaObj[u"oneOf"_qs].toArray())
+        for (const auto& item : schemaObj[u"oneOf"_qt_s].toArray())
         {
             auto r{compile(ctx, item)};
             if (!r)
@@ -305,34 +316,34 @@ compileObjectKeywords(CompileContext& ctx, const QJsonObject& schemaObj, ObjectS
     }
 
     // not
-    if (schemaObj.contains(u"not"_qs))
+    if (schemaObj.contains(u"not"_qt_s))
     {
-        auto r{compile(ctx, schemaObj[u"not"_qs])};
+        auto r{compile(ctx, schemaObj[u"not"_qt_s])};
         if (!r)
             return std::unexpected(r.error());
         node.notSchema = *r;
     }
 
     // if/then/else
-    if (schemaObj.contains(u"if"_qs))
+    if (schemaObj.contains(u"if"_qt_s))
     {
-        auto r{compile(ctx, schemaObj[u"if"_qs])};
+        auto r{compile(ctx, schemaObj[u"if"_qt_s])};
         if (!r)
             return std::unexpected(r.error());
         node.ifSchema = *r;
     }
 
-    if (schemaObj.contains(u"then"_qs))
+    if (schemaObj.contains(u"then"_qt_s))
     {
-        auto r{compile(ctx, schemaObj[u"then"_qs])};
+        auto r{compile(ctx, schemaObj[u"then"_qt_s])};
         if (!r)
             return std::unexpected(r.error());
         node.thenSchema = *r;
     }
 
-    if (schemaObj.contains(u"else"_qs))
+    if (schemaObj.contains(u"else"_qt_s))
     {
-        auto r{compile(ctx, schemaObj[u"else"_qs])};
+        auto r{compile(ctx, schemaObj[u"else"_qt_s])};
         if (!r)
             return std::unexpected(r.error());
         node.elseSchema = *r;
@@ -346,11 +357,13 @@ compileObjectKeywords(CompileContext& ctx, const QJsonObject& schemaObj, ObjectS
  */
 inline void compileMetadataKeywords(const QJsonObject& schemaObj, ObjectSchema& node)
 {
-    if (schemaObj.contains(u"title"_qs) && schemaObj[u"title"_qs].isString())
-        node.title = schemaObj[u"title"_qs].toString();
+    using json_query::literals::operator""_qt_s;
 
-    if (schemaObj.contains(u"description"_qs) && schemaObj[u"description"_qs].isString())
-        node.description = schemaObj[u"description"_qs].toString();
+    if (schemaObj.contains(u"title"_qt_s) && schemaObj[u"title"_qt_s].isString())
+        node.title = schemaObj[u"title"_qt_s].toString();
+
+    if (schemaObj.contains(u"description"_qt_s) && schemaObj[u"description"_qt_s].isString())
+        node.description = schemaObj[u"description"_qt_s].toString();
 }
 
 /**
@@ -359,9 +372,11 @@ inline void compileMetadataKeywords(const QJsonObject& schemaObj, ObjectSchema& 
 [[nodiscard]] inline std::expected<void, QueryError>
 compileNestedDefs(CompileContext& ctx, const QJsonObject& schemaObj, CompileSchemaFn& compile)
 {
-    if (schemaObj.contains(u"$defs"_qs) && schemaObj[u"$defs"_qs].isObject())
+    using json_query::literals::operator""_qt_s;
+
+    if (schemaObj.contains(u"$defs"_qt_s) && schemaObj[u"$defs"_qt_s].isObject())
     {
-        const auto defsObj{schemaObj[u"$defs"_qs].toObject()};
+        const auto defsObj{schemaObj[u"$defs"_qt_s].toObject()};
         for (auto it = defsObj.begin(); it != defsObj.end(); ++it)
         {
             auto r{compile(ctx, it.value())};
@@ -397,17 +412,19 @@ struct KeywordCategoryHandler<KeywordCategory::TypeConstraints>
     [[nodiscard]] static std::expected<void, QueryError>
     compile(CompileContext&, const QJsonObject& schemaObj, ObjectSchema& node, CompileSchemaFn&)
     {
-        if (auto r{parseTypeKeyword(schemaObj[u"type"_qs])}; !r)
+        using json_query::literals::operator""_qt_s;
+
+        if (auto r{parseTypeKeyword(schemaObj[u"type"_qt_s])}; !r)
             return std::unexpected(r.error());
         else
             node.type = *r;
 
-        if (auto r{parseEnumKeyword(schemaObj[u"enum"_qs])}; !r)
+        if (auto r{parseEnumKeyword(schemaObj[u"enum"_qt_s])}; !r)
             return std::unexpected(r.error());
         else
             node.enumValues = *r;
 
-        node.constValue = parseConstKeyword(schemaObj[u"const"_qs]);
+        node.constValue = parseConstKeyword(schemaObj[u"const"_qt_s]);
         return {};
     }
 };

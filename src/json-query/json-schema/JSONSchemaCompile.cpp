@@ -6,6 +6,7 @@
 #include "json-query/json-schema/internal/CompileContext.hpp"
 #include "json-query/json-schema/internal/CompileKeywords.hpp"
 #include "json-query/json-schema/internal/CompileDispatch.hpp"
+#include "json-query/utils/QtStringLiterals.hpp"
 
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonObject>
@@ -118,8 +119,10 @@ static constexpr std::array kMetadataOnlyKeys{
  */
 void processSchemaId(CompileContext& ctx, const QJsonObject& schemaObj)
 {
-    if (schemaObj.contains(u"$id"_qs) && schemaObj[u"$id"_qs].isString())
-        ctx.baseUri = schemaObj[u"$id"_qs].toString();
+    using json_query::literals::operator""_qt_s;
+
+    if (schemaObj.contains(u"$id"_qt_s) && schemaObj[u"$id"_qt_s].isString())
+        ctx.baseUri = schemaObj[u"$id"_qt_s].toString();
 }
 
 /**
@@ -127,8 +130,10 @@ void processSchemaId(CompileContext& ctx, const QJsonObject& schemaObj)
  */
 [[nodiscard]] std::optional<QString> extractAnchorName(const QJsonObject& schemaObj)
 {
-    if (schemaObj.contains(u"$anchor"_qs) && schemaObj[u"$anchor"_qs].isString())
-        return schemaObj[u"$anchor"_qs].toString();
+    using json_query::literals::operator""_qt_s;
+
+    if (schemaObj.contains(u"$anchor"_qt_s) && schemaObj[u"$anchor"_qt_s].isString())
+        return schemaObj[u"$anchor"_qt_s].toString();
     return std::nullopt;
 }
 
@@ -162,6 +167,8 @@ struct BaseUriScope
  */
 std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, const QJsonValue& schemaValue)
 {
+    using json_query::literals::operator""_qt_s;
+
     // Fast path: Boolean schema
     if (schemaValue.isBool())
         return ctx.addNode(BooleanSchema{schemaValue.toBool()});
@@ -177,15 +184,15 @@ std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, co
     const auto anchorName{extractAnchorName(schemaObj)};
 
     // Phase 2: Fast path for $ref-only schemas
-    const auto hasRef{schemaObj.contains(u"$ref"_qs)};
+    const auto hasRef{schemaObj.contains(u"$ref"_qt_s)};
     if (hasRef && !hasValidationKeywords(schemaObj))
-        return ctx.addNode(RefSchema{0, schemaObj[u"$ref"_qs].toString()});
+        return ctx.addNode(RefSchema{0, schemaObj[u"$ref"_qt_s].toString()});
 
     // Phase 3: Build ObjectSchema via dispatch
     ObjectSchema node{};
 
     if (hasRef)
-        node.allOf.push_back(ctx.addNode(RefSchema{0, schemaObj[u"$ref"_qs].toString()}));
+        node.allOf.push_back(ctx.addNode(RefSchema{0, schemaObj[u"$ref"_qt_s].toString()}));
 
     if (auto r{FullKeywordDispatcher::dispatch(ctx, schemaObj, node, compileSchemaNode)}; !r)
         return std::unexpected(r.error());
@@ -211,11 +218,13 @@ std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, co
  */
 void extractRootMetadata(const QJsonObject& rootObj, internal::CompiledSchema& compiled)
 {
-    if (rootObj.contains(u"$id"_qs) && rootObj[u"$id"_qs].isString())
-        compiled.schemaId = rootObj[u"$id"_qs].toString();
+    using json_query::literals::operator""_qt_s;
 
-    if (rootObj.contains(u"$schema"_qs) && rootObj[u"$schema"_qs].isString())
-        compiled.dialect = rootObj[u"$schema"_qs].toString();
+    if (rootObj.contains(u"$id"_qt_s) && rootObj[u"$id"_qt_s].isString())
+        compiled.schemaId = rootObj[u"$id"_qt_s].toString();
+
+    if (rootObj.contains(u"$schema"_qt_s) && rootObj[u"$schema"_qt_s].isString())
+        compiled.dialect = rootObj[u"$schema"_qt_s].toString();
 }
 
 /**
@@ -253,10 +262,12 @@ void resolveReference(RefSchema&                                      refNode,
                       std::size_t                                     rootIndex,
                       const std::unordered_map<QString, std::size_t>& anchors)
 {
+    using json_query::literals::operator""_qt_s;
+
     const auto& ref{refNode.originalRef};
 
     // Root reference
-    if (ref == u"#"_qs)
+    if (ref == u"#"_qt_s)
     {
         refNode.targetIndex = rootIndex;
         return;
@@ -270,7 +281,7 @@ void resolveReference(RefSchema&                                      refNode,
     }
 
     // Anchor with # prefix (e.g., "#foo" → lookup "foo")
-    if (ref.startsWith(u"#"_qs))
+    if (ref.startsWith(u"#"_qt_s))
     {
         const auto anchorName{ref.mid(1)};
         if (anchors.contains(anchorName))
@@ -288,7 +299,7 @@ void resolveReference(RefSchema&                                      refNode,
         // Extract filename and build scoped key
         const auto lastSlash{baseUri.lastIndexOf(u'/')};
         const auto filename{lastSlash >= 0 ? baseUri.mid(lastSlash + 1) : baseUri};
-        const auto scopedKey{filename + u"#"_qs + fragment};
+        const auto scopedKey{filename + u"#"_qt_s + fragment};
 
         if (anchors.contains(scopedKey))
             refNode.targetIndex = anchors.at(scopedKey);
@@ -313,6 +324,8 @@ void resolveAllReferences(internal::CompiledSchema& compiled, const std::unorder
 
 std::expected<std::shared_ptr<internal::CompiledSchema>, QueryError> compileSchema(const QJsonValue& schemaValue)
 {
+    using json_query::literals::operator""_qt_s;
+
     // Validate input
     if (schemaValue.isNull() || schemaValue.isUndefined())
         return std::unexpected(QueryError(ParseError::EmptySchema));
@@ -328,10 +341,10 @@ std::expected<std::shared_ptr<internal::CompiledSchema>, QueryError> compileSche
 
         extractRootMetadata(rootObj, *compiled);
 
-        if (auto r{compileDefinitionsBlock(ctx, rootObj, u"$defs"_qs, u"#/$defs/"_qs)}; !r)
+        if (auto r{compileDefinitionsBlock(ctx, rootObj, u"$defs"_qt_s, u"#/$defs/"_qt_s)}; !r)
             return std::unexpected(r.error());
 
-        if (auto r{compileDefinitionsBlock(ctx, rootObj, u"definitions"_qs, u"#/definitions/"_qs)}; !r)
+        if (auto r{compileDefinitionsBlock(ctx, rootObj, u"definitions"_qt_s, u"#/definitions/"_qt_s)}; !r)
             return std::unexpected(r.error());
     }
 
