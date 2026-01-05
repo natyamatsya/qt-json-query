@@ -69,127 +69,160 @@ namespace patterns {
     static constexpr ctll::fixed_string uriTemplatePattern{R"(^[^{}]*(\{[^{}]+\}[^{}]*)*$)"};
 }
 
+// Helpers for returning differentiated format validation errors
+inline constexpr auto formatInvalid{std::unexpected(EvalError::FormatInvalid)};          // Pattern mismatch
+inline constexpr auto semanticInvalid{std::unexpected(EvalError::FormatSemanticInvalid)}; // Qt semantic check failed
+
 } // anonymous namespace
 
-bool FormatValidators::isDateTime(QStringView value) noexcept
+FormatResult isDateTime(QStringView value) noexcept
 {
     // CTRE pattern match
     if (!ctre::match<patterns::dateTimePattern>(utils::to_sv(value.toString())))
-        return false;
-    // Qt semantic validation
+        return formatInvalid;
+    // Qt semantic validation (e.g., Feb 30 would fail here)
     const auto dt{QDateTime::fromString(value.toString(), Qt::ISODateWithMs)};
-    return dt.isValid();
+    if (!dt.isValid())
+        return semanticInvalid;
+    return {};
 }
 
-bool FormatValidators::isDate(QStringView value) noexcept
+FormatResult isDate(QStringView value) noexcept
 {
-    // CTRE pattern match using utils::to_sv() helper
+    // CTRE pattern match
     if (!ctre::match<patterns::datePattern>(utils::to_sv(value.toString())))
-        return false;
-    // Qt semantic validation
+        return formatInvalid;
+    // Qt semantic validation (e.g., Feb 30 would fail here)
     const auto date{QDate::fromString(value.toString(), Qt::ISODate)};
-    return date.isValid();
+    if (!date.isValid())
+        return semanticInvalid;
+    return {};
 }
 
-bool FormatValidators::isTime(QStringView value) noexcept
+FormatResult isTime(QStringView value) noexcept
 {
     // CTRE pattern match
     if (!ctre::match<patterns::timePattern>(utils::to_sv(value.toString())))
-        return false;
+        return formatInvalid;
     
     // Manual range validation (hour 0-23, minute 0-59, second 0-59)
     const auto str{value.toString()};
     if (str.length() < 8)
-        return false;
+        return formatInvalid;
     
     bool ok{};
     const auto hour{str.mid(0, 2).toInt(&ok)};
     if (!ok || hour > 23)
-        return false;
+        return formatInvalid;
     
     const auto minute{str.mid(3, 2).toInt(&ok)};
     if (!ok || minute > 59)
-        return false;
+        return formatInvalid;
     
     const auto second{str.mid(6, 2).toInt(&ok)};
     if (!ok || second > 59)
-        return false;
+        return formatInvalid;
     
-    return true;
+    return {};
 }
 
-bool FormatValidators::isEmail(QStringView value) noexcept
+FormatResult isEmail(QStringView value) noexcept
 {
     if (value.isEmpty() || value.size() > 254)
-        return false;
-    return ctre::match<patterns::emailPattern>(utils::to_sv(value.toString()));
+        return formatInvalid;
+    if (!ctre::match<patterns::emailPattern>(utils::to_sv(value.toString())))
+        return formatInvalid;
+    return {};
 }
 
-bool FormatValidators::isHostname(QStringView value) noexcept
+FormatResult isHostname(QStringView value) noexcept
 {
     if (value.isEmpty() || value.size() > 253)
-        return false;
-    return ctre::match<patterns::hostnamePattern>(utils::to_sv(value.toString()));
+        return formatInvalid;
+    if (!ctre::match<patterns::hostnamePattern>(utils::to_sv(value.toString())))
+        return formatInvalid;
+    return {};
 }
 
-bool FormatValidators::isIpv4(QStringView value) noexcept
+FormatResult isIpv4(QStringView value) noexcept
 {
     // CTRE pattern match for format
     if (!ctre::match<patterns::ipv4Pattern>(utils::to_sv(value.toString())))
-        return false;
+        return formatInvalid;
     // Qt validates the actual values (0-255 range)
     const QHostAddress addr{value.toString()};
-    return !addr.isNull() && addr.protocol() == QAbstractSocket::IPv4Protocol;
+    if (addr.isNull() || addr.protocol() != QAbstractSocket::IPv4Protocol)
+        return semanticInvalid;
+    return {};
 }
 
-bool FormatValidators::isIpv6(QStringView value) noexcept
+FormatResult isIpv6(QStringView value) noexcept
 {
-    // Qt handles IPv6 well (complex compression format)
+    // Qt handles IPv6 validation (complex compression format)
     const QHostAddress addr{value.toString()};
-    return !addr.isNull() && addr.protocol() == QAbstractSocket::IPv6Protocol;
+    if (addr.isNull() || addr.protocol() != QAbstractSocket::IPv6Protocol)
+        return formatInvalid;
+    return {};
 }
 
-bool FormatValidators::isUri(QStringView value) noexcept
+FormatResult isUri(QStringView value) noexcept
 {
+    // Qt handles URI validation
     const QUrl url{value.toString()};
-    return url.isValid() && !url.scheme().isEmpty();
+    if (!url.isValid())
+        return formatInvalid;
+    if (url.scheme().isEmpty())
+        return semanticInvalid; // Valid URI-reference but not absolute URI
+    return {};
 }
 
-bool FormatValidators::isUriReference(QStringView value) noexcept
+FormatResult isUriReference(QStringView value) noexcept
 {
+    // Qt handles URI-reference validation
     const QUrl url{value.toString()};
-    return url.isValid();
+    if (!url.isValid())
+        return formatInvalid;
+    return {};
 }
 
-bool FormatValidators::isUriTemplate(QStringView value) noexcept
+FormatResult isUriTemplate(QStringView value) noexcept
 {
-    return ctre::match<patterns::uriTemplatePattern>(utils::to_sv(value.toString()));
+    if (!ctre::match<patterns::uriTemplatePattern>(utils::to_sv(value.toString())))
+        return formatInvalid;
+    return {};
 }
 
-bool FormatValidators::isUuid(QStringView value) noexcept
+FormatResult isUuid(QStringView value) noexcept
 {
-    // CTRE pattern match
-    return ctre::match<patterns::uuidPattern>(utils::to_sv(value.toString()));
+    if (!ctre::match<patterns::uuidPattern>(utils::to_sv(value.toString())))
+        return formatInvalid;
+    return {};
 }
 
-bool FormatValidators::isJsonPointer(QStringView value) noexcept
+FormatResult isJsonPointer(QStringView value) noexcept
 {
-    // CTRE pattern match using utils::to_sv() helper
-    return ctre::match<patterns::jsonPointerPattern>(utils::to_sv(value.toString()));
+    if (!ctre::match<patterns::jsonPointerPattern>(utils::to_sv(value.toString())))
+        return formatInvalid;
+    return {};
 }
 
-bool FormatValidators::isRelativeJsonPointer(QStringView value) noexcept
+FormatResult isRelativeJsonPointer(QStringView value) noexcept
 {
-    return ctre::match<patterns::relativeJsonPointerPattern>(utils::to_sv(value.toString()));
+    if (!ctre::match<patterns::relativeJsonPointerPattern>(utils::to_sv(value.toString())))
+        return formatInvalid;
+    return {};
 }
 
-bool FormatValidators::isRegex(QStringView value) noexcept
+FormatResult isRegex(QStringView value) noexcept
 {
+    // Qt validates regex syntax
     const QRegularExpression regex{value.toString()};
-    return regex.isValid();
+    if (!regex.isValid())
+        return formatInvalid;
+    return {};
 }
 
-bool FormatValidators::validate(QStringView format, QStringView value) noexcept
+FormatResult validateFormat(QStringView format, QStringView value) noexcept
 {
     if (format == u"date-time")
         return isDateTime(value);
@@ -228,7 +261,8 @@ bool FormatValidators::validate(QStringView format, QStringView value) noexcept
     if (format == u"regex")
         return isRegex(value);
 
-    return true;
+    // Unknown format - pass validation (per JSON Schema spec)
+    return {};
 }
 
 } // namespace json_query::json_schema::internal

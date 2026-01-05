@@ -52,7 +52,8 @@ enum class EvalError : std::uint8_t
     OneOfFailed,
     NotFailed,
     IfThenElseFailed,
-    FormatInvalid,
+    FormatInvalid,         ///< Value does not match format pattern
+    FormatSemanticInvalid,  ///< Value matches pattern but fails semantic validation (e.g., Feb 30)
     ContentEncodingInvalid,
     UnevaluatedPropertiesInvalid,
     UnevaluatedItemsInvalid,
@@ -77,7 +78,7 @@ inline constexpr auto json_schema_parse_errors = utils::detail::ErrorMap<ParseEr
     {ParseError::EmptySchema, DEFINE_ERROR_STRING("Schema document is empty")}};
 
 // JSON Schema evaluation error messages
-inline constexpr auto json_schema_eval_errors = utils::detail::ErrorMap<EvalError, 31>{
+inline constexpr auto json_schema_eval_errors = utils::detail::ErrorMap<EvalError, 32>{
     {EvalError::TypeMismatch, DEFINE_ERROR_STRING("Value does not match expected type")},
     {EvalError::RequiredMissing, DEFINE_ERROR_STRING("Required property is missing")},
     {EvalError::AdditionalPropertiesInvalid, DEFINE_ERROR_STRING("Additional properties are not allowed")},
@@ -102,6 +103,7 @@ inline constexpr auto json_schema_eval_errors = utils::detail::ErrorMap<EvalErro
     {EvalError::NotFailed, DEFINE_ERROR_STRING("Value matches schema in not")},
     {EvalError::IfThenElseFailed, DEFINE_ERROR_STRING("Value does not satisfy if/then/else condition")},
     {EvalError::FormatInvalid, DEFINE_ERROR_STRING("Value does not match required format")},
+    {EvalError::FormatSemanticInvalid, DEFINE_ERROR_STRING("Value matches format but is semantically invalid")},
     {EvalError::ContentEncodingInvalid, DEFINE_ERROR_STRING("Invalid content encoding")},
     {EvalError::UnevaluatedPropertiesInvalid, DEFINE_ERROR_STRING("Unevaluated properties are not allowed")},
     {EvalError::UnevaluatedItemsInvalid, DEFINE_ERROR_STRING("Unevaluated items are not allowed")},
