@@ -267,11 +267,16 @@ FormatValidationResult isHostname(QStringView value) noexcept
     if (!ctre::match<patterns::hostnamePattern>(utils::to_sv(value.toString())))
         return formatInvalid;
     // RFC 1123: each label must be 1-63 characters
+    // RFC 5891 §4.2.3.1: labels must not have "--" at positions 3-4
     const auto str{value.toString()};
     const auto labels = str.split(u'.');
     for (const auto& label : labels)
+    {
         if (label.isEmpty() || label.size() > 63)
             return semanticInvalid;
+        if (label.size() >= 4 && label[2] == u'-' && label[3] == u'-')
+            return semanticInvalid;
+    }
     return {};
 }
 
@@ -289,8 +294,14 @@ FormatValidationResult isIpv4(QStringView value) noexcept
 
 FormatValidationResult isIpv6(QStringView value) noexcept
 {
+    const auto str{value.toString()};
+    // Reject leading/trailing whitespace and zone IDs (%25...)
+    if (str.isEmpty() || str[0].isSpace() || str.back().isSpace())
+        return formatInvalid;
+    if (str.contains(u'%'))
+        return formatInvalid;
     // Qt handles IPv6 validation (complex compression format)
-    const QHostAddress addr{value.toString()};
+    const QHostAddress addr{str};
     if (addr.isNull() || addr.protocol() != QAbstractSocket::IPv6Protocol)
         return formatInvalid;
     return {};
@@ -445,6 +456,10 @@ FormatValidationResult isJsonPointer(QStringView value) noexcept
 FormatValidationResult isRelativeJsonPointer(QStringView value) noexcept
 {
     if (!ctre::match<patterns::relativeJsonPointerPattern>(utils::to_sv(value.toString())))
+        return formatInvalid;
+    // Leading zeros are not allowed (e.g., "01" is invalid, but "0" is valid)
+    const auto str{value.toString()};
+    if (str.size() >= 2 && str[0] == u'0' && str[1].isDigit())
         return formatInvalid;
     return {};
 }
