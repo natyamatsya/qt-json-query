@@ -142,10 +142,6 @@ FormatValidationResult isTime(QStringView value) noexcept
     if (!ok || second > 60) // 60 is valid for leap seconds
         return formatInvalid;
 
-    // Leap second (60) is only valid at 23:59:60
-    if (second == 60 && (hour != 23 || minute != 59))
-        return formatInvalid;
-
     // RFC 3339 requires a timezone offset (Z or +/-HH:MM) for full time values
     // Find where the time digits end (after seconds + optional fractional)
     auto pos{8}; // past HH:MM:SS
@@ -162,7 +158,8 @@ FormatValidationResult isTime(QStringView value) noexcept
     if (tzChar != u'Z' && tzChar != u'z' && tzChar != u'+' && tzChar != u'-')
         return formatInvalid;
 
-    // Validate timezone offset range if not Z
+    // Parse timezone offset
+    int tzOffsetMinutes{0};
     if (tzChar == u'+' || tzChar == u'-')
     {
         if (pos + 6 > str.size())
@@ -172,6 +169,18 @@ FormatValidationResult isTime(QStringView value) noexcept
             return formatInvalid;
         const auto tzMin{str.mid(pos + 4, 2).toInt(&ok)};
         if (!ok || tzMin > 59)
+            return formatInvalid;
+        tzOffsetMinutes = (tzHour * 60 + tzMin) * (tzChar == u'+' ? 1 : -1);
+    }
+
+    // Leap second (60) is valid only when UTC time is 23:59:60
+    // UTC = local - offset
+    if (second == 60)
+    {
+        const auto utcTotalMinutes{(hour * 60 + minute - tzOffsetMinutes + 24 * 60) % (24 * 60)};
+        const auto utcHour{utcTotalMinutes / 60};
+        const auto utcMinute{utcTotalMinutes % 60};
+        if (utcHour != 23 || utcMinute != 59)
             return formatInvalid;
     }
 
@@ -287,21 +296,126 @@ FormatValidationResult isIpv6(QStringView value) noexcept
     return {};
 }
 
+namespace
+{
+/// RFC 3986 §2.1: reject characters not allowed in URIs
+/// Forbidden: space, <, >, ", {, }, |, \, ^, `, and non-ASCII
+[[nodiscard]] bool containsInvalidUriChars(const QString& str)
+{
+    for (const auto ch : str)
+    {
+        if (ch.unicode() > 127)
+            return true;
+        switch (ch.unicode())
+        {
+        case ' ':
+        case '<':
+        case '>':
+        case '"':
+        case '{':
+        case '}':
+        case '|':
+        case '\\':
+        case '^':
+        case '`':
+            return true;
+        default:
+            break;
+        }
+    }
+    return false;
+}
+} // namespace
+
 FormatValidationResult isUri(QStringView value) noexcept
 {
+    const auto str{value.toString()};
+    if (containsInvalidUriChars(str))
+        return formatInvalid;
     // Qt handles URI validation
-    const QUrl url{value.toString()};
+    const QUrl url{str, QUrl::StrictMode};
     if (!url.isValid())
         return formatInvalid;
     if (url.scheme().isEmpty())
         return semanticInvalid; // Valid URI-reference but not absolute URI
+    // Reject invalid userinfo (e.g., "http://foo:bar@/" — colons in userinfo need encoding)
+    if (url.userInfo().contains(u'/'))
+        return formatInvalid;
     return {};
 }
 
 FormatValidationResult isUriReference(QStringView value) noexcept
 {
+    const auto str{value.toString()};
+    if (containsInvalidUriChars(str))
+        return formatInvalid;
     // Qt handles URI-reference validation
-    const QUrl url{value.toString()};
+    const QUrl url{str, QUrl::StrictMode};
+    if (!url.isValid())
+        return formatInvalid;
+    return {};
+}
+
+FormatValidationResult isIri(QStringView value) noexcept
+{
+    // IRIs (RFC 3987) allow non-ASCII but still forbid control characters
+    const auto str{value.toString()};
+    for (const auto ch : str)
+    {
+        const auto cp{ch.unicode()};
+        if (cp < 0x20 || cp == 0x7F) // control characters
+            return formatInvalid;
+        switch (cp)
+        {
+        case ' ':
+        case '<':
+        case '>':
+        case '"':
+        case '{':
+        case '}':
+        case '|':
+        case '\\':
+        case '^':
+        case '`':
+            return formatInvalid;
+        default:
+            break;
+        }
+    }
+    const QUrl url{str, QUrl::StrictMode};
+    if (!url.isValid())
+        return formatInvalid;
+    if (url.scheme().isEmpty())
+        return semanticInvalid;
+    return {};
+}
+
+FormatValidationResult isIriReference(QStringView value) noexcept
+{
+    const auto str{value.toString()};
+    for (const auto ch : str)
+    {
+        const auto cp{ch.unicode()};
+        if (cp < 0x20 || cp == 0x7F)
+            return formatInvalid;
+        switch (cp)
+        {
+        case ' ':
+        case '<':
+        case '>':
+        case '"':
+        case '{':
+        case '}':
+        case '|':
+        case '\\':
+        case '^':
+        case '`':
+            return formatInvalid;
+        default:
+            break;
+        }
+    }
+    const QUrl url{str, QUrl::StrictMode};
     if (!url.isValid())
         return formatInvalid;
     return {};
@@ -364,27 +478,55 @@ FormatValidationResult isDuration(QStringView value) noexcept
         return pos == str.size() ? FormatValidationResult{} : formatInvalid;
     }
 
-    // Date part: [nY][nM][nD]
-    bool hasDatePart{false};
-    static constexpr QChar dateUnits[]{u'Y', u'M', u'D'};
-    for (const auto unit : dateUnits)
+    // Helper: try to parse [nU] components in order, skipping absent ones
+    auto parseComponents = [&](const QChar* units, int unitCount, bool allowFrac) -> bool
     {
-        if (pos >= str.size() || str[pos] == u'T')
-            break;
-        const auto numStart{pos};
-        while (pos < str.size() && str[pos].isDigit())
-            ++pos;
-        if (pos == numStart)
-            return formatInvalid; // Non-digit, non-T character without preceding number
-        if (pos >= str.size() || str[pos] != unit)
+        bool found{false};
+        int  ui{0};
+        while (ui < unitCount && pos < str.size())
         {
-            // Check if this unit appears later (out of order)
-            pos = numStart; // rewind
-            break;
+            if (!str[pos].isDigit())
+                break;
+            const auto numStart{pos};
+            while (pos < str.size() && str[pos].isDigit())
+                ++pos;
+            // Allow fractional part on last component if enabled
+            if (allowFrac && pos < str.size() && str[pos] == u'.')
+            {
+                ++pos;
+                while (pos < str.size() && str[pos].isDigit())
+                    ++pos;
+            }
+            if (pos >= str.size())
+            {
+                pos = numStart;
+                break;
+            }
+            // Find which unit this matches (must be at or after current ui)
+            bool matched{false};
+            for (int j{ui}; j < unitCount; ++j)
+            {
+                if (str[pos] == units[j])
+                {
+                    ++pos;
+                    ui = j + 1;
+                    found = true;
+                    matched = true;
+                    break;
+                }
+            }
+            if (!matched)
+            {
+                pos = numStart;
+                break;
+            }
         }
-        ++pos;
-        hasDatePart = true;
-    }
+        return found;
+    };
+
+    // Date part: [nY][nM][nD]
+    static constexpr QChar dateUnits[]{u'Y', u'M', u'D'};
+    const auto hasDatePart{parseComponents(dateUnits, 3, false)};
 
     // Time part: T[nH][nM][nS]
     bool hasTimePart{false};
@@ -395,30 +537,7 @@ FormatValidationResult isDuration(QStringView value) noexcept
             return formatInvalid; // "PT" or "P...T" with nothing after T
 
         static constexpr QChar timeUnits[]{u'H', u'M', u'S'};
-        for (const auto unit : timeUnits)
-        {
-            if (pos >= str.size())
-                break;
-            const auto numStart{pos};
-            while (pos < str.size() && str[pos].isDigit())
-                ++pos;
-            if (pos == numStart)
-                break;
-            // Allow fractional seconds on last component
-            if (pos < str.size() && str[pos] == u'.')
-            {
-                ++pos;
-                while (pos < str.size() && str[pos].isDigit())
-                    ++pos;
-            }
-            if (pos >= str.size() || str[pos] != unit)
-            {
-                pos = numStart;
-                break;
-            }
-            ++pos;
-            hasTimePart = true;
-        }
+        hasTimePart = parseComponents(timeUnits, 3, true);
     }
 
     if (!hasDatePart && !hasTimePart)
@@ -463,8 +582,8 @@ static constexpr std::array kFormatTable{
     FormatEntry{u"ipv6", isIpv6},
     FormatEntry{u"uri", isUri},
     FormatEntry{u"uri-reference", isUriReference},
-    FormatEntry{u"iri", isUri},
-    FormatEntry{u"iri-reference", isUriReference},
+    FormatEntry{u"iri", isIri},
+    FormatEntry{u"iri-reference", isIriReference},
     FormatEntry{u"uri-template", isUriTemplate},
     FormatEntry{u"uuid", isUuid},
     FormatEntry{u"json-pointer", isJsonPointer},
