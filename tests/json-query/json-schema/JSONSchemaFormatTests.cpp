@@ -50,14 +50,16 @@ TEST_F(JSONSchemaFormatTest, TimeFormat)
     auto schemaResult{JSONSchema::create(parseSchema(R"({"type": "string", "format": "time"})"))};
     ASSERT_TRUE(schemaResult.has_value());
 
-    EXPECT_TRUE(schemaResult->validate(QJsonValue("23:33:00")).isValid());
-    EXPECT_TRUE(schemaResult->validate(QJsonValue("23:33:00.123")).isValid());
     EXPECT_TRUE(schemaResult->validate(QJsonValue("23:33:00Z")).isValid());
+    EXPECT_TRUE(schemaResult->validate(QJsonValue("23:33:00.123Z")).isValid());
     EXPECT_TRUE(schemaResult->validate(QJsonValue("23:33:00+01:00")).isValid());
+    EXPECT_TRUE(schemaResult->validate(QJsonValue("23:33:00-05:00")).isValid());
 
+    EXPECT_FALSE(schemaResult->validate(QJsonValue("23:33:00")).isValid());     // no timezone
+    EXPECT_FALSE(schemaResult->validate(QJsonValue("23:33:00.123")).isValid()); // no timezone
     EXPECT_FALSE(schemaResult->validate(QJsonValue("2024-01-04T23:33:00Z")).isValid());
-    EXPECT_FALSE(schemaResult->validate(QJsonValue("25:00:00")).isValid());
-    EXPECT_FALSE(schemaResult->validate(QJsonValue("23:60:00")).isValid());
+    EXPECT_FALSE(schemaResult->validate(QJsonValue("25:00:00Z")).isValid());
+    EXPECT_FALSE(schemaResult->validate(QJsonValue("23:60:00Z")).isValid());
 }
 
 TEST_F(JSONSchemaFormatTest, EmailFormat)

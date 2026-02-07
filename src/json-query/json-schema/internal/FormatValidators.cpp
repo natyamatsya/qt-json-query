@@ -110,7 +110,7 @@ FormatValidationResult isTime(QStringView value) noexcept
     if (!ctre::match<patterns::timePattern>(utils::to_sv(value.toString())))
         return formatInvalid;
 
-    // Manual range validation (hour 0-23, minute 0-59, second 0-59)
+    // Manual range validation (hour 0-23, minute 0-59, second 0-60 for leap seconds)
     const auto str{value.toString()};
     if (str.length() < 8)
         return formatInvalid;
@@ -125,8 +125,41 @@ FormatValidationResult isTime(QStringView value) noexcept
         return formatInvalid;
 
     const auto second{str.mid(6, 2).toInt(&ok)};
-    if (!ok || second > 59)
+    if (!ok || second > 60) // 60 is valid for leap seconds
         return formatInvalid;
+
+    // Leap second (60) is only valid at 23:59:60
+    if (second == 60 && (hour != 23 || minute != 59))
+        return formatInvalid;
+
+    // RFC 3339 requires a timezone offset (Z or +/-HH:MM) for full time values
+    // Find where the time digits end (after seconds + optional fractional)
+    auto pos{8}; // past HH:MM:SS
+    if (pos < str.size() && str[pos] == u'.')
+    {
+        ++pos;
+        while (pos < str.size() && str[pos].isDigit())
+            ++pos;
+    }
+    // Must have timezone after the time value
+    if (pos >= str.size())
+        return formatInvalid; // No timezone offset
+    const auto tzChar{str[pos]};
+    if (tzChar != u'Z' && tzChar != u'z' && tzChar != u'+' && tzChar != u'-')
+        return formatInvalid;
+
+    // Validate timezone offset range if not Z
+    if (tzChar == u'+' || tzChar == u'-')
+    {
+        if (pos + 6 > str.size())
+            return formatInvalid;
+        const auto tzHour{str.mid(pos + 1, 2).toInt(&ok)};
+        if (!ok || tzHour > 23)
+            return formatInvalid;
+        const auto tzMin{str.mid(pos + 4, 2).toInt(&ok)};
+        if (!ok || tzMin > 59)
+            return formatInvalid;
+    }
 
     return {};
 }
@@ -146,6 +179,12 @@ FormatValidationResult isHostname(QStringView value) noexcept
         return formatInvalid;
     if (!ctre::match<patterns::hostnamePattern>(utils::to_sv(value.toString())))
         return formatInvalid;
+    // RFC 1123: each label must be 1-63 characters
+    const auto str{value.toString()};
+    const auto labels = str.split(u'.');
+    for (const auto& label : labels)
+        if (label.isEmpty() || label.size() > 63)
+            return semanticInvalid;
     return {};
 }
 
@@ -218,6 +257,100 @@ FormatValidationResult isRelativeJsonPointer(QStringView value) noexcept
     return {};
 }
 
+FormatValidationResult isDuration(QStringView value) noexcept
+{
+    // ISO 8601 duration: P[nY][nM][nD][T[nH][nM][nS]] or P[n]W
+    const auto str{value.toString()};
+    if (str.isEmpty() || str[0] != u'P')
+        return formatInvalid;
+
+    // Only ASCII characters allowed (reject non-ASCII digits like Bengali ২)
+    for (const auto ch : str)
+        if (ch.unicode() > 127)
+            return formatInvalid;
+
+    auto pos{1}; // past 'P'
+    if (pos >= str.size())
+        return formatInvalid; // "P" alone is invalid
+
+    // Week duration: P[n]W — cannot be combined with other units
+    if (str.contains(u'W'))
+    {
+        // Must be exactly P<digits>W
+        auto numStart{pos};
+        while (pos < str.size() && str[pos].isDigit())
+            ++pos;
+        if (pos == numStart || pos >= str.size() || str[pos] != u'W')
+            return formatInvalid;
+        ++pos;
+        return pos == str.size() ? FormatValidationResult{} : formatInvalid;
+    }
+
+    // Date part: [nY][nM][nD]
+    bool hasDatePart{false};
+    static constexpr QChar dateUnits[]{u'Y', u'M', u'D'};
+    for (const auto unit : dateUnits)
+    {
+        if (pos >= str.size() || str[pos] == u'T')
+            break;
+        const auto numStart{pos};
+        while (pos < str.size() && str[pos].isDigit())
+            ++pos;
+        if (pos == numStart)
+            return formatInvalid; // Non-digit, non-T character without preceding number
+        if (pos >= str.size() || str[pos] != unit)
+        {
+            // Check if this unit appears later (out of order)
+            pos = numStart; // rewind
+            break;
+        }
+        ++pos;
+        hasDatePart = true;
+    }
+
+    // Time part: T[nH][nM][nS]
+    bool hasTimePart{false};
+    if (pos < str.size() && str[pos] == u'T')
+    {
+        ++pos;
+        if (pos >= str.size())
+            return formatInvalid; // "PT" or "P...T" with nothing after T
+
+        static constexpr QChar timeUnits[]{u'H', u'M', u'S'};
+        for (const auto unit : timeUnits)
+        {
+            if (pos >= str.size())
+                break;
+            const auto numStart{pos};
+            while (pos < str.size() && str[pos].isDigit())
+                ++pos;
+            if (pos == numStart)
+                break;
+            // Allow fractional seconds on last component
+            if (pos < str.size() && str[pos] == u'.')
+            {
+                ++pos;
+                while (pos < str.size() && str[pos].isDigit())
+                    ++pos;
+            }
+            if (pos >= str.size() || str[pos] != unit)
+            {
+                pos = numStart;
+                break;
+            }
+            ++pos;
+            hasTimePart = true;
+        }
+    }
+
+    if (!hasDatePart && !hasTimePart)
+        return formatInvalid;
+    if (pos != str.size())
+        return formatInvalid; // Trailing characters
+
+    return {};
+}
+
 FormatValidationResult isRegex(QStringView value) noexcept
 {
     // Qt validates regex syntax
@@ -259,6 +392,7 @@ static constexpr std::array kFormatTable{
     FormatEntry{u"json-pointer", isJsonPointer},
     FormatEntry{u"relative-json-pointer", isRelativeJsonPointer},
     FormatEntry{u"regex", isRegex},
+    FormatEntry{u"duration", isDuration},
 };
 
 FormatValidationResult validateFormat(QStringView format, QStringView value) noexcept

@@ -393,10 +393,21 @@ void resolveAllReferences(internal::CompiledSchema&                        compi
                           const QJsonValue&                               rootSchema,
                           CompileContext&                                  ctx)
 {
-    // Use index-based loop since resolveReference may add new nodes
-    for (std::size_t i{0}; i < compiled.nodes.size(); ++i)
-        if (auto* refNode = std::get_if<RefSchema>(&compiled.nodes[i]))
-            resolveReference(*refNode, compiled.rootIndex, anchors, rootSchema, ctx);
+    // Resolve in bounded passes: newly compiled schemas may introduce new refs
+    static constexpr int kMaxPasses{8};
+    std::size_t start{0};
+    for (int pass{0}; pass < kMaxPasses; ++pass)
+    {
+        const auto end{compiled.nodes.size()};
+        if (start >= end)
+            break;
+        for (std::size_t i{start}; i < end; ++i)
+            if (auto* refNode = std::get_if<RefSchema>(&compiled.nodes[i]))
+                resolveReference(*refNode, compiled.rootIndex, anchors, rootSchema, ctx);
+        start = end;
+        if (compiled.nodes.size() == end)
+            break; // No new nodes added — done
+    }
 }
 
 // ────────────────────────────────────────────────────────────────────────────

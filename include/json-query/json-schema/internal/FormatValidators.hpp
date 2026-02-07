@@ -56,6 +56,9 @@ using FormatValidationResult = std::expected<void, EvalError>;
 /// Validate relative JSON Pointer
 [[nodiscard]] FormatValidationResult isRelativeJsonPointer(QStringView value) noexcept;
 
+/// Validate duration format (ISO 8601): P[nY][nM][nD][T[nH][nM][nS]] or P[n]W
+[[nodiscard]] FormatValidationResult isDuration(QStringView value) noexcept;
+
 /// Validate regex format (ECMA-262)
 [[nodiscard]] FormatValidationResult isRegex(QStringView value) noexcept;
 
