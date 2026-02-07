@@ -51,11 +51,13 @@ inline void validateNumeric(ValidateContext&    ctx,
 
     if (node.multipleOf)
     {
-        const auto remainder{std::fmod(value, *node.multipleOf)};
-        // Allow for floating point imprecision
-        if (std::abs(remainder) > 1e-10 && std::abs(remainder - *node.multipleOf) > 1e-10)
+        const auto divisor{*node.multipleOf};
+        const auto quotient{value / divisor};
+        const auto rounded{std::round(quotient)};
+        // Check if quotient is close to an integer (handles precision better than fmod)
+        if (std::abs(quotient - rounded) > 1e-8)
         {
-            const auto msg{QString(u"Value %1 is not a multiple of %2").arg(value).arg(*node.multipleOf)};
+            const auto msg{QString(u"Value %1 is not a multiple of %2").arg(value).arg(divisor)};
             ctx.result.addError(instancePath, schemaPath + u"/multipleOf"_qt_s, msg, EvalError::MultipleOfViolation);
         }
     }

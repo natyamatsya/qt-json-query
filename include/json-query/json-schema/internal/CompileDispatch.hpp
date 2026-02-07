@@ -286,6 +286,32 @@ compileObjectKeywords(CompileContext& ctx, const QJsonObject& schemaObj, ObjectS
         }
     }
 
+    // Legacy dependencies keyword (splits into dependentRequired + dependentSchemas)
+    if (schemaObj.contains(u"dependencies"_qt_s) && schemaObj[u"dependencies"_qt_s].isObject())
+    {
+        const auto depsObj{schemaObj[u"dependencies"_qt_s].toObject()};
+        for (auto it = depsObj.begin(); it != depsObj.end(); ++it)
+        {
+            if (it.value().isArray())
+            {
+                // Array value → dependentRequired
+                std::vector<QString> requiredProps{};
+                for (const QJsonValue& req : it.value().toArray())
+                    if (req.isString())
+                        requiredProps.push_back(req.toString());
+                node.dependentRequired[it.key()] = std::move(requiredProps);
+            }
+            else
+            {
+                // Schema value → dependentSchemas
+                auto r{compile(ctx, it.value())};
+                if (!r)
+                    return std::unexpected(r.error());
+                node.dependentSchemas[it.key()] = *r;
+            }
+        }
+    }
+
     // unevaluatedProperties
     if (schemaObj.contains(u"unevaluatedProperties"_qt_s))
     {
