@@ -2,6 +2,7 @@
 
 #include "json-query/json-path/JSONPathFilterExistenceParsers.hpp"
 #include "json-query/json-path/JSONPathFilterHelpers.hpp"
+#include "json-query/utils/BraceSafe.hpp"
 #include "json-query/utils/JSONQueryUtils.hpp"
 #include "json-query/json-path/JSONPathLog.hpp"
 #include <ctre.hpp>
@@ -200,7 +201,7 @@ struct ExistencePatternStrategy<ExistencePatternType::NestedFilter>
                     // Nested filter existence: @[?@>1] - true if array has elements matching the filter
                     if (j.isArray())
                     {
-                        const auto arr{j.toArray()};
+                        const auto arr{asArray(j)};
                         for (const auto& element : arr)
                         {
                             // For now, implement a simplified version for @>1 pattern
@@ -305,7 +306,7 @@ struct ExistencePatternStrategy<ExistencePatternType::Slice>
                 // Slice existence: true if array and slice would return any elements
                 if (j.isArray())
                 {
-                    const auto arr{j.toArray()};
+                    const auto arr{asArray(j)};
                     return !arr.isEmpty(); // Simplified: any slice on non-empty array returns something
                 }
                 return false; // Slices only apply to arrays
@@ -358,7 +359,7 @@ struct ExistencePatternStrategy<ExistencePatternType::MultiSelector>
                         auto index{trimmedSelector.toInt(&ok)};
                         if (ok && j.isArray())
                         {
-                            const auto arr{j.toArray()};
+                            const auto arr{asArray(j)};
                             // Handle negative indices
                             if (index < 0)
                                 index = arr.size() + index;
@@ -563,7 +564,7 @@ struct ExistencePatternStrategy<ExistencePatternType::IndexPattern>
                     // Index existence: @[index] - true if array has element at index
                     if (j.isArray())
                     {
-                        const auto arr{j.toArray()};
+                        const auto arr{asArray(j)};
                         const auto size{arr.size()};
                         // Handle negative indices
                         const auto actualIndex = (index < 0) ? size + index : index;
@@ -621,7 +622,7 @@ std::optional<Token> parseEmbeddedExists(const QString& s)
                 // Nested filter existence: @[?@>1] - true if array has elements matching the filter
                 if (j.isArray())
                 {
-                    const auto arr{j.toArray()};
+                    const auto arr{asArray(j)};
                     for (const auto& element : arr)
                     {
                         // For now, implement a simplified version for @>1 pattern
@@ -708,7 +709,7 @@ std::optional<Token> parseEmbeddedExists(const QString& s)
                 // Slice existence: true if array and slice would return any elements
                 if (j.isArray())
                 {
-                    const auto arr{j.toArray()};
+                    const auto arr{asArray(j)};
                     return !arr.isEmpty(); // Simplified: any slice on non-empty array returns something
                 }
                 return false; // Slices only apply to arrays
@@ -757,7 +758,7 @@ std::optional<Token> parseEmbeddedExists(const QString& s)
                         auto index{trimmedSelector.toInt(&ok)};
                         if (ok && j.isArray())
                         {
-                            const auto arr{j.toArray()};
+                            const auto arr{asArray(j)};
                             // Handle negative indices
                             if (index < 0)
                                 index = arr.size() + index;
@@ -904,7 +905,7 @@ std::optional<Token> parseEmbeddedExists(const QString& s)
                 // Index existence: @[index] - true if array has element at index
                 if (j.isArray())
                 {
-                    const auto arr{j.toArray()};
+                    const auto arr{asArray(j)};
                     const auto size{arr.size()};
                     // Handle negative indices
                     const auto actualIndex = (index < 0) ? size + index : index;

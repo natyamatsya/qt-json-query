@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include "json-query/utils/BraceSafe.hpp"
+
 #include <QJsonValue>
 #include <QJsonArray>
 #include <QJsonObject>
@@ -72,7 +74,7 @@ class IterativeRecursiveDescent
                 }
                 else if (frame.value.isArray())
                 {
-                    const auto arr{frame.value.toArray()};
+                    const auto arr{asArray(frame.value)};
                     // Add in reverse order so we process in original order
                     for (qsizetype i = arr.size() - 1; i >= 0; --i)
                         stack.push(arr[i]);
@@ -178,7 +180,7 @@ class IterativeRecursiveDescent
                 }
                 else if (frame.value.isArray())
                 {
-                    const auto arr{frame.value.toArray()};
+                    const auto arr{asArray(frame.value)};
                     // Add in reverse order so we process in original order
                     for (qsizetype i = arr.size() - 1; i >= 0; --i)
                         stack.push(arr[i]);
@@ -276,7 +278,7 @@ class IterativeRecursiveDescent
                     }
                     else if (frame.value.isArray())
                     {
-                        const auto arr{frame.value.toArray()};
+                        const auto arr{asArray(frame.value)};
                         for (qsizetype i = arr.size() - 1; i >= 0; --i)
                             stack.emplace_back(arr[i], frame.depth + 1);
                     }
@@ -404,7 +406,7 @@ class IterativeRecursiveDescent
             }
             else if (frame.value.isArray())
             {
-                const auto arr{frame.value.toArray()};
+                const auto arr{asArray(frame.value)};
 
                 if (!frame.processed)
                 {
@@ -495,7 +497,7 @@ class IterativeRecursiveDescent
             }
             else if (Q_UNLIKELY(current.value.isArray()))
             {
-                const auto arr{current.value.toArray()};
+                const auto arr{asArray(current.value)};
 
                 // Phase 3: Reverse iteration for better cache locality
                 for (qsizetype i = arr.size() - 1; i >= 0; --i)

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 // JSONPathConformanceGTest.cpp - GoogleTest version of minimal conformance suite
+#include "json-query/utils/BraceSafe.hpp"
+
 #include <gtest/gtest.h>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -69,7 +71,7 @@ static void compareJson(const QJsonValue& actual, const QJsonValue& expected)
 TEST(JSONPathConformance, ValidPaths)
 {
     const auto root{sampleDoc().object()};
-    const auto books{root["store"].toObject()["book"].toArray()};
+    const auto books{json_query::asArray(root["store"].toObject()["book"])};
 
     struct Case
     {

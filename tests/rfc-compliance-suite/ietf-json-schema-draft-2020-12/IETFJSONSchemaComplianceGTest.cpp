@@ -11,6 +11,8 @@
 // The test verifies that validation results match expected outcomes.
 // -----------------------------------------------------------------------------
 
+#include "json-query/utils/BraceSafe.hpp"
+
 #include <gtest/gtest.h>
 #include <ostream>
 
@@ -101,7 +103,7 @@ static QList<SchemaTestCase> loadTestFile(const QString& filePath)
         const auto groupDesc{groupObj[u"description"_qt_s].toString()};
         const auto schema{groupObj[u"schema"_qt_s]};
 
-        const auto testsArray{groupObj[u"tests"_qt_s].toArray()};
+        const auto testsArray{json_query::asArray(groupObj[u"tests"_qt_s])};
         for (const QJsonValue& testValue : testsArray)
         {
             if (!testValue.isObject())

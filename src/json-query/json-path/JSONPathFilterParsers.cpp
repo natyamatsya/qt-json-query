@@ -233,7 +233,7 @@ struct ExistenceTokenFactory<ExistenceFilterType::ArraySlice>
                 return b.add(
                     [start, end](const QJsonValue& j) -> bool
                     {
-                        const auto arr{j.toArray()};
+                        const auto arr{asArray(j)};
                         auto       actualStart = (start == -1) ? 0 : start;
                         auto       actualEnd   = (end == -1) ? arr.size() : end;
                         return actualStart < arr.size() && actualEnd > actualStart;
@@ -263,7 +263,7 @@ struct ExistenceTokenFactory<ExistenceFilterType::NegArraySlice>
                 return b.add(
                     [start, end](const QJsonValue& j) -> bool
                     {
-                        const auto arr{j.toArray()};
+                        const auto arr{asArray(j)};
                         auto       actualStart = (start == -1) ? 0 : start;
                         auto       actualEnd   = (end == -1) ? arr.size() : end;
                         return actualStart >= arr.size() || actualEnd <= actualStart;
@@ -308,7 +308,7 @@ struct ExistenceTokenFactory<ExistenceFilterType::MultiSelector>
                                 auto index{selector.toInt(&ok)};
                                 if (ok && j.isArray())
                                 {
-                                    const auto arr{j.toArray()};
+                                    const auto arr{asArray(j)};
                                     if (index >= 0 && index < arr.size())
                                         return true;
                                 }
@@ -357,7 +357,7 @@ struct ExistenceTokenFactory<ExistenceFilterType::NegMultiSelector>
                                 auto index{selector.toInt(&ok)};
                                 if (ok && j.isArray())
                                 {
-                                    const auto arr{j.toArray()};
+                                    const auto arr{asArray(j)};
                                     if (index >= 0 && index < arr.size())
                                         return false; // Found one, so negation is false
                                 }
@@ -390,7 +390,7 @@ struct ExistenceTokenFactory<ExistenceFilterType::NestedFilter>
                         if (!j.isArray())
                             return false;
 
-                        const auto                                   arr{j.toArray()};
+                        const auto                                   arr{asArray(j)};
                         std::vector<json_query::json_path::FilterFn> innerFilterFns;
                         auto innerToken{json_query::json_path::compileFilter(filterExpr, innerFilterFns)};
                         if (!innerToken || innerFilterFns.empty())
@@ -427,7 +427,7 @@ struct ExistenceTokenFactory<ExistenceFilterType::NegNestedFilter>
                         if (!j.isArray())
                             return true; // Non-arrays don't match, so negation is true
 
-                        const auto                                   arr{j.toArray()};
+                        const auto                                   arr{asArray(j)};
                         std::vector<json_query::json_path::FilterFn> innerFilterFns;
                         auto innerToken{json_query::json_path::compileFilter(filterExpr, innerFilterFns)};
                         if (!innerToken || innerFilterFns.empty())

@@ -67,7 +67,7 @@ std::expected<std::vector<std::size_t>, QueryError> compileSchemaArray(CompileCo
     if (!arrayValue.isArray())
         return std::unexpected(QueryError(ParseError::InvalidKeywordValue));
 
-    const auto arr{arrayValue.toArray()};
+    const auto arr{asArray(arrayValue)};
     result.reserve(static_cast<std::size_t>(arr.size()));
 
     for (const QJsonValue& item : arr)

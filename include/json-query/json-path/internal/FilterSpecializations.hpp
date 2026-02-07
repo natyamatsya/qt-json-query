@@ -6,6 +6,7 @@
 #include "json-query/json-path/internal/PathEvalCtx.hpp"
 #include "json-query/json-path/internal/ArrayPool.hpp"
 #include "json-query/json-path/JSONPathCompile.hpp"
+#include "json-query/utils/BraceSafe.hpp"
 #include <expected>
 #include <QtCore/QJsonValue>
 #include <QtCore/QJsonObject>
@@ -127,7 +128,7 @@ class FilterPatternEvaluator<FilterPattern::SimpleExistence>
 
         if (v.isArray())
         {
-            const auto arr{v.toArray()};
+            const auto arr{asArray(v)};
             for (const auto& item : arr)
             {
                 if (item.isObject())
@@ -191,7 +192,7 @@ class FilterPatternEvaluator<FilterPattern::SimpleComparison>
 
         if (v.isArray())
         {
-            const auto arr{v.toArray()};
+            const auto arr{asArray(v)};
             for (const auto& item : arr)
             {
                 if (item.isObject())
@@ -295,7 +296,7 @@ class FilterPatternEvaluator<FilterPattern::NumericComparison>
 
         if (v.isArray())
         {
-            const auto arr{v.toArray()};
+            const auto arr{asArray(v)};
             for (const auto& item : arr)
             {
                 if (item.isObject())
@@ -390,7 +391,7 @@ class FilterPatternEvaluator<FilterPattern::LengthComparison>
 
         if (v.isArray())
         {
-            const auto arr{v.toArray()};
+            const auto arr{asArray(v)};
             for (const auto& item : arr)
             {
                 if (item.isObject())

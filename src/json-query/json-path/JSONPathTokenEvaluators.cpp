@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "json-query/json-path/JSONPathTokenEvaluators.hpp"
+#include "json-query/utils/BraceSafe.hpp"
 #include "json-query/json-path/JSONPathEvaluate.hpp"                     // normalizeIndex, evalSlice
 #include "json-query/json-path/internal/ContainerCursor.hpp"             // ContainerCursor for optimized iteration
 #include "json-query/json-path/internal/ContextAwareContainerCursor.hpp" // ContextAwareContainerCursor for context-aware iteration
@@ -183,7 +184,7 @@ eval<Token::Kind::Filter>(const PathEvalCtx& ctx, const Token& tk, const QJsonVa
 
         if (v.isArray())
         {
-            const auto arr{v.toArray()};
+            const auto arr{asArray(v)};
             qCDebug(jsonPathLog) << "Filter token: processing array size=" << arr.size();
 
             for (const auto& item : arr)

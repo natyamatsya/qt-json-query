@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "json-query/json-path/JSONPathEvaluate.hpp"
+#include "json-query/utils/BraceSafe.hpp"
 #include "json-query/json-path/JSONPathTokenEvaluators.hpp"
 #include "json-query/json-path/JSONPathTokenDispatch.hpp"
 #include "json-query/json-path/JSONPathWildcardRecursive.hpp"
@@ -487,7 +488,7 @@ std::expected<QJsonValue, EvalError> evaluateDefinite(const std::vector<Token>& 
         {
             if (!cur.isArray())
                 return std::unexpected(EvalError::TypeMismatchArray);
-            const auto arr{cur.toArray()};
+            const auto arr{asArray(cur)};
             auto       idx = normalizeIndex(tk.index, arr.size());
             if (idx < 0 || idx >= arr.size())
                 return std::unexpected(EvalError::IndexOutOfRange);

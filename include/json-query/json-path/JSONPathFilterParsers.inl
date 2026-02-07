@@ -96,7 +96,7 @@ parseCompareIndex(QString s, std::vector<FilterFn>& out)
 
                         if (j.isArray())
                         {
-                            const auto arr{j.toArray()};
+                            const auto arr{asArray(j)};
                             if (index < 0 || index >= arr.size())
                             {
                                 // Out of bounds: compare with undefined/null
@@ -199,7 +199,7 @@ parseSelfCompareIndex(QString s, std::vector<FilterFn>& out)
 
                 if (j.isArray())
                 {
-                    const auto arr{j.toArray()};
+                    const auto arr{asArray(j)};
                     if (index < 0 || index >= arr.size())
                     {
                         // Out of bounds: compare with undefined
@@ -270,7 +270,7 @@ parseNullCompareIndex(QString s, std::vector<FilterFn>& out)
 
                 if (j.isArray())
                 {
-                    const auto arr{j.toArray()};
+                    const auto arr{asArray(j)};
                     if (index < 0 || index >= arr.size())
                     {
                         // Out of bounds: compare with undefined/null
@@ -360,7 +360,7 @@ std::optional<Token> parseEmbeddedCompareIndex(const QString& s)
 
                 if (j.isArray())
                 {
-                    const auto arr{j.toArray()};
+                    const auto arr{asArray(j)};
                     if (index < 0 || index >= arr.size())
                     {
                         // Out of bounds: compare with undefined/null

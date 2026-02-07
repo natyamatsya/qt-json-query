@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "json-query/json-path/JSONPathFilterComparisonDispatcher.hpp"
+#include "json-query/utils/BraceSafe.hpp"
 #include "json-query/utils/JSONQueryUtils.hpp"
 
 namespace json_query::json_path::detail
@@ -189,7 +190,7 @@ struct ComparisonTokenFactory<ComparisonFilterType::NullArrayIndex>
 
                     if (j.isArray())
                     {
-                        const auto arr{j.toArray()};
+                        const auto arr{asArray(j)};
                         if (index < 0 || index >= arr.size())
                         {
                             // Out of bounds: compare with undefined/null
@@ -302,7 +303,7 @@ struct ComparisonTokenFactory<ComparisonFilterType::SelfArrayIndex>
 
                     if (j.isArray())
                     {
-                        const auto arr{j.toArray()};
+                        const auto arr{asArray(j)};
                         if (index < 0 || index >= arr.size())
                         {
                             // Out of bounds: compare with undefined
@@ -438,7 +439,7 @@ struct ComparisonTokenFactory<ComparisonFilterType::BasicArrayIndex>
 
                     if (j.isArray())
                     {
-                        const auto arr{j.toArray()};
+                        const auto arr{asArray(j)};
                         if (index < 0 || index >= arr.size())
                         {
                             // Out of bounds: compare with undefined

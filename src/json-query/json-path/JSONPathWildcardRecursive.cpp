@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "json-query/json-path/JSONPathWildcardRecursive.hpp"
+#include "json-query/utils/BraceSafe.hpp"
 #include "json-query/json-path/internal/ContainerCursor.hpp"
 #include "json-query/json-path/internal/ArrayPool.hpp"
 #include "json-query/json-path/internal/IterativeRecursiveDescent.hpp"
@@ -107,7 +108,7 @@ struct RecursivePatternDetector
         }
         else if (value.isArray())
         {
-            const auto arr{value.toArray()};
+            const auto arr{asArray(value)};
             auto       complexity{arr.size()};
 
             // Sample first few elements
@@ -170,7 +171,7 @@ static std::expected<QJsonArray, EvalError> evaluateRecursiveDirectFastPath(cons
             }
             else if (value.isArray())
             {
-                const auto arr{value.toArray()};
+                const auto arr{asArray(value)};
                 for (const QJsonValue& element : arr)
                     if (element.isObject() || element.isArray())
                         (*this)(element); // Direct recursive call

@@ -2,6 +2,7 @@
 
 #include "json-query/json-path/JSONPathCompile.hpp"
 #include "json-query/json-path/JSONPathLog.hpp"
+#include "json-query/utils/BraceSafe.hpp"
 #include "json-query/json-path/JSONPath.hpp"
 #include "json-query/json-path/internal/ContextAwareContainerCursor.hpp"
 #include "json-query/json-path/internal/ContainerCursor.hpp"
@@ -297,7 +298,7 @@ QJsonValue evaluateContextFunction(const QString& funcExpr, const QJsonValue& co
         // Use ContextAwareContainerCursor for efficient length calculation
         if (argValue.isArray())
         {
-            auto cursor{makeSimpleContextCursor(argValue.toArray(), root, context)};
+            auto cursor{makeSimpleContextCursor(asArray(argValue).get(), root, context)};
             return QJsonValue{cursor.size()}; // Zero-copy size access
         }
         if (argValue.isObject())

@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include "json-query/utils/BraceSafe.hpp"
+
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QJsonValue>
@@ -37,8 +39,8 @@ namespace json_query::json_schema::internal
         return a.toString() == b.toString();
     case QJsonValue::Array:
     {
-        const auto arrA{a.toArray()};
-        const auto arrB{b.toArray()};
+        const auto arrA{asArray(a)};
+        const auto arrB{asArray(b)};
         if (arrA.size() != arrB.size())
             return false;
         for (const auto& [itemA, itemB] : std::views::zip(arrA, arrB))

@@ -6,6 +6,7 @@
 #include "json-query/json-path/JSONPathCompile.hpp"
 #include "json-query/json-path/internal/PathEvalCtx.hpp"
 #include "json-query/json-path/internal/ArrayPool.hpp"
+#include "json-query/utils/BraceSafe.hpp"
 #include <expected>
 #include <QtCore/QJsonValue>
 #include <utility>
@@ -95,7 +96,7 @@ struct TypedTokenEvaluator<Token::Kind::Index, QJsonValue::Array>
     eval(const detail::PathEvalCtx& ctx, const Token& tk, const QJsonValue& v) noexcept
     {
         // No type check needed - we know it's an array
-        const auto arr{v.toArray()};
+        const auto arr{asArray(v)};
         const auto len{arr.size()};
 
         // Normalize negative indices
@@ -169,7 +170,7 @@ struct TypedTokenEvaluator<Token::Kind::Wildcard, QJsonValue::Array>
     eval(const detail::PathEvalCtx& /*ctx*/, const Token& /*tk*/, const QJsonValue& v) noexcept
     {
         // No type check needed - we know it's an array
-        const auto arr{v.toArray()};
+        const auto arr{asArray(v)};
 
         // Use ArrayPool for result optimization
         auto        pooledArray{acquirePooledArray()};

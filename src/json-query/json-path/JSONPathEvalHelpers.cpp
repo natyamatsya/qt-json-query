@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "json-query/json-path/JSONPathEvalHelpers.hpp"
+#include "json-query/utils/BraceSafe.hpp"
 #include "json-query/json-path/JSONPathError.hpp"
 #include "json-query/json-path/JSONPathTokenEvaluators.hpp"
 #include "json-query/json-path/JSONPathEvaluate.hpp"
@@ -785,7 +786,7 @@ QJsonValue applyTrailing(json_path::FunctionType fn, const QJsonValue& v)
         if (!v.isArray())
             return {QJsonValue::Undefined};
         {
-            const auto arr{v.toArray()};
+            const auto arr{asArray(v)};
             bool       first{true};
             double     best = 0.0;
             for (const auto& e : arr)

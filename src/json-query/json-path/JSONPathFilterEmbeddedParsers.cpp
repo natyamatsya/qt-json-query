@@ -7,6 +7,7 @@
 #include "json-query/json-path/JSONPathFilterExistenceParsers.hpp"
 #include "json-query/json-path/JSONPathFilterFunctions.hpp"
 #include "json-query/json-path/JSONPathFilterHelpers.hpp"
+#include "json-query/utils/BraceSafe.hpp"
 #include "json-query/json-path/JSONPathLog.hpp"
 #include "json-query/json-path/JSONPath.hpp"
 #include "json-query/json-path/internal/ContainerCursor.hpp"
@@ -89,7 +90,7 @@ std::optional<Token> parseIn(const QString& s, std::vector<FilterFn>& out)
                     return false;
 
                 // Use ContainerCursor for optimized, zero-copy array iteration during 'in' evaluation
-                const auto arr{a.toArray()};
+                const auto arr{asArray(a)};
                 auto       cursor{internal::ContainerCursor::array(arr)};
                 for (const auto& v : cursor)
                     if (v.isString() && v.toString() == want)
@@ -315,7 +316,7 @@ std::optional<Token> parseEmbeddedComparePropToArrayIdx(const QString& s)
 
                 const auto obj{j.toObject()};
                 const auto leftValue{obj.value(leftProp)};
-                const auto rightArr{obj.value(rightProp).toArray()};
+                const auto rightArr{asArray(obj.value(rightProp))};
 
                 bool       ok;
                 auto       idx{rightIndex.toInt(&ok)};

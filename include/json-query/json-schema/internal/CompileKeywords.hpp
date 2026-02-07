@@ -3,6 +3,7 @@
 #pragma once
 
 #include "json-query/json-schema/internal/SchemaNode.hpp"
+#include "json-query/utils/BraceSafe.hpp"
 #include "json-query/utils/JSONQueryError.hpp"
 
 #include <QJsonArray>
@@ -39,7 +40,7 @@ parseTypeKeyword(const QJsonValue& typeValue)
 
     if (typeValue.isArray())
     {
-        const auto typeArray{typeValue.toArray()};
+        const auto typeArray{asArray(typeValue)};
         if (typeArray.isEmpty())
             return std::unexpected(QueryError(ParseError::InvalidTypeValue));
 
@@ -69,7 +70,7 @@ parseTypeKeyword(const QJsonValue& typeValue)
     if (!enumValue.isArray())
         return std::unexpected(QueryError(ParseError::InvalidEnumValue));
 
-    const auto enumArray{enumValue.toArray()};
+    const auto enumArray{asArray(enumValue)};
     if (enumArray.isEmpty())
         return std::unexpected(QueryError(ParseError::InvalidEnumValue));
 
@@ -152,7 +153,7 @@ parseRequiredKeyword(const QJsonValue& requiredValue)
     if (!requiredValue.isArray())
         return std::unexpected(QueryError(ParseError::InvalidKeywordValue));
 
-    const auto requiredArray{requiredValue.toArray()};
+    const auto requiredArray{asArray(requiredValue)};
     result.reserve(static_cast<std::size_t>(requiredArray.size()));
 
     for (const QJsonValue& item : requiredArray)

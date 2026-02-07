@@ -5,6 +5,8 @@
 #include <QString>
 #include <QVector>
 #include <QJsonValue>
+#include "json-query/utils/BraceSafe.hpp"
+
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QRegularExpression>

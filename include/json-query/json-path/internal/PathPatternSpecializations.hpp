@@ -6,6 +6,7 @@
 #include "json-query/json-path/JSONPathCompile.hpp"
 #include "json-query/json-path/internal/PathEvalCtx.hpp"
 #include "json-query/json-path/internal/ArrayPool.hpp"
+#include "json-query/utils/BraceSafe.hpp"
 #include <expected>
 #include <QtCore/QJsonValue>
 #include <QtCore/QJsonObject>
@@ -247,7 +248,7 @@ struct PathPatternEvaluator<PathPattern::ArrayIndex>
         if (!root.isArray())
             return QJsonArray{}; // Empty result for non-arrays
 
-        const auto arr{root.toArray()};
+        const auto arr{asArray(root)};
         const auto len{arr.size()};
 
         // Normalize negative indices
@@ -281,7 +282,7 @@ struct PathPatternEvaluator<PathPattern::ArrayWildcard>
         if (root.isArray())
         {
             // For arrays, return all elements
-            const auto arr{root.toArray()};
+            const auto arr{asArray(root)};
 
             // Use ArrayPool for result optimization
             auto        pooledArray{acquirePooledArray()};
@@ -335,7 +336,7 @@ struct PathPatternEvaluator<PathPattern::KeyThenIndex>
         if (!arrayValue.isArray())
             return QJsonArray{}; // Property is not an array
 
-        const auto arr{arrayValue.toArray()};
+        const auto arr{asArray(arrayValue)};
         const auto len{arr.size()};
 
         // Normalize negative indices
@@ -369,7 +370,7 @@ struct PathPatternEvaluator<PathPattern::IndexThenKey>
         if (!root.isArray())
             return QJsonArray{}; // Empty result for non-arrays
 
-        const auto arr{root.toArray()};
+        const auto arr{asArray(root)};
         const auto len{arr.size()};
 
         // Normalize negative indices
@@ -419,7 +420,7 @@ struct PathPatternEvaluator<PathPattern::WildcardThenKey>
         if (root.isArray())
         {
             // For arrays, check each element for the key
-            const auto arr{root.toArray()};
+            const auto arr{asArray(root)};
             for (const auto& item : arr)
             {
                 if (item.isObject())
