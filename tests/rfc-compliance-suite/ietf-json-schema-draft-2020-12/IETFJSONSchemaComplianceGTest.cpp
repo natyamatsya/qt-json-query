@@ -93,7 +93,7 @@ static QList<SchemaTestCase> loadTestFile(const QString& filePath)
     // Extract just the filename for display
     const auto fileName{QFileInfo{filePath}.fileName()};
 
-    const auto groupArray{doc.array()};
+    const auto groupArray = doc.array();
     for (const QJsonValue& groupValue : groupArray)
     {
         if (!groupValue.isObject())
