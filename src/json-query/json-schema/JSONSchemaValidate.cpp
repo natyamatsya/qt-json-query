@@ -79,9 +79,12 @@ void validateObjectSchema(ValidateContext&    ctx,
     if (ctx.shouldContinue())
         validateCombinators(ctx, node, instance, instancePath, schemaPath, validateNode);
 
-    // unevaluatedProperties — must run after combinators have populated the tracker
+    // unevaluatedProperties / unevaluatedItems — must run after combinators have populated the tracker
     if (node.unevaluatedProperties && instance.isObject() && ctx.shouldContinue())
         validateUnevaluatedProperties(ctx, node, instance.toObject(), instancePath, schemaPath, validateNode);
+
+    if (node.unevaluatedItems && instance.isArray() && ctx.shouldContinue())
+        validateUnevaluatedItems(ctx, node, instance.toArray(), instancePath, schemaPath, validateNode);
 
     // Clean up local tracker
     if (needsTracker)

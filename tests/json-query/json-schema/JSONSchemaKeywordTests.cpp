@@ -742,3 +742,85 @@ TEST_F(JSONSchemaKeywordTest, UnevaluatedPropertiesSchema)
     invalid[u"extra"_qt_s] = u"not a number"_qt_s;
     EXPECT_FALSE(schemaResult->validate(invalid).isValid());
 }
+
+// ============================================================================
+// Unevaluated Items Tests
+// ============================================================================
+
+TEST_F(JSONSchemaKeywordTest, UnevaluatedItemsFalseWithPrefixItems)
+{
+    auto schemaResult{JSONSchema::create(parseSchema(R"({
+        "prefixItems": [{"type": "string"}, {"type": "number"}],
+        "unevaluatedItems": false
+    })"))};
+    ASSERT_TRUE(schemaResult.has_value());
+
+    QJsonArray valid{};
+    valid.append(u"hello"_qt_s);
+    valid.append(42);
+    EXPECT_TRUE(schemaResult->validate(valid).isValid());
+
+    QJsonArray invalid{};
+    invalid.append(u"hello"_qt_s);
+    invalid.append(42);
+    invalid.append(true);
+    EXPECT_FALSE(schemaResult->validate(invalid).isValid());
+}
+
+TEST_F(JSONSchemaKeywordTest, UnevaluatedItemsWithItems)
+{
+    auto schemaResult{JSONSchema::create(parseSchema(R"({
+        "prefixItems": [{"type": "string"}],
+        "items": {"type": "number"},
+        "unevaluatedItems": false
+    })"))};
+    ASSERT_TRUE(schemaResult.has_value());
+
+    // All items evaluated by prefixItems + items
+    QJsonArray valid{};
+    valid.append(u"hello"_qt_s);
+    valid.append(1);
+    valid.append(2);
+    EXPECT_TRUE(schemaResult->validate(valid).isValid());
+}
+
+TEST_F(JSONSchemaKeywordTest, UnevaluatedItemsWithAllOf)
+{
+    auto schemaResult{JSONSchema::create(parseSchema(R"({
+        "prefixItems": [{"type": "string"}],
+        "allOf": [{"prefixItems": [true, {"type": "number"}]}],
+        "unevaluatedItems": false
+    })"))};
+    ASSERT_TRUE(schemaResult.has_value());
+
+    QJsonArray valid{};
+    valid.append(u"hello"_qt_s);
+    valid.append(42);
+    EXPECT_TRUE(schemaResult->validate(valid).isValid());
+
+    QJsonArray invalid{};
+    invalid.append(u"hello"_qt_s);
+    invalid.append(42);
+    invalid.append(u"extra"_qt_s);
+    EXPECT_FALSE(schemaResult->validate(invalid).isValid());
+}
+
+TEST_F(JSONSchemaKeywordTest, UnevaluatedItemsSchema)
+{
+    // unevaluatedItems as a schema validates remaining items
+    auto schemaResult{JSONSchema::create(parseSchema(R"({
+        "prefixItems": [{"type": "string"}],
+        "unevaluatedItems": {"type": "number"}
+    })"))};
+    ASSERT_TRUE(schemaResult.has_value());
+
+    QJsonArray valid{};
+    valid.append(u"hello"_qt_s);
+    valid.append(42);
+    EXPECT_TRUE(schemaResult->validate(valid).isValid());
+
+    QJsonArray invalid{};
+    invalid.append(u"hello"_qt_s);
+    invalid.append(u"not a number"_qt_s);
+    EXPECT_FALSE(schemaResult->validate(invalid).isValid());
+}

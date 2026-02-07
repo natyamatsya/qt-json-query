@@ -62,7 +62,7 @@ inline void validateArray(ValidateContext&    ctx,
         }
     }
 
-    // Validate prefixItems
+    // Validate prefixItems — each index is evaluated
     for (std::size_t i{0}; i < node.prefixItems.size(); ++i)
     {
         if (i >= arr.size() || !ctx.shouldContinue())
@@ -70,9 +70,11 @@ inline void validateArray(ValidateContext&    ctx,
         const auto itemPath{instancePath + u"/"_qt_s + QString::number(i)};
         const auto itemSchemaPath{schemaPath + u"/prefixItems/"_qt_s + QString::number(i)};
         validateNode(ctx, ctx.schema.nodeAt(node.prefixItems[i]), arr[static_cast<int>(i)], itemPath, itemSchemaPath);
+        if (ctx.tracker)
+            ctx.tracker->items.insert(static_cast<int>(i));
     }
 
-    // Validate items (for elements after prefixItems)
+    // Validate items (for elements after prefixItems) — all remaining indices evaluated
     if (node.items)
     {
         const auto startIndex{node.prefixItems.size()};
@@ -84,6 +86,8 @@ inline void validateArray(ValidateContext&    ctx,
                 break;
             const auto itemPath{instancePath + u"/"_qt_s + QString::number(i)};
             validateNode(ctx, ctx.schema.nodeAt(*node.items), arr[i], itemPath, schemaPath + u"/items"_qt_s);
+            if (ctx.tracker)
+                ctx.tracker->items.insert(i);
         }
     }
 
@@ -94,7 +98,7 @@ inline void validateArray(ValidateContext&    ctx,
         const auto maxC{node.maxContains};
 
         // When minContains is 0 and no maxContains, contains always passes
-        if (minC == 0 && !maxC)
+        if (minC == 0 && !maxC && !ctx.tracker)
             return;
 
         std::size_t matchCount{0};
@@ -108,10 +112,15 @@ inline void validateArray(ValidateContext&    ctx,
                          instancePath + u"/"_qt_s + QString::number(i),
                          schemaPath + u"/contains"_qt_s);
             if (tempResult.isValid())
+            {
                 ++matchCount;
+                // Track matching items for unevaluatedItems
+                if (ctx.tracker)
+                    ctx.tracker->items.insert(i);
+            }
 
-            // Early exit: if we already exceed maxContains
-            if (maxC && matchCount > *maxC)
+            // Early exit: if we already exceed maxContains (and not tracking)
+            if (maxC && matchCount > *maxC && !ctx.tracker)
                 break;
         }
 
@@ -136,6 +145,53 @@ inline void validateArray(ValidateContext&    ctx,
                                 msg,
                                 EvalError::ContainsViolation);
         }
+    }
+}
+
+/**
+ * @brief Validate unevaluatedItems constraint
+ *
+ * Any array item not evaluated by prefixItems, items, contains, or any in-place
+ * applicator must validate against the unevaluatedItems schema.
+ */
+inline void validateUnevaluatedItems(ValidateContext&    ctx,
+                                     const ObjectSchema& node,
+                                     const QJsonArray&   arr,
+                                     const QString&      instancePath,
+                                     const QString&      schemaPath,
+                                     ValidateNodeFn&     validateNode)
+{
+    using json_query::literals::operator""_qt_s;
+
+    if (!ctx.tracker)
+        return;
+
+    for (int i{0}; i < arr.size() && ctx.shouldContinue(); ++i)
+    {
+        if (ctx.tracker->items.contains(i))
+            continue;
+
+        const auto itemPath{instancePath + u"/"_qt_s + QString::number(i)};
+        const auto& unevalNode{ctx.schema.nodeAt(*node.unevaluatedItems)};
+
+        if (const auto* boolSchema = std::get_if<BooleanSchema>(&unevalNode))
+        {
+            if (!boolSchema->value)
+            {
+                const auto msg{QString(u"Unevaluated item at index %1 is not allowed").arg(i)};
+                ctx.result.addError(itemPath,
+                                    schemaPath + u"/unevaluatedItems"_qt_s,
+                                    msg,
+                                    EvalError::UnevaluatedItemsInvalid);
+            }
+        }
+        else
+        {
+            validateNode(ctx, unevalNode, arr[i], itemPath, schemaPath + u"/unevaluatedItems"_qt_s);
+        }
+
+        // Mark as evaluated by unevaluatedItems itself (for nested schemas)
+        ctx.tracker->items.insert(i);
     }
 }
 
