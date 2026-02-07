@@ -225,6 +225,13 @@ std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, co
             return std::unexpected(r.error());
     }
 
+    // Register $id URI so $ref can resolve against it
+    if (schemaObj.contains(u"$id"_qt_s) && schemaObj[u"$id"_qt_s].isString())
+    {
+        const auto id{schemaObj[u"$id"_qt_s].toString()};
+        ctx.anchors[id] = nodeIndex;
+    }
+
     return nodeIndex;
 }
 
