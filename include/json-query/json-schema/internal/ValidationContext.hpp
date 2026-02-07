@@ -5,8 +5,25 @@
 #include "json-query/json-schema/JSONSchemaValidate.hpp"
 #include "json-query/json-schema/internal/SchemaNode.hpp"
 
+#include <unordered_set>
+
 namespace json_query::json_schema::internal
 {
+
+/**
+ * @brief Tracks which properties/items have been "evaluated" for unevaluatedProperties/unevaluatedItems
+ */
+struct EvaluationTracker
+{
+    std::unordered_set<QString> properties{};
+    std::unordered_set<int>     items{};
+
+    void mergeFrom(const EvaluationTracker& other)
+    {
+        properties.insert(other.properties.begin(), other.properties.end());
+        items.insert(other.items.begin(), other.items.end());
+    }
+};
 
 /**
  * @brief Context for schema validation
@@ -18,6 +35,7 @@ struct ValidateContext
     const CompiledSchema& schema;
     ValidationResult&     result;
     bool                  stopOnFirstError{false};
+    EvaluationTracker*    tracker{nullptr};
 
     /**
      * @brief Check if validation should continue

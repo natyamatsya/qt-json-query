@@ -624,3 +624,121 @@ TEST_F(JSONSchemaKeywordTest, DependentSchemas)
     invalidMissingBilling[u"creditCard"_qt_s] = u"1234"_qt_s;
     EXPECT_FALSE(schemaResult->validate(invalidMissingBilling).isValid());
 }
+
+// ============================================================================
+// Unevaluated Properties Tests
+// ============================================================================
+
+TEST_F(JSONSchemaKeywordTest, UnevaluatedPropertiesFalse)
+{
+    auto schemaResult{JSONSchema::create(parseSchema(R"({
+        "properties": {"foo": {"type": "string"}},
+        "unevaluatedProperties": false
+    })"))};
+    ASSERT_TRUE(schemaResult.has_value());
+
+    QJsonObject valid{};
+    valid[u"foo"_qt_s] = u"bar"_qt_s;
+    EXPECT_TRUE(schemaResult->validate(valid).isValid());
+
+    QJsonObject invalid{};
+    invalid[u"foo"_qt_s] = u"bar"_qt_s;
+    invalid[u"extra"_qt_s] = 1;
+    EXPECT_FALSE(schemaResult->validate(invalid).isValid());
+}
+
+TEST_F(JSONSchemaKeywordTest, UnevaluatedPropertiesWithAllOf)
+{
+    auto schemaResult{JSONSchema::create(parseSchema(R"({
+        "properties": {"foo": {"type": "string"}},
+        "allOf": [{"properties": {"bar": {"type": "string"}}}],
+        "unevaluatedProperties": false
+    })"))};
+    ASSERT_TRUE(schemaResult.has_value());
+
+    QJsonObject valid{};
+    valid[u"foo"_qt_s] = u"a"_qt_s;
+    valid[u"bar"_qt_s] = u"b"_qt_s;
+    EXPECT_TRUE(schemaResult->validate(valid).isValid());
+
+    QJsonObject invalid{};
+    invalid[u"foo"_qt_s] = u"a"_qt_s;
+    invalid[u"bar"_qt_s] = u"b"_qt_s;
+    invalid[u"baz"_qt_s] = u"c"_qt_s;
+    EXPECT_FALSE(schemaResult->validate(invalid).isValid());
+}
+
+TEST_F(JSONSchemaKeywordTest, UnevaluatedPropertiesWithAnyOf)
+{
+    auto schemaResult{JSONSchema::create(parseSchema(R"({
+        "properties": {"foo": {"type": "string"}},
+        "anyOf": [
+            {"properties": {"bar": {"const": "bar"}}, "required": ["bar"]},
+            {"properties": {"baz": {"const": "baz"}}, "required": ["baz"]}
+        ],
+        "unevaluatedProperties": false
+    })"))};
+    ASSERT_TRUE(schemaResult.has_value());
+
+    QJsonObject valid{};
+    valid[u"foo"_qt_s] = u"foo"_qt_s;
+    valid[u"bar"_qt_s] = u"bar"_qt_s;
+    EXPECT_TRUE(schemaResult->validate(valid).isValid());
+
+    QJsonObject invalid{};
+    invalid[u"foo"_qt_s] = u"foo"_qt_s;
+    invalid[u"bar"_qt_s] = u"bar"_qt_s;
+    invalid[u"extra"_qt_s] = 1;
+    EXPECT_FALSE(schemaResult->validate(invalid).isValid());
+}
+
+TEST_F(JSONSchemaKeywordTest, UnevaluatedPropertiesWithIfThenElse)
+{
+    auto schemaResult{JSONSchema::create(parseSchema(R"({
+        "properties": {"foo": {"type": "string"}},
+        "if": {"properties": {"foo": {"const": "yes"}}},
+        "then": {"properties": {"bar": {"type": "string"}}},
+        "else": {"properties": {"baz": {"type": "string"}}},
+        "unevaluatedProperties": false
+    })"))};
+    ASSERT_TRUE(schemaResult.has_value());
+
+    // if matches -> then branch evaluates "bar"
+    QJsonObject validThen{};
+    validThen[u"foo"_qt_s] = u"yes"_qt_s;
+    validThen[u"bar"_qt_s] = u"b"_qt_s;
+    EXPECT_TRUE(schemaResult->validate(validThen).isValid());
+
+    // if doesn't match -> else branch evaluates "baz"
+    QJsonObject validElse{};
+    validElse[u"foo"_qt_s] = u"no"_qt_s;
+    validElse[u"baz"_qt_s] = u"c"_qt_s;
+    EXPECT_TRUE(schemaResult->validate(validElse).isValid());
+
+    // extra property not evaluated by any branch
+    QJsonObject invalid{};
+    invalid[u"foo"_qt_s] = u"yes"_qt_s;
+    invalid[u"bar"_qt_s] = u"b"_qt_s;
+    invalid[u"extra"_qt_s] = 1;
+    EXPECT_FALSE(schemaResult->validate(invalid).isValid());
+}
+
+TEST_F(JSONSchemaKeywordTest, UnevaluatedPropertiesSchema)
+{
+    // unevaluatedProperties as a schema (not false) validates remaining properties
+    auto schemaResult{JSONSchema::create(parseSchema(R"({
+        "properties": {"foo": {"type": "string"}},
+        "unevaluatedProperties": {"type": "number"}
+    })"))};
+    ASSERT_TRUE(schemaResult.has_value());
+
+    QJsonObject valid{};
+    valid[u"foo"_qt_s] = u"bar"_qt_s;
+    valid[u"extra"_qt_s] = 42;
+    EXPECT_TRUE(schemaResult->validate(valid).isValid());
+
+    QJsonObject invalid{};
+    invalid[u"foo"_qt_s] = u"bar"_qt_s;
+    invalid[u"extra"_qt_s] = u"not a number"_qt_s;
+    EXPECT_FALSE(schemaResult->validate(invalid).isValid());
+}

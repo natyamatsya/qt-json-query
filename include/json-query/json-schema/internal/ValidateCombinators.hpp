@@ -28,7 +28,7 @@ inline void validateCombinators(ValidateContext&    ctx,
 {
     using json_query::literals::operator""_qt_s;
 
-    // allOf: must match all schemas
+    // allOf: must match all schemas — pass tracker directly (all sub-schemas contribute)
     for (std::size_t i{0}; i < node.allOf.size(); ++i)
     {
         if (!ctx.shouldContinue())
@@ -40,14 +40,15 @@ inline void validateCombinators(ValidateContext&    ctx,
                      schemaPath + u"/allOf/"_qt_s + QString::number(i));
     }
 
-    // anyOf: must match at least one schema
+    // anyOf: must match at least one schema — merge tracker from ALL matching sub-schemas
     if (!node.anyOf.empty())
     {
         bool anyValid{false};
         for (std::size_t i{0}; i < node.anyOf.size(); ++i)
         {
-            ValidationResult tempResult{};
-            ValidateContext  tempCtx{ctx.schema, tempResult, true};
+            ValidationResult   tempResult{};
+            EvaluationTracker   tempTracker{};
+            ValidateContext    tempCtx{ctx.schema, tempResult, true, ctx.tracker ? &tempTracker : nullptr};
             validateNode(tempCtx,
                          ctx.schema.nodeAt(node.anyOf[i]),
                          instance,
@@ -56,7 +57,10 @@ inline void validateCombinators(ValidateContext&    ctx,
             if (tempResult.isValid())
             {
                 anyValid = true;
-                break;
+                if (ctx.tracker)
+                    ctx.tracker->mergeFrom(tempTracker);
+                if (!ctx.tracker)
+                    break; // No tracking needed — early exit
             }
         }
         if (!anyValid)
@@ -68,14 +72,16 @@ inline void validateCombinators(ValidateContext&    ctx,
         }
     }
 
-    // oneOf: must match exactly one schema
+    // oneOf: must match exactly one schema — merge tracker from the single match
     if (!node.oneOf.empty())
     {
-        int matchCount{0};
+        int               matchCount{0};
+        EvaluationTracker  matchedTracker{};
         for (std::size_t i{0}; i < node.oneOf.size(); ++i)
         {
-            ValidationResult tempResult{};
-            ValidateContext  tempCtx{ctx.schema, tempResult, true};
+            ValidationResult  tempResult{};
+            EvaluationTracker  tempTracker{};
+            ValidateContext   tempCtx{ctx.schema, tempResult, true, ctx.tracker ? &tempTracker : nullptr};
             validateNode(tempCtx,
                          ctx.schema.nodeAt(node.oneOf[i]),
                          instance,
@@ -84,10 +90,14 @@ inline void validateCombinators(ValidateContext&    ctx,
             if (tempResult.isValid())
             {
                 ++matchCount;
+                matchedTracker = std::move(tempTracker);
                 if (matchCount > 1)
                     break; // Already failed
             }
         }
+        if (matchCount == 1 && ctx.tracker)
+            ctx.tracker->mergeFrom(matchedTracker);
+
         if (matchCount != 1)
         {
             const auto msg{matchCount == 0 ? u"Value does not match any schema in oneOf"_qt_s
@@ -96,7 +106,7 @@ inline void validateCombinators(ValidateContext&    ctx,
         }
     }
 
-    // not: must not match
+    // not: must not match (does NOT contribute evaluated properties)
     if (node.notSchema)
     {
         ValidationResult tempResult{};
@@ -109,15 +119,20 @@ inline void validateCombinators(ValidateContext&    ctx,
         }
     }
 
-    // if/then/else
+    // if/then/else — matching branch passes tracker through
     if (node.ifSchema)
     {
-        ValidationResult ifResult{};
-        ValidateContext  ifCtx{ctx.schema, ifResult, true};
+        ValidationResult  ifResult{};
+        EvaluationTracker  ifTracker{};
+        ValidateContext   ifCtx{ctx.schema, ifResult, true, ctx.tracker ? &ifTracker : nullptr};
         validateNode(ifCtx, ctx.schema.nodeAt(*node.ifSchema), instance, instancePath, schemaPath + u"/if"_qt_s);
 
         if (ifResult.isValid())
         {
+            // Merge if-branch evaluated properties
+            if (ctx.tracker)
+                ctx.tracker->mergeFrom(ifTracker);
+
             if (node.thenSchema)
             {
                 validateNode(

@@ -169,6 +169,15 @@ compileArrayKeywords(CompileContext& ctx, const QJsonObject& schemaObj, ObjectSc
     else
         node.maxContains = *r;
 
+    // unevaluatedItems
+    if (schemaObj.contains(u"unevaluatedItems"_qt_s))
+    {
+        auto r{compile(ctx, schemaObj[u"unevaluatedItems"_qt_s])};
+        if (!r)
+            return std::unexpected(r.error());
+        node.unevaluatedItems = *r;
+    }
+
     return {};
 }
 
@@ -275,6 +284,15 @@ compileObjectKeywords(CompileContext& ctx, const QJsonObject& schemaObj, ObjectS
                 return std::unexpected(r.error());
             node.dependentSchemas[it.key()] = *r;
         }
+    }
+
+    // unevaluatedProperties
+    if (schemaObj.contains(u"unevaluatedProperties"_qt_s))
+    {
+        auto r{compile(ctx, schemaObj[u"unevaluatedProperties"_qt_s])};
+        if (!r)
+            return std::unexpected(r.error());
+        node.unevaluatedProperties = *r;
     }
 
     return {};

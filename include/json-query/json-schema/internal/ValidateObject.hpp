@@ -155,7 +155,12 @@ inline bool validateSingleProperty(ValidateContext&    ctx,
         {
             validateNode(ctx, additionalNode, propValue, propPath, schemaPath + u"/additionalProperties"_qt_s);
         }
+        evaluated = true; // additionalProperties always evaluates the property
     }
+
+    // Track evaluated property for unevaluatedProperties
+    if (evaluated && ctx.tracker)
+        ctx.tracker->properties.insert(propName);
 
     return evaluated;
 }
@@ -210,6 +215,58 @@ inline void validateDependentSchemas(ValidateContext&    ctx,
                          instancePath,
                          json_pointer::appendToken(schemaPath + u"/dependentSchemas"_qt_s, propName));
         }
+    }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Unevaluated Properties
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * @brief Validate unevaluatedProperties constraint
+ *
+ * Any property not evaluated by properties, patternProperties, additionalProperties,
+ * or any in-place applicator must validate against the unevaluatedProperties schema.
+ */
+inline void validateUnevaluatedProperties(ValidateContext&    ctx,
+                                          const ObjectSchema& node,
+                                          const QJsonObject&  obj,
+                                          const QString&      instancePath,
+                                          const QString&      schemaPath,
+                                          ValidateNodeFn&     validateNode)
+{
+    using json_query::literals::operator""_qt_s;
+
+    if (!ctx.tracker)
+        return;
+
+    for (auto it = obj.begin(); it != obj.end() && ctx.shouldContinue(); ++it)
+    {
+        if (ctx.tracker->properties.contains(it.key()))
+            continue;
+
+        // Property was not evaluated — validate against unevaluatedProperties schema
+        const auto propPath{json_pointer::appendToken(instancePath, it.key())};
+        const auto& unevalNode{ctx.schema.nodeAt(*node.unevaluatedProperties)};
+
+        if (const auto* boolSchema = std::get_if<BooleanSchema>(&unevalNode))
+        {
+            if (!boolSchema->value)
+            {
+                const auto msg{QString(u"Unevaluated property '%1' is not allowed").arg(it.key())};
+                ctx.result.addError(propPath,
+                                    schemaPath + u"/unevaluatedProperties"_qt_s,
+                                    msg,
+                                    EvalError::UnevaluatedPropertiesInvalid);
+            }
+        }
+        else
+        {
+            validateNode(ctx, unevalNode, it.value(), propPath, schemaPath + u"/unevaluatedProperties"_qt_s);
+        }
+
+        // Mark as evaluated by unevaluatedProperties itself (for nested schemas)
+        ctx.tracker->properties.insert(it.key());
     }
 }
 

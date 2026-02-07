@@ -46,6 +46,13 @@ void validateObjectSchema(ValidateContext&    ctx,
                           const QString&      instancePath,
                           const QString&      schemaPath)
 {
+    // Set up evaluation tracking if this schema uses unevaluatedProperties/unevaluatedItems
+    // and no parent tracker is already active
+    const auto needsTracker{(node.unevaluatedProperties || node.unevaluatedItems) && !ctx.tracker};
+    EvaluationTracker localTracker{};
+    if (needsTracker)
+        ctx.tracker = &localTracker;
+
     // Type constraint
     if (node.type && ctx.shouldContinue())
         validateType(ctx, *node.type, instance, instancePath, schemaPath);
@@ -71,6 +78,14 @@ void validateObjectSchema(ValidateContext&    ctx,
     // Combinators
     if (ctx.shouldContinue())
         validateCombinators(ctx, node, instance, instancePath, schemaPath, validateNode);
+
+    // unevaluatedProperties — must run after combinators have populated the tracker
+    if (node.unevaluatedProperties && instance.isObject() && ctx.shouldContinue())
+        validateUnevaluatedProperties(ctx, node, instance.toObject(), instancePath, schemaPath, validateNode);
+
+    // Clean up local tracker
+    if (needsTracker)
+        ctx.tracker = nullptr;
 }
 
 /**
