@@ -87,10 +87,17 @@ inline void validateArray(ValidateContext&    ctx,
         }
     }
 
-    // Validate contains
+    // Validate contains + minContains / maxContains
     if (node.contains)
     {
-        bool found{false};
+        const auto minC{node.minContains.value_or(1)};
+        const auto maxC{node.maxContains};
+
+        // When minContains is 0 and no maxContains, contains always passes
+        if (minC == 0 && !maxC)
+            return;
+
+        std::size_t matchCount{0};
         for (int i{0}; i < arr.size(); ++i)
         {
             ValidationResult tempResult{};
@@ -101,16 +108,32 @@ inline void validateArray(ValidateContext&    ctx,
                          instancePath + u"/"_qt_s + QString::number(i),
                          schemaPath + u"/contains"_qt_s);
             if (tempResult.isValid())
-            {
-                found = true;
+                ++matchCount;
+
+            // Early exit: if we already exceed maxContains
+            if (maxC && matchCount > *maxC)
                 break;
-            }
         }
-        if (!found)
+
+        if (matchCount < minC)
         {
+            const auto msg{QString(u"Array contains %1 matching items, minimum is %2")
+                               .arg(matchCount)
+                               .arg(minC)};
             ctx.result.addError(instancePath,
-                                schemaPath + u"/contains"_qt_s,
-                                u"Array does not contain required item"_qt_s,
+                                schemaPath + u"/minContains"_qt_s,
+                                msg,
+                                EvalError::ContainsViolation);
+        }
+
+        if (maxC && matchCount > *maxC)
+        {
+            const auto msg{QString(u"Array contains %1 matching items, maximum is %2")
+                               .arg(matchCount)
+                               .arg(*maxC)};
+            ctx.result.addError(instancePath,
+                                schemaPath + u"/maxContains"_qt_s,
+                                msg,
                                 EvalError::ContainsViolation);
         }
     }

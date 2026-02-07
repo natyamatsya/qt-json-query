@@ -158,6 +158,17 @@ compileArrayKeywords(CompileContext& ctx, const QJsonObject& schemaObj, ObjectSc
         node.contains = *r;
     }
 
+    // minContains / maxContains (only meaningful when contains is present)
+    if (auto r{parseIntegerKeyword(schemaObj[u"minContains"_qt_s])}; !r)
+        return std::unexpected(r.error());
+    else
+        node.minContains = *r;
+
+    if (auto r{parseIntegerKeyword(schemaObj[u"maxContains"_qt_s])}; !r)
+        return std::unexpected(r.error());
+    else
+        node.maxContains = *r;
+
     return {};
 }
 

@@ -327,6 +327,111 @@ TEST_F(JSONSchemaKeywordTest, Contains)
     EXPECT_FALSE(schemaResult->validate(invalid).isValid());
 }
 
+TEST_F(JSONSchemaKeywordTest, MinContains)
+{
+    auto schemaResult{JSONSchema::create(parseSchema(R"({
+        "type": "array",
+        "contains": {"type": "string"},
+        "minContains": 2
+    })"))};
+    ASSERT_TRUE(schemaResult.has_value());
+
+    // 2 strings — meets minimum
+    QJsonArray valid{};
+    valid.append(1);
+    valid.append(u"hello"_qt_s);
+    valid.append(u"world"_qt_s);
+    EXPECT_TRUE(schemaResult->validate(valid).isValid());
+
+    // 1 string — below minimum
+    QJsonArray tooFew{};
+    tooFew.append(1);
+    tooFew.append(u"hello"_qt_s);
+    tooFew.append(3);
+    EXPECT_FALSE(schemaResult->validate(tooFew).isValid());
+
+    // 0 strings — below minimum
+    QJsonArray none{};
+    none.append(1);
+    none.append(2);
+    EXPECT_FALSE(schemaResult->validate(none).isValid());
+}
+
+TEST_F(JSONSchemaKeywordTest, MaxContains)
+{
+    auto schemaResult{JSONSchema::create(parseSchema(R"({
+        "type": "array",
+        "contains": {"type": "string"},
+        "maxContains": 2
+    })"))};
+    ASSERT_TRUE(schemaResult.has_value());
+
+    // 1 string — within limit
+    QJsonArray valid{};
+    valid.append(1);
+    valid.append(u"hello"_qt_s);
+    EXPECT_TRUE(schemaResult->validate(valid).isValid());
+
+    // 3 strings — exceeds max
+    QJsonArray tooMany{};
+    tooMany.append(u"a"_qt_s);
+    tooMany.append(u"b"_qt_s);
+    tooMany.append(u"c"_qt_s);
+    EXPECT_FALSE(schemaResult->validate(tooMany).isValid());
+}
+
+TEST_F(JSONSchemaKeywordTest, MinContainsZero)
+{
+    // minContains: 0 means contains is not required to match anything
+    auto schemaResult{JSONSchema::create(parseSchema(R"({
+        "type": "array",
+        "contains": {"type": "string"},
+        "minContains": 0
+    })"))};
+    ASSERT_TRUE(schemaResult.has_value());
+
+    // No strings at all — valid because minContains is 0
+    QJsonArray noStrings{};
+    noStrings.append(1);
+    noStrings.append(2);
+    EXPECT_TRUE(schemaResult->validate(noStrings).isValid());
+
+    // Empty array — valid
+    EXPECT_TRUE(schemaResult->validate(QJsonArray{}).isValid());
+}
+
+TEST_F(JSONSchemaKeywordTest, MinAndMaxContains)
+{
+    auto schemaResult{JSONSchema::create(parseSchema(R"({
+        "type": "array",
+        "contains": {"type": "string"},
+        "minContains": 1,
+        "maxContains": 3
+    })"))};
+    ASSERT_TRUE(schemaResult.has_value());
+
+    // 2 strings — within range
+    QJsonArray valid{};
+    valid.append(u"a"_qt_s);
+    valid.append(1);
+    valid.append(u"b"_qt_s);
+    EXPECT_TRUE(schemaResult->validate(valid).isValid());
+
+    // 0 strings — below min
+    QJsonArray tooFew{};
+    tooFew.append(1);
+    tooFew.append(2);
+    EXPECT_FALSE(schemaResult->validate(tooFew).isValid());
+
+    // 4 strings — above max
+    QJsonArray tooMany{};
+    tooMany.append(u"a"_qt_s);
+    tooMany.append(u"b"_qt_s);
+    tooMany.append(u"c"_qt_s);
+    tooMany.append(u"d"_qt_s);
+    EXPECT_FALSE(schemaResult->validate(tooMany).isValid());
+}
+
 // ============================================================================
 // String Keyword Tests
 // ============================================================================
