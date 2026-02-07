@@ -85,11 +85,25 @@ FormatValidationResult isDateTime(QStringView value) noexcept
     // CTRE pattern match
     if (!ctre::match<patterns::dateTimePattern>(utils::to_sv(value.toString())))
         return formatInvalid;
-    // Qt semantic validation (e.g., Feb 30 would fail here)
-    const auto dt{QDateTime::fromString(value.toString(), Qt::ISODateWithMs)};
-    if (!dt.isValid())
+
+    const auto str{value.toString()};
+
+    // Find the T/t separator to split date and time parts
+    auto tPos{str.indexOf(u'T')};
+    if (tPos < 0)
+        tPos = str.indexOf(u't');
+    if (tPos < 0)
+        return formatInvalid;
+
+    // Validate date part via Qt
+    const auto datePart{str.left(tPos)};
+    const auto date{QDate::fromString(datePart, Qt::ISODate)};
+    if (!date.isValid())
         return semanticInvalid;
-    return {};
+
+    // Validate time part (handles leap seconds that Qt rejects)
+    const auto timePart{QStringView{str}.mid(tPos + 1)};
+    return isTime(timePart);
 }
 
 FormatValidationResult isDate(QStringView value) noexcept
@@ -166,11 +180,75 @@ FormatValidationResult isTime(QStringView value) noexcept
 
 FormatValidationResult isEmail(QStringView value) noexcept
 {
-    if (value.isEmpty() || value.size() > 254)
+    const auto str{value.toString()};
+    if (str.isEmpty() || str.size() > 254)
         return formatInvalid;
-    if (!ctre::match<patterns::emailPattern>(utils::to_sv(value.toString())))
+
+    // Find the last @ to split local and domain
+    const auto atPos{str.lastIndexOf(u'@')};
+    if (atPos < 1 || atPos >= str.size() - 1)
         return formatInvalid;
-    return {};
+
+    const auto local{QStringView{str}.left(atPos)};
+    const auto domain{QStringView{str}.mid(atPos + 1)};
+
+    // Validate local part
+    if (local.isEmpty() || local.size() > 64)
+        return formatInvalid;
+
+    if (local.startsWith(u'"') && local.endsWith(u'"'))
+    {
+        // Quoted local part — most printable ASCII allowed inside quotes
+        if (local.size() < 2)
+            return formatInvalid;
+    }
+    else
+    {
+        // Unquoted local part: atext characters + dots (no leading/trailing/consecutive dots)
+        if (local.startsWith(u'.') || local.endsWith(u'.'))
+            return formatInvalid;
+        bool prevDot{false};
+        for (const auto ch : local)
+        {
+            if (ch == u'.')
+            {
+                if (prevDot)
+                    return formatInvalid; // consecutive dots
+                prevDot = true;
+                continue;
+            }
+            prevDot = false;
+            // RFC 5321 atext: alphanumeric + !#$%&'*+/=?^_`{|}~-
+            if (ch.isLetterOrNumber())
+                continue;
+            static constexpr QStringView atext{u"!#$%&'*+/=?^_`{|}~-"};
+            if (!atext.contains(ch))
+                return formatInvalid;
+        }
+    }
+
+    // Validate domain part
+    if (domain.startsWith(u'[') && domain.endsWith(u']'))
+    {
+        // IP-literal domain: [IPv4] or [IPv6:addr]
+        const auto inner{domain.mid(1, domain.size() - 2)};
+        if (inner.startsWith(u"IPv6:"))
+        {
+            const QHostAddress addr{inner.mid(5).toString()};
+            if (addr.isNull() || addr.protocol() != QAbstractSocket::IPv6Protocol)
+                return formatInvalid;
+        }
+        else
+        {
+            const QHostAddress addr{inner.toString()};
+            if (addr.isNull() || addr.protocol() != QAbstractSocket::IPv4Protocol)
+                return formatInvalid;
+        }
+        return {};
+    }
+
+    // Standard domain: validate as hostname
+    return isHostname(domain);
 }
 
 FormatValidationResult isHostname(QStringView value) noexcept
