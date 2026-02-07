@@ -6,6 +6,8 @@
 #include "json-query/json-schema/internal/CompileContext.hpp"
 #include "json-query/json-schema/internal/CompileKeywords.hpp"
 #include "json-query/json-schema/internal/CompileDispatch.hpp"
+#include "json-query/json-pointer/JSONPointerParsing.hpp"
+#include "json-query/json-pointer/JSONPointerEvaluation.hpp"
 #include "json-query/utils/QtStringLiterals.hpp"
 
 #include <QtCore/QJsonArray>
@@ -273,11 +275,39 @@ void extractRootMetadata(const QJsonObject& rootObj, internal::CompiledSchema& c
 }
 
 /**
+ * @brief Percent-decode a URI fragment (e.g., %22 → ", %25 → %)
+ */
+QString percentDecode(const QString& input)
+{
+    QString result{};
+    result.reserve(input.size());
+    for (int i{0}; i < input.size(); ++i)
+    {
+        if (input[i] == u'%' && i + 2 < input.size())
+        {
+            const auto hex{input.mid(i + 1, 2)};
+            bool ok{false};
+            const auto ch{static_cast<char>(hex.toInt(&ok, 16))};
+            if (ok)
+            {
+                result.append(QChar::fromLatin1(ch));
+                i += 2;
+                continue;
+            }
+        }
+        result.append(input[i]);
+    }
+    return result;
+}
+
+/**
  * @brief Resolve a single $ref reference
  */
 void resolveReference(RefSchema&                                      refNode,
                       std::size_t                                     rootIndex,
-                      const std::unordered_map<QString, std::size_t>& anchors)
+                      const std::unordered_map<QString, std::size_t>& anchors,
+                      const QJsonValue&                               rootSchema,
+                      CompileContext&                                  ctx)
 {
     using json_query::literals::operator""_qt_s;
 
@@ -297,12 +327,37 @@ void resolveReference(RefSchema&                                      refNode,
         return;
     }
 
-    // Anchor with # prefix (e.g., "#foo" → lookup "foo")
+    // Local fragment reference (e.g., "#foo" or "#/properties/foo")
     if (ref.startsWith(u"#"_qt_s))
     {
-        const auto anchorName{ref.mid(1)};
-        if (anchors.contains(anchorName))
-            refNode.targetIndex = anchors.at(anchorName);
+        const auto fragment{ref.mid(1)};
+
+        // Try anchor lookup first
+        if (anchors.contains(fragment))
+        {
+            refNode.targetIndex = anchors.at(fragment);
+            return;
+        }
+
+        // Try JSON Pointer resolution against the root schema document
+        if (fragment.startsWith(u"/"_qt_s))
+        {
+            const auto decoded{percentDecode(fragment)};
+            std::vector<json_pointer::Token> tokens{};
+            if (json_pointer::detail::parsePointer(decoded, tokens))
+            {
+                const auto resolved{json_pointer::detail::evaluatePointerImpl(tokens, rootSchema)};
+                if (resolved)
+                {
+                    auto compiled{compileSchemaNode(ctx, *resolved)};
+                    if (compiled)
+                    {
+                        refNode.targetIndex = *compiled;
+                        return;
+                    }
+                }
+            }
+        }
         return;
     }
 
@@ -326,11 +381,15 @@ void resolveReference(RefSchema&                                      refNode,
 /**
  * @brief Resolve all $ref references in compiled nodes
  */
-void resolveAllReferences(internal::CompiledSchema& compiled, const std::unordered_map<QString, std::size_t>& anchors)
+void resolveAllReferences(internal::CompiledSchema&                        compiled,
+                          const std::unordered_map<QString, std::size_t>& anchors,
+                          const QJsonValue&                               rootSchema,
+                          CompileContext&                                  ctx)
 {
-    for (auto& node : compiled.nodes)
-        if (auto* refNode = std::get_if<RefSchema>(&node))
-            resolveReference(*refNode, compiled.rootIndex, anchors);
+    // Use index-based loop since resolveReference may add new nodes
+    for (std::size_t i{0}; i < compiled.nodes.size(); ++i)
+        if (auto* refNode = std::get_if<RefSchema>(&compiled.nodes[i]))
+            resolveReference(*refNode, compiled.rootIndex, anchors, rootSchema, ctx);
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -397,10 +456,14 @@ phase2_CompileSchemaTree(internal::CompiledSchema& compiled, CompileContext& ctx
  * @brief Phase 3: Link references to their targets
  *
  * Resolves all $ref references to their target node indices using the anchor table.
+ * JSON Pointer refs are resolved by walking the original schema document.
  */
-void phase3_LinkReferences(internal::CompiledSchema& compiled, const std::unordered_map<QString, std::size_t>& anchors)
+void phase3_LinkReferences(internal::CompiledSchema&                        compiled,
+                           const std::unordered_map<QString, std::size_t>& anchors,
+                           const QJsonValue&                               rootSchema,
+                           CompileContext&                                  ctx)
 {
-    resolveAllReferences(compiled, anchors);
+    resolveAllReferences(compiled, anchors, rootSchema, ctx);
 }
 
 } // anonymous namespace
@@ -460,7 +523,7 @@ std::expected<std::shared_ptr<internal::CompiledSchema>, QueryError> compileSche
         return std::unexpected(r.error());
 
     // Phase 3: Reference Resolution (Linking)
-    phase3_LinkReferences(*compiled, ctx.anchors);
+    phase3_LinkReferences(*compiled, ctx.anchors, schemaValue, ctx);
 
     return compiled;
 }
