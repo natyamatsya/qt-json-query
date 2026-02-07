@@ -109,6 +109,8 @@ void validateNode(ValidateContext&  ctx,
 
             if constexpr (std::is_same_v<T, RefSchema>)
             {
+                if (!schemaVariant.isResolved())
+                    return; // Unresolved remote $ref — treat as true (accept all)
                 validateNode(ctx, ctx.schema.nodeAt(schemaVariant.targetIndex), instance, instancePath, schemaPath);
                 return;
             }

@@ -203,13 +203,13 @@ std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, co
     // Phase 2: Fast path for $ref-only schemas
     const auto hasRef{schemaObj.contains(u"$ref"_qt_s)};
     if (hasRef && !hasValidationKeywords(schemaObj))
-        return ctx.addNode(RefSchema{0, schemaObj[u"$ref"_qt_s].toString()});
+        return ctx.addNode(RefSchema{RefSchema::kUnresolved, schemaObj[u"$ref"_qt_s].toString()});
 
     // Phase 3: Build ObjectSchema via dispatch
     ObjectSchema node{};
 
     if (hasRef)
-        node.allOf.push_back(ctx.addNode(RefSchema{0, schemaObj[u"$ref"_qt_s].toString()}));
+        node.allOf.push_back(ctx.addNode(RefSchema{RefSchema::kUnresolved, schemaObj[u"$ref"_qt_s].toString()}));
 
     if (auto r{FullKeywordDispatcher::dispatch(ctx, schemaObj, node, compileSchemaNode)}; !r)
         return std::unexpected(r.error());

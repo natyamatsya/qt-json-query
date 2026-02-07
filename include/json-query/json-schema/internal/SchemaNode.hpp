@@ -8,6 +8,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <unordered_map>
@@ -67,8 +68,12 @@ struct BooleanSchema
  */
 struct RefSchema
 {
-    std::size_t targetIndex; // Index into CompiledSchema::nodes
-    QString     originalRef; // Original $ref string for error messages
+    static constexpr std::size_t kUnresolved{std::numeric_limits<std::size_t>::max()};
+
+    std::size_t targetIndex{kUnresolved}; // Index into CompiledSchema::nodes
+    QString     originalRef;              // Original $ref string for error messages
+
+    [[nodiscard]] bool isResolved() const noexcept { return targetIndex != kUnresolved; }
 };
 
 /**
