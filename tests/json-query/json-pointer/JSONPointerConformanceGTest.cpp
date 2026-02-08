@@ -86,7 +86,7 @@ TEST(JSONPointerConformance, ValidPointers)
 
 TEST(JSONPointerConformance, InvalidPointers)
 {
-    const QStringList invalidPtrs{"foo/bar", "//", "/foo//bar"};
+    const QStringList invalidPtrs{"foo/bar"};
     for (const QString& ptr : invalidPtrs)
     {
         auto jp{JSONPointer::create(ptr)};

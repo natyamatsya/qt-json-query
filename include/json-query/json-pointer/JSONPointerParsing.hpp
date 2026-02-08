@@ -119,12 +119,6 @@ namespace json_query::json_pointer::detail
         const auto atEnd{end == -1};
         const auto raw = atEnd ? ptr.sliced(begin) : ptr.sliced(begin, end - begin);
 
-        if (raw.isEmpty() && !atEnd)
-        {
-            tokens.clear();
-            return std::unexpected(EmptyNonTerminalToken);
-        }
-
         const auto decoded = decodeToken(raw);
         if (raw.contains(u'~') && decoded.isEmpty() && !raw.isEmpty())
         {

@@ -148,10 +148,27 @@ QString resolveUri(const QString& ref, const QString& base)
 
     // Relative reference: replace last path segment in base
     const auto lastSlash{base.lastIndexOf(u'/')};
-    if (lastSlash >= 0)
-        return base.left(lastSlash + 1) + ref;
+    if (lastSlash < 0)
+        return ref;
 
-    return ref;
+    auto result{base.left(lastSlash + 1) + ref};
+
+    // Normalize ./ and ../ segments per RFC 3986 §5.2.4
+    result.replace(u"/./"_qt_s, u"/"_qt_s);
+    if (result.endsWith(u"/."_qt_s))
+        result.chop(1);
+
+    // Handle ../ by removing parent segments
+    int dotdot{};
+    while ((dotdot = result.indexOf(u"/../"_qt_s)) >= 0)
+    {
+        const auto parent{result.lastIndexOf(u'/', dotdot - 1)};
+        if (parent < 0)
+            break;
+        result.remove(parent, dotdot - parent + 3);
+    }
+
+    return result;
 }
 
 /**
