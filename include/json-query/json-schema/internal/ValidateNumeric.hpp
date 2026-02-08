@@ -54,8 +54,9 @@ inline void validateNumeric(ValidateContext&    ctx,
         const auto divisor{*node.multipleOf};
         const auto quotient{value / divisor};
         const auto rounded{std::round(quotient)};
-        // Check if quotient is close to an integer (handles precision better than fmod)
-        if (std::abs(quotient - rounded) > 1e-8)
+        // Non-finite quotient (overflow to inf) or NaN means not a valid multiple.
+        // Otherwise check if quotient is close to an integer (handles precision better than fmod).
+        if (!std::isfinite(quotient) || std::abs(quotient - rounded) > 1e-8)
         {
             const auto msg{QString(u"Value %1 is not a multiple of %2").arg(value).arg(divisor)};
             ctx.result.addError(instancePath, schemaPath + u"/multipleOf"_qt_s, msg, EvalError::MultipleOfViolation);
