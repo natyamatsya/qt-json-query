@@ -268,7 +268,7 @@ class CacheAnalysisTests
 
         if (jsonPathResult)
         {
-            auto evalResult{jsonPathResult->evaluateAll(data)};
+            auto evalResult{jsonPathResult->evaluate(data)};
             if (evalResult)
                 result = *evalResult;
         }

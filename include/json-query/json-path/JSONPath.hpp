@@ -49,11 +49,11 @@ class JSONPath
     using EvalResult      = std::expected<QJsonValue, json_query::Error>;
     using EvalArrayResult = std::expected<QJsonArray, json_query::Error>;
 
-    [[nodiscard]] EvalResult evaluate(const QJsonDocument& doc) const;
-    [[nodiscard]] EvalResult evaluate(const QJsonValue& value) const;
+    [[nodiscard]] EvalArrayResult evaluate(const QJsonDocument& doc) const;
+    [[nodiscard]] EvalArrayResult evaluate(const QJsonValue& value) const;
 
-    [[nodiscard]] EvalArrayResult evaluateAll(const QJsonDocument& doc) const;
-    [[nodiscard]] EvalArrayResult evaluateAll(const QJsonValue& value) const;
+    [[nodiscard]] EvalResult evaluateSingle(const QJsonDocument& doc) const;
+    [[nodiscard]] EvalResult evaluateSingle(const QJsonValue& value) const;
 
     // -----------------------------------------------------------------
     //  Other

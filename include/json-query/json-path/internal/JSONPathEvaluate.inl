@@ -22,7 +22,7 @@ using internal::acquirePooledArray;
  * @brief Single-value evaluation: squash the node list + apply trailing function.
  */
 QT_QUERY_JSON_ALWAYS_INLINE
-std::expected<QJsonValue, DetailedEvalError> evaluate(const PathEvalCtx& ctx, const QJsonValue& root)
+std::expected<QJsonValue, DetailedEvalError> evaluateSingle(const PathEvalCtx& ctx, const QJsonValue& root)
 {
     return evaluateTokenStream(ctx, root)
         .transform([&ctx](NodeList&& nl) -> QJsonValue {
@@ -39,7 +39,7 @@ std::expected<QJsonValue, DetailedEvalError> evaluate(const PathEvalCtx& ctx, co
  * node list to a single value.
  */
 QT_QUERY_JSON_ALWAYS_INLINE
-std::expected<QJsonArray, DetailedEvalError> evaluateAll(const PathEvalCtx& ctx, const QJsonValue& root)
+std::expected<QJsonArray, DetailedEvalError> evaluate(const PathEvalCtx& ctx, const QJsonValue& root)
 {
     return evaluateTokenStream(ctx, root)
         .transform([&ctx](NodeList&& nl) -> QJsonArray {

@@ -184,7 +184,7 @@ std::expected<NodeList, DetailedEvalError> evaluateTokenStream(const PathEvalCtx
 //  Convenience entry points (pure)
 // ---------------------------------------------------------------------------
 
-// Note: evaluate(), evaluateAll(), and fanOut() implementations moved to
+// Note: evaluate(), evaluateSingle(), and fanOut() implementations moved to
 // JSONPathEvaluate.inl for inlining optimization. The inline implementations
 // are included via the header file to enable compiler inlining while keeping
 // headers clean.

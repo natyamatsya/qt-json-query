@@ -194,7 +194,7 @@ benchmarkWithMemoryTracking(const std::string& jsonPath, const QJsonValue& testD
 
     // Warm up
     for (int i = 0; i < 10; ++i)
-        auto result{path.evaluate(testData)};
+        auto result{path.evaluateSingle(testData)};
 
     // Reset tracker after warmup
     MemoryTracker::instance().reset();
@@ -205,7 +205,7 @@ benchmarkWithMemoryTracking(const std::string& jsonPath, const QJsonValue& testD
 
     for (int i = 0; i < iterations; ++i)
     {
-        auto result{path.evaluate(testData)};
+        auto result{path.evaluateSingle(testData)};
 
         // Track peak memory usage
         size_t currentMemory = MemoryTracker::instance().getTotalAllocated();

@@ -120,7 +120,7 @@ class AllocationHotspotAnalyzer
 
             // Warm up
             for (int i = 0; i < 5; ++i)
-                auto result{path.evaluate(testData)};
+                auto result{path.evaluateSingle(testData)};
 
             // Measure memory and performance
             const auto iterations{100};
@@ -129,7 +129,7 @@ class AllocationHotspotAnalyzer
             auto totalResults{0};
             for (int i = 0; i < iterations; ++i)
             {
-                auto result{path.evaluate(testData)};
+                auto result{path.evaluateSingle(testData)};
                 if (result)
                 {
                     if (result->isArray())

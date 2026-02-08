@@ -204,7 +204,7 @@ static auto log_query_error(const QString& context)
     { return JSONPath::create(QString(u"$.inventory[?(@.price > %1)].title").arg(thr)); };
     const auto evaluate = [&doc](const JSONPath& p)
     {
-        return p.evaluate(doc); // expected<QJsonValue, Error>
+        return p.evaluateSingle(doc); // expected<QJsonValue, Error>
     };
     const auto normalize_to_array = [](const QJsonValue& v) -> QJsonArray
     {

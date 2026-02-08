@@ -43,7 +43,7 @@ class QtMemoryTracker
 
         // Warm up
         for (int i = 0; i < 10; ++i)
-            auto result{path.evaluate(testData)};
+            auto result{path.evaluateSingle(testData)};
 
         // Benchmark with Qt memory tracking
         auto   start{std::chrono::high_resolution_clock::now()};
@@ -52,7 +52,7 @@ class QtMemoryTracker
 
         for (int i = 0; i < iterations; ++i)
         {
-            auto result{path.evaluate(testData)};
+            auto result{path.evaluateSingle(testData)};
             if (result)
             {
                 QJsonArray resultArray;
@@ -185,7 +185,7 @@ class StreamingComparisonTest
         for (int i = 0; i < 100; ++i)
         {
             auto start{std::chrono::high_resolution_clock::now()};
-            auto result{path.evaluate(testData)};
+            auto result{path.evaluateSingle(testData)};
             auto end{std::chrono::high_resolution_clock::now()};
 
             durations.push_back(std::chrono::duration_cast<std::chrono::nanoseconds>(end - start));

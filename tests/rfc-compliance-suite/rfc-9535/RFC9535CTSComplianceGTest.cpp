@@ -196,7 +196,7 @@ TEST_P(CtsJsonPathTest, EvaluatesPerSpec)
 
     const JSONPath& path = *maybePath;
     qDebug() << "DEBUG: About to evaluate with document";
-    auto result{path.evaluate(doc)};
+    auto result{path.evaluateSingle(doc)};
     qDebug() << "DEBUG: Evaluation result has_value:" << result.has_value();
     if (!result.has_value())
     {

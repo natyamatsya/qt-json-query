@@ -56,7 +56,7 @@ std::expected<QJsonArray, QString> executeEvaluation(const JSONPath& path, const
 {
     std::cout << "  → Executing JSONPath evaluation\n";
 
-    auto result{path.evaluateAll(doc)};
+    auto result{path.evaluate(doc)};
     if (!result)
         return std::unexpected(QStringLiteral("Evaluation failed: ") + result.error().formatted_message());
 

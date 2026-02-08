@@ -302,21 +302,21 @@ class MemoryOptimizationTest
 
             // Warm up
             for (int i = 0; i < 3; ++i)
-                auto result{path.evaluate(testData)};
+                auto result{path.evaluateSingle(testData)};
 
             // Baseline measurement (before optimization)
             const auto iterations{50};
             auto       start{std::chrono::high_resolution_clock::now()};
 
             for (int i = 0; i < iterations; ++i)
-                auto result{path.evaluate(testData)};
+                auto result{path.evaluateSingle(testData)};
 
             auto end{std::chrono::high_resolution_clock::now()};
             auto baselineDuration{std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)};
             auto avgBaseline = static_cast<double>(baselineDuration.count()) / iterations;
 
             // Test RFC compliance
-            auto testResult{path.evaluate(testData)};
+            auto testResult{path.evaluateSingle(testData)};
             auto rfcCompliant{testResult.has_value()};
 
             // For this test, we assume optimized version has same performance characteristics

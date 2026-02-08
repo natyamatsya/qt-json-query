@@ -630,7 +630,7 @@ std::optional<json_query::json_path::Token> parseAbsolutePath(const QString&    
             // against the root document
             if (auto path = JSONPath::create(s))
             {
-                auto results{path->evaluateAll(rootValue)};
+                auto results{path->evaluate(rootValue)};
                 if (results)
                     return !results->isEmpty();
                 return false;

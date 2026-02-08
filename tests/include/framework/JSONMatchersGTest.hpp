@@ -51,7 +51,7 @@ inline QJsonDocument parseJson(const char* src)
 // Evaluate a compiled JSONPath against a document and return the raw value.
 inline QJsonValue eval(const JSONPath& path, const QJsonDocument& doc)
 {
-    auto result{path.evaluate(doc)};
+    auto result{path.evaluateSingle(doc)};
     if (!result)
     {
         // Return null value on evaluation error instead of throwing
@@ -70,7 +70,7 @@ inline QJsonValue eval(QStringView path, const QJsonDocument& doc)
         return QJsonValue{};
     }
 
-    auto result{p->evaluate(doc)};
+    auto result{p->evaluateSingle(doc)};
     if (!result)
     {
         // Return null value on evaluation error instead of throwing
@@ -84,7 +84,7 @@ inline QJsonValue eval(QStringView path, const QJsonDocument& doc)
 // so caller can treat uniformly.
 inline QJsonArray evalArray(const JSONPath& path, const QJsonDocument& doc)
 {
-    auto result{path.evaluateAll(doc)};
+    auto result{path.evaluate(doc)};
     if (!result)
     {
         // Return empty array on evaluation error instead of throwing
@@ -102,7 +102,7 @@ inline QJsonArray evalArray(QStringView path, const QJsonDocument& doc)
         return QJsonArray{};
     }
 
-    auto result{p->evaluateAll(doc)};
+    auto result{p->evaluate(doc)};
     if (!result)
     {
         // Return empty array on evaluation error instead of throwing

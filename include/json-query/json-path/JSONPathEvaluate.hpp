@@ -38,8 +38,8 @@ struct NodeList
 std::expected<NodeList, DetailedEvalError> evaluateTokenStream(const PathEvalCtx& ctx, const QJsonValue& root);
 
 // Convenience wrappers that squash / apply trailing function
-std::expected<QJsonArray, DetailedEvalError> evaluateAll(const PathEvalCtx& ctx, const QJsonValue& root);
-std::expected<QJsonValue, DetailedEvalError> evaluate(const PathEvalCtx& ctx, const QJsonValue& root);
+std::expected<QJsonArray, DetailedEvalError> evaluate(const PathEvalCtx& ctx, const QJsonValue& root);
+std::expected<QJsonValue, DetailedEvalError> evaluateSingle(const PathEvalCtx& ctx, const QJsonValue& root);
 
 // Fast path for definite JSONPaths (only Key/Index selectors, no wildcard/recursive/filter)
 std::expected<NodeList, DetailedEvalError> evaluateDefinite(const std::vector<Token>& tokens,

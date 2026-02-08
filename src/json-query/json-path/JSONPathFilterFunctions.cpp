@@ -70,7 +70,7 @@ QJsonValue evaluateFunction(const QString& funcCall, const QJsonValue& context)
             if (!pathResult)
                 return {}; // Return null for invalid JSONPath
 
-            auto evalResult{pathResult->evaluateAll(context)};
+            auto evalResult{pathResult->evaluate(context)};
             if (!evalResult)
                 return {}; // Return null for evaluation errors
 

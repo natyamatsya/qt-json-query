@@ -46,16 +46,16 @@ static QJsonValue evaluateDefiniteValue(const std::vector<Token>& tokens, const 
 }
 
 // ─────────────────────────────────────────────────────────────────────
-//  evaluate – single value
+//  evaluateSingle – single value
 // ─────────────────────────────────────────────────────────────────────
 
-JSONPath::EvalResult JSONPath::evaluate(const QJsonDocument& doc) const
+JSONPath::EvalResult JSONPath::evaluateSingle(const QJsonDocument& doc) const
 {
     const auto root{doc.isArray() ? QJsonValue{doc.array()} : QJsonValue{doc.object()}};
-    return evaluate(root);
+    return evaluateSingle(root);
 }
 
-JSONPath::EvalResult JSONPath::evaluate(const QJsonValue& value) const
+JSONPath::EvalResult JSONPath::evaluateSingle(const QJsonValue& value) const
 {
     if (m_definite && m_func == FunctionType::None)
     {
@@ -69,22 +69,22 @@ JSONPath::EvalResult JSONPath::evaluate(const QJsonValue& value) const
 
     json_path::detail::PathEvalCtx ctx{m_tokens, value, m_func};
 
-    return json_path::detail::evaluate(ctx, value)
+    return json_path::detail::evaluateSingle(ctx, value)
         .or_else([](const json_path::detail::DetailedEvalError& e) -> EvalResult
                  { return std::unexpected(json_query::Error{e.error, e.tokenIndex}); });
 }
 
 // ─────────────────────────────────────────────────────────────────────
-//  evaluateAll – array results
+//  evaluate – array results
 // ─────────────────────────────────────────────────────────────────────
 
-JSONPath::EvalArrayResult JSONPath::evaluateAll(const QJsonDocument& doc) const
+JSONPath::EvalArrayResult JSONPath::evaluate(const QJsonDocument& doc) const
 {
     const auto root{doc.isArray() ? QJsonValue{doc.array()} : QJsonValue{doc.object()}};
-    return evaluateAll(root);
+    return evaluate(root);
 }
 
-JSONPath::EvalArrayResult JSONPath::evaluateAll(const QJsonValue& value) const
+JSONPath::EvalArrayResult JSONPath::evaluate(const QJsonValue& value) const
 {
     if (m_definite && m_func == FunctionType::None)
     {
@@ -98,7 +98,7 @@ JSONPath::EvalArrayResult JSONPath::evaluateAll(const QJsonValue& value) const
 
     json_path::detail::PathEvalCtx ctx{m_tokens, value, m_func};
 
-    return json_path::detail::evaluateAll(ctx, value)
+    return json_path::detail::evaluate(ctx, value)
         .or_else([](const json_path::detail::DetailedEvalError& e) -> EvalArrayResult
                  { return std::unexpected(json_query::Error{e.error, e.tokenIndex}); });
 }

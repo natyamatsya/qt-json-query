@@ -143,7 +143,7 @@ evaluateAbsolutePathSafe(const QString& path, const QJsonValue& root, const QJso
         return std::unexpected(EvalError::KeyNotFound); // Path creation failed
     }
 
-    auto results{absolutePath->evaluateAll(root)};
+    auto results{absolutePath->evaluate(root)};
     if (!results)
     {
         qCDebug(jsonPathLog) << "Failed to evaluate absolute path:" << path;
@@ -319,7 +319,7 @@ QJsonValue evaluateContextFunction(const QString& funcExpr, const QJsonValue& co
             if (path)
             {
                 // Evaluate against root document with context awareness
-                auto results{path->evaluateAll(root)};
+                auto results{path->evaluate(root)};
                 if (results)
                 {
                     if (results->isEmpty())
@@ -448,7 +448,7 @@ SideEvaluationResult evaluateExpressionSide(const QString& side, const QJsonValu
             auto    path{JSONPath::create(pathStr)};
             if (path)
             {
-                auto results{path->evaluateAll(root)};
+                auto results{path->evaluate(root)};
                 if (results)
                 {
                     if (results->isEmpty())
@@ -690,7 +690,7 @@ struct ContextFilterParsingStrategy<ContextFilterParsingType::ExistencePattern>
                     auto absolutePath{JSONPath::create(expr)};
                     if (absolutePath)
                     {
-                        auto results{absolutePath->evaluateAll(root)};
+                        auto results{absolutePath->evaluate(root)};
                         if (results && !results->isEmpty())
                             return true;
 

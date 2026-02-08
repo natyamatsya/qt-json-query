@@ -51,16 +51,16 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
         if (parseError.error == QJsonParseError::NoError && !doc.isNull())
         {
             // Both JSONPath and JSON are valid - test evaluation
-            auto evalResult = pathResult->evaluate(doc);
+            auto evalResult = pathResult->evaluateSingle(doc);
 
-            // Test both evaluate() and evaluateAll() if available
+            // Test both evaluateSingle() and evaluate() if available
             static_cast<void>(evalResult);
 
             // Test with different document root types
             if (doc.isObject())
             {
                 // Test object root evaluation
-                auto objResult = pathResult->evaluate(doc);
+                auto objResult = pathResult->evaluateSingle(doc);
                 static_cast<void>(objResult);
             }
             else if (doc.isArray())
