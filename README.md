@@ -4,9 +4,9 @@ A high-performance, modern C++ implementation of [JSONPointer (IETF RFC 6901)](h
 
 **Features:**
 
-- Full **JSONPointer (RFC 6901)** compliance.
-- Full **JSONPath (RFC 9535)** compliance (443/444 tests passing).
-- Full **JSON Schema (Draft 2020-12)** validation (1994/1994 tests passing).
+- Full **JSONPointer (RFC 6901)** compliance (33/33 tests passing).
+- Full **JSONPath (RFC 9535)** compliance (443/444 tests passing, 1 skipped).
+- **JSON Schema (Draft 2020-12)** validation — 1932/1994 IETF compliance tests passing (96.9%).
 - Utilizes **Compile-Time Regular Expressions (CTRE)** for efficient parsing.
 - Robust error handling using **`std::expected`** (C++23) for object creation/parsing.
 - Modern C++23 design, prioritizing standard library types (`std::vector`, `std::string`, etc.) internally.
@@ -263,6 +263,23 @@ if (isValid.value_or(false))
     qDebug() << "Valid!";
 ```
 
-## Performance Comparison
+## Test Status
 
-This implementation leverages compile-time regular expressions (CTRE) for parsing, which generally offers significantly better performance compared to runtime regex engines like QRegularExpression for the patterns used in path segmentation. Actual performance gains depend on the complexity of the paths and the specific operations. Benchmarking against other libraries or approaches is recommended for specific use cases.
+*Last verified: 2026-02-08 — Homebrew clang 21.1.8 (LLVM), macOS, Qt 6.8.3, C++23*
+
+| Test Suite | Passed | Total | Rate |
+|---|---|---|---|
+| **Core unit tests** (`json_query_core_tests`) | 18 | 18 | 100% |
+| **Internal unit tests** (`json_query_internal_tests`) | 60 | 60 | 100% |
+| **RFC 6901 — JSON Pointer** (`rfc6901_compliance_tests`) | 33 | 33 | 100% |
+| **RFC 9535 — JSONPath CTS** (`rfc9535_compliance_tests`) | 443 | 444 | 99.8% |
+| **JSON Schema unit tests** (`json_schema_tests`) | 116 | 116 | 100% |
+| **IETF JSON Schema Draft 2020-12** (`ietf_json_schema_draft_2020_12_compliance_tests`) | 1932 | 1994 | 96.9% |
+
+**Totals: 2602 / 2665 tests passing (97.6%)**
+
+Remaining IETF schema failures are in `ecmascript-regex.json` (ECMA-262 Unicode semantics — requires optional SRELL dependency), `hostname.json` (Unicode hostnames), and `idn-hostname.json` / `idn-email.json` (IDN — requires optional libidn2 dependency).
+
+## Performance
+
+This implementation leverages compile-time regular expressions (CTRE) for parsing, which generally offers significantly better performance compared to runtime regex engines like QRegularExpression for the patterns used in path segmentation. Actual performance gains depend on the complexity of the paths and the specific operations.
