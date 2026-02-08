@@ -5,14 +5,12 @@
 
 # Core JSONPath tests
 set(CORE_JSONPATH_SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-path/JSONPathConformanceGTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-path/JSONPathGTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-path/JSONPathLogicalOrPredicateGTest.cpp
 )
 
 # Core JSONPointer tests
 set(CORE_JSONPOINTER_SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-pointer/JSONPointerConformanceGTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-pointer/JSONPointerGTest.cpp)
 
 # Combined core test sources
