@@ -10,7 +10,7 @@ using namespace json_query;
 
 // Import the as<T> function and error utilities
 using json_query::as;
-using json_query::to_qt_sv; // unified error -> QStringView
+// QueryError::message_qt() provides human-readable QStringView
 
 int main(int argc, char* argv[])
 {
@@ -62,14 +62,14 @@ int main(int argc, char* argv[])
     if (storeName)
         qDebug() << "1. Store name:" << *storeName;
     else
-        qDebug() << "1. Error getting store name:" << to_qt_sv(storeName.error());
+        qDebug() << "1. Error getting store name:" << storeName.error().message_qt();
 
     // 1b. Same using the PIPE syntax
     auto storeNamePipe = (doc["store"]["name"] | as<QString>);
     if (storeNamePipe)
         qDebug() << "1b. Store name (pipe):" << *storeNamePipe;
     else
-        qDebug() << "1b. Error getting store name (pipe):" << to_qt_sv(storeNamePipe.error());
+        qDebug() << "1b. Error getting store name (pipe):" << storeNamePipe.error().message_qt();
 
     // 2. Get the first book
     auto firstBook = as<QJsonObject>(doc["store"]["book"][0]);
@@ -80,32 +80,32 @@ int main(int argc, char* argv[])
         if (title)
             qDebug() << "2.1 Book title:" << *title;
         else
-            qDebug() << "2.1 Error getting title:" << to_qt_sv(title.error());
+            qDebug() << "2.1 Error getting title:" << title.error().message_qt();
 
         // 2.1b Title using PIPE syntax
         auto titlePipe = (((*firstBook)["title"]) | as<QString>);
         if (titlePipe)
             qDebug() << "2.1b Book title (pipe):" << *titlePipe;
         else
-            qDebug() << "2.1b Error getting title (pipe):" << to_qt_sv(titlePipe.error());
+            qDebug() << "2.1b Error getting title (pipe):" << titlePipe.error().message_qt();
 
         // 2.2 Get book price as double
         auto price = as<double>((*firstBook)["price"]);
         if (price)
             qDebug() << "2.2 Book price:" << *price;
         else
-            qDebug() << "2.2 Error getting price:" << to_qt_sv(price.error());
+            qDebug() << "2.2 Error getting price:" << price.error().message_qt();
 
         // 2.2b Price using PIPE syntax
         auto pricePipe = (((*firstBook)["price"]) | as<double>);
         if (pricePipe)
             qDebug() << "2.2b Book price (pipe):" << *pricePipe;
         else
-            qDebug() << "2.2b Error getting price (pipe):" << to_qt_sv(pricePipe.error());
+            qDebug() << "2.2b Error getting price (pipe):" << pricePipe.error().message_qt();
     }
     else
     {
-        qDebug() << "2. Error getting first book:" << to_qt_sv(firstBook.error());
+        qDebug() << "2. Error getting first book:" << firstBook.error().message_qt();
     }
 
     // 3. Check inventory status
@@ -119,7 +119,7 @@ int main(int argc, char* argv[])
             if (firstItem)
                 qDebug() << "3. First item in stock:" << (*firstItem)["inStock"].toBool();
             else
-                qWarning() << "3. Error getting first inventory item:" << to_qt_sv(firstItem.error());
+                qWarning() << "3. Error getting first inventory item:" << firstItem.error().message_qt();
         }
         else
         {
@@ -128,13 +128,13 @@ int main(int argc, char* argv[])
     }
     else
     {
-        qDebug() << "3. Error getting store:" << to_qt_sv(store.error());
+        qDebug() << "3. Error getting store:" << store.error().message_qt();
     }
 
     // 4. Pipe example for a missing key (to show error propagation)
     auto missingPipe = (doc["store"]["doesNotExist"] | as<QString>);
     if (!missingPipe)
-        qDebug() << "4. Pipe error example:" << to_qt_sv(missingPipe.error());
+        qDebug() << "4. Pipe error example:" << missingPipe.error().message_qt();
 
     return 0;
 }

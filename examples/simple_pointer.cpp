@@ -27,7 +27,7 @@ void evaluateAndPrint(const JSONPointer& pointer, const QJsonDocument& doc, QStr
 
     if (!result)
     {
-        qDebug() << "  Error:" << to_qt_sv(result.error());
+        qDebug() << "  Error:" << result.error().message_qt();
         return;
     }
 
@@ -58,7 +58,7 @@ bool evaluatePointer(QStringView path, const QJsonDocument& doc, QStringView des
     if (!pointer)
     {
         qWarning() << "Failed to create pointer:" << path << "-" << description;
-        qWarning() << "  Error:" << to_qt_sv(pointer.error());
+        qWarning() << "  Error:" << pointer.error().message_qt();
         return false;
     }
 

@@ -155,7 +155,7 @@ static auto log_query_error(const QString& context)
 {
     return [&](const QueryError& error)
     {
-        qWarning() << context << ":" << to_qt_sv(error);
+        qWarning() << context << ":" << error.message_qt();
         return error;
     };
 }
@@ -224,7 +224,7 @@ static auto log_query_error(const QString& context)
             if (auto s = as<QString>(item))
                 out << *s;
             else
-                qWarning() << "Skipping non-string title:" << item << "Error:" << to_qt_sv(s.error());
+                qWarning() << "Skipping non-string title:" << item << "Error:" << s.error().message_qt();
         return out;
     };
 

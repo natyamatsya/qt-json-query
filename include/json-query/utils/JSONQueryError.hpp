@@ -192,6 +192,10 @@ struct QueryError
         return QueryError{d, c};
     }
 
+    // Human-readable error message (defined after to_std_sv/to_qt_sv below)
+    [[nodiscard]] constexpr std::string_view message() const noexcept;
+    [[nodiscard]] constexpr QStringView      message_qt() const noexcept;
+
     // Domain predicates
     [[nodiscard]] constexpr bool is_path_parse() const noexcept { return domain == ErrorDomain::PathParse; }
     [[nodiscard]] constexpr bool is_pointer_parse() const noexcept { return domain == ErrorDomain::PointerParse; }
@@ -271,5 +275,9 @@ static_assert(sizeof(QueryError) == 2, "QueryError should remain compact (2 byte
     }
     return QStringLiteral("unknown error domain");
 }
+
+// Out-of-line definitions (depend on to_std_sv/to_qt_sv above)
+constexpr std::string_view QueryError::message() const noexcept { return to_std_sv(*this); }
+constexpr QStringView      QueryError::message_qt() const noexcept { return to_qt_sv(*this); }
 
 } // namespace json_query
