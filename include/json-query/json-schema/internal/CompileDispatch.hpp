@@ -132,8 +132,8 @@ compileArrayKeywords(CompileContext& ctx, const QJsonObject& schemaObj, ObjectSc
             node.uniqueItems = uniqueVal.toBool();
     }
 
-    // prefixItems - array of schemas
-    if (schemaObj.contains(u"prefixItems"_qt_s) && schemaObj[u"prefixItems"_qt_s].isArray())
+    // prefixItems - array of schemas (2020-12+ only)
+    if (ctx.prefixItemsSupported && schemaObj.contains(u"prefixItems"_qt_s) && schemaObj[u"prefixItems"_qt_s].isArray())
     {
         for (const auto& item : schemaObj[u"prefixItems"_qt_s].toArray())
         {

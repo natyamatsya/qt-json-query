@@ -637,11 +637,21 @@ bool fetchAndCompileRemoteSchema(CompileContext&                                
     BaseUriScope uriScope{ctx};
     ctx.baseUri = uri;
 
+    // Check draft version — disable 2020-12-only keywords for older drafts
+    const auto savedPrefixItems{ctx.prefixItemsSupported};
+    if (fetched->isObject())
+    {
+        const auto dialect{fetched->toObject().value(u"$schema"_qt_s).toString()};
+        if (!dialect.isEmpty() && !dialect.contains(u"2020-12"_qt_s))
+            ctx.prefixItemsSupported = false;
+    }
+
     // Store the document for JSON Pointer resolution
     ctx.resourceDocuments[uri] = *fetched;
 
     // Compile the root of the fetched document (single-pass handles $defs inline)
     auto compiled{compileSchemaNode(ctx, *fetched)};
+    ctx.prefixItemsSupported = savedPrefixItems;
     if (!compiled)
         return false;
 

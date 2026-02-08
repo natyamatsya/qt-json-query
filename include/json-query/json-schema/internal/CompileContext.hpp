@@ -52,6 +52,10 @@ struct CompileContext
     /// without https://json-schema.org/draft/2020-12/vocab/validation.
     bool validationVocabActive{true};
 
+    /// Whether prefixItems is supported (2020-12+). Set to false for older drafts
+    /// where prefixItems didn't exist and should be treated as an unknown keyword.
+    bool prefixItemsSupported{true};
+
     /**
      * @brief Add a node and return its index
      */
