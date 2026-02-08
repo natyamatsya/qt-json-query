@@ -132,7 +132,7 @@ namespace json_query::json_pointer::detail
         }
         else
         {
-            bool digits = true;
+            bool digits{!decoded.isEmpty()};
             for (QChar ch : decoded)
             {
                 if (ch < u'0' || ch > u'9')
