@@ -1,12 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "json-query/json-path/JSONPath.hpp"
-#include "json-query/json-path/JSONPathTokenEvaluators.hpp"
 #include "json-query/json-path/JSONPathEvaluate.hpp"
 #include "json-query/utils/JSONError.hpp"
-
-#include <vector>
-#include <deque>
 
 namespace json_query::json_path
 {
