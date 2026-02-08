@@ -421,44 +421,6 @@ inline void compileMetadataKeywords(const QJsonObject& schemaObj, ObjectSchema& 
         node.description = schemaObj[u"description"_qt_s].toString();
 }
 
-/**
- * @brief Process nested $defs for anchor resolution
- *
- * **Design Note: Why is this a no-op?**
- *
- * This function is intentionally empty because $defs must be handled at the
- * root level using a two-pass compilation approach (see compileSchema()).
- *
- * **The Problem:**
- * If we compile $defs recursively through the dispatcher, we get infinite
- * recursion when definitions reference each other:
- *
- *   $defs: {
- *     "A": { "$ref": "#/$defs/B" },  // A references B
- *     "B": { "$ref": "#/$defs/A" }   // B references A
- *   }
- *
- * Compiling A triggers compilation of B, which triggers compilation of A again.
- *
- * **The Solution:**
- * Use a two-pass approach (standard in compiler theory):
- * 1. Pass 1: Register all $defs in the anchor table (symbol table construction)
- * 2. Pass 2: Compile schemas recursively (code generation)
- *
- * This ensures all symbols are registered before any schema bodies are compiled,
- * preventing infinite recursion and allowing forward references.
- *
- * This placeholder exists to maintain the dispatch table structure and document
- * why $defs are NOT processed during recursive schema compilation.
- */
-[[nodiscard]] inline std::expected<void, QueryError>
-compileNestedDefs(CompileContext&, const QJsonObject&, CompileSchemaFn&)
-{
-    // $defs are compiled in Phase 1 (symbol table construction) which now
-    // recursively scans the entire schema tree for $defs blocks.
-    // Re-compiling here would create duplicate nodes with stale path-prefix anchors.
-    return {};
-}
 
 // ────────────────────────────────────────────────────────────────────────────
 // TableGen-Inspired Keyword Category Dispatch
@@ -472,8 +434,7 @@ enum class KeywordCategory
     ArrayKeywords,   // minItems, maxItems, uniqueItems, prefixItems, items, contains
     ObjectKeywords,  // properties, required, additionalProperties, patternProperties, etc.
     Combinators,     // allOf, anyOf, oneOf, not, if/then/else
-    Metadata,        // title, description
-    NestedDefs       // $defs processing
+    Metadata         // title, description
 };
 
 template <KeywordCategory Category>
@@ -563,16 +524,6 @@ struct KeywordCategoryHandler<KeywordCategory::Metadata>
     }
 };
 
-template <>
-struct KeywordCategoryHandler<KeywordCategory::NestedDefs>
-{
-    [[nodiscard]] static std::expected<void, QueryError>
-    compile(CompileContext& ctx, const QJsonObject& schemaObj, ObjectSchema&, CompileSchemaFn& compileFn)
-    {
-        return compileNestedDefs(ctx, schemaObj, compileFn);
-    }
-};
-
 // ────────────────────────────────────────────────────────────────────────────
 // Recursive Dispatch Table for Keyword Categories
 // ────────────────────────────────────────────────────────────────────────────
@@ -613,7 +564,6 @@ using FullKeywordDispatcher = KeywordDispatchTable<KeywordCategory::TypeConstrai
                                                    KeywordCategory::ArrayKeywords,
                                                    KeywordCategory::ObjectKeywords,
                                                    KeywordCategory::Combinators,
-                                                   KeywordCategory::Metadata,
-                                                   KeywordCategory::NestedDefs>;
+                                                   KeywordCategory::Metadata>;
 
 } // namespace json_query::json_schema::internal
