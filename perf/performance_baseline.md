@@ -13,46 +13,46 @@
 
 | Benchmark | Time | Iterations | vs Previous |
 |---|---|---|---|
-| Simple | 231 ns | 3,219,990 | +8.5% slower |
-| Nested | 365 ns | 1,931,120 | +3.1% slower |
-| Array | 475 ns | 1,457,295 | **-1.0%** faster |
-| Complex | 631 ns | 1,123,325 | ~stable |
-| Creation | 344 ns | 2,084,208 | **-2.3%** faster |
+| Simple | 210 ns | 3,323,521 | **-9.1%** faster |
+| Nested | 354 ns | 1,973,143 | **-3.0%** faster |
+| Array | 479 ns | 1,414,948 | ~stable |
+| Complex | 631 ns | 1,111,676 | ~stable |
+| Creation | 350 ns | 2,003,136 | +1.7% slower |
 
 ### Plain Qt JSON (manual traversal, reference baseline)
 
 | Benchmark | Time | Iterations | vs Previous |
 |---|---|---|---|
-| Simple | 123 ns | 5,650,356 | **-2.4%** faster |
-| Nested | 214 ns | 3,308,738 | ~stable |
-| Array | 258 ns | 2,680,750 | ~stable |
-| Filter | 11.1 µs | 65,091 | ~stable |
-| Recursive | 16.8 µs | 41,937 | ~stable |
+| Simple | 125 ns | 5,589,358 | +1.6% slower |
+| Nested | 216 ns | 3,252,199 | ~stable |
+| Array | 257 ns | 2,718,616 | ~stable |
+| Filter | 10.7 µs | 64,035 | **-3.3%** faster |
+| Recursive | 16.4 µs | 43,575 | **-2.5%** faster |
 
 ### JSONPath
 
 | Benchmark | Time | Iterations | vs Previous |
 |---|---|---|---|
-| Simple | 1.9 µs | 368,885 | ~stable |
-| Nested | 2.6 µs | 263,461 | **-8.7%** faster |
-| Array | 3.9 µs | 184,187 | +4.3% slower |
-| Filter | 15.0 µs | 46,549 | ~stable |
-| Recursive | 81.1 µs | 8,520 | ~stable |
-| Creation | 1.5 µs | 483,903 | +3.3% slower |
+| Simple | 784 ns | 901,957 | **-58.8%** faster |
+| Nested | 971 ns | 723,574 | **-62.7%** faster |
+| Array | 3.1 µs | 229,416 | **-21.6%** faster |
+| Filter | 14.4 µs | 48,757 | **-4.1%** faster |
+| Recursive | 3.6 µs | 187,830 | **-95.5%** faster |
+| Creation | 1.4 µs | 505,349 | **-4.5%** faster |
 
 ## JSONPath vs Plain Qt Overhead
 
 | Operation | Plain Qt | JSONPath | Overhead |
 |---|---|---|---|
-| Simple | 123 ns | 1.9 µs | 15.5x |
-| Nested | 214 ns | 2.6 µs | 12.2x |
-| Array | 258 ns | 3.9 µs | 15.2x |
-| Filter | 11.1 µs | 15.0 µs | 1.4x |
-| Recursive | 16.8 µs | 81.1 µs | 4.8x |
+| Simple | 125 ns | 784 ns | 6.3x |
+| Nested | 216 ns | 971 ns | 4.5x |
+| Array | 257 ns | 3.1 µs | 12.0x |
+| Filter | 10.7 µs | 14.4 µs | 1.3x |
+| Recursive | 16.4 µs | 3.6 µs | 0.2x |
 
 ## Previous Baseline
 
-Compared against: `benchmark_2026-02-08_170631.json` (2026-02-08)
+Compared against: `benchmark_2026-02-08_170726.json` (2026-02-08)
 
 ## Raw Data
 
