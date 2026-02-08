@@ -13,7 +13,11 @@
 #include <srell.hpp>
 #endif
 
-#ifdef JSON_QUERY_HAS_IDNA
+#if defined(JSON_QUERY_IDN_LIBIDN2)
+extern "C" {
+#include <idn2.h>
+}
+#elif defined(JSON_QUERY_IDN_ADA)
 #include <ada/idna/to_ascii.h>
 #endif
 
@@ -289,6 +293,20 @@ FormatValidationResult isHostname(QStringView value) noexcept
 }
 
 #ifdef JSON_QUERY_HAS_IDNA
+
+/// Map Unicode dot variants to ASCII period (UTS #46 §4, step 1) and reject empty labels
+std::pair<QString, bool> normalizeIdnDots(const QString& str)
+{
+    auto normalized{str};
+    normalized.replace(QChar(0x3002), QChar(u'.'));  // Ideographic full stop
+    normalized.replace(QChar(0xFF0E), QChar(u'.'));  // Fullwidth full stop
+    normalized.replace(QChar(0xFF61), QChar(u'.'));  // Halfwidth ideographic full stop
+
+    const auto valid{!normalized.startsWith(u'.') && !normalized.endsWith(u'.')
+                     && !normalized.contains(u"..")};
+    return {normalized, valid};
+}
+
 FormatValidationResult isIdnHostname(QStringView value) noexcept
 {
     if (value.isEmpty() || value.size() > 253)
@@ -306,33 +324,49 @@ FormatValidationResult isIdnHostname(QStringView value) noexcept
     if (allAscii)
         return isHostname(value);
 
-    // Non-ASCII: use IDNA to_ascii for Unicode hostname normalization
-    const auto utf8{str.toUtf8()};
-    const auto ascii{ada::idna::to_ascii(std::string_view{utf8.constData(), static_cast<std::size_t>(utf8.size())})};
-    if (ascii.empty())
+    auto [normalized, dotsValid]{normalizeIdnDots(str)};
+    if (!dotsValid)
         return semanticInvalid;
 
-    // Validate the IDNA output labels (RFC 1123 + RFC 5891)
+#if defined(JSON_QUERY_IDN_LIBIDN2)
+    // libidn2: full IDNA 2008 with contextual rules (RFC 5891/5892)
+    const auto utf8{normalized.toUtf8()};
+    char* output{nullptr};
+    const auto rc{idn2_lookup_u8(
+        reinterpret_cast<const uint8_t*>(utf8.constData()),
+        reinterpret_cast<uint8_t**>(&output),
+        IDN2_NFC_INPUT)};
+    if (output)
+        idn2_free(output);
+    if (rc != IDN2_OK)
+        return semanticInvalid;
+#elif defined(JSON_QUERY_IDN_ADA)
+    // ada-url/idna: UTS #46 implementation
+    const auto utf8{normalized.toUtf8()};
+    const auto ascii{ada::idna::to_ascii(
+        std::string_view{utf8.constData(), static_cast<std::size_t>(utf8.size())})};
+    if (ascii.empty())
+        return semanticInvalid;
+    // Validate output labels
     const auto result{QString::fromStdString(ascii)};
     const auto labels = result.split(u'.');
     for (const auto& label : labels)
-    {
         if (label.isEmpty() || label.size() > 63)
             return semanticInvalid;
-    }
+#endif
+
     return {};
 }
 
 FormatValidationResult isIdnEmail(QStringView value) noexcept
 {
-    // Split at last '@', validate domain with IDNA
     const auto str{value.toString()};
     const auto atPos{str.lastIndexOf(u'@')};
     if (atPos <= 0 || atPos == str.size() - 1)
         return formatInvalid;
-    const auto domain{QStringView{str}.mid(atPos + 1)};
-    return isIdnHostname(domain);
+    return isIdnHostname(QStringView{str}.mid(atPos + 1));
 }
+
 #endif
 
 FormatValidationResult isIpv4(QStringView value) noexcept

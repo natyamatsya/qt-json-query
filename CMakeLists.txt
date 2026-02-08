@@ -95,24 +95,53 @@ if(JSON_QUERY_FORMAT_ECMA_REGEX)
 endif()
 
 # ---------------------------------------------------------------------------
-# Optional: ada-url/idna (IDNA 2008 / UTS #46, Apache-2.0/MIT license)
-# Enables IDN hostname and IDN email format validation
+# Optional: IDN hostname and IDN email format validation
+# Backend choices:
+#   libidn2 - Full IDNA 2008 / RFC 5891+5892, LGPL-3.0 (system library)
+#   ada     - UTS #46 via ada-url/idna, Apache-2.0/MIT (fetched via FetchContent)
 # ---------------------------------------------------------------------------
-option(JSON_QUERY_FORMAT_IDN
-       "Enable IDN hostname format validation (fetches ada-url/idna)" OFF)
+option(JSON_QUERY_FORMAT_IDN "Enable IDN hostname format validation" OFF)
+set(JSON_QUERY_IDN_BACKEND "libidn2" CACHE STRING
+    "IDN library backend: 'libidn2' (LGPL, system) or 'ada' (MIT, fetched)")
+set_property(CACHE JSON_QUERY_IDN_BACKEND PROPERTY STRINGS libidn2 ada)
 
 if(JSON_QUERY_FORMAT_IDN)
-  FetchContent_Declare(
-    ada_idna
-    GIT_REPOSITORY https://github.com/ada-url/idna.git
-    GIT_TAG 0.4.0)
+  if(JSON_QUERY_IDN_BACKEND STREQUAL "libidn2")
+    # libidn2: full IDNA 2008 with contextual rules (RFC 5892)
+    # Install: brew install libidn2 (macOS) or apt install libidn2-dev (Linux)
+    find_path(IDN2_INCLUDE_DIR idn2.h)
+    find_library(IDN2_LIBRARY NAMES idn2)
 
-  # Disable ada-idna tests/benchmarks to avoid GoogleTest target conflicts
-  set(ADA_IDNA_BENCHMARKS OFF CACHE BOOL "" FORCE)
-  set(BUILD_TESTING_SAVED ${BUILD_TESTING})
-  set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
-  FetchContent_MakeAvailable(ada_idna)
-  set(BUILD_TESTING ${BUILD_TESTING_SAVED} CACHE BOOL "" FORCE)
+    if(IDN2_INCLUDE_DIR AND IDN2_LIBRARY)
+      if(NOT TARGET idn2::idn2)
+        add_library(idn2::idn2 UNKNOWN IMPORTED)
+        set_target_properties(
+          idn2::idn2
+          PROPERTIES IMPORTED_LOCATION "${IDN2_LIBRARY}"
+                     INTERFACE_INCLUDE_DIRECTORIES "${IDN2_INCLUDE_DIR}")
+      endif()
+      message(STATUS "IDN backend: libidn2 (${IDN2_LIBRARY})")
+    else()
+      message(FATAL_ERROR "libidn2 not found. Install: brew install libidn2 (macOS) / apt install libidn2-dev (Linux)")
+    endif()
+
+  elseif(JSON_QUERY_IDN_BACKEND STREQUAL "ada")
+    # ada-url/idna: UTS #46 implementation (lighter, permissive license)
+    FetchContent_Declare(
+      ada_idna
+      GIT_REPOSITORY https://github.com/ada-url/idna.git
+      GIT_TAG 0.4.0)
+
+    set(ADA_IDNA_BENCHMARKS OFF CACHE BOOL "" FORCE)
+    set(BUILD_TESTING_SAVED ${BUILD_TESTING})
+    set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(ada_idna)
+    set(BUILD_TESTING ${BUILD_TESTING_SAVED} CACHE BOOL "" FORCE)
+    message(STATUS "IDN backend: ada-url/idna (fetched)")
+
+  else()
+    message(FATAL_ERROR "Invalid JSON_QUERY_IDN_BACKEND: '${JSON_QUERY_IDN_BACKEND}'. Use 'libidn2' or 'ada'.")
+  endif()
 endif()
 
 add_subdirectory(src/json-query)

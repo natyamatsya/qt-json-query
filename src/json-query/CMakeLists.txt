@@ -85,10 +85,15 @@ if(TARGET srell_interface)
   target_compile_definitions(json_query PRIVATE JSON_QUERY_HAS_SRELL)
 endif()
 
-# Optional: ada-url/idna for IDN hostname format validation
-if(TARGET ada-idna)
+# Optional: IDN hostname format validation (backend-specific)
+if(TARGET idn2::idn2)
+  target_link_libraries(json_query PRIVATE idn2::idn2)
+  target_compile_definitions(json_query PRIVATE JSON_QUERY_HAS_IDNA
+                                                JSON_QUERY_IDN_LIBIDN2)
+elseif(TARGET ada-idna)
   target_link_libraries(json_query PRIVATE ada-idna)
-  target_compile_definitions(json_query PRIVATE JSON_QUERY_HAS_IDNA)
+  target_compile_definitions(json_query PRIVATE JSON_QUERY_HAS_IDNA
+                                                JSON_QUERY_IDN_ADA)
 endif()
 
 # ---------------------------------------------------------------------------
