@@ -2,430 +2,76 @@
 
 #pragma once
 
+#include "json-query/json-path/JSONPathError.hpp"
+#include "json-query/json-path/internal/ArrayPool.hpp"
 #include "json-query/utils/BraceSafe.hpp"
 
-#include <QJsonValue>
 #include <QJsonArray>
 #include <QJsonObject>
-#include <vector>
+#include <QJsonValue>
 #include <expected>
-
-#include "json-query/json-path/internal/ResultStreamer.hpp"
-#include "json-query/json-path/internal/ArrayPool.hpp"
-#include "json-query/json-path/internal/CacheOptimizedStructures.hpp"
+#include <vector>
 
 namespace json_query::json_path::internal
 {
 
 /**
- * @brief Iterative implementation of recursive descent to reduce call stack memory
+ * @brief Iterative recursive descent for JSONPath $.. evaluation.
  *
- * This replaces the recursive __evaluateRecursiveImpl with an iterative version
- * that uses an explicit stack, significantly reducing memory overhead and
- * improving performance for deep traversals.
+ * Uses an explicit std::vector<QJsonValue> stack with pop-emit-push
+ * (no "processed" flag, no pool allocator, no pointer indirection).
  */
-class IterativeRecursiveDescent
+struct RecursiveDescent
 {
-  public:
-    /**
-     * @brief Stack frame for iterative recursive descent
-     */
-    using StackFrame = json_query::json_path::detail::CacheOptimizedStackFrame;
+    static constexpr std::size_t kMaxResults{10000};
+    static constexpr std::size_t kMaxStackDepth{100};
 
     /**
-     * @brief Iterative recursive descent with result streaming and cache optimization
+     * @brief Emit every value in depth-first order with safety limits.
      *
-     * @param rootValue The root value to traverse recursively
-     * @param streamer Result streamer for emitting found values
-     * @return std::expected<void, EvalError> Success or error
+     * Used for $..* and generic recursive descent. The next token in the
+     * pipeline (via fanOut) handles key/index selection from the result set.
      */
-    template <json_query::json_path::internal::ResultStreamerConcept StreamerType>
-    static std::expected<void, EvalError> evaluateIterative(const QJsonValue& rootValue, StreamerType& streamer)
+    static std::expected<QJsonArray, EvalError> evaluateAll(const QJsonValue& root)
     {
+        auto  pooled{acquirePooledArray()};
+        auto& result = *pooled;
 
-        // Use cache-optimized stack for better memory locality
-        thread_local json_query::json_path::detail::CacheOptimizedStack stack;
+        thread_local std::vector<QJsonValue> stack;
         stack.clear();
-        stack.reserve(64); // Pre-allocate reasonable capacity
+        stack.push_back(root);
 
-        // Start with root value
-        stack.push(rootValue);
+        std::size_t resultCount{0};
 
         while (!stack.empty())
         {
-            auto& frame = stack.top();
-
-            if (!frame.processed)
-            {
-                // First time processing this frame - emit the value
-                streamer.emitValue(frame.value);
-                frame.processed = true;
-
-                // Add children to stack for traversal using cache-optimized approach
-                if (frame.value.isObject())
-                {
-                    const auto obj{frame.value.toObject()};
-                    // Add in reverse order so we process in original order
-                    for (auto it = obj.end(); it != obj.begin();)
-                    {
-                        --it;
-                        stack.push(it.value());
-                    }
-                }
-                else if (frame.value.isArray())
-                {
-                    const auto arr{asArray(frame.value)};
-                    // Add in reverse order so we process in original order
-                    for (qsizetype i = arr.size() - 1; i >= 0; --i)
-                        stack.push(arr[i]);
-                }
-            }
-            else
-            {
-                // Frame already processed, remove it
-                stack.pop();
-            }
-        }
-
-        return {};
-    }
-
-    /**
-     * @brief Iterative recursive descent returning QJsonArray (for compatibility)
-     *
-     * @param rootValue The root value to traverse recursively
-     * @return std::expected<QJsonArray, EvalError> Array of all found values
-     */
-    static std::expected<QJsonArray, EvalError> evaluateIterativeArray(const QJsonValue& rootValue)
-    {
-
-        // Use cache-optimized result collector for better memory layout
-        thread_local json_query::json_path::detail::CacheOptimizedResultCollector collector;
-        collector.clear();
-        collector.reserve(32); // Pre-allocate reasonable capacity
-
-        auto result{evaluateIterative(rootValue, collector)};
-        if (!result)
-            return std::unexpected(result.error());
-
-        // Convert to QJsonArray for compatibility
-        return collector.toQJsonArray();
-    }
-
-    /**
-     * @brief Safe version of evaluateIterativeArray with memory and depth limits
-     *
-     * This version is specifically designed for recursive wildcard operations ($..*)
-     * that can cause memory exhaustion. It includes safety limits while preserving
-     * normal JSONPath functionality.
-     *
-     * @param rootValue The root value to traverse recursively
-     * @return std::expected<QJsonArray, EvalError> Array of all found values or TooComplex error
-     */
-    static std::expected<QJsonArray, EvalError> evaluateIterativeArraySafe(const QJsonValue& rootValue)
-    {
-        constexpr size_t MAX_RESULTS     = 10000; // Limit result count
-        constexpr size_t MAX_STACK_DEPTH = 100;   // Limit stack depth
-        constexpr size_t MAX_MEMORY_MB   = 50;    // Limit memory usage (approximate)
-
-        // Use cache-optimized result collector with limits
-        thread_local json_query::json_path::detail::CacheOptimizedResultCollector collector;
-        collector.clear();
-        collector.reserve(32);
-
-        // Use cache-optimized stack for better memory locality
-        thread_local json_query::json_path::detail::CacheOptimizedStack stack;
-        stack.clear();
-        stack.reserve(64);
-
-        // Start with root value
-        stack.push(rootValue);
-        size_t resultCount            = 0;
-        size_t approximateMemoryUsage = 0;
-
-        while (!stack.empty())
-        {
-            // Check safety limits
-            if (stack.size() > MAX_STACK_DEPTH)
+            if (stack.size() > kMaxStackDepth || resultCount > kMaxResults)
                 return std::unexpected(EvalError::TooComplex);
 
-            if (resultCount > MAX_RESULTS)
-                return std::unexpected(EvalError::TooComplex);
+            const auto current{std::move(stack.back())};
+            stack.pop_back();
 
-            if (approximateMemoryUsage > MAX_MEMORY_MB * 1024 * 1024)
-                return std::unexpected(EvalError::TooComplex);
+            result.append(current);
+            ++resultCount;
 
-            auto& frame = stack.top();
-
-            if (!frame.processed)
+            if (current.isObject())
             {
-                // First time processing this frame - emit the value
-                collector.emitValue(frame.value);
-                frame.processed = true;
-                resultCount++;
-
-                // Rough memory usage estimation
-                approximateMemoryUsage += 100; // Approximate per-result overhead
-
-                // Add children to stack for traversal
-                if (frame.value.isObject())
-                {
-                    const auto obj{frame.value.toObject()};
-                    // Add in reverse order so we process in original order
-                    for (auto it = obj.end(); it != obj.begin();)
-                    {
-                        --it;
-                        stack.push(it.value());
-                    }
-                }
-                else if (frame.value.isArray())
-                {
-                    const auto arr{asArray(frame.value)};
-                    // Add in reverse order so we process in original order
-                    for (qsizetype i = arr.size() - 1; i >= 0; --i)
-                        stack.push(arr[i]);
-                }
-            }
-            else
-            {
-                // Frame already processed, remove it
-                stack.pop();
-            }
-        }
-
-        // Convert to QJsonArray for compatibility
-        return collector.toQJsonArray();
-    }
-
-    /**
-     * @brief Early termination patterns for common recursive queries
-     */
-    struct EarlyTerminationPatterns
-    {
-        // Common field names that appear frequently in recursive queries
-        static constexpr std::array<QStringView, 8> COMMON_FIELDS = {
-            u"title", u"name", u"id", u"type", u"value", u"data", u"content", u"text"};
-
-        // Check if a field name matches common patterns for early termination
-        static QT_QUERY_JSON_ALWAYS_INLINE bool isCommonField(QStringView fieldName)
-        {
-            for (const auto& field : COMMON_FIELDS)
-                if (fieldName == field)
-                    return true;
-            return false;
-        }
-
-        // Estimate traversal cost based on document structure
-        static QT_QUERY_JSON_ALWAYS_INLINE size_t estimateTraversalCost(const QJsonValue& value)
-        {
-            if (value.isObject())
-                return value.toObject().size() * 2; // Object keys + values
-            else if (value.isArray())
-                return value.toArray().size() * 3; // Array elements with potential nesting
-            return 1;                              // Leaf value
-        }
-    };
-
-    /**
-     * @brief Optimized recursive descent with early termination and indexing
-     *
-     * Implements Phase 2 optimizations:
-     * - Early termination for common patterns
-     * - Structural indexing to avoid unnecessary traversal
-     * - Pattern-specific fast paths
-     *
-     * @param rootValue The root value to traverse recursively
-     * @param targetField Optional target field name for early termination
-     * @param streamer Result streamer for emitting values
-     * @return std::expected<void, EvalError> Success or error
-     */
-    template <json_query::json_path::internal::ResultStreamerConcept StreamerType>
-    static std::expected<void, EvalError>
-    evaluateIterativeWithEarlyTermination(const QJsonValue& rootValue, QStringView targetField, StreamerType& streamer)
-    {
-
-        // Use thread-local stack for better performance
-        thread_local std::vector<StackFrame> stack;
-        stack.clear();
-        stack.reserve(64); // Smaller initial capacity for early termination
-
-        // Early termination heuristics
-        const bool useEarlyTermination =
-            !targetField.isEmpty() && EarlyTerminationPatterns::isCommonField(targetField);
-        const auto maxTraversalCost = useEarlyTermination ? 1000 : SIZE_MAX;
-        auto       currentCost{0};
-
-        // Start with root value
-        stack.emplace_back(rootValue);
-
-        while (!stack.empty())
-        {
-            auto& frame = stack.back();
-
-            // Early termination check
-            if (useEarlyTermination && currentCost > maxTraversalCost)
-                break;
-
-            if (frame.value.isObject())
-            {
-                const auto obj{frame.value.toObject()};
-
-                if (!frame.processed)
-                {
-                    // Emit the object itself
-                    streamer.emitValue(frame.value);
-                    frame.processed = true;
-
-                    // Early termination: if we found the target field, prioritize it
-                    if (useEarlyTermination && obj.contains(targetField))
-                    {
-                        const auto targetValue{obj[targetField]};
-                        streamer.emitValue(targetValue);
-
-                        // If target is a leaf value, we can potentially skip other fields
-                        if (!targetValue.isObject() && !targetValue.isArray())
-                        {
-                            currentCost += 1;
-                            continue;
-                        }
-                    }
-                }
-
-                // Add children to stack (reverse order for correct traversal)
-                auto hasUnprocessedChildren{false};
-                for (auto it = obj.end(); it != obj.begin();)
+                const auto obj{current.toObject()};
+                for (auto it{obj.end()}; it != obj.begin();)
                 {
                     --it;
-                    if (!frame.processed || it == obj.begin())
-                    {
-                        stack.emplace_back(it.value());
-                        hasUnprocessedChildren = true;
-                        currentCost += EarlyTerminationPatterns::estimateTraversalCost(it.value());
-                        break;
-                    }
+                    stack.push_back(it.value());
                 }
-
-                if (!hasUnprocessedChildren)
-                    stack.pop_back();
             }
-            else if (frame.value.isArray())
+            else if (current.isArray())
             {
-                const auto arr{asArray(frame.value)};
-
-                if (!frame.processed)
-                {
-                    // Emit the array itself
-                    streamer.emitValue(frame.value);
-                    frame.processed = true;
-                }
-
-                // Add children to stack
-                auto hasUnprocessedChildren{false};
-                for (qsizetype i = arr.size() - 1; i >= 0; --i)
-                {
-                    if (!frame.processed || i == 0)
-                    {
-                        stack.emplace_back(arr[i]);
-                        hasUnprocessedChildren = true;
-                        currentCost += EarlyTerminationPatterns::estimateTraversalCost(arr[i]);
-                        break;
-                    }
-                }
-
-                if (!hasUnprocessedChildren)
-                    stack.pop_back();
-            }
-            else
-            {
-                // Emit leaf value and remove frame
-                streamer.emitValue(frame.value);
-                stack.pop_back();
-                currentCost += 1;
+                const auto arr{asArray(current)};
+                for (auto i{arr.size() - 1}; i >= 0; --i)
+                    stack.push_back(arr[i]);
             }
         }
 
-        return {};
-    }
-
-    /**
-     * @brief Phase 3: Memory-optimized recursive descent with zero-copy access
-     *
-     * Advanced optimizations:
-     * - Zero-copy object traversal using iterators
-     * - Branch prediction optimization
-     * - Cache-friendly memory access patterns
-     * - Specialized fast paths for single-field access
-     */
-    template <typename ResultCollector>
-    static std::expected<void, EvalError>
-    evaluateIterativePhase3Optimized(const QJsonValue& root, QStringView targetField, ResultCollector& collector)
-    {
-
-        // Phase 3: Use thread-local stack with optimized allocation
-        thread_local static std::vector<StackFrame> optimizedStack;
-        optimizedStack.clear();
-
-        // Reserve based on estimated depth for better memory locality
-        auto estimatedDepth = estimateStackDepth(root);
-        optimizedStack.reserve(static_cast<qsizetype>(estimatedDepth));
-
-        // Initialize with root
-        optimizedStack.push_back(StackFrame{root});
-
-        // Phase 3: Optimized traversal loop with branch prediction hints
-        while (!optimizedStack.empty())
-        {
-            StackFrame current = optimizedStack.back();
-            optimizedStack.pop_back();
-
-            // Branch prediction: Most common case is Object traversal
-            if (Q_LIKELY(current.value.isObject()))
-            {
-                const auto obj{current.value.toObject()};
-
-                // Phase 3: Direct key lookup for target field (fastest path)
-                if (Q_LIKELY(!targetField.isEmpty()))
-                {
-                    auto it{obj.find(QString(targetField))};
-                    if (Q_LIKELY(it != obj.end()))
-                        collector.collect(it.value());
-                }
-
-                // Phase 3: Zero-copy iterator traversal for nested objects
-                for (auto it = obj.begin(); it != obj.end(); ++it)
-                {
-                    const auto& value = it.value();
-                    if (Q_LIKELY(value.isObject() || value.isArray()))
-                        optimizedStack.push_back(StackFrame{value});
-                }
-            }
-            else if (Q_UNLIKELY(current.value.isArray()))
-            {
-                const auto arr{asArray(current.value)};
-
-                // Phase 3: Reverse iteration for better cache locality
-                for (qsizetype i = arr.size() - 1; i >= 0; --i)
-                {
-                    const auto& value = arr[i];
-                    if (Q_LIKELY(value.isObject() || value.isArray()))
-                        optimizedStack.push_back(StackFrame{value});
-                }
-            }
-        }
-
-        return {};
-    }
-
-    /**
-     * @brief Estimate stack depth for memory allocation optimization
-     */
-    static QT_QUERY_JSON_ALWAYS_INLINE size_t estimateStackDepth(const QJsonValue& root)
-    {
-        if (root.isObject())
-            return std::min(size_t(128), size_t(root.toObject().size()) / 4 + 16);
-        else if (root.isArray())
-            return std::min(size_t(128), size_t(root.toArray().size()) / 8 + 16);
-        return 16;
+        return std::move(result);
     }
 };
 
