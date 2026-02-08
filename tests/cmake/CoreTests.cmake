@@ -6,7 +6,7 @@
 # Core JSONPath tests
 set(CORE_JSONPATH_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-path/JSONPathGTest.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-path/JSONPathLogicalOrPredicateGTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-path/JSONPathLogicalOrGTest.cpp
 )
 
 # Core JSONPointer tests
