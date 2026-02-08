@@ -45,11 +45,10 @@ inline void validateArray(ValidateContext&    ctx,
 
     if (node.uniqueItems && size > 1)
     {
-        // Check for duplicate items
-        for (int i = 0; i < arr.size() && ctx.shouldContinue(); ++i)
-        {
-            for (int j = i + 1; j < arr.size(); ++j)
-            {
+        // Raw index loop: pairwise (i, j>i) comparison requires index arithmetic.
+        // std::views::enumerate is unavailable in the current libc++ version.
+        for (qsizetype i{0}; i < arr.size() && ctx.shouldContinue(); ++i)
+            for (qsizetype j{i + 1}; j < arr.size(); ++j)
                 if (jsonValuesEqual(arr[i], arr[j]))
                 {
                     ctx.result.addError(instancePath,
@@ -58,8 +57,6 @@ inline void validateArray(ValidateContext&    ctx,
                                         EvalError::UniqueItemsViolation);
                     break;
                 }
-            }
-        }
     }
 
     // Suspend tracker when descending into array items — evaluations at nested
