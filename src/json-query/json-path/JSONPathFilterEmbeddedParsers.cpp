@@ -8,6 +8,7 @@
 #include "json-query/json-path/JSONPathFilterFunctions.hpp"
 #include "json-query/json-path/JSONPathFilterHelpers.hpp"
 #include "json-query/utils/BraceSafe.hpp"
+#include "json-query/utils/QtStringLiterals.hpp"
 #include "json-query/json-path/JSONPathLog.hpp"
 #include "json-query/json-path/JSONPath.hpp"
 #include "json-query/json-path/internal/ContainerCursor.hpp"
@@ -28,6 +29,7 @@ using json_query::json_path::detail::splitTopLevel;
 using json_query::json_path::detail::stripOuterParens;
 using json_query::utils::to_qt_s;
 using json_query::utils::to_sv;
+using json_query::literals::operator""_qt_l1;
 
 // ============================================================================
 // Basic Parser Function Implementations
@@ -35,7 +37,7 @@ using json_query::utils::to_sv;
 
 std::optional<Token> parseOr(const QString& s, std::vector<FilterFn>& out)
 {
-    if (auto split = splitTopLevel(s, "||"_L1); split)
+    if (auto split = splitTopLevel(s, "||"_qt_l1); split)
     {
         const auto& [lhsS, rhsS] = *split;
 
@@ -55,7 +57,7 @@ std::optional<Token> parseOr(const QString& s, std::vector<FilterFn>& out)
 
 std::optional<Token> parseAnd(const QString& s, std::vector<FilterFn>& out)
 {
-    if (auto split = splitTopLevel(s, "&&"_L1); split)
+    if (auto split = splitTopLevel(s, "&&"_qt_l1); split)
     {
         const auto& [lhsS, rhsS] = *split;
 
@@ -111,7 +113,7 @@ std::optional<Token> parseEmbeddedOr(const QString& s)
     // Simple debug output to verify execution
     qCDebug(jsonPathLog) << "DEBUG: parseEmbeddedOr called with input:" << s;
     qCDebug(jsonPathLog) << "parseEmbeddedOr: input=" << s;
-    if (auto split = splitTopLevel(s, "||"_L1); split)
+    if (auto split = splitTopLevel(s, "||"_qt_l1); split)
     {
         auto [lhs, rhs] = *split;
         qCDebug(jsonPathLog) << "parseEmbeddedOr: split found - lhs=" << lhs << "rhs=" << rhs;
@@ -152,7 +154,7 @@ std::optional<Token> parseEmbeddedOr(const QString& s)
 std::optional<Token> parseEmbeddedAnd(const QString& s)
 {
     qCDebug(jsonPathLog) << "parseEmbeddedAnd: input=" << s;
-    if (auto split = splitTopLevel(s, "&&"_L1); split)
+    if (auto split = splitTopLevel(s, "&&"_qt_l1); split)
     {
         auto [lhs, rhs] = *split;
         qCDebug(jsonPathLog) << "parseEmbeddedAnd: split found - lhs=" << lhs << "rhs=" << rhs;

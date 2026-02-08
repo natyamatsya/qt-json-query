@@ -27,7 +27,6 @@
 #include "json-query/utils/JSONQueryError.hpp"
 #include "json-query/json-pointer/JSONPointer.hpp"
 
-using namespace Qt::StringLiterals;
 // ======================================================================
 //  JSONPath
 // ======================================================================
