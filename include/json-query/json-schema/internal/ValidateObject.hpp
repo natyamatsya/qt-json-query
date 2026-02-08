@@ -119,14 +119,20 @@ inline bool validateSingleProperty(ValidateContext&    ctx,
 
     bool evaluated{false};
 
+    // Suspend tracker when descending into property values — evaluations at nested
+    // instance paths must not leak into the current-level tracker.
+    auto* parentTracker{ctx.tracker};
+
     // Check properties
     if (auto propIt = node.properties.find(propName); propIt != node.properties.end())
     {
+        ctx.tracker = nullptr;
         validateNode(ctx,
                      ctx.schema.nodeAt(propIt->second),
                      propValue,
                      propPath,
                      json_pointer::appendToken(schemaPath + u"/properties"_qt_s, propName));
+        ctx.tracker = parentTracker;
         evaluated = true;
     }
 
@@ -135,8 +141,10 @@ inline bool validateSingleProperty(ValidateContext&    ctx,
     {
         if (pattern.match(propName).hasMatch())
         {
+            ctx.tracker = nullptr;
             validateNode(
                 ctx, ctx.schema.nodeAt(schemaIndex), propValue, propPath, schemaPath + u"/patternProperties"_qt_s);
+            ctx.tracker = parentTracker;
             evaluated = true;
         }
     }
@@ -153,7 +161,9 @@ inline bool validateSingleProperty(ValidateContext&    ctx,
         }
         else
         {
+            ctx.tracker = nullptr;
             validateNode(ctx, additionalNode, propValue, propPath, schemaPath + u"/additionalProperties"_qt_s);
+            ctx.tracker = parentTracker;
         }
         evaluated = true; // additionalProperties always evaluates the property
     }

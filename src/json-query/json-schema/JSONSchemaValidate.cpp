@@ -55,10 +55,12 @@ void validateObjectSchema(ValidateContext&    ctx,
             resourceGuard.emplace(ctx.dynamicScope, rdaIt->second);
     }
 
-    // Set up evaluation tracking if this schema uses unevaluatedProperties/unevaluatedItems
-    // and no parent tracker is already active
-    const auto needsTracker{(node.unevaluatedProperties || node.unevaluatedItems) && !ctx.tracker};
-    EvaluationTracker localTracker{};
+    // Set up evaluation tracking if this schema uses unevaluatedProperties/unevaluatedItems.
+    // Always create a local tracker so this schema only sees its own evaluations,
+    // not evaluations from sibling keywords in a parent schema.
+    const auto needsTracker{node.unevaluatedProperties || node.unevaluatedItems};
+    EvaluationTracker  localTracker{};
+    EvaluationTracker* savedTracker{ctx.tracker};
     if (needsTracker)
         ctx.tracker = &localTracker;
 
@@ -95,9 +97,13 @@ void validateObjectSchema(ValidateContext&    ctx,
     if (node.unevaluatedItems && instance.isArray() && ctx.shouldContinue())
         validateUnevaluatedItems(ctx, node, instance.toArray(), instancePath, schemaPath, validateNode);
 
-    // Clean up local tracker
+    // Merge local evaluations into parent tracker and restore
     if (needsTracker)
-        ctx.tracker = nullptr;
+    {
+        if (savedTracker)
+            savedTracker->mergeFrom(localTracker);
+        ctx.tracker = savedTracker;
+    }
 }
 
 /**

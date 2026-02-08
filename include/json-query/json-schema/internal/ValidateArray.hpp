@@ -62,6 +62,10 @@ inline void validateArray(ValidateContext&    ctx,
         }
     }
 
+    // Suspend tracker when descending into array items — evaluations at nested
+    // instance paths must not leak into the current-level tracker.
+    auto* parentTracker{ctx.tracker};
+
     // Validate prefixItems — each index is evaluated
     for (std::size_t i{0}; i < node.prefixItems.size(); ++i)
     {
@@ -69,7 +73,9 @@ inline void validateArray(ValidateContext&    ctx,
             break;
         const auto itemPath{instancePath + u"/"_qt_s + QString::number(i)};
         const auto itemSchemaPath{schemaPath + u"/prefixItems/"_qt_s + QString::number(i)};
+        ctx.tracker = nullptr;
         validateNode(ctx, ctx.schema.nodeAt(node.prefixItems[i]), arr[static_cast<int>(i)], itemPath, itemSchemaPath);
+        ctx.tracker = parentTracker;
         if (ctx.tracker)
             ctx.tracker->items.insert(static_cast<int>(i));
     }
@@ -85,7 +91,9 @@ inline void validateArray(ValidateContext&    ctx,
             if (!ctx.shouldContinue())
                 break;
             const auto itemPath{instancePath + u"/"_qt_s + QString::number(i)};
+            ctx.tracker = nullptr;
             validateNode(ctx, ctx.schema.nodeAt(*node.items), arr[i], itemPath, schemaPath + u"/items"_qt_s);
+            ctx.tracker = parentTracker;
             if (ctx.tracker)
                 ctx.tracker->items.insert(i);
         }
