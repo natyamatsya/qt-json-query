@@ -22,6 +22,17 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Refactoring tools option (disabled by default)
 option(WITH_REFACTORING_TOOLS "Build C++ modernization refactoring tools" OFF)
 
+# ---------------------------------------------------------------------------
+# Sanitizer instrumentation for fuzz testing
+# ---------------------------------------------------------------------------
+# When fuzz testing is enabled, the entire project (including the library)
+# must be compiled with ASan/UBSan so that fuzz targets can link against it.
+option(ENABLE_FUZZ_TESTS "Enable LibFuzzer-based fuzz testing" OFF)
+if(ENABLE_FUZZ_TESTS)
+  add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
+  add_link_options(-fsanitize=address,undefined)
+endif()
+
 # Allow the user to specify a Qt installation via CMAKE_PREFIX_PATH Example:
 # cmake -S . -B build -DCMAKE_PREFIX_PATH=$HOME/Qt/6.8.3/macos
 

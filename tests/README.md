@@ -131,3 +131,50 @@ tests/
 ```
 
 **Naming convention**: All test files use the `*GTest.cpp` suffix.
+
+## Fuzz Testing
+
+Fuzz tests use [LibFuzzer](https://llvm.org/docs/LibFuzzer.html) and require Clang. They are disabled by default.
+
+| Target | What it fuzzes |
+| --- | --- |
+| `fuzz_jsonpath_parsing` | Random bytes → JSONPath parsing + evaluation |
+| `fuzz_jsonpointer_parsing` | Random bytes → JSONPointer parsing + evaluation |
+| `fuzz_combined_evaluation` | Fuzzed JSONPath expression + fuzzed JSON document |
+
+### Building
+
+`ENABLE_FUZZ_TESTS=ON` adds ASan/UBSan instrumentation globally (library + fuzz targets):
+
+```bash
+cmake -B build-fuzz -S . -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+    -DCMAKE_PREFIX_PATH=/path/to/qt/6.x/platform \
+    -DENABLE_FUZZ_TESTS=ON \
+    -DCMAKE_CXX_COMPILER=clang++ \
+    -DCMAKE_C_COMPILER=clang
+ninja -C build-fuzz fuzz_jsonpath_parsing fuzz_jsonpointer_parsing fuzz_combined_evaluation
+```
+
+### Running
+
+```bash
+# Single fuzzer (5 minutes)
+./build-fuzz/fuzz/fuzz_jsonpath_parsing build-fuzz/fuzz/corpus/fuzz_jsonpath_parsing -max_total_time=300
+
+# All fuzzers (5 minutes each)
+ninja -C build-fuzz run_all_fuzzers
+
+# Quick run (30 seconds each)
+ninja -C build-fuzz fuzz_quick
+```
+
+### macOS notes
+
+On macOS with homebrew LLVM, you may also need to set `CMAKE_AR` and `CMAKE_RANLIB` to the LLVM versions to avoid archive format mismatches:
+
+```bash
+-DCMAKE_AR=/opt/homebrew/opt/llvm/bin/llvm-ar \
+-DCMAKE_RANLIB=/opt/homebrew/opt/llvm/bin/llvm-ranlib
+```
+
+**Known issue**: Homebrew LLVM 21 ships a `libclang_rt.fuzzer_osx.a` compiled against a different libc++ ABI, causing `__hash_memory` linker errors. This is a toolchain bug — fuzz tests work on Linux and in CI environments with consistent LLVM toolchains.

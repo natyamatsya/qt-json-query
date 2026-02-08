@@ -50,19 +50,12 @@ function(configure_fuzz_target target_name source_file)
     target_link_libraries(${target_name} PRIVATE ctre_interface)
   endif()
 
-  # Set fuzzer-specific compile and link flags
-  target_compile_options(
-    ${target_name}
-    PRIVATE -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer -g
-            -O1 # Light optimization for better fuzzing performance
-  )
-
-  target_link_options(${target_name} PRIVATE
-                      -fsanitize=fuzzer,address,undefined)
-  if(APPLE)
-    # Fix for Xcode 15 ld-prime compatibility issues
-    target_link_options(${target_name} PRIVATE -Wl,-ld_classic)
-  endif()
+  # Add -fsanitize=fuzzer for the LibFuzzer entry point and mutation engine.
+  # ASan/UBSan flags are applied globally in the top-level CMakeLists.txt
+  # when ENABLE_FUZZ_TESTS=ON, so the library and fuzz targets share
+  # the same instrumentation.
+  target_compile_options(${target_name} PRIVATE -fsanitize=fuzzer -g -O1)
+  target_link_options(${target_name} PRIVATE -fsanitize=fuzzer)
 
   # Add include directories for the library headers
   target_include_directories(${target_name} PRIVATE ${CMAKE_SOURCE_DIR}/include
