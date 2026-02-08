@@ -198,102 +198,6 @@ class IterativeRecursiveDescent
     }
 
     /**
-     * @brief Iterative recursive descent returning QJsonArray (for compatibility)
-     *
-     * @param rootValue The root value to traverse recursively
-     * @param maxDepth Maximum traversal depth (0 = unlimited)
-     * @return std::expected<QJsonArray, EvalError> Array of all found values
-     */
-    static std::expected<QJsonArray, EvalError> evaluateIterativeArray(const QJsonValue& rootValue, size_t maxDepth)
-    {
-
-        // Use cache-optimized result collector for better memory layout
-        thread_local json_query::json_path::detail::CacheOptimizedResultCollector collector;
-        collector.clear();
-        collector.reserve(32); // Pre-allocate reasonable capacity
-
-        auto result{evaluateIterativeDepthLimited(rootValue, maxDepth, collector)};
-        if (!result)
-            return std::unexpected(result.error());
-
-        // Convert to QJsonArray for compatibility
-        return collector.toQJsonArray();
-    }
-
-    /**
-     * @brief Memory-efficient depth-limited recursive descent with cache optimization
-     *
-     * Prevents stack overflow and excessive memory usage by limiting traversal depth.
-     * Uses cache-optimized structures for better memory locality.
-     *
-     * @param rootValue The root value to traverse
-     * @param maxDepth Maximum traversal depth (0 = unlimited)
-     * @param streamer Result streamer for emitting values
-     * @return std::expected<void, EvalError> Success or error
-     */
-    template <json_query::json_path::internal::ResultStreamerConcept StreamerType>
-    static std::expected<void, EvalError>
-    evaluateIterativeDepthLimited(const QJsonValue& rootValue, size_t maxDepth, StreamerType& streamer)
-    {
-
-        // Use cache-optimized depth frame with better memory layout
-        struct CacheOptimizedDepthFrame
-        {
-            QJsonValue value;
-            size_t     depth;
-            bool       processed{false};
-
-            CacheOptimizedDepthFrame(const QJsonValue& v, size_t d) : value(v), depth(d) {}
-            CacheOptimizedDepthFrame(QJsonValue&& v, size_t d) : value(std::move(v)), depth(d) {}
-        };
-
-        // Use cache-conscious stack allocation
-        thread_local std::vector<CacheOptimizedDepthFrame> stack;
-        stack.clear();
-        stack.reserve(std::min(maxDepth * 8, size_t(256))); // Reasonable capacity
-
-        stack.emplace_back(rootValue, 0);
-
-        while (!stack.empty())
-        {
-            auto& frame = stack.back();
-
-            if (!frame.processed)
-            {
-                // Emit the value
-                streamer.emitValue(frame.value);
-                frame.processed = true;
-
-                // Add children if within depth limit
-                if (maxDepth == 0 || frame.depth < maxDepth)
-                {
-                    if (frame.value.isObject())
-                    {
-                        const auto obj{frame.value.toObject()};
-                        for (auto it = obj.end(); it != obj.begin();)
-                        {
-                            --it;
-                            stack.emplace_back(it.value(), frame.depth + 1);
-                        }
-                    }
-                    else if (frame.value.isArray())
-                    {
-                        const auto arr{asArray(frame.value)};
-                        for (qsizetype i = arr.size() - 1; i >= 0; --i)
-                            stack.emplace_back(arr[i], frame.depth + 1);
-                    }
-                }
-            }
-            else
-            {
-                stack.pop_back();
-            }
-        }
-
-        return {};
-    }
-
-    /**
      * @brief Early termination patterns for common recursive queries
      */
     struct EarlyTerminationPatterns
@@ -523,25 +427,6 @@ class IterativeRecursiveDescent
             return std::min(size_t(128), size_t(root.toArray().size()) / 8 + 16);
         return 16;
     }
-
-    /**
-     * @brief Get statistics about stack usage for optimization
-     */
-    struct Stats
-    {
-        size_t maxStackDepth = 0;
-        size_t totalFramesProcessed{0};
-        size_t memoryReused{0}; // Number of times thread_local stack was reused
-    };
-
-    // Thread-local statistics
-    thread_local static Stats stats_;
-
-    static const Stats& getStats() { return stats_; }
-    static void         resetStats() { stats_ = {}; }
 };
-
-// Thread-local statistics declaration (definition in .cpp file)
-// thread_local IterativeRecursiveDescent::Stats IterativeRecursiveDescent::stats_;
 
 } // namespace json_query::json_path::internal

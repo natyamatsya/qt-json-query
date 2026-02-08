@@ -28,7 +28,6 @@ set(JSON_QUERY_SOURCES
     json-path/JSONPathTokenEvaluators.cpp
     json-path/JSONPathWildcardRecursive.cpp
     json-path/internal/CacheOptimizedStructures.cpp
-    json-path/internal/IterativeRecursiveDescent.cpp
     json-schema/JSONSchema.cpp
     json-schema/JSONSchemaCompile.cpp
     json-schema/JSONSchemaValidate.cpp
