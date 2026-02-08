@@ -3,10 +3,7 @@
 #include "json-query/json-path/JSONPathEvalHelpers.hpp"
 #include "json-query/utils/BraceSafe.hpp"
 #include "json-query/json-path/JSONPathError.hpp"
-#include "json-query/json-path/JSONPathTokenEvaluators.hpp"
 #include "json-query/json-path/JSONPathEvaluate.hpp"
-#include "json-query/json-path/JSONPathWildcardRecursive.hpp"
-#include "json-query/utils/SanitizerCompat.hpp"
 #include "json-query/json-path/internal/ArrayPool.hpp"
 #include "json-query/json-path/JSONPathLog.hpp"
 
@@ -147,9 +144,12 @@ std::expected<QJsonArray, EvalError> processUnionTokens(const PathEvalCtx&      
     if (resultArrays.empty())
         return std::unexpected(lastError);
 
-    // Copy-init: brace-init would trigger QJsonArray's initializer_list constructor (ADR-001)
-    auto mergedResults = mergeTokenResults(resultArrays);
-    return mergedResults;
+    // RFC 9535: Unions preserve order and duplicates; concatenate without dedup
+    QJsonArray merged;
+    for (const auto& results : resultArrays)
+        for (const auto& value : results)
+            merged.append(value);
+    return merged;
 }
 
 // ---------------------------------------------------------------------------
@@ -213,12 +213,25 @@ std::expected<QJsonArray, EvalError> processBranchUniqueSelection(
         const auto obj{workingValue.toObject()};
 
         if (isLeaf)
-            processObjectForLeafSelection(obj, keys, workingValue, &results);
+        {
+            // Check if object contains all required keys
+            const auto hasAll{std::ranges::all_of(keys, [&obj](const QString& k) { return obj.contains(k); })};
+            if (!hasAll)
+                continue;
+
+            if (keys.size() > 1)
+                results.append(workingValue); // Multi-property leaf union → return parent (Jayway)
+            else
+                results.append(obj.value(keys[0])); // Single-property leaf → return value
+        }
         else
-            processObjectForNonLeafSelection(obj, keys, workingValue, &results);
+        {
+            for (const auto& key : keys)
+                if (obj.contains(key))
+                    results.append(obj[key]);
+        }
     }
 
-    // Deduplicate results
     return deduplicateJsonValues(results);
 }
 
@@ -339,61 +352,6 @@ processSingleUnionToken(const PathEvalCtx& ctx, qsizetype tokenIdx, const QJsonA
     if (anySuccess)
         return {.success = true, .results = std::move(results), .error = EvalError::KeyNotFound};
     return {.success = false, .results = QJsonArray{}, .error = lastError};
-}
-
-// Helper: Merge results from multiple tokens using simple concatenation
-QJsonArray mergeTokenResults(const std::vector<QJsonArray>& resultArrays)
-{
-    QJsonArray collectedResults;
-
-    // Concatenate results from all union tokens
-    for (const auto& results : resultArrays)
-        for (const auto& value : results)
-            collectedResults.append(value);
-
-    // RFC 9535: Unions preserve order and duplicates; do not deduplicate here
-    return collectedResults;
-}
-
-// Helper: Check if an object contains all required keys
-bool objectContainsAllKeys(const QJsonObject& obj, const std::vector<QString>& keys)
-{
-    for (const QString& key : keys)
-        if (!obj.contains(key))
-            return false;
-    return true;
-}
-
-// Helper: Process object for leaf selection
-void processObjectForLeafSelection(const QJsonObject&          obj,
-                                   const std::vector<QString>& keys,
-                                   const QJsonValue&           v,
-                                   QJsonArray*                 results)
-{
-    if (!objectContainsAllKeys(obj, keys))
-        return;
-
-    if (keys.size() > 1)
-    {
-        // Multi-property leaf union ⇒ return parent only (Jayway)
-        results->append(v);
-    }
-    else
-    {
-        // Single-property leaf: return only the value, not the parent
-        results->append(obj.value(keys[0]));
-    }
-}
-
-// Helper: Process object for non-leaf selection
-void processObjectForNonLeafSelection(const QJsonObject&          obj,
-                                      const std::vector<QString>& keys,
-                                      const QJsonValue&           v,
-                                      QJsonArray*                 results)
-{
-    for (const QString& key : keys)
-        if (obj.contains(key))
-            results->append(obj[key]);
 }
 
 // Helper: Deduplicate JSON values using hash-based approach

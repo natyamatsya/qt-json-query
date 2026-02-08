@@ -63,24 +63,13 @@ UnionDetectionResult detectUnionTokens(const PathEvalCtx& ctx, qsizetype startIn
 TokenProcessingResult
 processSingleUnionToken(const PathEvalCtx& ctx, qsizetype tokenIdx, const QJsonArray& working, const QJsonValue& root);
 
-QJsonArray mergeTokenResults(const std::vector<QJsonArray>& resultArrays);
-
 std::expected<QJsonArray, EvalError> processUnionTokens(const PathEvalCtx&            ctx,
                                                         const std::vector<qsizetype>& unionTokens,
                                                         const QJsonArray&             working,
                                                         const QJsonValue&             root);
 
-// Branch selection micro-helpers
+// Branch selection helpers
 KeyCollectionResult collectKeysFromTokens(const PathEvalCtx& ctx, qsizetype startIndex);
-bool                objectContainsAllKeys(const QJsonObject& obj, const std::vector<QString>& keys);
-void                processObjectForLeafSelection(const QJsonObject&          obj,
-                                                  const std::vector<QString>& keys,
-                                                  const QJsonValue&           v,
-                                                  QJsonArray*                 results);
-void                processObjectForNonLeafSelection(const QJsonObject&          obj,
-                                                     const std::vector<QString>& keys,
-                                                     const QJsonValue&           v,
-                                                     QJsonArray*                 results);
 QJsonArray          deduplicateJsonValues(const QJsonArray& input);
 
 std::expected<QJsonArray, EvalError> processBranchUniqueSelection(
