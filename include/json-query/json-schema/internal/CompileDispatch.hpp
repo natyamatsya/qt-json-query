@@ -41,26 +41,30 @@ tryParseKeyword(const QJsonObject& obj, const QString& key, std::optional<T>& ta
  * @brief Compile string-related keywords (pattern, minLength, maxLength, format)
  */
 [[nodiscard]] inline std::expected<void, QueryError> compileStringKeywords(const QJsonObject& schemaObj,
-                                                                           ObjectSchema&      node)
+                                                                           ObjectSchema&      node,
+                                                                           bool validationVocabActive = true)
 {
     using json_query::literals::operator""_qt_s;
 
-    if (auto r{parsePatternKeyword(schemaObj[u"pattern"_qt_s])}; !r)
-        return std::unexpected(r.error());
-    else
-        node.pattern = std::move(*r);
+    if (validationVocabActive)
+    {
+        if (auto r{parsePatternKeyword(schemaObj[u"pattern"_qt_s])}; !r)
+            return std::unexpected(r.error());
+        else
+            node.pattern = std::move(*r);
 
-    if (auto r{parseIntegerKeyword(schemaObj[u"minLength"_qt_s])}; !r)
-        return std::unexpected(r.error());
-    else
-        node.minLength = *r;
+        if (auto r{parseIntegerKeyword(schemaObj[u"minLength"_qt_s])}; !r)
+            return std::unexpected(r.error());
+        else
+            node.minLength = *r;
 
-    if (auto r{parseIntegerKeyword(schemaObj[u"maxLength"_qt_s])}; !r)
-        return std::unexpected(r.error());
-    else
-        node.maxLength = *r;
+        if (auto r{parseIntegerKeyword(schemaObj[u"maxLength"_qt_s])}; !r)
+            return std::unexpected(r.error());
+        else
+            node.maxLength = *r;
+    }
 
-    // Format is just a string, no parsing needed
+    // Format is format-annotation vocabulary, always compiled
     if (schemaObj.contains(u"format"_qt_s) && schemaObj[u"format"_qt_s].isString())
         node.format = schemaObj[u"format"_qt_s].toString();
 
@@ -444,8 +448,11 @@ template <>
 struct KeywordCategoryHandler<KeywordCategory::TypeConstraints>
 {
     [[nodiscard]] static std::expected<void, QueryError>
-    compile(CompileContext&, const QJsonObject& schemaObj, ObjectSchema& node, CompileSchemaFn&)
+    compile(CompileContext& ctx, const QJsonObject& schemaObj, ObjectSchema& node, CompileSchemaFn&)
     {
+        if (!ctx.validationVocabActive)
+            return {};
+
         using json_query::literals::operator""_qt_s;
 
         if (auto r{parseTypeKeyword(schemaObj[u"type"_qt_s])}; !r)
@@ -467,9 +474,9 @@ template <>
 struct KeywordCategoryHandler<KeywordCategory::StringKeywords>
 {
     [[nodiscard]] static std::expected<void, QueryError>
-    compile(CompileContext&, const QJsonObject& schemaObj, ObjectSchema& node, CompileSchemaFn&)
+    compile(CompileContext& ctx, const QJsonObject& schemaObj, ObjectSchema& node, CompileSchemaFn&)
     {
-        return compileStringKeywords(schemaObj, node);
+        return compileStringKeywords(schemaObj, node, ctx.validationVocabActive);
     }
 };
 
@@ -477,8 +484,10 @@ template <>
 struct KeywordCategoryHandler<KeywordCategory::NumericKeywords>
 {
     [[nodiscard]] static std::expected<void, QueryError>
-    compile(CompileContext&, const QJsonObject& schemaObj, ObjectSchema& node, CompileSchemaFn&)
+    compile(CompileContext& ctx, const QJsonObject& schemaObj, ObjectSchema& node, CompileSchemaFn&)
     {
+        if (!ctx.validationVocabActive)
+            return {};
         return compileNumericKeywords(schemaObj, node);
     }
 };

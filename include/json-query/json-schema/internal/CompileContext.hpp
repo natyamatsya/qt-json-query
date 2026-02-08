@@ -47,6 +47,11 @@ struct CompileContext
     /// Maps $id → QJsonValue of the resource root
     std::unordered_map<QString, QJsonValue> resourceDocuments{};
 
+    /// Whether the validation vocabulary is active (default true for standard 2020-12).
+    /// Set to false when the schema's $schema metaschema declares $vocabulary
+    /// without https://json-schema.org/draft/2020-12/vocab/validation.
+    bool validationVocabActive{true};
+
     /**
      * @brief Add a node and return its index
      */

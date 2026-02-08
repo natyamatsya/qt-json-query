@@ -906,6 +906,29 @@ compileSchema(const QJsonValue& schemaValue, SchemaFetcher fetcher)
     if (auto r{phase1_BuildSymbolTable(*compiled, ctx, schemaValue)}; !r)
         return std::unexpected(r.error());
 
+    // Extract $vocabulary from $schema metaschema (if custom)
+    if (schemaValue.isObject())
+    {
+        const auto schemaDialect{schemaValue.toObject().value(u"$schema"_qt_s).toString()};
+        if (!schemaDialect.isEmpty() && schemaDialect != u"https://json-schema.org/draft/2020-12/schema"_qt_s)
+        {
+            // Fetch the metaschema to read its $vocabulary
+            auto metaSchema{internal::lookupBuiltinSchema(schemaDialect)};
+            if (!metaSchema && fetcher)
+                metaSchema = fetcher(schemaDialect);
+            if (metaSchema && metaSchema->isObject())
+            {
+                const auto vocabObj{metaSchema->toObject().value(u"$vocabulary"_qt_s)};
+                if (vocabObj.isObject())
+                {
+                    // If $vocabulary is declared, only listed vocabularies are active
+                    ctx.validationVocabActive = vocabObj.toObject().contains(
+                        u"https://json-schema.org/draft/2020-12/vocab/validation"_qt_s);
+                }
+            }
+        }
+    }
+
     // Phase 2: Code Generation
     if (auto r{phase2_CompileSchemaTree(*compiled, ctx, schemaValue)}; !r)
         return std::unexpected(r.error());
