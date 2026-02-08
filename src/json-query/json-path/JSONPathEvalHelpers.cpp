@@ -555,7 +555,9 @@ struct UnionProcessingStrategy<UnionProcessingType::MultipleTokens>
 
         qCDebug(jsonPathLog) << "[UnionProcessing::MultipleTokens] Merging results from" << resultArrays.size()
                              << "successful arrays";
-        auto mergedResults{mergeTokenResults(resultArrays, root)};
+        // Copy-init: brace-init would trigger QJsonArray's initializer_list<QJsonValue>
+        // constructor, wrapping the result in an extra array. See ADR-001.
+        auto mergedResults = mergeTokenResults(resultArrays, root);
         qCDebug(jsonPathLog) << "[UnionProcessing::MultipleTokens] Merged to" << mergedResults.size()
                              << "total results";
         return mergedResults;
