@@ -6,10 +6,8 @@
  * edge case, and randomly generated JSON Pointer expressions according to RFC 6901.
  */
 
-#include <fuzzer/FuzzedDataProvider.h>
 #include <cstddef>
 #include <cstdint>
-#include <string>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -42,15 +40,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
         QJsonDocument doc(testDoc);
 
         // Test evaluation - should handle all RFC 6901 cases gracefully
-        try
-        {
-            auto evalResult = pointerResult->evaluate(doc);
-            static_cast<void>(evalResult); // Suppress unused variable warning
-        }
-        catch (...)
-        {
-            // Should not throw, but if it does, continue testing
-        }
+        auto evalResult = pointerResult->evaluate(doc);
+        static_cast<void>(evalResult);
     }
 
     return 0;

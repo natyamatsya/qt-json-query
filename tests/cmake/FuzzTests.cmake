@@ -34,12 +34,9 @@ endif()
 
 # Define fuzz test sources
 set(FUZZ_TEST_SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/fuzz_simple_api.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/fuzz_jsonpath_parsing.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/fuzz_jsonpointer_parsing.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/fuzz_combined_evaluation.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/fuzz_container_cursor.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/fuzz_filter_storage.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/fuzz_combined_evaluation.cpp)
 
 # Common fuzz test configuration
 function(configure_fuzz_target target_name source_file)
@@ -97,10 +94,6 @@ endfunction()
 function(add_fuzz_tests)
   message(STATUS "Adding LibFuzzer-based fuzz tests")
 
-  # Simple API fuzzer (basic public API testing)
-  configure_fuzz_target(fuzz_simple_api
-                        ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/fuzz_simple_api.cpp)
-
   # JSONPath parsing fuzzer
   configure_fuzz_target(
     fuzz_jsonpath_parsing
@@ -111,34 +104,21 @@ function(add_fuzz_tests)
     fuzz_jsonpointer_parsing
     ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/fuzz_jsonpointer_parsing.cpp)
 
-  # Combined evaluation fuzzer
+  # Combined evaluation fuzzer (fuzzed JSONPath + fuzzed JSON document)
   configure_fuzz_target(
     fuzz_combined_evaluation
     ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/fuzz_combined_evaluation.cpp)
 
-  # Container cursor fuzzer
-  configure_fuzz_target(
-    fuzz_container_cursor
-    ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/fuzz_container_cursor.cpp)
-
-  # Filter storage fuzzer
-  configure_fuzz_target(
-    fuzz_filter_storage
-    ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/fuzz_filter_storage.cpp)
-
   # Create aggregate target for running all fuzzers
   add_custom_target(
     run_all_fuzzers
-    DEPENDS run_fuzz_simple_api run_fuzz_jsonpath_parsing
-            run_fuzz_jsonpointer_parsing run_fuzz_combined_evaluation
-            run_fuzz_container_cursor run_fuzz_filter_storage
+    DEPENDS run_fuzz_jsonpath_parsing run_fuzz_jsonpointer_parsing
+            run_fuzz_combined_evaluation
     COMMENT "Running all fuzz tests")
 
   # Create target for quick fuzz testing (30 seconds each)
   add_custom_target(
     fuzz_quick
-    COMMAND fuzz_simple_api ${CMAKE_BINARY_DIR}/fuzz/corpus/fuzz_simple_api
-            -max_total_time=30
     COMMAND
       fuzz_jsonpath_parsing
       ${CMAKE_BINARY_DIR}/fuzz/corpus/fuzz_jsonpath_parsing -max_total_time=30
@@ -150,14 +130,8 @@ function(add_fuzz_tests)
       fuzz_combined_evaluation
       ${CMAKE_BINARY_DIR}/fuzz/corpus/fuzz_combined_evaluation
       -max_total_time=30
-    COMMAND
-      fuzz_container_cursor
-      ${CMAKE_BINARY_DIR}/fuzz/corpus/fuzz_container_cursor -max_total_time=30
-    COMMAND
-      fuzz_filter_storage ${CMAKE_BINARY_DIR}/fuzz/corpus/fuzz_filter_storage
-      -max_total_time=30
-    DEPENDS fuzz_simple_api fuzz_jsonpath_parsing fuzz_jsonpointer_parsing
-            fuzz_combined_evaluation fuzz_container_cursor fuzz_filter_storage
+    DEPENDS fuzz_jsonpath_parsing fuzz_jsonpointer_parsing
+            fuzz_combined_evaluation
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/fuzz
     COMMENT "Running quick fuzz tests (30 seconds each)")
 

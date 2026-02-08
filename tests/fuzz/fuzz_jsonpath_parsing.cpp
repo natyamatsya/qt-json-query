@@ -6,10 +6,8 @@
  * edge case, and randomly generated JSONPath expressions.
  */
 
-#include <fuzzer/FuzzedDataProvider.h>
 #include <cstddef>
 #include <cstdint>
-#include <string>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
