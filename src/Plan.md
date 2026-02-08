@@ -10,7 +10,7 @@ src/json‑path/
 //   └─ parseDot(), parseBracket(), parseBare(), makeSlice(), stripOuterParens(), splitTopLevel
 ├── JSONPathFilter.cpp     // JSONPath::compileFilter(…)
 //   └─ parseOr/And/In/Compare/Regex rule fns + callCompileFilter wrapper
-├── JSONPathEvaluate.cpp   // JSONPath::evaluate(…), evaluateAll(…), evalStandard()
+├── JSONPathEvaluate.cpp   // JSONPath::evaluate(…), evaluateAll(…), evaluateTokenStream()
 //   └─ dispatch table & detail::eval<Key/Index/Slice/...>
 ├── JSONPathEvalHelpers.cpp// detail::fanOut(), addsMultiplicity(), squash(), applyTrailing()
 └── JSONPathRecursion.cpp  // wildcardObject/Array, evaluateRecursive(), evalSlice(), normalizeIndex()

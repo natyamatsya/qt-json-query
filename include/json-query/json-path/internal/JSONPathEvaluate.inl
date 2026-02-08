@@ -26,46 +26,28 @@ using internal::ResultCollector;
 QT_QUERY_JSON_ALWAYS_INLINE
 std::expected<QJsonValue, DetailedEvalError> evaluate(const PathEvalCtx& ctx, const QJsonValue& root)
 {
-    return evalStandard(ctx, root);
+    return evaluateTokenStream(ctx, root);
 }
 
 /**
- * @brief Inline array-based fan-out using TableGen dispatch - critical hot path
- *
- * This function is called frequently during token evaluation and is a prime
- * candidate for inlining to eliminate function call overhead.
+ * @brief Apply a single token to every element in src, collecting results.
  */
 QT_QUERY_JSON_ALWAYS_INLINE
 std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src, qsizetype tokenPos)
 {
-    if (jsonPathLog().isDebugEnabled())
-        qCDebug(jsonPathLog) << "DEBUG: fanOut called - tokenPos:" << tokenPos << "kind:" << static_cast<int>(tk.kind)
-                            << "index:" << tk.index << "src.size():" << src.size();
-    // Use ArrayPool for better memory management
-    auto pooledArray = acquirePooledArray();
-    QJsonArray& result = *pooledArray;
+    auto pooledArray{acquirePooledArray()};
+    auto& result = *pooledArray;
 
-    ResultCollector collector(&result);
-    auto streamer = collector.getStreamer();
+    ResultCollector collector{&result};
+    auto streamer{collector.getStreamer()};
 
-    if (jsonPathLog().isDebugEnabled())
-        qCDebug(jsonPathLog) << "DEBUG: fanOut - about to call ErrorHandlingDispatcher::dispatch";
-    // Apply token per working element via ErrorHandlingDispatcher (correct serial semantics)
     internal::ErrorHandlingDispatcher::dispatch(tk, tokenPos, ctx, src, streamer);
-    if (jsonPathLog().isDebugEnabled())
-        qCDebug(jsonPathLog) << "DEBUG: fanOut - dispatch completed, result.size():" << result.size();
 
-    // Check if an error occurred during processing
-    if (QT_QUERY_JSON_UNLIKELY(collector.hasError())) {
-        if (jsonPathLog().isDebugEnabled())
-            qCDebug(jsonPathLog) << "DEBUG: fanOut - collector has error:" << static_cast<int>(collector.getLastError());
+    if (QT_QUERY_JSON_UNLIKELY(collector.hasError()))
         return std::unexpected(collector.getLastError());
-    }
 
-    if (jsonPathLog().isDebugEnabled())
-        qCDebug(jsonPathLog) << "DEBUG: fanOut - returning result with size:" << result.size();
-    // Return by move to transfer ownership of the contents out of the pooled array
-    // The pooled array instance will be returned to the pool in a moved-from (empty) state
+    qCDebug(jsonPathLog) << "fanOut: tokenPos=" << tokenPos << "kind=" << static_cast<int>(tk.kind)
+                         << "results=" << result.size();
     return std::move(result);
 }
 
@@ -75,20 +57,17 @@ std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token&
 QT_QUERY_JSON_ALWAYS_INLINE
 std::expected<QJsonArray, DetailedEvalError> evaluateAll(const PathEvalCtx& ctx, const QJsonValue& root)
 {
-    // C++23 Monadic Chain - Elegant error composition without manual checks!
     return evaluate(ctx, root)
         .transform([&ctx](const QJsonValue& res) -> QJsonArray {
-            // Special handling for root-only selectors: preserve the result as a single item
-            // even if it's an array, to match RFC 9535 CTS expectations
-            bool isRootSelectorOnly = (ctx.tokens.size() == 1);
-            if (QT_QUERY_JSON_UNLIKELY(isRootSelectorOnly)) {
-                // Root selector should return the document itself as a single result
-                // even if it's an array, to match RFC 9535 CTS expectations
+            // Root-only selector ($): wrap the document as a single result
+            const auto isRootOnly{ctx.tokens.size() == 1};
+            if (QT_QUERY_JSON_UNLIKELY(isRootOnly))
+            {
                 if (res.isUndefined() || res.isNull()) return {};
                 return QJsonArray{res};
             }
 
-            // For non-root selectors, expand arrays into individual results
+            // Non-root selectors: expand arrays into individual results
             if (QT_QUERY_JSON_LIKELY(res.isArray())) return res.toArray();
             if (res.isUndefined() || res.isNull()) return {};
             return QJsonArray{res};

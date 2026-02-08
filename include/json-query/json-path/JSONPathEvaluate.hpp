@@ -31,7 +31,7 @@ struct DetailedEvalError
 // ---------------------------------------------------------------------------
 
 // Complete evaluation pipelines with std::expected error handling
-std::expected<QJsonValue, DetailedEvalError> evalStandard(const PathEvalCtx& ctx, const QJsonValue& root);
+std::expected<QJsonValue, DetailedEvalError> evaluateTokenStream(const PathEvalCtx& ctx, const QJsonValue& root);
 std::expected<QJsonArray, DetailedEvalError> evaluateAll(const PathEvalCtx& ctx, const QJsonValue& root);
 
 // Evaluate a *definite* JSONPath (no wildcard/recursive/filter) sequentially
