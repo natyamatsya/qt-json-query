@@ -210,7 +210,8 @@ struct PathPatternEvaluator<PathPattern::NestedKeys>
     eval(const detail::PathEvalCtx& /*ctx*/, const std::vector<Token>& tokens, const QJsonValue& root) noexcept
     {
         // Fast path: chained object navigation without intermediate arrays
-        auto current{root};
+        // Intentional copy: current is reassigned on each iteration as we navigate deeper.
+        auto current{root}; // NOLINT(performance-unnecessary-copy-initialization)
 
         for (const auto& token : tokens)
         {

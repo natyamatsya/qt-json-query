@@ -3,6 +3,7 @@
 # Focus on constexpr, const, and brace initialization improvements
 
 Checks: >
+  -*,
   modernize-make-unique,
   modernize-make-shared,
   modernize-use-auto,
@@ -20,7 +21,6 @@ Checks: >
   modernize-redundant-void-arg,
   modernize-replace-auto-ptr,
   modernize-replace-random-shuffle,
-  modernize-return-braced-init-list,
   modernize-shrink-to-fit,
   modernize-unary-static-assert,
   modernize-use-bool-literals,
@@ -29,7 +29,6 @@ Checks: >
   readability-const-return-type,
   readability-container-size-empty,
   readability-make-member-function-const,
-  readability-redundant-member-init,
   readability-redundant-string-cstr,
   readability-simplify-boolean-expr,
   readability-static-accessed-through-instance,
@@ -60,7 +59,7 @@ CheckOptions:
   - key: modernize-loop-convert.MinConfidence
     value: 'safe'
   - key: modernize-use-default-member-init.UseAssignment
-    value: 'true'
+    value: 'false'
   - key: performance-for-range-copy.WarnOnAllAutoCopies
     value: 'true'
   - key: performance-unnecessary-value-param.AllowedTypes

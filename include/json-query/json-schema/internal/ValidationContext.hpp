@@ -50,7 +50,8 @@ struct DynamicScopeGuard
     {
         stack.push_back(DynamicScopeEntry{&anchors});
     }
-    ~DynamicScopeGuard() { stack.pop_back(); }
+    // RAII guard: destructor pops the dynamic scope entry pushed in the constructor.
+    ~DynamicScopeGuard() { stack.pop_back(); } // NOLINT(modernize-use-equals-default)
 
     DynamicScopeGuard(const DynamicScopeGuard&)            = delete;
     DynamicScopeGuard& operator=(const DynamicScopeGuard&) = delete;

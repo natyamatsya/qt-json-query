@@ -48,7 +48,7 @@ inline void validateEnum(ValidateContext&  ctx,
 {
     using json_query::literals::operator""_qt_s;
 
-    for (const QJsonValue& allowed : enumValues)
+    for (const auto& allowed : enumValues)
         if (jsonValuesEqual(instance, allowed))
             return; // Match found
 

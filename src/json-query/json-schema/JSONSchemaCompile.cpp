@@ -239,7 +239,8 @@ struct BaseUriScope
     QString         saved;
 
     explicit BaseUriScope(CompileContext& c) : ctx{c}, saved{c.baseUri} {}
-    ~BaseUriScope() { ctx.baseUri = saved; }
+    // RAII guard: destructor restores the base URI that was saved in the constructor.
+    ~BaseUriScope() { ctx.baseUri = saved; } // NOLINT(modernize-use-equals-default)
 };
 
 // Forward declaration: compileSchemaNode and compileDefinitionsBlock are mutually recursive

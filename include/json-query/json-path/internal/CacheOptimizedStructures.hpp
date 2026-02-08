@@ -71,7 +71,8 @@ class StackFramePool
         alignas(CACHE_LINE_SIZE) std::array<CacheOptimizedStackFrame, FRAMES_PER_POOL> frames;
         size_t nextIndex{0};
 
-        CacheOptimizedStackFrame* allocate()
+        // allocate() mutates nextIndex via post-increment — not const.
+        CacheOptimizedStackFrame* allocate() // NOLINT(readability-make-member-function-const)
         {
             if (nextIndex >= FRAMES_PER_POOL)
                 return nullptr; // Pool exhausted
@@ -87,9 +88,9 @@ class StackFramePool
     size_t                             currentPoolIndex_{0};
 
   public:
-    StackFramePool()
+    // Constructor pre-allocates the first memory pool — not trivial.
+    StackFramePool() // NOLINT(modernize-use-equals-default)
     {
-        // Pre-allocate first pool
         pools_.push_back(std::make_unique<Pool>());
     }
 
@@ -142,16 +143,13 @@ class CacheOptimizedStack
     std::vector<CacheOptimizedStackFrame*> frames_;
 
   public:
-    CacheOptimizedStack()
+    // Constructor reserves vector capacity to avoid reallocations — not trivial.
+    CacheOptimizedStack() // NOLINT(modernize-use-equals-default)
     {
-        // Reserve space to avoid reallocations
-        frames_.reserve(256); // Reasonable default depth
+        frames_.reserve(256);
     }
 
-    ~CacheOptimizedStack()
-    {
-        // Pool cleanup is automatic (thread_local)
-    }
+    ~CacheOptimizedStack() = default;
 
     void push(const QJsonValue& value, uint32_t depth = 0, uint32_t flags = 0)
     {

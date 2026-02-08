@@ -32,7 +32,8 @@ class ArenaAllocator
         allocateNewBlock();
     }
 
-    ~ArenaAllocator()
+    // Destructor frees all allocated memory blocks via std::free — not trivial.
+    ~ArenaAllocator() // NOLINT(modernize-use-equals-default)
     {
         for (auto& block : blocks_)
             std::free(block);

@@ -50,8 +50,9 @@ std::optional<Slice> makeSlice(QStringView v)
         if (!ok)
         {
             // Conversion overflowed 64-bit
+            // Guard clause: overflow handling continues below with clamping logic — not a simple boolean.
             if (overflowInvalid)
-                return false; // illegal for this component
+                return false; // NOLINT(readability-simplify-boolean-expr)
 
             // Otherwise, clamp to sentinel (treat as ±∞)
             if (!part.isEmpty() && part.front() == u'-')
@@ -350,10 +351,7 @@ bool isValidIndexLiteral(QStringView content)
     qCDebug(jsonPathLog) << "isValidIndexLiteral(" << content << ") match=true ok=" << ok
                          << " val=" << (ok ? QString::number(val) : QStringLiteral("n/a"));
     constexpr qlonglong SAFE_INT = 9007199254740992LL; // 2^53 per RFC 9535 test expectations
-    if (!ok || val <= -SAFE_INT || val >= SAFE_INT)
-        return false; // totally out of supported range – selector invalid
-
-    return true;
+    return ok && val > -SAFE_INT && val < SAFE_INT;
 }
 
 // ──────────────────────────────────────────────────────────────────────

@@ -41,8 +41,9 @@ namespace json_query::json_schema::internal
     {
         const auto arrA{asArray(a)};
         const auto arrB{asArray(b)};
+        // Early exit guard clause; the loop and final return true below are not a simple boolean pattern.
         if (arrA.size() != arrB.size())
-            return false;
+            return false; // NOLINT(readability-simplify-boolean-expr)
         for (const auto& [itemA, itemB] : std::views::zip(arrA, arrB))
             if (!jsonValuesEqual(itemA, itemB))
                 return false;

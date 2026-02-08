@@ -268,7 +268,7 @@ compileObjectKeywords(CompileContext& ctx, const QJsonObject& schemaObj, ObjectS
             if (it.value().isArray())
             {
                 std::vector<QString> requiredProps{};
-                for (const QJsonValue& req : it.value().toArray())
+                for (const auto& req : it.value().toArray())
                     if (req.isString())
                         requiredProps.push_back(req.toString());
                 node.dependentRequired[it.key()] = std::move(requiredProps);
@@ -299,7 +299,7 @@ compileObjectKeywords(CompileContext& ctx, const QJsonObject& schemaObj, ObjectS
             {
                 // Array value → dependentRequired
                 std::vector<QString> requiredProps{};
-                for (const QJsonValue& req : it.value().toArray())
+                for (const auto& req : it.value().toArray())
                     if (req.isString())
                         requiredProps.push_back(req.toString());
                 node.dependentRequired[it.key()] = std::move(requiredProps);
