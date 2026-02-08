@@ -349,9 +349,6 @@ FormatValidationResult isUri(QStringView value) noexcept
         return formatInvalid;
     if (url.scheme().isEmpty())
         return semanticInvalid; // Valid URI-reference but not absolute URI
-    // Reject invalid userinfo (e.g., "http://foo:bar@/" — colons in userinfo need encoding)
-    if (url.userInfo().contains(u'/'))
-        return formatInvalid;
     return {};
 }
 
