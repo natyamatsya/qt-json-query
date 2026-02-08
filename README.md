@@ -1,266 +1,199 @@
-# JSON Query for Qt (C++23 Edition)
+# qt-json-query
 
-A high-performance, modern C++ implementation of [JSONPointer (IETF RFC 6901)](https://www.rfc-editor.org/rfc/rfc6901), [JSONPath (IETF RFC 9535)](https://www.rfc-editor.org/rfc/rfc9535), and [JSON Schema (IETF Draft 2020-12)](https://json-schema.org/draft/2020-12/json-schema-core) for Qt.
+A modern C++23 library providing [JSON Pointer (RFC 6901)](https://www.rfc-editor.org/rfc/rfc6901), [JSONPath (RFC 9535)](https://www.rfc-editor.org/rfc/rfc9535), and [JSON Schema (Draft 2020-12)](https://json-schema.org/draft/2020-12/json-schema-core) for Qt.
 
-**Features:**
-
-- Full **JSONPointer (RFC 6901)** compliance (33/33 tests passing).
-- Full **JSONPath (RFC 9535)** compliance (443/444 tests passing, 1 skipped).
-- **JSON Schema (Draft 2020-12)** validation — 1932/1994 IETF compliance tests passing (96.9%).
-- Utilizes **Compile-Time Regular Expressions (CTRE)** for efficient parsing.
-- Robust error handling using **`std::expected`** (C++23) for object creation/parsing.
-- Modern C++23 design, prioritizing standard library types (`std::vector`, `std::string`, etc.) internally.
-- Clean integration with Qt's JSON types (`QJsonValue`, `QJsonDocument`, etc.) at the API boundary.
-
-## Detailed Features
-
-### [JSONPointer (RFC 6901)](https://www.rfc-editor.org/rfc/rfc6901)
-
-- Direct access to JSON elements using pointer notation (e.g., `/foo/0/bar`).
-- Support for nested objects and arrays.
-- Correct handling of escape sequences (`~0` for `~`, `~1` for `/`).
-- **Robust Error Handling:** Uses `std::expected` for:
-  - **Creation/Parsing:** Indicates syntax errors via `JsonPointerParseError`.
-  - **Evaluation:** Indicates errors like key-not-found or invalid-index via `JsonPointerError`.
-
-### [JSONPath (RFC 9535)](https://www.rfc-editor.org/rfc/rfc9535)
-
-- **Full RFC 9535 compliance** (443/444 test suite passing).
-- Standard JSONPath query features:
-  - Root object access (`$`).
-  - Direct property access (dot `.` and bracket `['...']` notation).
-  - Array access by index (`[index]`, including negative indices).
-  - Array slices (`[start:end:step]`, including defaults and negative indices/steps).
-  - Wildcards for properties (`.*`) and array elements (`[*]`).
-  - Recursive descent (`..`) to search deeply.
-  - Basic filter expressions (`[?(@.property == value)]`, `[?(@.age > 30)]`, `[?(@.name)]`).
-- **Robust Parsing:** Uses `std::expected` to report syntax errors during creation via `JsonPathParseError`.
-- **Evaluation Results:** Returns a `QJsonArray` containing all matched values (empty array if no matches found).
-
-### [JSON Schema (IETF Draft 2020-12)](https://json-schema.org/draft/2020-12/json-schema-core)
-
-- **Full Draft 2020-12 compliance** (1994/1994 test suite passing).
-- Supported keywords:
-  - **Type validation:** `type`, `enum`, `const`
-  - **String:** `minLength`, `maxLength`, `pattern`, `format`
-  - **Numeric:** `minimum`, `maximum`, `exclusiveMinimum`, `exclusiveMaximum`, `multipleOf`
-  - **Array:** `minItems`, `maxItems`, `uniqueItems`, `prefixItems`, `items`, `contains`
-  - **Object:** `properties`, `patternProperties`, `additionalProperties`, `required`, `propertyNames`, `minProperties`, `maxProperties`, `dependentRequired`, `dependentSchemas`
-  - **Combinators:** `allOf`, `anyOf`, `oneOf`, `not`, `if`/`then`/`else`
-  - **References:** `$ref`, `$defs`, `$anchor`, `$id`
-- **Format validation** with CTRE + Qt semantic checks:
-  - Date/time: `date-time`, `date`, `time`
-  - Network: `email`, `hostname`, `ipv4`, `ipv6`, `uri`, `uri-reference`, `uri-template`
-  - Other: `uuid`, `json-pointer`, `relative-json-pointer`, `regex`
-- **Detailed error reporting:** Instance path, schema path, error code, and message for each violation.
-- **Two validation modes:** Collect all errors or stop on first error.
-
-### Performance & Design
-
-- Uses **compile-time regular expressions (CTRE)** via Hana Dusíková's library for fast path parsing where applicable.
-- Internal implementation prioritizes standard C++ types (`std::string`, `std::vector`, `std::variant`, `std::optional`, `std::tuple`) for efficiency and portability.
-- Minimized allocations where possible during parsing and evaluation.
-- Consistent C++23 features (e.g., brace initialization, `const` correctness).
+- Full **JSON Pointer (RFC 6901)** compliance (33/33 tests)
+- Full **JSONPath (RFC 9535)** compliance (443/444 tests, 1 skipped)
+- **JSON Schema (Draft 2020-12)** validation — 1932/1994 IETF tests (96.9%)
+- Unified **`Error`** type with `std::expected` across all modules
+- Compile-time regular expressions (**CTRE**) for fast parsing
+- Clean integration with Qt JSON types (`QJsonValue`, `QJsonDocument`, etc.)
 
 ## Requirements
 
-- **C++23 compatible compiler:**
-  - GCC 13 or newer
-  - Clang 16 or newer
-  - MSVC VS 2022 v17.8 or newer (ensure `/std:c++latest` is enabled)
-- **Qt 6.7 or newer** (Recommended for better C++23 integration, though core features might work with 6.5+ depending on compiler).
-- **CTRE library:** Included as a submodule. Ensure you initialize and update submodules.
+| Dependency | Version |
+|---|---|
+| **C++23 compiler** | Clang 16+, GCC 13+, or MSVC 17.8+ |
+| **Qt** | 6.7+ |
+| **CTRE** | v3.9.0 (fetched automatically via CMake FetchContent) |
+| **GoogleTest** | (fetched automatically for tests) |
 
-## Installation
+### Optional Dependencies
 
-1. Clone the repository:
+| Dependency | CMake Option | Purpose |
+|---|---|---|
+| **SRELL** | `JSON_QUERY_FORMAT_ECMA_REGEX=ON` | ECMA-262 regex for `pattern` + `regex` format |
+| **libidn2** | `JSON_QUERY_FORMAT_IDN=ON` | IDN hostname/email validation |
 
-    ```bash
-    git clone [https://github.com/yourusername/json-query-qt.git](https://github.com/yourusername/json-query-qt.git)
-    cd json-query-qt
-    # Initialize and fetch the CTRE submodule
-    git submodule update --init --recursive
-    ```
+## Building
 
-2. Include in your CMake project:
+```bash
+cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+    -DCMAKE_PREFIX_PATH=/path/to/qt/6.x/platform
+cmake --build build
+```
 
-    ```cmake
-    # Add the subdirectory containing json-query-qt's CMakeLists.txt
-    add_subdirectory(path/to/json-query-qt)
+Run tests:
 
-    # Link the library to your target
-    target_link_libraries(your_target PRIVATE json-query-qt)
-    ```
+```bash
+cmake --build build --target json_query_tests
+ctest --test-dir build
+```
 
-    *(A basic `CMakeLists.txt` would need to be provided in the library for this to work).*
+## Integration
 
-    **Alternatively (Manual):**
-    Add the `.h` and `.cpp` files directly to your existing build system, ensuring the CTRE include path is correctly configured and C++23 is enabled.
+```cmake
+add_subdirectory(path/to/qt-json-query)
+target_link_libraries(your_target PRIVATE json_query)
+```
+
+Then include the umbrella header:
+
+```cpp
+#include "json-query/JSONQuery"
+using namespace json_query;
+```
+
+This provides `JSONPointer`, `JSONPath`, and `JSONSchema` in the `json_query` namespace.
 
 ## Usage
 
-### JSONPointer (C++23 with `std::expected`)
+### JSON Pointer
 
 ```cpp
-#include "JSONPointer.hpp"
-#include "JSONQueryUtils.hpp" // For conversions if needed elsewhere
+#include "json-query/JSONQuery"
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QDebug>
-#include <expected>
 
-// --- Create Document ---
-QJsonObject obj{{"foo", QJsonObject{{"bar", 42}, {"baz", "hello"}}}};
-QJsonDocument doc(obj);
+using namespace json_query;
 
-// --- Create Pointer (Handles Parsing Errors) ---
-auto pointer_exp = JSONPointer::create("/foo/bar");
+const QJsonObject obj{{"foo", QJsonObject{{"bar", 42}, {"baz", "hello"}}}};
+const QJsonDocument doc{obj};
 
-if (!pointer_exp) {
-    // Handle parsing error
-    qWarning() << "Failed to parse JSON Pointer:"
-               << utils::std_string_to_qstring(pointer_exp.error().message);
+// Create a pointer (returns std::expected<JSONPointer, Error>)
+auto pointer{JSONPointer::create("/foo/bar")};
+if (!pointer)
+{
+    qWarning() << "Parse error:" << pointer.error().formatted_message();
     return;
 }
-const JSONPointer pointer = pointer_exp.value(); // or *pointer_exp
 
-// --- Evaluate Pointer (Handles Evaluation Errors) ---
-auto eval_result = pointer.evaluate(doc);
+// Evaluate against a document (returns std::expected<QJsonValue, Error>)
+auto result{pointer->evaluate(doc)};
+if (result)
+    qDebug() << "Result:" << *result; // QJsonValue(double, 42)
+else
+    qWarning() << "Eval error:" << result.error().formatted_message();
+```
 
-if (eval_result) {
-    // Evaluation successful
-    QJsonValue value = eval_result.value(); // or *eval_result
-    qDebug() << "Pointer result:" << value; // Output: QJsonValue(double, 42)
-} else {
-    // Handle evaluation error
-    JsonPointerError error_code = eval_result.error();
-    qWarning() << "Failed to evaluate JSON Pointer, error code:" << static_cast<int>(error_code);
-    // Example: KeyNotFound, IndexOutOfBounds, TypeMismatch
-}
+### JSONPath
 
-// --- Example: Non-existent path ---
-auto pointer_nonexist_exp = JSONPointer::create("/foo/qux");
-if (pointer_nonexist_exp) {
-    auto eval_nonexist = pointer_nonexist_exp->evaluate(doc);
-    if (!eval_nonexist) {
-         qDebug() << "Evaluation failed as expected for non-existent path. Error:"
-                  << static_cast<int>(eval_nonexist.error()); // Likely KeyNotFound
-    }
-}
-
-// --- Example: Invalid Syntax ---
-auto pointer_invalid_exp = JSONPointer::create("foo/bar"); // Missing leading '/'
-if (!pointer_invalid_exp) {
-     qDebug() << "Pointer creation failed as expected for invalid syntax. Error:"
-              << utils::std_string_to_qstring(pointer_invalid_exp.error().message);
-}
-JSONPath (C++23 with std::expected for creation)
-
-#include "JSONPath.h"
-#include "JSONQueryUtils.hpp" // For conversions if needed elsewhere
+```cpp
+#include "json-query/JSONQuery"
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QDebug>
-#include <expected>
 
-// --- Create Document ---
-QJsonArray books{};
-books.append(QJsonObject{{"title", "Book 1"}, {"author", "Author 1"}, {"price", 10.0}});
-books.append(QJsonObject{{"title", "Book 2"}, {"author", "Author 2"}, {"price", 25.5}});
-books.append(QJsonObject{{"title", "Book 3"}, {"author", "Author 1"}, {"price", 15.0}});
-QJsonObject store{{"books", books}};
-QJsonDocument doc(store);
+using namespace json_query;
 
-// --- Create Path (Handles Parsing Errors) ---
-auto path_exp = JSONPath::create("$.books[*].title");
+const QJsonObject store{{"books", QJsonArray{
+    QJsonObject{{"title", "Book 1"}, {"price", 10.0}},
+    QJsonObject{{"title", "Book 2"}, {"price", 25.5}},
+    QJsonObject{{"title", "Book 3"}, {"price", 15.0}},
+}}};
+const QJsonDocument doc{store};
 
-if (!path_exp) {
-    // Handle parsing error
-    qWarning() << "Failed to parse JSON Path:"
-               << utils::std_string_to_qstring(path_exp.error().message);
+// Create a path (returns std::expected<JSONPath, Error>)
+auto path{JSONPath::create("$.books[*].title")};
+if (!path)
+{
+    qWarning() << "Parse error:" << path.error().formatted_message();
     return;
 }
-const JSONPath path = path_exp.value(); // or *path_exp
 
-// --- Evaluate Path ---
-// Evaluate returns QJsonArray directly (empty if no matches)
-QJsonArray titles = path.evaluate(doc);
-qDebug() << "All book titles:" << titles; // Output: QJsonArray(["Book 1", "Book 2", "Book 3"])
+// evaluateAll returns std::expected<QJsonArray, Error>
+auto titles{path->evaluateAll(doc)};
+if (titles)
+    qDebug() << "Titles:" << *titles; // ["Book 1", "Book 2", "Book 3"]
 
-// --- Example: Filter Path ---
-auto filter_path_exp = JSONPath::create("$.books[?(@.price > 12)].author");
-if (!filter_path_exp) {
-     qWarning() << "Failed to parse filter path:"
-                << utils::std_string_to_qstring(filter_path_exp.error().message);
-     return;
-}
-const JSONPath filter_path = *filter_path_exp; // Alternate access via operator*
-
-QJsonArray expensive_authors = filter_path.evaluate(doc);
-qDebug() << "Authors of expensive books:" << expensive_authors; // Output: QJsonArray(["Author 2", "Author 1"])
-
-// --- Example: Invalid Syntax ---
-auto invalid_path_exp = JSONPath::create("$[1:2:0]"); // Invalid step
-if (!invalid_path_exp) {
-    qDebug() << "Path creation failed as expected for invalid syntax. Error:"
-             << utils::std_string_to_qstring(invalid_path_exp.error().message);
+// Filter expressions
+auto expensive{JSONPath::create("$.books[?(@.price > 12)].title")};
+if (expensive)
+{
+    auto result{expensive->evaluateAll(doc)};
+    if (result)
+        qDebug() << "Expensive:" << *result; // ["Book 2", "Book 3"]
 }
 ```
 
-### JSON Schema Validation
+### JSON Schema
 
 ```cpp
-#include "json-query/json-schema/JSONSchema.hpp"
-#include <QJsonDocument>
+#include "json-query/JSONQuery"
 #include <QJsonObject>
+#include <QJsonArray>
 #include <QDebug>
 
+using namespace json_query;
 using namespace json_query::json_schema;
 
-// --- Define Schema ---
-const QJsonObject schemaObj{
+// Define a schema
+const auto schemaJson{QJsonObject{
     {"type", "object"},
+    {"required", QJsonArray{"name", "age"}},
     {"properties", QJsonObject{
         {"name", QJsonObject{{"type", "string"}, {"minLength", 1}}},
         {"age", QJsonObject{{"type", "integer"}, {"minimum", 0}}},
-        {"email", QJsonObject{{"type", "string"}, {"format", "email"}}}
+        {"email", QJsonObject{{"type", "string"}, {"format", "email"}}},
     }},
-    {"required", QJsonArray{"name", "age"}}
-};
+}};
 
-// --- Monadic Style: Compile and Validate in One Expression ---
-const QJsonObject instance{{"name", "Alice"}, {"age", 30}, {"email", "alice@example.com"}};
-
-const auto result{JSONSchema::create(schemaObj).transform([&](const JSONSchema& schema) {
-    return schema.validate(instance);
-})};
-
-if (result && result->isValid()) {
-    qDebug() << "Instance is valid!";
+// Compile once, validate many times
+auto schema{JSONSchema::create(schemaJson)};
+if (!schema)
+{
+    qCritical() << "Schema error:" << schema.error().formatted_message();
+    return;
 }
 
-// --- Monadic Chain with Error Handling ---
-JSONSchema::create(schemaObj)
-    .transform([&](const JSONSchema& schema) { return schema.validate(instance); })
-    .transform([&](const ValidationResult& r) {
-        for (const auto& err : r.errors()) {
-            qDebug() << err.instanceLocation << "->" << err.message;
-            
-            // Navigate directly to the failing value using JSONPointer
-            if (auto failingValue = err.navigateTo(instance))
-                qDebug() << "  Value was:" << *failingValue;
-        }
-        return r.isValid();
-    });
+// Validate an instance
+const QJsonObject person{{"name", "Alice"}, {"age", 30}, {"email", "alice@example.com"}};
+auto result{schema->validate(QJsonValue{person})};
 
-// --- Quick Validation (stops on first error) ---
-const auto isValid{JSONSchema::create(schemaObj).transform([&](const JSONSchema& s) {
-    return s.isValid(instance);
-})};
-
-if (isValid.value_or(false))
+if (result)
+{
     qDebug() << "Valid!";
+}
+else
+{
+    qDebug() << result.errorCount() << "errors:";
+    for (const auto& err : result.errors())
+        qDebug().noquote() << " " << err.instanceLocation << "—" << err.message;
+}
+
+// Quick bool check (no error details collected)
+if (schema->isValid(QJsonValue{person}))
+    qDebug() << "Still valid!";
+```
+
+### Unified Error Handling
+
+All three modules return `std::expected<T, Error>`. The `Error` type is a compact 4-byte struct:
+
+```cpp
+auto result{pointer->evaluate(doc)};
+if (!result)
+{
+    const auto& err{result.error()};
+    err.message();            // constexpr std::string_view — zero-cost
+    err.message_qt();         // constexpr QStringView — zero-cost
+    err.formatted_message();  // QString — includes "at token N" context
+    err.domain;               // ErrorDomain enum
+    err.code;                 // uint8_t error code
+    err.detail;               // uint16_t token index (for eval errors)
+}
 ```
 
 ## Test Status
@@ -269,17 +202,17 @@ if (isValid.value_or(false))
 
 | Test Suite | Passed | Total | Rate |
 |---|---|---|---|
-| **Core unit tests** (`json_query_core_tests`) | 18 | 18 | 100% |
-| **Internal unit tests** (`json_query_internal_tests`) | 60 | 60 | 100% |
-| **RFC 6901 — JSON Pointer** (`rfc6901_compliance_tests`) | 33 | 33 | 100% |
-| **RFC 9535 — JSONPath CTS** (`rfc9535_compliance_tests`) | 443 | 444 | 99.8% |
-| **JSON Schema unit tests** (`json_schema_tests`) | 116 | 116 | 100% |
-| **IETF JSON Schema Draft 2020-12** (`ietf_json_schema_draft_2020_12_compliance_tests`) | 1932 | 1994 | 96.9% |
+| **Core unit tests** | 18 | 18 | 100% |
+| **Internal unit tests** | 60 | 60 | 100% |
+| **RFC 6901 — JSON Pointer** | 33 | 33 | 100% |
+| **RFC 9535 — JSONPath CTS** | 443 | 444 | 99.8% |
+| **JSON Schema unit tests** | 116 | 116 | 100% |
+| **IETF JSON Schema Draft 2020-12** | 1932 | 1994 | 96.9% |
 
 **Totals: 2602 / 2665 tests passing (97.6%)**
 
-Remaining IETF schema failures are in `ecmascript-regex.json` (ECMA-262 Unicode semantics — requires optional SRELL dependency), `hostname.json` (Unicode hostnames), and `idn-hostname.json` / `idn-email.json` (IDN — requires optional libidn2 dependency).
+Remaining IETF failures are in `ecmascript-regex.json` (ECMA-262 Unicode semantics — requires SRELL), `hostname.json` (Unicode hostnames), and `idn-hostname.json` / `idn-email.json` (IDN — requires libidn2).
 
-## Performance
+## License
 
-This implementation leverages compile-time regular expressions (CTRE) for parsing, which generally offers significantly better performance compared to runtime regex engines like QRegularExpression for the patterns used in path segmentation. Actual performance gains depend on the complexity of the paths and the specific operations.
+Apache-2.0 WITH LLVM-exception
