@@ -10,10 +10,9 @@
 #include <QJsonArray>
 #include "json-query/json-pointer/JSONPointerParsing.hpp"
 #include "json-query/json-pointer/JSONPointerEvaluation.hpp"
-
-#include <vector> // added include for std::vector
-
 #include "json-query/utils/JSONError.hpp"
+
+#include <vector>
 
 namespace json_query::json_pointer
 {
@@ -21,14 +20,9 @@ namespace json_query::json_pointer
 class JSONPointer
 {
   public:
-    // Factory function mirroring JSONPath
     using ParseResult = std::expected<JSONPointer, json_query::Error>;
     using EvalResult  = std::expected<QJsonValue, json_query::Error>;
 
-    // Note: Internal error types are not exposed in the public API
-    // All error handling should use the Error type
-
-    // Factory function mirroring JSONPath
     static ParseResult create(QStringView pointer) noexcept;
 
     // Detailed-error variants

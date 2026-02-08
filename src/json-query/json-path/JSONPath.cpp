@@ -21,7 +21,7 @@ namespace json_query::json_path
 
 JSONPath::EvalResult JSONPath::evaluate(const QJsonDocument& doc) const
 {
-    const QJsonValue root = doc.isArray() ? QJsonValue{doc.array()} : QJsonValue{doc.object()};
+    const auto root{doc.isArray() ? QJsonValue{doc.array()} : QJsonValue{doc.object()}};
     return evaluate(root);
 }
 
@@ -40,7 +40,7 @@ JSONPath::EvalResult JSONPath::evaluate(const QJsonValue& value) const
 
 JSONPath::EvalArrayResult JSONPath::evaluateAll(const QJsonDocument& doc) const
 {
-    const QJsonValue root = doc.isArray() ? QJsonValue{doc.array()} : QJsonValue{doc.object()};
+    const auto root{doc.isArray() ? QJsonValue{doc.array()} : QJsonValue{doc.object()}};
     return evaluateAll(root);
 }
 

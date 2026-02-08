@@ -22,7 +22,7 @@ struct Token
         Key,
         Index
     };
-    Kind      kind;
+    Kind      kind{};
     qsizetype index{};
     QString   key{};
 };
@@ -84,7 +84,7 @@ namespace json_query::json_pointer::detail
     if (s.startsWith(u'0'))
         return false;
     bool       ok;
-    const auto value = s.toLongLong(&ok);
+    const auto value{s.toLongLong(&ok)};
     if (!ok || value < 0)
         return false;
     out = value;
@@ -113,13 +113,13 @@ namespace json_query::json_pointer::detail
     const auto approx{ptr.count(Slash)};
     tokens.reserve(approx);
 
-    for (qsizetype begin = 1;;)
+    for (qsizetype begin{1};;)
     {
         const auto end{ptr.indexOf(Slash, begin)};
         const auto atEnd{end == -1};
-        const auto raw = atEnd ? ptr.sliced(begin) : ptr.sliced(begin, end - begin);
+        const auto raw{atEnd ? ptr.sliced(begin) : ptr.sliced(begin, end - begin)};
 
-        const auto decoded = decodeToken(raw);
+        const auto decoded{decodeToken(raw)};
         if (raw.contains(u'~') && decoded.isEmpty() && !raw.isEmpty())
         {
             // decodeToken failing would produce same string; we approximate by checking unsupported escape later

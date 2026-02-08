@@ -19,7 +19,7 @@ namespace json_query::json_pointer
 JSONPointer::ParseResult JSONPointer::create(QStringView pointer) noexcept
 {
     JSONPointer jp;
-    if (auto parseResult = json_pointer::detail::parsePointer(pointer, jp.m_tokens); !parseResult)
+    if (auto parseResult{json_pointer::detail::parsePointer(pointer, jp.m_tokens)}; !parseResult)
         return std::unexpected(Error{parseResult.error()});
     return jp;
 }
@@ -72,7 +72,7 @@ QString JSONPointer::to_string() const
         return {};
 
     // ───────────────────────────────── capacity ─────────────────────────────────
-    auto cap{0};
+    qsizetype cap{0};
     for (const Token& tk : m_tokens)
     {
         cap += 1; // the leading '/'
@@ -88,12 +88,12 @@ QString JSONPointer::to_string() const
     // ─────────────────────────────── single allocation ──────────────────────────
     QString out(cap, Qt::Uninitialized);
     QChar*  dst{out.data()};
-    auto    wr{0};
+    qsizetype wr{0};
 
     auto writeIndex = [&](qsizetype value)
     {
         char buf[24];
-        auto [ptr, ec] = std::to_chars(std::begin(buf), std::end(buf), value);
+        auto [ptr, ec]{std::to_chars(std::begin(buf), std::end(buf), value)};
         const auto len{ptr - buf};
         for (qsizetype i = 0; i < len; ++i)
             dst[wr++] = QLatin1Char(buf[i]);
