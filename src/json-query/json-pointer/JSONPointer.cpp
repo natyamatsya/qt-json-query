@@ -30,16 +30,14 @@ JSONPointer::ParseResult JSONPointer::create(QStringView pointer) noexcept
 
 namespace
 {
-// Internal implementation that returns domain-specific errors
-std::expected<QJsonValue, EvalError> evaluateImpl(const std::vector<json_pointer::Token>& tokens,
-                                                  const QJsonValue&                       value) noexcept
+using json_pointer::detail::DetailedEvalError;
+
+auto evaluateImpl(const std::vector<json_pointer::Token>& tokens, const QJsonValue& value) noexcept
 {
     return json_pointer::detail::evaluatePointerImpl(tokens, value);
 }
 
-// Internal implementation for QJsonDocument that returns domain-specific errors
-std::expected<QJsonValue, EvalError> evaluateDocumentImpl(const std::vector<json_pointer::Token>& tokens,
-                                                          const QJsonDocument&                    doc) noexcept
+auto evaluateDocumentImpl(const std::vector<json_pointer::Token>& tokens, const QJsonDocument& doc) noexcept
 {
     if (doc.isNull())
         return evaluateImpl(tokens, QJsonValue{});
@@ -47,27 +45,25 @@ std::expected<QJsonValue, EvalError> evaluateDocumentImpl(const std::vector<json
         return evaluateImpl(tokens, QJsonValue{doc.object()});
     if (doc.isArray())
         return evaluateImpl(tokens, QJsonValue{doc.array()});
-    // otherwise, treat as undefined
     return evaluateImpl(tokens, QJsonValue{});
+}
+
+JSONPointer::EvalResult toPublicError(const std::expected<QJsonValue, DetailedEvalError>& result)
+{
+    if (!result)
+        return std::unexpected(Error{result.error().error, result.error().tokenIndex});
+    return *result;
 }
 } // namespace
 
-// Public API that converts domain errors to Error
 JSONPointer::EvalResult JSONPointer::evaluate(const QJsonDocument& doc) const
 {
-    auto result = evaluateDocumentImpl(m_tokens, doc);
-    if (!result)
-        return std::unexpected(Error{result.error()});
-    return *result;
+    return toPublicError(evaluateDocumentImpl(m_tokens, doc));
 }
 
-// Public API that converts domain errors to Error
 JSONPointer::EvalResult JSONPointer::evaluate(const QJsonValue& value) const
 {
-    auto result = evaluateImpl(m_tokens, value);
-    if (!result)
-        return std::unexpected(Error{result.error()});
-    return *result;
+    return toPublicError(evaluateImpl(m_tokens, value));
 }
 
 QString JSONPointer::to_string() const

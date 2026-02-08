@@ -29,14 +29,10 @@ JSONPath::EvalResult JSONPath::evaluate(const QJsonValue& value) const
 {
     json_path::detail::PathEvalCtx ctx{m_tokens, value, m_func};
 
-    // C++23 Monadic Chain - Elegant error propagation with unified Error
     return json_path::detail::evaluate(ctx, value)
         .or_else(
-            [](json_path::EvalError error) -> EvalResult
-            {
-                return std::unexpected(
-                    json_query::Error{json_query::ErrorDomain::PathEval, static_cast<std::uint8_t>(error)});
-            });
+            [](const json_path::detail::DetailedEvalError& e) -> EvalResult
+            { return std::unexpected(json_query::Error{e.error, e.tokenIndex}); });
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -53,14 +49,10 @@ JSONPath::EvalArrayResult JSONPath::evaluateAll(const QJsonValue& value) const
 {
     json_path::detail::PathEvalCtx ctx{m_tokens, value, m_func};
 
-    // C++23 Monadic Chain - Elegant error propagation with unified Error
     return json_path::detail::evaluateAll(ctx, value)
         .or_else(
-            [](json_path::EvalError error) -> EvalArrayResult
-            {
-                return std::unexpected(
-                    json_query::Error{json_query::ErrorDomain::PathEval, static_cast<std::uint8_t>(error)});
-            });
+            [](const json_path::detail::DetailedEvalError& e) -> EvalArrayResult
+            { return std::unexpected(json_query::Error{e.error, e.tokenIndex}); });
 }
 
 } // namespace json_query::json_path

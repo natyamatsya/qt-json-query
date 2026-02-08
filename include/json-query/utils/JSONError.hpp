@@ -130,30 +130,31 @@ inline constexpr bool is_domain_enum_v =
 // The compact, unified error type
 struct Error
 {
-    ErrorDomain  domain{};
-    std::uint8_t code{};
+    ErrorDomain   domain{};
+    std::uint8_t  code{};
+    std::uint16_t detail{}; // Context-dependent: token index for Path/Pointer eval errors, 0 = none
 
     constexpr Error() = default;
-    constexpr Error(ErrorDomain d, std::uint8_t c) : domain(d), code(c) {}
+    constexpr Error(ErrorDomain d, std::uint8_t c, std::uint16_t detail = 0) : domain(d), code(c), detail(detail) {}
 
     // Explicit constructors for each domain error type
-    constexpr explicit Error(json_path::ParseError e) noexcept
-        : domain(ErrorDomain::PathParse), code(static_cast<std::uint8_t>(e))
+    constexpr explicit Error(json_path::ParseError e, std::uint16_t d = 0) noexcept
+        : domain(ErrorDomain::PathParse), code(static_cast<std::uint8_t>(e)), detail(d)
     {
     }
 
-    constexpr explicit Error(json_pointer::ParseError e) noexcept
-        : domain(ErrorDomain::PointerParse), code(static_cast<std::uint8_t>(e))
+    constexpr explicit Error(json_pointer::ParseError e, std::uint16_t d = 0) noexcept
+        : domain(ErrorDomain::PointerParse), code(static_cast<std::uint8_t>(e)), detail(d)
     {
     }
 
-    constexpr explicit Error(json_path::EvalError e) noexcept
-        : domain(ErrorDomain::PathEval), code(static_cast<std::uint8_t>(e))
+    constexpr explicit Error(json_path::EvalError e, std::uint16_t d = 0) noexcept
+        : domain(ErrorDomain::PathEval), code(static_cast<std::uint8_t>(e)), detail(d)
     {
     }
 
-    constexpr explicit Error(json_pointer::EvalError e) noexcept
-        : domain(ErrorDomain::PointerEval), code(static_cast<std::uint8_t>(e))
+    constexpr explicit Error(json_pointer::EvalError e, std::uint16_t d = 0) noexcept
+        : domain(ErrorDomain::PointerEval), code(static_cast<std::uint8_t>(e)), detail(d)
     {
     }
 
@@ -205,7 +206,7 @@ struct Error
     [[nodiscard]] constexpr bool is_schema_parse() const noexcept { return domain == ErrorDomain::SchemaParse; }
     [[nodiscard]] constexpr bool is_schema_eval() const noexcept { return domain == ErrorDomain::SchemaEval; }
 
-    // Equality (so it works nicely in tests)
+    // Equality — compares domain + code only (detail is context, not identity)
     friend constexpr bool operator==(Error a, Error b) noexcept
     {
         return a.domain == b.domain && a.code == b.code;
@@ -213,7 +214,7 @@ struct Error
     friend constexpr bool operator!=(Error a, Error b) noexcept { return !(a == b); }
 };
 
-static_assert(sizeof(Error) == 2, "Error should remain compact (2 bytes).");
+static_assert(sizeof(Error) == 4, "Error should remain compact (4 bytes).");
 /**
  * @brief Convert a Error to a human-readable string view
  *

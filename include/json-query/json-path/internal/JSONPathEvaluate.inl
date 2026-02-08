@@ -24,7 +24,7 @@ using internal::ResultCollector;
  * @brief Inline convenience entry point for single value evaluation - critical hot path
  */
 QT_QUERY_JSON_ALWAYS_INLINE
-std::expected<QJsonValue, EvalError> evaluate(const PathEvalCtx& ctx, const QJsonValue& root)
+std::expected<QJsonValue, DetailedEvalError> evaluate(const PathEvalCtx& ctx, const QJsonValue& root)
 {
     return evalStandard(ctx, root);
 }
@@ -73,7 +73,7 @@ std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token&
  * @brief Inline convenience entry point for array evaluation - critical hot path
  */
 QT_QUERY_JSON_ALWAYS_INLINE
-std::expected<QJsonArray, EvalError> evaluateAll(const PathEvalCtx& ctx, const QJsonValue& root)
+std::expected<QJsonArray, DetailedEvalError> evaluateAll(const PathEvalCtx& ctx, const QJsonValue& root)
 {
     // C++23 Monadic Chain - Elegant error composition without manual checks!
     return evaluate(ctx, root)

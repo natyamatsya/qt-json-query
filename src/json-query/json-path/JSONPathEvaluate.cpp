@@ -376,7 +376,7 @@ using TokenProcessingDispatcher = TokenProcessingDispatchTable<TokenProcessingTy
 // ---------------------------------------------------------------------------
 //  evalStandard – Refactored with TableGen-inspired architecture
 // ---------------------------------------------------------------------------
-std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
+std::expected<QJsonValue, DetailedEvalError> evalStandard(const PathEvalCtx& ctx, const QJsonValue& root)
 {
     if (ctx.tokens.empty())
         return QJsonValue{QJsonValue::Undefined};
@@ -425,7 +425,7 @@ std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const 
         working = TokenProcessingDispatcher::dispatch(ctx, i, tk, *working, root, multi, prevRecursive);
 
         if (!working)
-            return std::unexpected(working.error());
+            return std::unexpected(DetailedEvalError{working.error(), static_cast<std::uint16_t>(i)});
 
         if (working->empty())
             return emptyResult(); // RFC 9535: empty result list when no matches
@@ -453,8 +453,8 @@ std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const 
 // ---------------------------------------------------------------------------
 //  evaluateDefinite - Evaluate a JSONPath with no wildcards or filters
 // ---------------------------------------------------------------------------
-std::expected<QJsonValue, EvalError> evaluateDefinite(const std::vector<Token>& tokens,
-                                                      const QJsonValue&         root) noexcept
+std::expected<QJsonValue, DetailedEvalError> evaluateDefinite(const std::vector<Token>& tokens,
+                                                              const QJsonValue&         root) noexcept
 {
     using enum Token::Kind;
 
@@ -463,41 +463,42 @@ std::expected<QJsonValue, EvalError> evaluateDefinite(const std::vector<Token>& 
     auto startIdx{0};
     if (!tokens.empty() && tokens.front().kind == Token::Kind::Key)
     {
-        const auto& k = tokens.front().key;
+        const auto& k{tokens.front().key};
         if (k == u"$" || k == u"@")
             startIdx = 1;
     }
 
-    for (int i = startIdx; i < tokens.size(); ++i)
+    for (int i{startIdx}; i < tokens.size(); ++i)
     {
-        const auto& tk = tokens[i];
+        const auto  idx16{static_cast<std::uint16_t>(i)};
+        const auto& tk{tokens[i]};
         switch (tk.kind)
         {
         case Key:
         {
             if (!cur.isObject())
-                return std::unexpected(EvalError::TypeMismatchObject);
+                return std::unexpected(DetailedEvalError{EvalError::TypeMismatchObject, idx16});
             const auto obj{cur.toObject()};
             auto       it{obj.constFind(tk.key)};
             if (it == obj.constEnd())
-                return std::unexpected(EvalError::KeyNotFound);
+                return std::unexpected(DetailedEvalError{EvalError::KeyNotFound, idx16});
             cur = *it;
             break;
         }
         case Index:
         {
             if (!cur.isArray())
-                return std::unexpected(EvalError::TypeMismatchArray);
+                return std::unexpected(DetailedEvalError{EvalError::TypeMismatchArray, idx16});
             const auto arr{asArray(cur)};
-            auto       idx = normalizeIndex(tk.index, arr.size());
-            if (idx < 0 || idx >= arr.size())
-                return std::unexpected(EvalError::IndexOutOfRange);
-            cur = arr[idx];
+            auto       normalIdx{normalizeIndex(tk.index, arr.size())};
+            if (normalIdx < 0 || normalIdx >= arr.size())
+                return std::unexpected(DetailedEvalError{EvalError::IndexOutOfRange, idx16});
+            cur = arr[normalIdx];
             break;
         }
         default:
             // This function only handles definite paths (no wildcards/filters)
-            return std::unexpected(EvalError::TypeMismatchObject);
+            return std::unexpected(DetailedEvalError{EvalError::TypeMismatchObject, idx16});
         }
     }
     return cur;

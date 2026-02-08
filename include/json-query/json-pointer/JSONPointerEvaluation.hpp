@@ -45,48 +45,56 @@ namespace json_query::json_pointer::detail
     return true;
 }
 
-// Internal implementation that returns domain-specific errors
+// Internal error carrying both the error code and the failing token index
+struct DetailedEvalError
+{
+    EvalError     error{};
+    std::uint16_t tokenIndex{};
+};
+
+// Internal implementation that returns domain-specific errors with token index
 // IMPORTANT: This function is excluded from sanitizer instrumentation due to
 // incompatibility with Qt's copy-on-write semantics under AddressSanitizer.
 // The sanitizer's memory layout changes interfere with QJsonArray/QJsonObject operations,
 // causing functional test failures (not memory safety issues).
-[[nodiscard]] inline std::expected<QJsonValue, EvalError> evaluatePointerImpl(const std::vector<Token>& tokens,
-                                                                              const QJsonValue&         root) noexcept
+[[nodiscard]] inline std::expected<QJsonValue, DetailedEvalError> evaluatePointerImpl(
+    const std::vector<Token>& tokens, const QJsonValue& root) noexcept
 {
     if (tokens.empty())
         return root; // success with root value
 
     QJsonValue current{root};
-    for (const Token& tk : tokens)
+    for (std::uint16_t i{0}; i < tokens.size(); ++i)
     {
+        const auto& tk{tokens[i]};
         switch (current.type())
         {
         case QJsonValue::Object:
             if (tk.kind != Token::Kind::Key)
-                return std::unexpected(EvalError::TypeMismatchObject);
+                return std::unexpected(DetailedEvalError{EvalError::TypeMismatchObject, i});
             if (!stepObject(current, tk.key))
-                return std::unexpected(EvalError::KeyNotFound);
+                return std::unexpected(DetailedEvalError{EvalError::KeyNotFound, i});
             break;
         case QJsonValue::Array:
             if (tk.kind != Token::Kind::Index)
-                return std::unexpected(EvalError::TypeMismatchArray);
+                return std::unexpected(DetailedEvalError{EvalError::TypeMismatchArray, i});
             if (!stepArray(current, tk.index))
-                return std::unexpected(EvalError::IndexOutOfRange);
+                return std::unexpected(DetailedEvalError{EvalError::IndexOutOfRange, i});
             break;
         default:
-            return std::unexpected(EvalError::TypeMismatchObject);
+            return std::unexpected(DetailedEvalError{EvalError::TypeMismatchObject, i});
         }
     }
     return current; // success
 }
 
-// Public API that converts domain errors to Error
+// Public API that converts domain errors to Error (with token index in detail)
 [[nodiscard]] inline std::expected<QJsonValue, json_query::Error>
 evaluatePointer(const std::vector<Token>& tokens, const QJsonValue& root) noexcept
 {
-    auto result = evaluatePointerImpl(tokens, root);
+    auto result{evaluatePointerImpl(tokens, root)};
     if (!result)
-        return std::unexpected(json_query::Error{result.error()});
+        return std::unexpected(json_query::Error{result.error().error, result.error().tokenIndex});
     return *result;
 }
 

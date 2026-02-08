@@ -19,21 +19,28 @@
 namespace json_query::json_path::detail
 {
 
+// Internal error carrying both the error code and the failing token index
+struct DetailedEvalError
+{
+    EvalError     error{};
+    std::uint16_t tokenIndex{};
+};
+
 // ---------------------------------------------------------------------------
 //  Core evaluation API with std::expected error handling
 // ---------------------------------------------------------------------------
 
 // Complete evaluation pipelines with std::expected error handling
-std::expected<QJsonValue, EvalError> evalStandard(const PathEvalCtx& ctx, const QJsonValue& root);
-std::expected<QJsonArray, EvalError> evaluateAll(const PathEvalCtx& ctx, const QJsonValue& root);
+std::expected<QJsonValue, DetailedEvalError> evalStandard(const PathEvalCtx& ctx, const QJsonValue& root);
+std::expected<QJsonArray, DetailedEvalError> evaluateAll(const PathEvalCtx& ctx, const QJsonValue& root);
 
 // Evaluate a *definite* JSONPath (no wildcard/recursive/filter) sequentially
 // This is a specialized fast path for simple JSONPaths that don't require complex evaluation
-std::expected<QJsonValue, EvalError> evaluateDefinite(const std::vector<Token>& tokens,
-                                                      const QJsonValue&         root) noexcept;
+std::expected<QJsonValue, DetailedEvalError> evaluateDefinite(const std::vector<Token>& tokens,
+                                                              const QJsonValue&         root) noexcept;
 
 // Convenience top-level entry that uses std::expected
-std::expected<QJsonValue, EvalError> evaluate(const PathEvalCtx& ctx, const QJsonValue& root);
+std::expected<QJsonValue, DetailedEvalError> evaluate(const PathEvalCtx& ctx, const QJsonValue& root);
 
 // Direct array-based fan-out using TableGen dispatch - critical hot path
 std::expected<QJsonArray, EvalError>
