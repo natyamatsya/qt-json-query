@@ -9,6 +9,7 @@ project(
 # Testing option (enabled by default) and CTest include
 # ---------------------------------------------------------------------------
 option(BUILD_TESTING "Build and enable tests" ON)
+option(BUILD_BENCHMARKING "Build and enable benchmarks" OFF)
 include(CTest)
 
 # ---------------------------------------------------------------------------
