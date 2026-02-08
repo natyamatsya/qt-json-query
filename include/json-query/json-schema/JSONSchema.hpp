@@ -66,6 +66,21 @@ namespace json_query::json_schema
  */
 using SchemaFetcher = std::function<std::optional<QJsonValue>(const QString& uri)>;
 
+/**
+ * @brief Options for schema compilation
+ */
+enum class FormatValidation
+{
+    Auto,      ///< Derive from $vocabulary (annotation-only for standard 2020-12)
+    Assertion, ///< Always validate format as assertion
+    Annotation ///< Never validate format (annotation-only)
+};
+
+struct SchemaOptions
+{
+    FormatValidation formatValidation{FormatValidation::Auto};
+};
+
 class JSONSchema
 {
   public:
@@ -80,6 +95,7 @@ class JSONSchema
      */
     static ParseResult create(const QJsonObject& schemaObject);
     static ParseResult create(const QJsonObject& schemaObject, SchemaFetcher fetcher);
+    static ParseResult create(const QJsonObject& schemaObject, SchemaFetcher fetcher, SchemaOptions options);
 
     /**
      * @brief Create a compiled schema from a JSON document
@@ -89,6 +105,7 @@ class JSONSchema
      */
     static ParseResult create(const QJsonDocument& schemaDoc);
     static ParseResult create(const QJsonDocument& schemaDoc, SchemaFetcher fetcher);
+    static ParseResult create(const QJsonDocument& schemaDoc, SchemaFetcher fetcher, SchemaOptions options);
 
     /**
      * @brief Create a compiled schema from a JSON value (object or boolean)
@@ -100,6 +117,7 @@ class JSONSchema
      */
     static ParseResult create(const QJsonValue& schemaValue);
     static ParseResult create(const QJsonValue& schemaValue, SchemaFetcher fetcher);
+    static ParseResult create(const QJsonValue& schemaValue, SchemaFetcher fetcher, SchemaOptions options);
 
     /**
      * @brief Validate a JSON value against this schema

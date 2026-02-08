@@ -45,7 +45,7 @@ inline void validateString(ValidateContext&    ctx,
                             EvalError::PatternMismatch);
     }
 
-    if (node.format && !validateFormat(*node.format, str))
+    if (node.format && ctx.schema.formatAssertionEnabled && !validateFormat(*node.format, str))
     {
         const auto msg{QString(u"String does not match format '%1'").arg(*node.format)};
         ctx.result.addError(instancePath, schemaPath + u"/format"_qt_s, msg, EvalError::FormatInvalid);

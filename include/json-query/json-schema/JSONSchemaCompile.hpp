@@ -26,6 +26,6 @@ namespace json_query::json_schema
  * @return Compiled schema or error
  */
 [[nodiscard]] std::expected<std::shared_ptr<internal::CompiledSchema>, QueryError>
-compileSchema(const QJsonValue& schemaValue, SchemaFetcher fetcher = {});
+compileSchema(const QJsonValue& schemaValue, SchemaFetcher fetcher = {}, SchemaOptions options = {});
 
 } // namespace json_query::json_schema

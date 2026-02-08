@@ -203,6 +203,10 @@ struct CompiledSchema
     QString schemaId; // $id if present
     QString dialect;  // $schema if present
 
+    /// Whether format validation produces assertion errors (default: false for 2020-12).
+    /// Set to true when the format-assertion vocabulary is active.
+    bool formatAssertionEnabled{false};
+
     /**
      * @brief Get the root schema node
      */

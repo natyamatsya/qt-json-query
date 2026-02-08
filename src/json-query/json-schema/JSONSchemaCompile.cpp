@@ -900,7 +900,7 @@ void phase3_LinkReferences(internal::CompiledSchema&                  compiled,
  * @return Compiled schema or error
  */
 std::expected<std::shared_ptr<internal::CompiledSchema>, QueryError>
-compileSchema(const QJsonValue& schemaValue, SchemaFetcher fetcher)
+compileSchema(const QJsonValue& schemaValue, SchemaFetcher fetcher, SchemaOptions options)
 {
     using json_query::literals::operator""_qt_s;
 
@@ -916,13 +916,12 @@ compileSchema(const QJsonValue& schemaValue, SchemaFetcher fetcher)
     if (auto r{phase1_BuildSymbolTable(*compiled, ctx, schemaValue)}; !r)
         return std::unexpected(r.error());
 
-    // Extract $vocabulary from $schema metaschema (if custom)
+    // Extract $vocabulary from $schema metaschema to determine active vocabularies
     if (schemaValue.isObject())
     {
         const auto schemaDialect{schemaValue.toObject().value(u"$schema"_qt_s).toString()};
-        if (!schemaDialect.isEmpty() && schemaDialect != u"https://json-schema.org/draft/2020-12/schema"_qt_s)
+        if (!schemaDialect.isEmpty())
         {
-            // Fetch the metaschema to read its $vocabulary
             auto metaSchema{internal::lookupBuiltinSchema(schemaDialect)};
             if (!metaSchema && fetcher)
                 metaSchema = fetcher(schemaDialect);
@@ -931,13 +930,23 @@ compileSchema(const QJsonValue& schemaValue, SchemaFetcher fetcher)
                 const auto vocabObj{metaSchema->toObject().value(u"$vocabulary"_qt_s)};
                 if (vocabObj.isObject())
                 {
-                    // If $vocabulary is declared, only listed vocabularies are active
-                    ctx.validationVocabActive = vocabObj.toObject().contains(
+                    const auto vocabObject{vocabObj.toObject()};
+                    ctx.validationVocabActive = vocabObject.contains(
                         u"https://json-schema.org/draft/2020-12/vocab/validation"_qt_s);
+                    // Auto mode: derive format assertion from vocabulary
+                    if (options.formatValidation == FormatValidation::Auto)
+                        compiled->formatAssertionEnabled = vocabObject.contains(
+                            u"https://json-schema.org/draft/2020-12/vocab/format-assertion"_qt_s);
                 }
             }
         }
     }
+
+    // Apply explicit format validation override
+    if (options.formatValidation == FormatValidation::Assertion)
+        compiled->formatAssertionEnabled = true;
+    else if (options.formatValidation == FormatValidation::Annotation)
+        compiled->formatAssertionEnabled = false;
 
     // Phase 2: Code Generation
     if (auto r{phase2_CompileSchemaTree(*compiled, ctx, schemaValue)}; !r)

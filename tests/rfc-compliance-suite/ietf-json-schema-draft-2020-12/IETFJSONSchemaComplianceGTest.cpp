@@ -80,6 +80,7 @@ struct SchemaTestCase
     QJsonValue schema;        // the schema to compile
     QJsonValue data;          // instance data to validate
     bool       expectedValid; // expected validation result
+    bool       formatAssertion{true}; // whether format validation is assertion (optional/format/) or auto
 };
 
 // Custom GoogleTest printer for readable test output
@@ -183,7 +184,14 @@ static QList<SchemaTestCase> collectAllTestCases()
     while (it.hasNext())
     {
         const auto filePath{it.next()};
-        auto       cases{loadTestFile(filePath)};
+        // Tests in optional/format/ need format assertion; format.json tests annotation-only behavior
+        const auto needsFormatAssertion{filePath.contains(u"/optional/format/"_qt_s)
+                                        || filePath.contains(u"/optional/format-assertion"_qt_s)};
+        const auto isFormatAnnotation{QFileInfo{filePath}.fileName() == u"format.json"_qt_s
+                                      && !filePath.contains(u"/optional/"_qt_s)};
+        auto cases{loadTestFile(filePath)};
+        for (auto& tc : cases)
+            tc.formatAssertion = needsFormatAssertion || (!isFormatAnnotation);
         all.append(cases);
     }
 
@@ -205,7 +213,8 @@ TEST_P(IETFJsonSchemaTest, ValidatesPerSpec)
 
     // Compile schema with file-based fetcher for remote $ref resolution
     static const auto fetcher{makeFileBasedFetcher()};
-    auto schemaResult{JSONSchema::create(tc.schema, fetcher)};
+    const SchemaOptions opts{tc.formatAssertion ? FormatValidation::Assertion : FormatValidation::Auto};
+    auto schemaResult{JSONSchema::create(tc.schema, fetcher, opts)};
     if (!schemaResult)
     {
         FAIL() << "Schema compilation failed for: " << tc.groupDesc.toStdString()
