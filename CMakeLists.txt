@@ -167,7 +167,6 @@ add_subdirectory(src/json-query)
 add_subdirectory(examples)
 
 # Add organized subdirectories
-add_subdirectory(compliance)
 add_subdirectory(perf)
 
 # Unit tests (GoogleTest)
