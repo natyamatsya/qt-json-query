@@ -23,7 +23,7 @@ inline void validateString(ValidateContext&    ctx,
 {
     using json_query::literals::operator""_qt_s;
 
-    const auto length{static_cast<std::size_t>(str.length())};
+    const auto length{static_cast<std::size_t>(str.toUcs4().size())};
 
     if (node.minLength && length < *node.minLength)
     {
