@@ -63,42 +63,51 @@ struct SchemaOptions { FormatValidation formatValidation{FormatValidation::Auto}
 
 ---
 
-## Remaining: Phase 5b — Unicode Format Validators (+62 tests)
+## Phase 5b: Optional Format Dependencies ✅ (+33 tests → 1965 with deps)
 
-### Hostname / IDN-hostname (+76 tests)
+Two optional dependencies enabled via CMake options:
 
-All failures involve internationalized hostnames: Hangul, Punycode, PVALID exceptions,
-ZERO WIDTH JOINER/NON-JOINER, Arabic-Indic digits, etc.
+```cmake
+cmake -DJSON_QUERY_FORMAT_ECMA_REGEX=ON -DJSON_QUERY_FORMAT_IDN=ON ...
+```
 
-**Requires**: IDNA 2008 (RFC 5891/5892) — Unicode category tables, bidi rules, contextual rules.
+### SRELL (ECMAScript regex, header-only, BSD license)
 
-**Options**: ICU library, or a standalone IDNA implementation.
+**[akenotsuki.com/misc/srell](https://www.akenotsuki.com/misc/srell/en/)** — 3 header files
 
-### ECMA-262 regex validation (+46 tests)
+- `SchemaRegex` wrapper abstracts SRELL vs QRegularExpression
+- Used for both `regex` format validation AND `pattern` keyword matching
+- Compile definition: `JSON_QUERY_HAS_SRELL`
+- **Fixes**: All 46 ecmascript-regex tests (44 from `pattern` keyword, 2 from `regex` format)
 
-Failures involve Unicode property escapes (`\p{Space_Separator}`), line terminators,
-and other ECMA-262-specific regex features different from PCRE/Qt regex.
+### ada-url/idna (IDNA 2008 / UTS #46, Apache-2.0/MIT)
 
-**Requires**: Dedicated ECMA-262 regex syntax validator (not a full engine, just syntax checking).
+**[github.com/ada-url/idna](https://github.com/ada-url/idna)** — v0.4.0
 
-### IDN-email (+2 tests)
+- `isIdnHostname` with ASCII fast path (delegates to strict RFC 1123 for ASCII inputs)
+- `isIdnEmail` validates domain part with IDNA
+- Compile definition: `JSON_QUERY_HAS_IDNA`
+- **Fixes**: 18 idn-hostname + 2 idn-email tests
 
-Hangul domain names in email addresses.
+### Remaining 29 failures (hostname IDN edge cases)
 
-**Requires**: IDN-aware email validation (depends on hostname/IDN-hostname fix).
-
-**Recommendation**: These are all *optional* per the spec (format is annotation-only by default
-in 2020-12). Prioritize based on user demand. Consider ICU as a dependency for IDNA support.
+- **hostname.json (30)**: Unicode hostname tests — our `hostname` format uses the strict
+  ASCII RFC 1123 validator because ada-url/idna is too lenient for some invalid ASCII hostnames.
+  These tests require a hybrid validator that's strict for ASCII but supports Unicode.
+- **idn-hostname.json (28)**: IDNA 2008 contextual rules (MIDDLE DOT, KERAIA, GERESH,
+  KATAKANA MIDDLE DOT, ZERO WIDTH JOINER/NON-JOINER) — ada-url/idna doesn't fully enforce
+  all RFC 5892 contextual rules.
 
 ---
 
 ## Summary
 
-| Phase    | Tests | Status    | Cumulative |
-| -------- | ----- | --------- | ---------- |
-| Phase 1  | +2    | ✅ Done   | 1909/1994  |
-| Phase 2  | +2    | ✅ Done   | 1911/1994  |
-| Phase 3  | +1    | ✅ Done   | 1912/1994  |
-| Phase 4  | +1    | ✅ Done   | 1913/1994  |
-| Phase 5a | +19   | ✅ Done   | 1932/1994  |
-| Phase 5b | +62   | ⏳ Future | 1994/1994  |
+| Phase    | Tests | Status    | Cumulative       |
+| -------- | ----- | --------- | ---------------- |
+| Phase 1  | +2    | ✅ Done   | 1909/1994        |
+| Phase 2  | +2    | ✅ Done   | 1911/1994        |
+| Phase 3  | +1    | ✅ Done   | 1912/1994        |
+| Phase 4  | +1    | ✅ Done   | 1913/1994        |
+| Phase 5a | +19   | ✅ Done   | 1932/1994 (base) |
+| Phase 5b | +33   | ✅ Done   | 1965/1994 (opts) |
+| Remain   | 29    | ⏳ Future | 1994/1994        |
