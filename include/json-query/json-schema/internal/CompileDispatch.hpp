@@ -425,152 +425,57 @@ inline void compileMetadataKeywords(const QJsonObject& schemaObj, ObjectSchema& 
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// TableGen-Inspired Keyword Category Dispatch
+// Compile all keyword categories sequentially
 // ────────────────────────────────────────────────────────────────────────────
 
-enum class KeywordCategory
-{
-    TypeConstraints, // type, enum, const
-    StringKeywords,  // pattern, minLength, maxLength, format
-    NumericKeywords, // minimum, maximum, exclusiveMinimum, exclusiveMaximum, multipleOf
-    ArrayKeywords,   // minItems, maxItems, uniqueItems, prefixItems, items, contains
-    ObjectKeywords,  // properties, required, additionalProperties, patternProperties, etc.
-    Combinators,     // allOf, anyOf, oneOf, not, if/then/else
-    Metadata         // title, description
-};
-
-template <KeywordCategory Category>
-struct KeywordCategoryHandler;
-
-template <>
-struct KeywordCategoryHandler<KeywordCategory::TypeConstraints>
-{
-    [[nodiscard]] static std::expected<void, Error>
-    compile(CompileContext& ctx, const QJsonObject& schemaObj, ObjectSchema& node, CompileSchemaFn&)
-    {
-        if (!ctx.validationVocabActive)
-            return {};
-
-        using json_query::literals::operator""_qt_s;
-
-        if (auto r{parseTypeKeyword(schemaObj[u"type"_qt_s])}; !r)
-            return std::unexpected(r.error());
-        else
-            node.type = *r;
-
-        if (auto r{parseEnumKeyword(schemaObj[u"enum"_qt_s])}; !r)
-            return std::unexpected(r.error());
-        else
-            node.enumValues = *r;
-
-        node.constValue = parseConstKeyword(schemaObj[u"const"_qt_s]);
-        return {};
-    }
-};
-
-template <>
-struct KeywordCategoryHandler<KeywordCategory::StringKeywords>
-{
-    [[nodiscard]] static std::expected<void, Error>
-    compile(CompileContext& ctx, const QJsonObject& schemaObj, ObjectSchema& node, CompileSchemaFn&)
-    {
-        return compileStringKeywords(schemaObj, node, ctx.validationVocabActive);
-    }
-};
-
-template <>
-struct KeywordCategoryHandler<KeywordCategory::NumericKeywords>
-{
-    [[nodiscard]] static std::expected<void, Error>
-    compile(CompileContext& ctx, const QJsonObject& schemaObj, ObjectSchema& node, CompileSchemaFn&)
-    {
-        if (!ctx.validationVocabActive)
-            return {};
-        return compileNumericKeywords(schemaObj, node);
-    }
-};
-
-template <>
-struct KeywordCategoryHandler<KeywordCategory::ArrayKeywords>
-{
-    [[nodiscard]] static std::expected<void, Error>
-    compile(CompileContext& ctx, const QJsonObject& schemaObj, ObjectSchema& node, CompileSchemaFn& compileFn)
-    {
-        return compileArrayKeywords(ctx, schemaObj, node, compileFn);
-    }
-};
-
-template <>
-struct KeywordCategoryHandler<KeywordCategory::ObjectKeywords>
-{
-    [[nodiscard]] static std::expected<void, Error>
-    compile(CompileContext& ctx, const QJsonObject& schemaObj, ObjectSchema& node, CompileSchemaFn& compileFn)
-    {
-        return compileObjectKeywords(ctx, schemaObj, node, compileFn);
-    }
-};
-
-template <>
-struct KeywordCategoryHandler<KeywordCategory::Combinators>
-{
-    [[nodiscard]] static std::expected<void, Error>
-    compile(CompileContext& ctx, const QJsonObject& schemaObj, ObjectSchema& node, CompileSchemaFn& compileFn)
-    {
-        return compileCombinatorKeywords(ctx, schemaObj, node, compileFn);
-    }
-};
-
-template <>
-struct KeywordCategoryHandler<KeywordCategory::Metadata>
-{
-    [[nodiscard]] static std::expected<void, Error>
-    compile(CompileContext&, const QJsonObject& schemaObj, ObjectSchema& node, CompileSchemaFn&)
-    {
-        compileMetadataKeywords(schemaObj, node);
-        return {};
-    }
-};
-
-// ────────────────────────────────────────────────────────────────────────────
-// Recursive Dispatch Table for Keyword Categories
-// ────────────────────────────────────────────────────────────────────────────
-
-template <KeywordCategory... Categories>
-struct KeywordDispatchTable;
-
-template <KeywordCategory First, KeywordCategory... Rest>
-struct KeywordDispatchTable<First, Rest...>
+struct FullKeywordDispatcher
 {
     [[nodiscard]] static std::expected<void, Error>
     dispatch(CompileContext& ctx, const QJsonObject& schemaObj, ObjectSchema& node, CompileSchemaFn& compileFn)
     {
-        // Compile this category
-        if (auto r{KeywordCategoryHandler<First>::compile(ctx, schemaObj, node, compileFn)}; !r)
+        using json_query::literals::operator""_qt_s;
+
+        // Type constraints (type, enum, const)
+        if (ctx.validationVocabActive)
+        {
+            if (auto r{parseTypeKeyword(schemaObj[u"type"_qt_s])}; !r)
+                return std::unexpected(r.error());
+            else
+                node.type = *r;
+
+            if (auto r{parseEnumKeyword(schemaObj[u"enum"_qt_s])}; !r)
+                return std::unexpected(r.error());
+            else
+                node.enumValues = *r;
+
+            node.constValue = parseConstKeyword(schemaObj[u"const"_qt_s]);
+        }
+
+        // String keywords
+        if (auto r{compileStringKeywords(schemaObj, node, ctx.validationVocabActive)}; !r)
             return r;
 
-        // Continue with remaining categories
-        return KeywordDispatchTable<Rest...>::dispatch(ctx, schemaObj, node, compileFn);
-    }
-};
+        // Numeric keywords
+        if (ctx.validationVocabActive)
+            if (auto r{compileNumericKeywords(schemaObj, node)}; !r)
+                return r;
 
-// Base case: all categories processed
-template <>
-struct KeywordDispatchTable<>
-{
-    [[nodiscard]] static std::expected<void, Error>
-    dispatch(CompileContext&, const QJsonObject&, ObjectSchema&, CompileSchemaFn&)
-    {
+        // Array keywords
+        if (auto r{compileArrayKeywords(ctx, schemaObj, node, compileFn)}; !r)
+            return r;
+
+        // Object keywords
+        if (auto r{compileObjectKeywords(ctx, schemaObj, node, compileFn)}; !r)
+            return r;
+
+        // Combinators (allOf, anyOf, oneOf, not, if/then/else)
+        if (auto r{compileCombinatorKeywords(ctx, schemaObj, node, compileFn)}; !r)
+            return r;
+
+        // Metadata (title, description)
+        compileMetadataKeywords(schemaObj, node);
         return {};
     }
 };
-
-// Full keyword dispatch chain
-using FullKeywordDispatcher = KeywordDispatchTable<KeywordCategory::TypeConstraints,
-                                                   KeywordCategory::StringKeywords,
-                                                   KeywordCategory::NumericKeywords,
-                                                   KeywordCategory::ArrayKeywords,
-                                                   KeywordCategory::ObjectKeywords,
-                                                   KeywordCategory::Combinators,
-                                                   KeywordCategory::Metadata>;
 
 } // namespace json_query::json_schema::internal
