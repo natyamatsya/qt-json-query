@@ -6,9 +6,6 @@
 #include "json-query/json-path/JSONPathCompile.hpp"
 #include "json-query/json-path/internal/PathEvalCtx.hpp"
 #include "json-query/json-path/JSONPathEvalHelpers.hpp"
-#include "json-query/json-path/JSONPathTokenDispatch.hpp"
-#include "json-query/json-path/JSONPathWildcardRecursive.hpp"
-#include "json-query/utils/SanitizerCompat.hpp"
 
 #include <QJsonValue>
 #include <QJsonArray>

@@ -25,7 +25,6 @@ set(JSON_QUERY_SOURCES
     json-path/JSONPathParseUtils.cpp
     json-path/JSONPathParsers.cpp
     json-path/JSONPathPointerConversion.cpp
-    json-path/JSONPathTokenDispatch.cpp
     json-path/JSONPathTokenEvaluators.cpp
     json-path/JSONPathWildcardRecursive.cpp
     json-path/internal/CacheOptimizedStructures.cpp
