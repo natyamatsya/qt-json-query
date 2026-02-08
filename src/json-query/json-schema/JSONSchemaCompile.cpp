@@ -448,9 +448,13 @@ resolveRef(const QString&                                   ref,
 {
     using json_query::literals::operator""_qt_s;
 
-    // Root reference
+    // Root reference: "#" means the root of the current resource
     if (ref == u"#"_qt_s)
+    {
+        if (!refBaseUri.isEmpty() && anchors.contains(refBaseUri))
+            return anchors.at(refBaseUri);
         return rootIndex;
+    }
 
     // Direct anchor match
     if (anchors.contains(ref))
