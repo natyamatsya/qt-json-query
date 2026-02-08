@@ -246,7 +246,93 @@ static void BM_JSONPath_Recursive(benchmark::State& state)
 }
 BENCHMARK(BM_JSONPath_Recursive);
 
+// ----------------------------
+// Pre-compiled evaluation benchmarks (isolate eval from parse)
+// ----------------------------
+static void BM_JSONPointer_Eval_Simple(benchmark::State& state)
+{
+    const auto doc{prepareTestDocument()};
+    const auto ptr{JSONPointer::create(QStringLiteral("/name")).value()};
+    for (auto _ : state)
+        benchmark::DoNotOptimize(ptr.evaluate(doc));
+}
+BENCHMARK(BM_JSONPointer_Eval_Simple);
+
+static void BM_JSONPointer_Eval_Nested(benchmark::State& state)
+{
+    const auto doc{prepareTestDocument()};
+    const auto ptr{JSONPointer::create(QStringLiteral("/location/city")).value()};
+    for (auto _ : state)
+        benchmark::DoNotOptimize(ptr.evaluate(doc));
+}
+BENCHMARK(BM_JSONPointer_Eval_Nested);
+
+static void BM_JSONPointer_Eval_Array(benchmark::State& state)
+{
+    const auto doc{prepareTestDocument()};
+    const auto ptr{JSONPointer::create(QStringLiteral("/inventory/5/title")).value()};
+    for (auto _ : state)
+        benchmark::DoNotOptimize(ptr.evaluate(doc));
+}
+BENCHMARK(BM_JSONPointer_Eval_Array);
+
+static void BM_JSONPointer_Eval_Complex(benchmark::State& state)
+{
+    const auto doc{prepareTestDocument()};
+    const auto ptr{JSONPointer::create(QStringLiteral("/inventory/15/author/name")).value()};
+    for (auto _ : state)
+        benchmark::DoNotOptimize(ptr.evaluate(doc));
+}
+BENCHMARK(BM_JSONPointer_Eval_Complex);
+
+static void BM_JSONPath_Eval_Simple(benchmark::State& state)
+{
+    const auto doc{prepareTestDocument()};
+    const auto path{JSONPath::create(u"$.name").value()};
+    for (auto _ : state)
+        benchmark::DoNotOptimize(path.evaluateAll(doc));
+}
+BENCHMARK(BM_JSONPath_Eval_Simple);
+
+static void BM_JSONPath_Eval_Nested(benchmark::State& state)
+{
+    const auto doc{prepareTestDocument()};
+    const auto path{JSONPath::create(u"$.location.city").value()};
+    for (auto _ : state)
+        benchmark::DoNotOptimize(path.evaluateAll(doc));
+}
+BENCHMARK(BM_JSONPath_Eval_Nested);
+
+static void BM_JSONPath_Eval_Array(benchmark::State& state)
+{
+    const auto doc{prepareTestDocument()};
+    const auto path{JSONPath::create(u"$.inventory[5].title").value()};
+    for (auto _ : state)
+        benchmark::DoNotOptimize(path.evaluateAll(doc));
+}
+BENCHMARK(BM_JSONPath_Eval_Array);
+
+static void BM_JSONPath_Eval_Filter(benchmark::State& state)
+{
+    const auto doc{prepareTestDocument()};
+    const auto path{JSONPath::create(u"$.inventory[?(@.price > 20)].title").value()};
+    for (auto _ : state)
+        benchmark::DoNotOptimize(path.evaluateAll(doc));
+}
+BENCHMARK(BM_JSONPath_Eval_Filter);
+
+static void BM_JSONPath_Eval_Recursive(benchmark::State& state)
+{
+    const auto doc{prepareTestDocument()};
+    const auto path{JSONPath::create(u"$..title").value()};
+    for (auto _ : state)
+        benchmark::DoNotOptimize(path.evaluateAll(doc));
+}
+BENCHMARK(BM_JSONPath_Eval_Recursive);
+
+// ----------------------------
 // Creation benchmarks
+// ----------------------------
 static void BM_JSONPointer_Creation(benchmark::State& state)
 {
     for (auto _ : state)

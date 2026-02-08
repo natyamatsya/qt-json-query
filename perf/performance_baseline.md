@@ -13,46 +13,75 @@
 
 | Benchmark | Time | Iterations | vs Previous |
 |---|---|---|---|
-| Simple | 210 ns | 3,323,521 | **-9.1%** faster |
-| Nested | 354 ns | 1,973,143 | **-3.0%** faster |
-| Array | 479 ns | 1,414,948 | ~stable |
-| Complex | 631 ns | 1,111,676 | ~stable |
-| Creation | 350 ns | 2,003,136 | +1.7% slower |
+| Simple | 223 ns | 3,135,260 | +6.2% slower |
+| Nested | 359 ns | 1,952,117 | +1.4% slower |
+| Array | 497 ns | 1,410,474 | +3.8% slower |
+| Complex | 634 ns | 1,105,199 | ~stable |
+| Creation | 346 ns | 2,034,712 | **-1.1%** faster |
+
+### JSONPointer (eval only, pre-compiled)
+
+| Benchmark | Time | Iterations | vs Previous |
+|---|---|---|---|
+| Simple | 102 ns | 6,837,740 |  |
+| Nested | 165 ns | 4,247,856 |  |
+| Array | 216 ns | 3,253,998 |  |
+| Complex | 279 ns | 2,498,545 |  |
 
 ### Plain Qt JSON (manual traversal, reference baseline)
 
 | Benchmark | Time | Iterations | vs Previous |
 |---|---|---|---|
-| Simple | 125 ns | 5,589,358 | +1.6% slower |
-| Nested | 216 ns | 3,252,199 | ~stable |
-| Array | 257 ns | 2,718,616 | ~stable |
-| Filter | 10.7 µs | 64,035 | **-3.3%** faster |
-| Recursive | 16.4 µs | 43,575 | **-2.5%** faster |
+| Simple | 134 ns | 5,230,360 | +7.2% slower |
+| Nested | 225 ns | 3,114,184 | +4.2% slower |
+| Array | 287 ns | 2,540,042 | +11.7% slower |
+| Filter | 11.1 µs | 62,669 | +3.8% slower |
+| Recursive | 16.6 µs | 42,464 | +1.4% slower |
 
 ### JSONPath
 
 | Benchmark | Time | Iterations | vs Previous |
 |---|---|---|---|
-| Simple | 784 ns | 901,957 | **-58.8%** faster |
-| Nested | 971 ns | 723,574 | **-62.7%** faster |
-| Array | 3.1 µs | 229,416 | **-21.6%** faster |
-| Filter | 14.4 µs | 48,757 | **-4.1%** faster |
-| Recursive | 3.6 µs | 187,830 | **-95.5%** faster |
-| Creation | 1.4 µs | 505,349 | **-4.5%** faster |
+| Simple | 780 ns | 902,457 | ~stable |
+| Nested | 978 ns | 700,729 | ~stable |
+| Array | 3.1 µs | 228,960 | ~stable |
+| Filter | 14.5 µs | 48,403 | ~stable |
+| Recursive | 3.6 µs | 192,480 | ~stable |
+| Creation | 1.4 µs | 505,601 | ~stable |
 
-## JSONPath vs Plain Qt Overhead
+### JSONPath (eval only, pre-compiled)
+
+| Benchmark | Time | Iterations | vs Previous |
+|---|---|---|---|
+| Simple | 452 ns | 1,546,616 |  |
+| Nested | 501 ns | 1,392,869 |  |
+| Array | 2.2 µs | 320,140 |  |
+| Filter | 11.3 µs | 62,684 |  |
+| Recursive | 3.2 µs | 219,765 |  |
+
+## JSONPath vs Plain Qt Overhead (create + eval)
 
 | Operation | Plain Qt | JSONPath | Overhead |
 |---|---|---|---|
-| Simple | 125 ns | 784 ns | 6.3x |
-| Nested | 216 ns | 971 ns | 4.5x |
-| Array | 257 ns | 3.1 µs | 12.0x |
-| Filter | 10.7 µs | 14.4 µs | 1.3x |
-| Recursive | 16.4 µs | 3.6 µs | 0.2x |
+| Simple | 134 ns | 780 ns | 5.8x |
+| Nested | 225 ns | 978 ns | 4.3x |
+| Array | 287 ns | 3.1 µs | 10.8x |
+| Filter | 11.1 µs | 14.5 µs | 1.3x |
+| Recursive | 16.6 µs | 3.6 µs | 0.2x |
+
+## JSONPath vs Plain Qt Overhead (eval only)
+
+| Operation | Plain Qt | JSONPath Eval | Overhead |
+|---|---|---|---|
+| Simple | 134 ns | 452 ns | 3.4x |
+| Nested | 225 ns | 501 ns | 2.2x |
+| Array | 287 ns | 2.2 µs | 7.6x |
+| Filter | 11.1 µs | 11.3 µs | 1.0x |
+| Recursive | 16.6 µs | 3.2 µs | 0.2x |
 
 ## Previous Baseline
 
-Compared against: `benchmark_2026-02-08_170726.json` (2026-02-08)
+Compared against: `benchmark_2026-02-08_205956.json` (2026-02-08)
 
 ## Raw Data
 
