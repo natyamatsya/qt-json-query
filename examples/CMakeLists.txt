@@ -42,6 +42,12 @@ if(TARGET function_ref_interface)
   target_link_libraries(simple_schema PRIVATE function_ref_interface)
 endif()
 
+add_executable(flagship_pipeline flagship_pipeline.cpp)
+target_link_libraries(flagship_pipeline PRIVATE json_query Qt6::Core)
+if(TARGET function_ref_interface)
+  target_link_libraries(flagship_pipeline PRIVATE function_ref_interface)
+endif()
+
 install(
   TARGETS simple_pointer
           monadic_error_handling_demo
@@ -50,4 +56,5 @@ install(
           refactor_potential
           as_function_demo
           simple_schema
+          flagship_pipeline
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}/examples)
