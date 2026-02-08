@@ -59,17 +59,17 @@ std::expected<QJsonArray, DetailedEvalError> evaluateAll(const PathEvalCtx& ctx,
  * @brief Dispatch a single token to a single value via switch over Token::Kind.
  */
 QT_QUERY_JSON_ALWAYS_INLINE
-std::expected<QJsonArray, EvalError> evaluateToken(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
+std::expected<QJsonArray, EvalError> evaluateToken(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v, qsizetype tokenPos)
 {
     switch (tk.kind)
     {
-    case Token::Kind::Key:       return eval<Token::Kind::Key>(ctx, tk, v);
-    case Token::Kind::Index:     return eval<Token::Kind::Index>(ctx, tk, v);
-    case Token::Kind::Slice:     return eval<Token::Kind::Slice>(ctx, tk, v);
-    case Token::Kind::Wildcard:  return eval<Token::Kind::Wildcard>(ctx, tk, v);
-    case Token::Kind::Recursive: return eval<Token::Kind::Recursive>(ctx, tk, v);
-    case Token::Kind::Filter:    return eval<Token::Kind::Filter>(ctx, tk, v);
-    case Token::Kind::KeyList:   return eval<Token::Kind::KeyList>(ctx, tk, v);
+    case Token::Kind::Key:       return eval<Token::Kind::Key>(ctx, tk, v, tokenPos);
+    case Token::Kind::Index:     return eval<Token::Kind::Index>(ctx, tk, v, tokenPos);
+    case Token::Kind::Slice:     return eval<Token::Kind::Slice>(ctx, tk, v, tokenPos);
+    case Token::Kind::Wildcard:  return eval<Token::Kind::Wildcard>(ctx, tk, v, tokenPos);
+    case Token::Kind::Recursive: return eval<Token::Kind::Recursive>(ctx, tk, v, tokenPos);
+    case Token::Kind::Filter:    return eval<Token::Kind::Filter>(ctx, tk, v, tokenPos);
+    case Token::Kind::KeyList:   return eval<Token::Kind::KeyList>(ctx, tk, v, tokenPos);
     }
     return std::unexpected(EvalError::TypeMismatchObject);
 }
@@ -88,7 +88,7 @@ std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token&
 
     for (const auto& v : src)
     {
-        auto tokenResult{evaluateToken(ctx, tk, v)};
+        auto tokenResult{evaluateToken(ctx, tk, v, tokenPos)};
         if (tokenResult)
             for (const auto& item : *tokenResult)
                 result.append(item);

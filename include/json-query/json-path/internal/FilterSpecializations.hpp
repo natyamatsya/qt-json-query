@@ -11,7 +11,6 @@
 #include <QtCore/QJsonValue>
 #include <QtCore/QJsonObject>
 #include <QtCore/QJsonArray>
-#include <QtCore/QRegularExpression>
 #include <utility>
 
 namespace json_query::json_path::internal
@@ -22,12 +21,8 @@ namespace json_query::json_path::internal
  */
 enum class FilterPattern
 {
-    SimpleExistence,   // [?(@.key)]
-    SimpleComparison,  // [?(@.key == "value")]
-    NumericComparison, // [?(@.age > 18)]
-    LengthComparison,  // [?(@.array.length() > 0)]
-    ContextReference,  // [?(@.key == $.other)]
-    Generic            // Complex patterns requiring generic evaluation
+    SimpleExistence, // [?(@.key)]
+    Generic          // Complex patterns requiring generic evaluation
 };
 
 /**
@@ -117,7 +112,6 @@ class FilterPatternEvaluator<FilterPattern::SimpleExistence>
     static std::expected<QJsonArray, EvalError>
     eval(const detail::PathEvalCtx& /*ctx*/, const Token& tk, const QJsonValue& v) noexcept
     {
-
         auto        pooledArray{acquirePooledArray()};
         QJsonArray& out = *pooledArray;
 
@@ -142,9 +136,9 @@ class FilterPatternEvaluator<FilterPattern::SimpleExistence>
         else if (v.isObject())
         {
             const auto obj{v.toObject()};
-            for (auto it = obj.begin(); it != obj.end(); ++it)
+            for (auto it{obj.begin()}; it != obj.end(); ++it)
             {
-                const QJsonValue& val = it.value();
+                const auto& val{it.value()};
                 if (val.isObject())
                 {
                     const auto valObj{val.toObject()};
@@ -159,311 +153,20 @@ class FilterPatternEvaluator<FilterPattern::SimpleExistence>
 };
 
 /**
- * @brief Simple comparison filter optimization: [?(@.key == "value")]
- */
-template <>
-class FilterPatternEvaluator<FilterPattern::SimpleComparison>
-{
-  public:
-    QT_QUERY_JSON_ALWAYS_INLINE
-    static std::expected<QJsonArray, EvalError>
-    eval(const detail::PathEvalCtx& /*ctx*/, const Token& tk, const QJsonValue& v) noexcept
-    {
-
-        auto        pooledArray{acquirePooledArray()};
-        QJsonArray& out = *pooledArray;
-
-        // Parse key and value from expression like "@.key == 'value'"
-        const auto expr{tk.key};
-        const auto eqPos{expr.indexOf("==")};
-        if (eqPos == -1)
-            return std::move(out); // Invalid expression
-
-        auto key{expr.left(eqPos).trimmed()};
-        auto value{expr.mid(eqPos + 2).trimmed()};
-
-        // Remove @. prefix from key
-        if (key.startsWith("@."))
-            key = key.mid(2);
-
-        // Remove quotes from value
-        if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith('\'') && value.endsWith('\'')))
-            value = value.mid(1, value.length() - 2);
-
-        if (v.isArray())
-        {
-            const auto arr{asArray(v)};
-            for (const auto& item : arr)
-            {
-                if (item.isObject())
-                {
-                    const auto obj{item.toObject()};
-                    const auto it{obj.find(key)};
-                    if (it != obj.end() && it.value().toString() == value)
-                        out.append(item);
-                }
-            }
-        }
-        else if (v.isObject())
-        {
-            const auto obj{v.toObject()};
-            for (auto it = obj.begin(); it != obj.end(); ++it)
-            {
-                const QJsonValue& val = it.value();
-                if (val.isObject())
-                {
-                    const auto valObj{val.toObject()};
-                    const auto keyIt{valObj.find(key)};
-                    if (keyIt != valObj.end() && keyIt.value().toString() == value)
-                        out.append(val);
-                }
-            }
-        }
-
-        return std::move(out);
-    }
-};
-
-/**
- * @brief Numeric comparison filter optimization: [?(@.age > 18)]
- */
-template <>
-class FilterPatternEvaluator<FilterPattern::NumericComparison>
-{
-  public:
-    QT_QUERY_JSON_ALWAYS_INLINE
-    static std::expected<QJsonArray, EvalError>
-    eval(const detail::PathEvalCtx& /*ctx*/, const Token& tk, const QJsonValue& v) noexcept
-    {
-
-        auto        pooledArray{acquirePooledArray()};
-        QJsonArray& out = *pooledArray;
-
-        // Parse numeric comparison expression
-        const auto expr{tk.key};
-        QString    key;
-        QString    op;
-        auto       compareValue{0.0};
-
-        // Simple parsing for common operators
-        if (expr.contains(" > "))
-        {
-            const QStringList parts = expr.split(" > ");
-            if (parts.size() == 2)
-            {
-                key          = parts[0].trimmed();
-                op           = ">";
-                compareValue = parts[1].trimmed().toDouble();
-            }
-        }
-        else if (expr.contains(" < "))
-        {
-            const QStringList parts = expr.split(" < ");
-            if (parts.size() == 2)
-            {
-                key          = parts[0].trimmed();
-                op           = "<";
-                compareValue = parts[1].trimmed().toDouble();
-            }
-        }
-        else if (expr.contains(" >= "))
-        {
-            const QStringList parts = expr.split(" >= ");
-            if (parts.size() == 2)
-            {
-                key          = parts[0].trimmed();
-                op           = ">=";
-                compareValue = parts[1].trimmed().toDouble();
-            }
-        }
-        else if (expr.contains(" <= "))
-        {
-            const QStringList parts = expr.split(" <= ");
-            if (parts.size() == 2)
-            {
-                key          = parts[0].trimmed();
-                op           = "<=";
-                compareValue = parts[1].trimmed().toDouble();
-            }
-        }
-
-        // Remove @. prefix from key
-        if (key.startsWith("@."))
-            key = key.mid(2);
-
-        if (key.isEmpty() || op.isEmpty())
-            return std::move(out); // Invalid expression
-
-        if (v.isArray())
-        {
-            const auto arr{asArray(v)};
-            for (const auto& item : arr)
-            {
-                if (item.isObject())
-                {
-                    const auto obj{item.toObject()};
-                    const auto it{obj.find(key)};
-                    if (it != obj.end())
-                    {
-                        const auto itemValue{it.value().toDouble()};
-                        auto       matches{false};
-
-                        if (op == ">")
-                            matches = itemValue > compareValue;
-                        else if (op == "<")
-                            matches = itemValue < compareValue;
-                        else if (op == ">=")
-                            matches = itemValue >= compareValue;
-                        else if (op == "<=")
-                            matches = itemValue <= compareValue;
-
-                        if (matches)
-                            out.append(item);
-                    }
-                }
-            }
-        }
-
-        return std::move(out);
-    }
-};
-
-/**
- * @brief Length comparison filter optimization: [?(@.array.length() > 0)]
- */
-template <>
-class FilterPatternEvaluator<FilterPattern::LengthComparison>
-{
-  public:
-    QT_QUERY_JSON_ALWAYS_INLINE
-    static std::expected<QJsonArray, EvalError>
-    eval(const detail::PathEvalCtx& /*ctx*/, const Token& tk, const QJsonValue& v) noexcept
-    {
-
-        auto        pooledArray{acquirePooledArray()};
-        QJsonArray& out = *pooledArray;
-
-        // Parse length comparison expression
-        const auto expr{tk.key};
-        const auto lengthPos{expr.indexOf(".length()")};
-        if (lengthPos == -1)
-            return std::move(out); // Invalid expression
-
-        auto    key{expr.left(lengthPos).trimmed()};
-        QString remainder{expr.mid(lengthPos + 9).trimmed()}; // Skip ".length()"
-
-        // Remove @. prefix from key
-        if (key.startsWith("@."))
-            key = key.mid(2);
-
-        // Parse comparison operator and value
-        QString op;
-        auto    compareValue{0};
-
-        if (remainder.startsWith(" > "))
-        {
-            op           = ">";
-            compareValue = remainder.mid(3).trimmed().toInt();
-        }
-        else if (remainder.startsWith(" < "))
-        {
-            op           = "<";
-            compareValue = remainder.mid(3).trimmed().toInt();
-        }
-        else if (remainder.startsWith(" >= "))
-        {
-            op           = ">=";
-            compareValue = remainder.mid(4).trimmed().toInt();
-        }
-        else if (remainder.startsWith(" <= "))
-        {
-            op           = "<=";
-            compareValue = remainder.mid(4).trimmed().toInt();
-        }
-        else if (remainder.startsWith(" == "))
-        {
-            op           = "==";
-            compareValue = remainder.mid(4).trimmed().toInt();
-        }
-
-        if (op.isEmpty())
-            return std::move(out); // Invalid expression
-
-        if (v.isArray())
-        {
-            const auto arr{asArray(v)};
-            for (const auto& item : arr)
-            {
-                if (item.isObject())
-                {
-                    const auto obj{item.toObject()};
-                    const auto it{obj.find(key)};
-                    if (it != obj.end() && it.value().isArray())
-                    {
-                        const auto arrayLength{it.value().toArray().size()};
-                        auto       matches{false};
-
-                        if (op == ">")
-                            matches = arrayLength > compareValue;
-                        else if (op == "<")
-                            matches = arrayLength < compareValue;
-                        else if (op == ">=")
-                            matches = arrayLength >= compareValue;
-                        else if (op == "<=")
-                            matches = arrayLength <= compareValue;
-                        else if (op == "==")
-                            matches = arrayLength == compareValue;
-
-                        if (matches)
-                            out.append(item);
-                    }
-                }
-            }
-        }
-
-        return std::move(out);
-    }
-};
-
-/**
  * @brief Pattern-aware filter evaluator dispatcher
  */
 class PatternAwareFilterEvaluator
 {
   public:
-    /**
-     * @brief Evaluate a filter using pattern-specific optimizations
-     *
-     * @param ctx Path evaluation context
-     * @param tk Filter token
-     * @param v JSON value to filter
-     * @return Expected result or error
-     */
     QT_QUERY_JSON_ALWAYS_INLINE
     static std::expected<QJsonArray, EvalError>
     evaluate(const detail::PathEvalCtx& ctx, const Token& tk, const QJsonValue& v) noexcept
     {
-
-        // Detect the filter pattern type
-        const FilterPattern pattern = FilterPatternDetector::detectPattern(tk.key);
-
-        // Dispatch to specialized evaluator
-        switch (pattern)
-        {
-        case FilterPattern::SimpleExistence:
+        if (FilterPatternDetector::detectPattern(tk.key) == FilterPattern::SimpleExistence)
             return FilterPatternEvaluator<FilterPattern::SimpleExistence>::eval(ctx, tk, v);
-        case FilterPattern::SimpleComparison:
-            return FilterPatternEvaluator<FilterPattern::SimpleComparison>::eval(ctx, tk, v);
-        case FilterPattern::NumericComparison:
-            return FilterPatternEvaluator<FilterPattern::NumericComparison>::eval(ctx, tk, v);
-        case FilterPattern::LengthComparison:
-            return FilterPatternEvaluator<FilterPattern::LengthComparison>::eval(ctx, tk, v);
-        case FilterPattern::ContextReference:
-        case FilterPattern::Generic:
-        default:
-            // Fall back to generic embedded filter evaluation
-            return std::unexpected(EvalError::TypeMismatchObject);
-        }
+
+        // Fall back to generic embedded filter evaluation
+        return std::unexpected(EvalError::TypeMismatchObject);
     }
 };
 

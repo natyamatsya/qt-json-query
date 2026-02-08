@@ -19,7 +19,7 @@ using internal::emptyResult;
 // --- Key -------------------------------------------------------------------
 template <>
 std::expected<QJsonArray, EvalError>
-eval<Token::Kind::Key>(const PathEvalCtx& /*ctx*/, const Token& tk, const QJsonValue& v)
+eval<Token::Kind::Key>(const PathEvalCtx& /*ctx*/, const Token& tk, const QJsonValue& v, qsizetype /*tokenPos*/)
 {
     if (!v.isObject())
         return emptyResult();
@@ -38,7 +38,7 @@ eval<Token::Kind::Key>(const PathEvalCtx& /*ctx*/, const Token& tk, const QJsonV
 // --- Index -----------------------------------------------------------------
 template <>
 std::expected<QJsonArray, EvalError>
-eval<Token::Kind::Index>(const PathEvalCtx& /*ctx*/, const Token& tk, const QJsonValue& v)
+eval<Token::Kind::Index>(const PathEvalCtx& /*ctx*/, const Token& tk, const QJsonValue& v, qsizetype /*tokenPos*/)
 {
     if (!v.isArray())
         return emptyResult();
@@ -57,7 +57,7 @@ eval<Token::Kind::Index>(const PathEvalCtx& /*ctx*/, const Token& tk, const QJso
 // --- Slice -----------------------------------------------------------------
 template <>
 std::expected<QJsonArray, EvalError>
-eval<Token::Kind::Slice>(const PathEvalCtx& /*ctx*/, const Token& tk, const QJsonValue& v)
+eval<Token::Kind::Slice>(const PathEvalCtx& /*ctx*/, const Token& tk, const QJsonValue& v, qsizetype /*tokenPos*/)
 {
     if (!v.isArray())
         return emptyResult();
@@ -67,7 +67,7 @@ eval<Token::Kind::Slice>(const PathEvalCtx& /*ctx*/, const Token& tk, const QJso
 // --- Wildcard --------------------------------------------------------------
 template <>
 std::expected<QJsonArray, EvalError>
-eval<Token::Kind::Wildcard>(const PathEvalCtx& /*ctx*/, const Token&, const QJsonValue& v)
+eval<Token::Kind::Wildcard>(const PathEvalCtx& /*ctx*/, const Token&, const QJsonValue& v, qsizetype /*tokenPos*/)
 {
     // Fast path: direct type checking and processing without monadic overhead
     if (v.isObject())
@@ -83,45 +83,26 @@ eval<Token::Kind::Wildcard>(const PathEvalCtx& /*ctx*/, const Token&, const QJso
 // --- Recursive -------------------------------------------------------------
 template <>
 std::expected<QJsonArray, EvalError>
-eval<Token::Kind::Recursive>(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
+eval<Token::Kind::Recursive>(const PathEvalCtx& ctx, const Token& /*tk*/, const QJsonValue& v, qsizetype tokenPos)
 {
-    // Phase 2 optimization: Build path hint for pattern detection
-    auto pathHint = QStringLiteral("$..");
-
-    // Look ahead in token stream to detect common patterns like "$..title"
-    auto currentPos{-1};
-    for (qsizetype i = 0; i < ctx.tokens.size(); ++i)
+    // Look ahead: if next token is a simple key, build a path hint for "$..key" optimization
+    if (tokenPos + 1 < static_cast<qsizetype>(ctx.tokens.size()))
     {
-        if (&ctx.tokens[i] == &tk)
-        {
-            currentPos = i;
-            break;
-        }
-    }
-
-    // If we found the current token and there's a next token
-    if (currentPos >= 0 && currentPos + 1 < ctx.tokens.size())
-    {
-        const auto& nextToken = ctx.tokens[currentPos + 1];
-
-        // Check if next token is a simple key (common pattern)
+        const auto& nextToken{ctx.tokens[tokenPos + 1]};
         if (nextToken.kind == Token::Kind::Key)
         {
-            pathHint += nextToken.key;
-
-            // Use optimized path with hint
+            auto pathHint{QStringLiteral("$..") + nextToken.key};
             return evaluateRecursive(v, QStringView(pathHint));
         }
     }
 
-    // Fallback to standard implementation for complex patterns
     return evaluateRecursive(v, 0);
 }
 
 // --- Filter ----------------------------------------------------------------
 template <>
 std::expected<QJsonArray, EvalError>
-eval<Token::Kind::Filter>(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
+eval<Token::Kind::Filter>(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v, qsizetype /*tokenPos*/)
 {
     // First try pattern-aware filter optimization
     if (auto result{internal::PatternAwareFilterEvaluator::evaluate(ctx, tk, v)})
@@ -160,7 +141,7 @@ eval<Token::Kind::Filter>(const PathEvalCtx& ctx, const Token& tk, const QJsonVa
 // --- KeyList ---------------------------------------------------------------
 template <>
 std::expected<QJsonArray, EvalError>
-eval<Token::Kind::KeyList>(const PathEvalCtx& /*ctx*/, const Token& tk, const QJsonValue& v)
+eval<Token::Kind::KeyList>(const PathEvalCtx& /*ctx*/, const Token& tk, const QJsonValue& v, qsizetype /*tokenPos*/)
 {
     if (!v.isObject())
         return emptyResult();

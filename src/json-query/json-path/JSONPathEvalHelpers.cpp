@@ -324,7 +324,7 @@ processSingleUnionToken(const PathEvalCtx& ctx, qsizetype tokenIdx, const QJsonA
 
     for (const auto& workingValue : working)
     {
-        auto tokenResult{evaluateToken(ctx, ctx.tokens[tokenIdx], workingValue)};
+        auto tokenResult{evaluateToken(ctx, ctx.tokens[tokenIdx], workingValue, tokenIdx)};
         if (!tokenResult)
         {
             lastError = tokenResult.error();
