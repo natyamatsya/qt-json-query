@@ -5,8 +5,6 @@
 #include "json-query/json-path/JSONPathEvaluate.hpp"
 #include "json-query/utils/JSONQueryError.hpp"
 
-#include "json-query/json-path/JSONPathLog.hpp"
-
 #include <vector>
 #include <deque>
 
@@ -23,28 +21,12 @@ namespace json_query::json_path
 
 JSONPath::EvalResult JSONPath::evaluate(const QJsonDocument& doc) const
 {
-    qCDebug(jsonPathLog) << "DEBUG: JSONPath::evaluate(QJsonDocument) called with" << m_tokens.size() << "tokens";
-    for (size_t i = 0; i < m_tokens.size(); ++i)
-    {
-        qCDebug(jsonPathLog) << "DEBUG: Token[" << i << "] kind=" << static_cast<int>(m_tokens[i].kind)
-                             << "key=" << m_tokens[i].key;
-        if (m_tokens[i].kind == Token::Kind::Filter)
-            qCDebug(jsonPathLog) << "DEBUG: Token[" << i << "] is a FILTER token";
-    }
     const QJsonValue root = doc.isArray() ? QJsonValue{doc.array()} : QJsonValue{doc.object()};
     return evaluate(root);
 }
 
 JSONPath::EvalResult JSONPath::evaluate(const QJsonValue& value) const
 {
-    qCDebug(jsonPathLog) << "DEBUG: JSONPath::evaluate called with" << m_tokens.size() << "tokens";
-    for (size_t i = 0; i < m_tokens.size(); ++i)
-    {
-        qCDebug(jsonPathLog) << "DEBUG: Token[" << i << "] kind=" << static_cast<int>(m_tokens[i].kind)
-                             << "key=" << m_tokens[i].key;
-        if (m_tokens[i].kind == Token::Kind::Index)
-            qCDebug(jsonPathLog) << "DEBUG: Token[" << i << "] Index value:" << m_tokens[i].index;
-    }
     json_path::detail::PathEvalCtx ctx{m_tokens, value, m_func};
 
     // C++23 Monadic Chain - Elegant error propagation with unified QueryError

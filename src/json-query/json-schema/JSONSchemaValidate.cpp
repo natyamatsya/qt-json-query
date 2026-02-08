@@ -35,6 +35,32 @@ void validateNode(ValidateContext&  ctx,
                   const QString&    instancePath,
                   const QString&    schemaPath);
 
+/**
+ * @brief Validate a target node, optionally pushing a resource dynamic scope
+ *
+ * If the target has an entry in resourceDynamicAnchors, a DynamicScopeGuard
+ * is pushed for the duration of validation. Deduplicates the pattern shared
+ * by RefSchema and DynamicRefSchema handlers.
+ */
+void validateWithResourceScope(ValidateContext&  ctx,
+                               std::size_t       targetIndex,
+                               const QJsonValue& instance,
+                               const QString&    instancePath,
+                               const QString&    schemaPath)
+{
+    const auto& rdaMap{ctx.schema.resourceDynamicAnchors};
+    const auto  rdaIt{rdaMap.find(targetIndex)};
+    if (rdaIt != rdaMap.end())
+    {
+        DynamicScopeGuard guard{ctx.dynamicScope, rdaIt->second};
+        validateNode(ctx, ctx.schema.nodeAt(targetIndex), instance, instancePath, schemaPath);
+    }
+    else
+    {
+        validateNode(ctx, ctx.schema.nodeAt(targetIndex), instance, instancePath, schemaPath);
+    }
+}
+
 // All validators now in modular headers with callback pattern
 
 /**
@@ -156,17 +182,7 @@ void validateNode(ValidateContext&  ctx,
                         selfGuard.emplace(ctx.dynamicScope, selfRda->second);
                 }
 
-                // Push resource dynamic anchors if the target is a resource root
-                const auto rdaIt{rdaMap.find(schemaVariant.targetIndex)};
-                if (rdaIt != rdaMap.end())
-                {
-                    DynamicScopeGuard guard{ctx.dynamicScope, rdaIt->second};
-                    validateNode(ctx, ctx.schema.nodeAt(schemaVariant.targetIndex), instance, instancePath, schemaPath);
-                }
-                else
-                {
-                    validateNode(ctx, ctx.schema.nodeAt(schemaVariant.targetIndex), instance, instancePath, schemaPath);
-                }
+                validateWithResourceScope(ctx, schemaVariant.targetIndex, instance, instancePath, schemaPath);
                 return;
             }
 
@@ -189,18 +205,7 @@ void validateNode(ValidateContext&  ctx,
                     }
                 }
 
-                // Push resource dynamic anchors if the target is a resource root
-                const auto& rdaMap{ctx.schema.resourceDynamicAnchors};
-                const auto  rdaIt{rdaMap.find(targetIndex)};
-                if (rdaIt != rdaMap.end())
-                {
-                    DynamicScopeGuard guard{ctx.dynamicScope, rdaIt->second};
-                    validateNode(ctx, ctx.schema.nodeAt(targetIndex), instance, instancePath, schemaPath);
-                }
-                else
-                {
-                    validateNode(ctx, ctx.schema.nodeAt(targetIndex), instance, instancePath, schemaPath);
-                }
+                validateWithResourceScope(ctx, targetIndex, instance, instancePath, schemaPath);
                 return;
             }
         },
