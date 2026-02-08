@@ -6,6 +6,7 @@
 #include <QtCore/QRegularExpression>
 #include <QtCore/QString>
 
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -226,9 +227,8 @@ struct CompiledSchema
         return SchemaType::Boolean;
     case QJsonValue::Double:
     {
-        // Check if it's an integer
         const auto d{value.toDouble()};
-        if (d == static_cast<double>(static_cast<qint64>(d)))
+        if (std::isfinite(d) && std::trunc(d) == d)
             return SchemaType::Integer;
         return SchemaType::Number;
     }
