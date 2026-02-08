@@ -13,7 +13,25 @@ JSONPath::ParseResult JSONPath::create(QStringView rawPath)
     if (!compileResult)
         return std::unexpected(Error{ErrorDomain::PathParse, static_cast<std::uint8_t>(compileResult.error())});
 
-    return JSONPath(compileResult->function, rawPath.toString(), std::move(compileResult->compiled.tokens));
+    auto& tokens{compileResult->compiled.tokens};
+
+    // Pre-compute whether the path is definite (only Key/Index selectors, no unions).
+    // A single-token bracket group (e.g. [5]) is still definite; only multi-token
+    // bracket groups (unions like [0,2]) disqualify.
+    const auto definite{[&tokens]
+    {
+        for (std::size_t i{1}; i < tokens.size(); ++i)
+        {
+            const auto& tk{tokens[i]};
+            if (tk.kind != Token::Kind::Key && tk.kind != Token::Kind::Index)
+                return false;
+            if (tk.bracketGroupId > 0 && i + 1 < tokens.size() && tokens[i + 1].bracketGroupId == tk.bracketGroupId)
+                return false;
+        }
+        return true;
+    }()};
+
+    return JSONPath(compileResult->function, rawPath.toString(), std::move(tokens), definite);
 }
 
 } // namespace json_query::json_path

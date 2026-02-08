@@ -86,8 +86,10 @@ static bool isDefinitePath(const std::vector<Token>& tokens)
         const auto& tk{tokens[i]};
         if (tk.kind != Token::Kind::Key && tk.kind != Token::Kind::Index)
             return false;
-        // Bracket groups indicate union selectors (e.g., $[0,2]) — not definite
-        if (tk.bracketGroupId > 0)
+        // Multi-token bracket groups are unions (e.g., $[0,2]) — not definite.
+        // Single-token bracket groups (e.g., $[5]) are still definite.
+        if (tk.bracketGroupId > 0 && i + 1 < static_cast<qsizetype>(tokens.size()) &&
+            tokens[i + 1].bracketGroupId == tk.bracketGroupId)
             return false;
     }
     return true;

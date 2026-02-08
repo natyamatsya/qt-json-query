@@ -72,8 +72,9 @@ class JSONPath
     // -----------------------------------------------------------------
     JSONPath(json_query::json_path::FunctionType       func,
              QString                                   original,
-             std::vector<json_query::json_path::Token> tokens) noexcept
-        : m_func(func), m_originalPath(std::move(original)), m_tokens(std::move(tokens))
+             std::vector<json_query::json_path::Token> tokens,
+             bool                                      definite) noexcept
+        : m_func(func), m_originalPath(std::move(original)), m_tokens(std::move(tokens)), m_definite(definite)
     {
     }
 
@@ -83,6 +84,7 @@ class JSONPath
     json_query::json_path::FunctionType       m_func{json_query::json_path::FunctionType::None};
     QString                                   m_originalPath;
     std::vector<json_query::json_path::Token> m_tokens;
+    bool                                      m_definite{false};
 }; // end class JSONPath
 
 } // namespace json_query::json_path
