@@ -74,6 +74,47 @@ if(NOT TARGET function_ref_interface)
                              INTERFACE ${function_ref_SOURCE_DIR}/include)
 endif()
 
+# ---------------------------------------------------------------------------
+# Optional: SRELL (ECMAScript-compatible regex, header-only, BSD license)
+# Enables ECMA-262 regex format validation with Unicode property escapes
+# ---------------------------------------------------------------------------
+option(JSON_QUERY_FORMAT_ECMA_REGEX
+       "Enable ECMA-262 regex format validation (fetches SRELL)" OFF)
+
+if(JSON_QUERY_FORMAT_ECMA_REGEX)
+  FetchContent_Declare(
+    srell
+    URL https://www.akenotsuki.com/misc/srell/releases/srell4_140.zip
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+  FetchContent_MakeAvailable(srell)
+
+  if(NOT TARGET srell_interface)
+    add_library(srell_interface INTERFACE)
+    target_include_directories(srell_interface INTERFACE ${srell_SOURCE_DIR})
+  endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# Optional: ada-url/idna (IDNA 2008 / UTS #46, Apache-2.0/MIT license)
+# Enables IDN hostname and IDN email format validation
+# ---------------------------------------------------------------------------
+option(JSON_QUERY_FORMAT_IDN
+       "Enable IDN hostname format validation (fetches ada-url/idna)" OFF)
+
+if(JSON_QUERY_FORMAT_IDN)
+  FetchContent_Declare(
+    ada_idna
+    GIT_REPOSITORY https://github.com/ada-url/idna.git
+    GIT_TAG 0.4.0)
+
+  # Disable ada-idna tests/benchmarks to avoid GoogleTest target conflicts
+  set(ADA_IDNA_BENCHMARKS OFF CACHE BOOL "" FORCE)
+  set(BUILD_TESTING_SAVED ${BUILD_TESTING})
+  set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+  FetchContent_MakeAvailable(ada_idna)
+  set(BUILD_TESTING ${BUILD_TESTING_SAVED} CACHE BOOL "" FORCE)
+endif()
+
 add_subdirectory(src/json-query)
 
 # ---------------------------------------------------------------------------

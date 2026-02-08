@@ -9,6 +9,14 @@
 #include <QtNetwork/QHostAddress>
 #include "json-query/utils/JSONQueryUtils.hpp"
 
+#ifdef JSON_QUERY_HAS_SRELL
+#include <srell.hpp>
+#endif
+
+#ifdef JSON_QUERY_HAS_IDNA
+#include <ada/idna/to_ascii.h>
+#endif
+
 namespace json_query::json_schema::internal
 {
 
@@ -279,6 +287,53 @@ FormatValidationResult isHostname(QStringView value) noexcept
     }
     return {};
 }
+
+#ifdef JSON_QUERY_HAS_IDNA
+FormatValidationResult isIdnHostname(QStringView value) noexcept
+{
+    if (value.isEmpty() || value.size() > 253)
+        return formatInvalid;
+
+    // Fast path: if it's pure ASCII, use the strict RFC 1123 validator
+    const auto str{value.toString()};
+    auto allAscii{true};
+    for (const auto ch : str)
+        if (ch.unicode() > 127)
+        {
+            allAscii = false;
+            break;
+        }
+    if (allAscii)
+        return isHostname(value);
+
+    // Non-ASCII: use IDNA to_ascii for Unicode hostname normalization
+    const auto utf8{str.toUtf8()};
+    const auto ascii{ada::idna::to_ascii(std::string_view{utf8.constData(), static_cast<std::size_t>(utf8.size())})};
+    if (ascii.empty())
+        return semanticInvalid;
+
+    // Validate the IDNA output labels (RFC 1123 + RFC 5891)
+    const auto result{QString::fromStdString(ascii)};
+    const auto labels = result.split(u'.');
+    for (const auto& label : labels)
+    {
+        if (label.isEmpty() || label.size() > 63)
+            return semanticInvalid;
+    }
+    return {};
+}
+
+FormatValidationResult isIdnEmail(QStringView value) noexcept
+{
+    // Split at last '@', validate domain with IDNA
+    const auto str{value.toString()};
+    const auto atPos{str.lastIndexOf(u'@')};
+    if (atPos <= 0 || atPos == str.size() - 1)
+        return formatInvalid;
+    const auto domain{QStringView{str}.mid(atPos + 1)};
+    return isIdnHostname(domain);
+}
+#endif
 
 FormatValidationResult isIpv4(QStringView value) noexcept
 {
@@ -562,11 +617,25 @@ FormatValidationResult isDuration(QStringView value) noexcept
 
 FormatValidationResult isRegex(QStringView value) noexcept
 {
-    // Qt validates regex syntax
+#ifdef JSON_QUERY_HAS_SRELL
+    // SRELL: ECMAScript-compatible regex with Unicode property escapes
+    try
+    {
+        const auto str{value.toString().toStdU16String()};
+        srell::u16regex re{str, srell::regex_constants::ECMAScript};
+    }
+    catch (...)
+    {
+        return formatInvalid;
+    }
+    return {};
+#else
+    // Fallback: Qt validates regex syntax (PCRE, not ECMAScript)
     const QRegularExpression regex{value.toString()};
     if (!regex.isValid())
         return formatInvalid;
     return {};
+#endif
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -587,9 +656,17 @@ static constexpr std::array kFormatTable{
     FormatEntry{u"date", isDate},
     FormatEntry{u"time", isTime},
     FormatEntry{u"email", isEmail},
+#ifdef JSON_QUERY_HAS_IDNA
+    FormatEntry{u"idn-email", isIdnEmail},
+#else
     FormatEntry{u"idn-email", isEmail},
+#endif
     FormatEntry{u"hostname", isHostname},
+#ifdef JSON_QUERY_HAS_IDNA
+    FormatEntry{u"idn-hostname", isIdnHostname},
+#else
     FormatEntry{u"idn-hostname", isHostname},
+#endif
     FormatEntry{u"ipv4", isIpv4},
     FormatEntry{u"ipv6", isIpv6},
     FormatEntry{u"uri", isUri},

@@ -79,6 +79,18 @@ if(TARGET function_ref_interface)
   target_link_libraries(json_query PRIVATE function_ref_interface)
 endif()
 
+# Optional: SRELL for ECMA-262 regex format validation
+if(TARGET srell_interface)
+  target_link_libraries(json_query PRIVATE srell_interface)
+  target_compile_definitions(json_query PRIVATE JSON_QUERY_HAS_SRELL)
+endif()
+
+# Optional: ada-url/idna for IDN hostname format validation
+if(TARGET ada-idna)
+  target_link_libraries(json_query PRIVATE ada-idna)
+  target_compile_definitions(json_query PRIVATE JSON_QUERY_HAS_IDNA)
+endif()
+
 # ---------------------------------------------------------------------------
 # Installation (optional; relies on top-level JSON_QUERY_ENABLE_INSTALL option)
 # ---------------------------------------------------------------------------
