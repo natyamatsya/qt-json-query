@@ -5,7 +5,6 @@
 #include "json-query/json-path/internal/ContainerCursor.hpp"
 #include "json-query/json-path/internal/ArrayPool.hpp"
 #include "json-query/json-path/internal/IterativeRecursiveDescent.hpp"
-#include <QDebug>
 #include <QStringView>
 #include <stdcompat/function_ref.hpp>
 

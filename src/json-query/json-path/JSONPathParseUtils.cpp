@@ -6,7 +6,6 @@
 #include "json-query/json-path/internal/QtHash.hpp"
 #include "json-query/utils/JSONQueryUtils.hpp"
 
-#include <QDebug>
 #include <limits>
 #include <ctre.hpp>
 

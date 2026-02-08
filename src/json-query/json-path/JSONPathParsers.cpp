@@ -6,8 +6,6 @@
 #include "json-query/json-path/JSONPathBracketRules.hpp"
 #include "json-query/json-path/JSONPathLog.hpp"
 
-#include <QDebug>
-
 namespace json_query::json_path::detail
 {
 

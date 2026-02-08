@@ -8,7 +8,6 @@
 #include "json-query/json-path/JSONPathHelpers.hpp"
 #include "json-query/json-path/internal/QtHash.hpp"
 
-#include <QDebug>
 #include <QJsonValue>
 
 namespace json_query::json_path::detail

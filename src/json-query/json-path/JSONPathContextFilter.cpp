@@ -7,8 +7,6 @@
 #include "json-query/json-path/internal/ContextAwareContainerCursor.hpp"
 #include "json-query/json-path/internal/ContainerCursor.hpp"
 #include "json-query/utils/JSONQueryUtils.hpp"
-#include <QDebug>
-#include <iostream>
 #include <ctre.hpp>
 #include <expected>
 

@@ -6,8 +6,6 @@
 #include "json-query/json-path/JSONPathParsers.hpp"
 #include "json-query/json-path/JSONPathFilterParsers.hpp"
 
-#include <iostream>
-#include <QDebug>
 #include "json-query/json-path/JSONPathLog.hpp"
 #include "json-query/json-path/JSONPathHelpers.hpp"
 
