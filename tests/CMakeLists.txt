@@ -28,9 +28,6 @@ option(JSON_QUERY_ENABLE_RFC9535_TESTS
 option(JSON_QUERY_ENABLE_RFC6901_TESTS
        "Build RFC 6901 JSON Pointer compliance tests" ON)
 
-option(JSON_QUERY_ENABLE_EXTENSION_TESTS
-       "Build extension tests (Baeldung, etc.) - DISABLED by default" OFF)
-
 option(ENABLE_FUZZ_TESTS "Enable LibFuzzer-based fuzz testing" OFF)
 
 option(JSON_QUERY_ENABLE_SCHEMA_TESTS "Build JSON Schema validation tests" ON)
@@ -64,12 +61,6 @@ endif()
 if(JSON_QUERY_ENABLE_RFC6901_TESTS)
   include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/RFC6901Tests.cmake)
   add_rfc6901_tests()
-endif()
-
-# Extension tests (optional)
-if(JSON_QUERY_ENABLE_EXTENSION_TESTS)
-  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/ExtensionTests.cmake)
-  add_extension_tests()
 endif()
 
 # Fuzz tests (optional)
@@ -118,10 +109,6 @@ if(JSON_QUERY_CREATE_AGGREGATE_TARGET)
     list(APPEND ALL_TEST_TARGETS rfc6901_compliance_tests)
   endif()
 
-  if(JSON_QUERY_ENABLE_EXTENSION_TESTS AND TARGET json_query_extension_tests)
-    list(APPEND ALL_TEST_TARGETS json_query_extension_tests)
-  endif()
-
   if(ENABLE_FUZZ_TESTS AND TARGET json_query_fuzz_tests)
     list(APPEND ALL_TEST_TARGETS json_query_fuzz_tests)
   endif()
@@ -151,10 +138,6 @@ message(STATUS "Core Tests:      ${JSON_QUERY_ENABLE_CORE_TESTS}")
 message(STATUS "Internal Tests:  ${JSON_QUERY_ENABLE_INTERNAL_TESTS}")
 message(STATUS "RFC 9535 Tests:  ${JSON_QUERY_ENABLE_RFC9535_TESTS}")
 message(STATUS "RFC 6901 Tests:  ${JSON_QUERY_ENABLE_RFC6901_TESTS}")
-message(
-  STATUS
-    "Extension Tests: ${JSON_QUERY_ENABLE_EXTENSION_TESTS} (DISABLED by default)"
-)
 message(STATUS "Fuzz Tests:      ${ENABLE_FUZZ_TESTS}")
 message(STATUS "Schema Tests:    ${JSON_QUERY_ENABLE_SCHEMA_TESTS}")
 message(
