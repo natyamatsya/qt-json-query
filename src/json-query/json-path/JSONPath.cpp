@@ -84,16 +84,30 @@ JSONPath::EvalArrayResult JSONPath::evaluate(const QJsonDocument& doc) const
     return evaluate(root);
 }
 
+// Thread-local reusable single-element QJsonArray for definite path evaluation.
+// See docs/adr/ADR-001-thread-local-jsonarray-cache.md for rationale.
+static QJsonArray& reusableSingleElementArray()
+{
+    thread_local auto arr{QJsonArray{QJsonValue{}}};
+    return arr;
+}
+
 JSONPath::EvalArrayResult JSONPath::evaluate(const QJsonValue& value) const
 {
     if (m_definite && m_func == FunctionType::None)
     {
         if (m_tokens.size() <= 1)
-            return QJsonArray{value};
+        {
+            auto& arr{reusableSingleElementArray()};
+            arr[0] = value;
+            return arr;
+        }
         auto result{evaluateDefiniteValue(m_tokens, value)};
         if (result.isUndefined())
             return QJsonArray{};
-        return QJsonArray{result};
+        auto& arr{reusableSingleElementArray()};
+        arr[0] = result;
+        return arr;
     }
 
     json_path::detail::PathEvalCtx ctx{m_tokens, value, m_func};

@@ -11,77 +11,89 @@
 
 ### JSONPointer
 
-| Benchmark | Time | Iterations | vs Previous |
-|---|---|---|---|
-| Simple | 215 ns | 3,253,045 | ~stable |
-| Nested | 362 ns | 1,933,899 | +3.7% slower |
-| Array | 490 ns | 1,427,540 | +4.0% slower |
-| Complex | 650 ns | 1,076,608 | +3.2% slower |
-| Creation | 348 ns | 2,018,018 | ~stable |
+| Benchmark | Time | Iterations |
+|---|---|---|
+| Simple | 211 ns | 3,329,845 |
+| Nested | 350 ns | 2,003,704 |
+| Array | 474 ns | 1,483,469 |
+| Complex | 626 ns | 1,123,415 |
+| Creation | 346 ns | 2,028,351 |
 
 ### JSONPointer (eval only, pre-compiled)
 
-| Benchmark | Time | Iterations | vs Previous |
-|---|---|---|---|
-| Simple | 100 ns | 7,016,348 | +1.0% slower |
-| Nested | 166 ns | 4,234,084 | +1.2% slower |
-| Array | 216 ns | 3,269,378 | ~stable |
-| Complex | 279 ns | 2,512,563 | ~stable |
+| Benchmark | Time | Iterations |
+|---|---|---|
+| Simple | 99 ns | 6,998,880 |
+| Nested | 165 ns | 4,214,938 |
+| Array | 215 ns | 3,247,220 |
+| Complex | 280 ns | 2,510,220 |
 
 ### Plain Qt JSON (manual traversal, reference baseline)
 
-| Benchmark | Time | Iterations | vs Previous |
-|---|---|---|---|
-| Simple | 133 ns | 5,278,477 | +6.4% slower |
-| Nested | 225 ns | 3,131,921 | +5.1% slower |
-| Array | 276 ns | 2,546,844 | +7.0% slower |
-| Filter | 11.4 µs | 61,886 | +4.2% slower |
-| Recursive | 17.5 µs | 40,101 | +5.1% slower |
+| Benchmark | Time | Iterations |
+|---|---|---|
+| Simple | 126 ns | 5,573,382 |
+| Nested | 217 ns | 3,227,859 |
+| Array | 259 ns | 2,702,932 |
+| Filter | 11.0 µs | 63,691 |
+| Recursive | 16.5 µs | 42,423 |
 
 ### JSONPath
 
-| Benchmark | Time | Iterations | vs Previous |
-|---|---|---|---|
-| Simple | 771 ns | 916,170 | ~stable |
-| Nested | 986 ns | 716,927 | +3.4% slower |
-| Array | 1.5 µs | 475,750 | **-52.2%** faster |
-| Filter | 14.4 µs | 48,473 | ~stable |
-| Recursive | 3.7 µs | 192,096 | ~stable |
-| Creation | 1.5 µs | 493,970 | +7.8% slower |
+| Benchmark | Time | Iterations |
+|---|---|---|
+| Simple | 681 ns | 1,026,182 |
+| Nested | 931 ns | 791,801 |
+| Array | 1.4 µs | 500,229 |
+| Filter | 14.4 µs | 49,096 |
+| Recursive | 3.7 µs | 191,528 |
+| Creation | 1.4 µs | 492,594 |
 
 ### JSONPath (eval only, pre-compiled)
 
-| Benchmark | Time | Iterations | vs Previous |
-|---|---|---|---|
-| Simple | 427 ns | 1,651,290 | ~stable |
-| Nested | 466 ns | 1,488,782 | **-2.1%** faster |
-| Array | 539 ns | 1,332,090 | **-75.2%** faster |
-| Filter | 11.3 µs | 61,648 | ~stable |
-| Recursive | 3.2 µs | 219,983 | ~stable |
+| Benchmark | Time | Iterations |
+|---|---|---|
+| Simple | 349 ns | 1,999,983 |
+| Nested | 396 ns | 1,772,753 |
+| Array | 456 ns | 1,541,762 |
+| Filter | 11.8 µs | 62,067 |
+| Recursive | 3.2 µs | 219,660 |
+
+### JSONPath evaluateSingle (eval only, pre-compiled, no QJsonArray)
+
+| Benchmark | Time | Iterations |
+|---|---|---|
+| Simple | 96 ns | 7,319,726 |
+| Nested | 161 ns | 4,332,648 |
+| Array | 212 ns | 3,302,572 |
 
 ## JSONPath vs Plain Qt Overhead (create + eval)
 
 | Operation | Plain Qt | JSONPath | Overhead |
 |---|---|---|---|
-| Simple | 133 ns | 771 ns | 5.8x |
-| Nested | 225 ns | 986 ns | 4.4x |
-| Array | 276 ns | 1.5 µs | 5.3x |
-| Filter | 11.4 µs | 14.4 µs | 1.3x |
-| Recursive | 17.5 µs | 3.7 µs | 0.2x |
+| Simple | 126 ns | 681 ns | 5.4x |
+| Nested | 217 ns | 931 ns | 4.3x |
+| Array | 259 ns | 1.4 µs | 5.3x |
+| Filter | 11.0 µs | 14.4 µs | 1.3x |
+| Recursive | 16.5 µs | 3.7 µs | 0.2x |
 
 ## JSONPath vs Plain Qt Overhead (eval only)
 
 | Operation | Plain Qt | JSONPath Eval | Overhead |
 |---|---|---|---|
-| Simple | 133 ns | 427 ns | 3.2x |
-| Nested | 225 ns | 466 ns | 2.1x |
-| Array | 276 ns | 539 ns | 2.0x |
-| Filter | 11.4 µs | 11.3 µs | 1.0x |
-| Recursive | 17.5 µs | 3.2 µs | 0.2x |
+| Simple | 126 ns | 349 ns | 2.8x |
+| Nested | 217 ns | 396 ns | 1.8x |
+| Array | 259 ns | 456 ns | 1.8x |
+| Filter | 11.0 µs | 11.8 µs | 1.1x |
+| Recursive | 16.5 µs | 3.2 µs | 0.2x |
 
-## Previous Baseline
+## JSONPath vs Plain Qt Overhead (evaluateSingle)
 
-Compared against: `benchmark_2026-02-08_211546.json` (2026-02-08)
+| Operation | Plain Qt | evaluateSingle | Overhead |
+|---|---|---|---|
+| Simple | 126 ns | 96 ns | 0.8x |
+| Nested | 217 ns | 161 ns | 0.7x |
+| Array | 259 ns | 212 ns | 0.8x |
 
 ## Raw Data
 

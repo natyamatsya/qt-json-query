@@ -272,6 +272,20 @@ write_section "JSONPath_Eval" \
     "BM_JSONPath_Eval_Filter" \
     "BM_JSONPath_Eval_Recursive"
 
+cat >> "$BASELINE_MD" << 'EVAL_SINGLE_HEADER'
+
+### JSONPath evaluateSingle (eval only, pre-compiled, no QJsonArray)
+
+EVAL_SINGLE_HEADER
+
+echo "| Benchmark | Time | Iterations |$(if [[ -n "$PREV_JSON" ]]; then echo " vs Previous |"; fi)" >> "$BASELINE_MD"
+echo "|---|---|---|$(if [[ -n "$PREV_JSON" ]]; then echo "---|"; fi)" >> "$BASELINE_MD"
+
+write_section "JSONPath_EvalSingle" \
+    "BM_JSONPath_EvalSingle_Simple" \
+    "BM_JSONPath_EvalSingle_Nested" \
+    "BM_JSONPath_EvalSingle_Array"
+
 # ── 6. Overhead summary ─────────────────────────────────────────────────
 
 cat >> "$BASELINE_MD" << 'OVERHEAD_HEADER'
@@ -320,6 +334,32 @@ EVAL_OVERHEAD_PAIRS=(
 )
 
 for pair in "${EVAL_OVERHEAD_PAIRS[@]}"; do
+    IFS=: read -r label plain_name path_name <<< "$pair"
+    local_plain=$(bench_ns "$JSON_OUT" "$plain_name")
+    local_path=$(bench_ns "$JSON_OUT" "$path_name")
+    if [[ "$local_plain" == "—" || "$local_path" == "—" ]]; then continue; fi
+    overhead=$(python3 -c "print(f'{$local_path / $local_plain:.1f}x')")
+    plain_str=$(fmt_ns "$local_plain")
+    path_str=$(fmt_ns "$local_path")
+    echo "| $label | $plain_str | $path_str | ${overhead} |" >> "$BASELINE_MD"
+done
+
+cat >> "$BASELINE_MD" << 'EVAL_SINGLE_OVERHEAD_HEADER'
+
+## JSONPath vs Plain Qt Overhead (evaluateSingle)
+
+EVAL_SINGLE_OVERHEAD_HEADER
+
+echo "| Operation | Plain Qt | evaluateSingle | Overhead |" >> "$BASELINE_MD"
+echo "|---|---|---|---|" >> "$BASELINE_MD"
+
+EVAL_SINGLE_OVERHEAD_PAIRS=(
+    "Simple:BM_Plain_Simple:BM_JSONPath_EvalSingle_Simple"
+    "Nested:BM_Plain_Nested:BM_JSONPath_EvalSingle_Nested"
+    "Array:BM_Plain_Array:BM_JSONPath_EvalSingle_Array"
+)
+
+for pair in "${EVAL_SINGLE_OVERHEAD_PAIRS[@]}"; do
     IFS=: read -r label plain_name path_name <<< "$pair"
     local_plain=$(bench_ns "$JSON_OUT" "$plain_name")
     local_path=$(bench_ns "$JSON_OUT" "$path_name")
