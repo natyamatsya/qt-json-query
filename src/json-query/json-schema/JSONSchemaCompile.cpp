@@ -6,6 +6,7 @@
 #include "json-query/json-schema/internal/CompileContext.hpp"
 #include "json-query/json-schema/internal/CompileKeywords.hpp"
 #include "json-query/json-schema/internal/CompileDispatch.hpp"
+#include "json-query/json-schema/internal/MetaSchema2020_12.hpp"
 #include "json-query/json-pointer/JSONPointerParsing.hpp"
 #include "json-query/json-pointer/JSONPointerEvaluation.hpp"
 #include "json-query/utils/QtStringLiterals.hpp"
@@ -617,14 +618,18 @@ bool fetchAndCompileRemoteSchema(CompileContext&                                
 {
     using json_query::literals::operator""_qt_s;
 
-    if (!ctx.fetcher)
-        return false;
-
     // Avoid re-fetching URIs we already have
     if (ctx.resourceDocuments.contains(uri) || anchors.contains(uri))
         return false;
 
-    const auto fetched{(*ctx.fetcher)(uri)};
+    // Try built-in meta-schemas first, then the user's fetcher
+    auto fetched{internal::lookupBuiltinSchema(uri)};
+    if (!fetched)
+    {
+        if (!ctx.fetcher)
+            return false;
+        fetched = (*ctx.fetcher)(uri);
+    }
     if (!fetched)
         return false;
 

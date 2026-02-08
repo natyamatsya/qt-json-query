@@ -33,7 +33,8 @@ set(JSON_QUERY_SOURCES
     json-schema/JSONSchema.cpp
     json-schema/JSONSchemaCompile.cpp
     json-schema/JSONSchemaValidate.cpp
-    json-schema/internal/FormatValidators.cpp)
+    json-schema/internal/FormatValidators.cpp
+    json-schema/MetaSchema2020_12.cpp)
 
 # ---------------------------------------------------------------------------
 # Library target
