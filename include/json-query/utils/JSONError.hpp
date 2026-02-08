@@ -197,6 +197,9 @@ struct Error
     [[nodiscard]] constexpr std::string_view message() const noexcept;
     [[nodiscard]] constexpr QStringView      message_qt() const noexcept;
 
+    // Rich formatted message including detail context (e.g. "Key not found (at token 2)")
+    [[nodiscard]] inline QString formatted_message() const;
+
     // Domain predicates
     [[nodiscard]] constexpr bool is_path_parse() const noexcept { return domain == ErrorDomain::PathParse; }
     [[nodiscard]] constexpr bool is_pointer_parse() const noexcept { return domain == ErrorDomain::PointerParse; }
@@ -280,5 +283,14 @@ static_assert(sizeof(Error) == 4, "Error should remain compact (4 bytes).");
 // Out-of-line definitions (depend on to_std_sv/to_qt_sv above)
 constexpr std::string_view Error::message() const noexcept { return to_std_sv(*this); }
 constexpr QStringView      Error::message_qt() const noexcept { return to_qt_sv(*this); }
+
+inline QString Error::formatted_message() const
+{
+    const auto base{message_qt()};
+    const auto hasTokenDetail{detail > 0 && (is_path_eval() || is_pointer_eval())};
+    if (!hasTokenDetail)
+        return base.toString();
+    return QString(u"%1 (at token %2)").arg(base).arg(detail);
+}
 
 } // namespace json_query
