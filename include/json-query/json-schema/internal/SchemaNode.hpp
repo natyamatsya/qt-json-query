@@ -74,6 +74,7 @@ struct RefSchema
     std::size_t targetIndex{kUnresolved}; // Index into CompiledSchema::nodes
     QString     originalRef;              // Original $ref string for error messages
     std::size_t selfIndex{kNoIndex};      // Own node index for resource scope push
+    QString     baseUri;                  // Base URI at compile time for relative ref resolution
 
     [[nodiscard]] bool isResolved() const noexcept { return targetIndex != kUnresolved; }
 };
@@ -167,6 +168,7 @@ struct DynamicRefSchema
     QString     anchorName;              // Dynamic anchor name to search for at runtime
     std::size_t selfIndex{kUnresolved};  // Own node index for resource scope push
     QString     originalRef;             // Original $dynamicRef string for error messages
+    QString     baseUri;                 // Base URI at compile time for relative ref resolution
 
     [[nodiscard]] bool isResolved() const noexcept { return targetIndex != kUnresolved; }
 };
