@@ -14,7 +14,7 @@
 #include "JSONSchemaError.hpp"
 #include "JSONSchemaResult.hpp"
 #include "json-query/utils/JSONQueryError.hpp"
-#include "internal/SchemaNode.hpp"
+namespace json_query::json_schema::internal { struct CompiledSchema; }
 
 namespace json_query::json_schema
 {
@@ -165,11 +165,11 @@ class JSONSchema
     JSONSchema(const JSONSchema&)                = default;
     JSONSchema& operator=(JSONSchema&&) noexcept = default;
     JSONSchema& operator=(const JSONSchema&)     = default;
-    ~JSONSchema()                                = default;
+    ~JSONSchema();
 
   private:
     JSONSchema() = default;
-    explicit JSONSchema(std::shared_ptr<const internal::CompiledSchema> compiled) : m_compiled(std::move(compiled)) {}
+    explicit JSONSchema(std::shared_ptr<const internal::CompiledSchema> compiled);
 
     std::shared_ptr<const internal::CompiledSchema> m_compiled;
 };

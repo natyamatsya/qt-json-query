@@ -7,6 +7,10 @@
 namespace json_query::json_schema
 {
 
+JSONSchema::~JSONSchema() = default;
+
+JSONSchema::JSONSchema(std::shared_ptr<const internal::CompiledSchema> compiled) : m_compiled(std::move(compiled)) {}
+
 JSONSchema::ParseResult JSONSchema::create(const QJsonObject& schemaObject)
 {
     return create(QJsonValue(schemaObject), {});
