@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 #pragma once
 
-#include "JSONQueryError.hpp"
+#include "JSONError.hpp"
 
 #include <QJsonValue>
 #include <QJsonArray>
@@ -77,7 +77,7 @@ inline constexpr std::string_view kind_name(JsonKind k) noexcept
 }
 
 // For local conversion core we use a small internal error,
-// then map it to the unified QueryError on the API boundary.
+// then map it to the unified Error on the API boundary.
 enum class ConvErrorCode
 {
     TypeMismatch,
@@ -109,21 +109,21 @@ inline QString errorMessage(const ConvError& e)
     return QStringLiteral("Conversion error");
 }
 
-// Map ConvError -> unified QueryError (Convert domain)
-inline QueryError mapConvError(const ConvError& e) noexcept
+// Map ConvError -> unified Error (Convert domain)
+inline Error mapConvError(const ConvError& e) noexcept
 {
     using enum ConvErrorCode;
     switch (e.code)
     {
     case TypeMismatch:
-        return QueryError{ConvertError::TypeMismatch};
+        return Error{ConvertError::TypeMismatch};
     case OutOfRange:
-        return QueryError{ConvertError::NumericOutOfRange};
+        return Error{ConvertError::NumericOutOfRange};
     case NotIntegral:
-        return QueryError{ConvertError::NumericNotIntegral};
+        return Error{ConvertError::NumericNotIntegral};
     }
     // Fallback – shouldn't happen.
-    return QueryError{ConvertError::TypeMismatch};
+    return Error{ConvertError::TypeMismatch};
 }
 
 //------------------------------------------------------------------------------
@@ -214,8 +214,8 @@ inline std::expected<int, ConvError> as_core(const QJsonValue& v)
 
 //------------------------------------------------------------------------------
 // Public helpers
-//   - as<T>(QJsonValue)               -> expected<T, QueryError>
-//   - as<T>(expected<QJsonValue,QueryError>) -> expected<T, QueryError>
+//   - as<T>(QJsonValue)               -> expected<T, Error>
+//   - as<T>(expected<QJsonValue,Error>) -> expected<T, Error>
 //   - pipe: QJsonValue (or QJsonValueRef) | as<T>
 //   NOTE: The second overload is templated so it is NOT viable via implicit
 //         conversions from QJsonValue/Ref → expected<...>, avoiding ambiguity.
@@ -224,25 +224,25 @@ inline std::expected<int, ConvError> as_core(const QJsonValue& v)
 template <JsonTarget T>
 struct AsFn
 {
-    // 1) Plain value: domain-agnostic conversion → mapped to QueryError
-    [[nodiscard]] auto operator()(QJsonValue v) const -> std::expected<T, QueryError>
+    // 1) Plain value: domain-agnostic conversion → mapped to Error
+    [[nodiscard]] auto operator()(QJsonValue v) const -> std::expected<T, Error>
     {
         auto base = detail::as_core<T>(v);         // expected<T, ConvError>
-        return base.transform_error(mapConvError); // expected<T, QueryError>
+        return base.transform_error(mapConvError); // expected<T, Error>
     }
 
-    // 2) Chaining case: preserve unified error (QueryError)
+    // 2) Chaining case: preserve unified error (Error)
     //    Templated so it doesn't participate in overload resolution
     //    for non-expected arguments.
     template <class E>
-        requires std::same_as<std::remove_cv_t<E>, QueryError>
+        requires std::same_as<std::remove_cv_t<E>, Error>
     [[nodiscard]] auto operator()(const std::expected<QJsonValue, E>& r) const -> std::expected<T, E>
     {
         if (!r)
             return std::unexpected(r.error());
 
         auto base = detail::as_core<T>(*r);        // expected<T, ConvError>
-        return base.transform_error(mapConvError); // expected<T, QueryError>
+        return base.transform_error(mapConvError); // expected<T, Error>
     }
 };
 
@@ -262,7 +262,7 @@ template <class LHS, JsonTarget T>
 // Special-case overload to handle QJsonValueRef (produced by Qt's operator[])
 // without colliding with Qt's many operator| flag overloads.
 template <JsonTarget T>
-[[nodiscard]] inline auto operator|(QJsonValueRef lhs, const AsFn<T>& f) -> std::expected<T, QueryError>
+[[nodiscard]] inline auto operator|(QJsonValueRef lhs, const AsFn<T>& f) -> std::expected<T, Error>
 {
     return f(QJsonValue(lhs));
 }

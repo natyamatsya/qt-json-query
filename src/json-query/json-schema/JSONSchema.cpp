@@ -41,8 +41,8 @@ JSONSchema::ParseResult JSONSchema::create(const QJsonDocument& schemaDoc, Schem
     if (schemaDoc.isObject())
         return create(schemaDoc.object(), std::move(fetcher), options);
     if (schemaDoc.isArray())
-        return std::unexpected(QueryError(ParseError::InvalidSchemaStructure));
-    return std::unexpected(QueryError(ParseError::EmptySchema));
+        return std::unexpected(Error(ParseError::InvalidSchemaStructure));
+    return std::unexpected(Error(ParseError::EmptySchema));
 }
 
 JSONSchema::ParseResult JSONSchema::create(const QJsonValue& schemaValue)

@@ -12,6 +12,7 @@
 
 #include "JSONSchemaError.hpp"
 #include "json-query/json-pointer/JSONPointer.hpp"
+#include "json-query/utils/JSONError.hpp"
 #include "json-query/utils/QtStringLiterals.hpp"
 
 namespace json_query::json_schema
@@ -29,14 +30,14 @@ struct ValidationError
     QString   instanceLocation; // JSON Pointer to failing data (e.g., "/address/zip")
     QString   schemaLocation;   // JSON Pointer within schema (e.g., "#/properties/address")
     QString   message;          // Human-readable description
-    EvalError code;             // Machine-readable error code
+    json_query::Error code{}; // Machine-readable error code (unified across modules)
 
     // For nested errors (e.g., from allOf/anyOf)
     std::vector<ValidationError> nested{};
 
     ValidationError() = default;
 
-    ValidationError(QString instLoc, QString schemaLoc, QString msg, EvalError c)
+    ValidationError(QString instLoc, QString schemaLoc, QString msg, json_query::Error c)
         : instanceLocation(std::move(instLoc)), schemaLocation(std::move(schemaLoc)), message(std::move(msg)), code(c)
     {
     }
@@ -96,7 +97,7 @@ struct ValidationError
         obj[u"instanceLocation"_qt_s] = instanceLocation;
         obj[u"schemaLocation"_qt_s]   = schemaLocation;
         obj[u"message"_qt_s]          = message;
-        obj[u"code"_qt_s]             = static_cast<int>(code);
+        obj[u"code"_qt_s]             = static_cast<int>(code.numeric());
 
         if (!nested.empty())
         {
@@ -199,7 +200,7 @@ class ValidationResult
     /**
      * @brief Add an error with individual components
      */
-    void addError(QString instanceLocation, QString schemaLocation, QString message, EvalError code)
+    void addError(QString instanceLocation, QString schemaLocation, QString message, json_query::Error code)
     {
         m_errors.emplace_back(std::move(instanceLocation), std::move(schemaLocation), std::move(message), code);
     }

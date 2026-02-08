@@ -28,12 +28,12 @@ namespace
 using namespace internal;
 
 // Forward declaration for recursive compilation
-std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, const QJsonValue& schemaValue);
+std::expected<std::size_t, Error> compileSchemaNode(CompileContext& ctx, const QJsonValue& schemaValue);
 
 /**
  * @brief Compile properties keyword
  */
-std::expected<std::unordered_map<QString, std::size_t>, QueryError> compileProperties(CompileContext&   ctx,
+std::expected<std::unordered_map<QString, std::size_t>, Error> compileProperties(CompileContext&   ctx,
                                                                                       const QJsonValue& propsValue)
 {
     std::unordered_map<QString, std::size_t> result;
@@ -42,7 +42,7 @@ std::expected<std::unordered_map<QString, std::size_t>, QueryError> compilePrope
         return result;
 
     if (!propsValue.isObject())
-        return std::unexpected(QueryError(ParseError::InvalidKeywordValue));
+        return std::unexpected(Error(ParseError::InvalidKeywordValue));
 
     const auto propsObj{propsValue.toObject()};
     for (auto it = propsObj.begin(); it != propsObj.end(); ++it)
@@ -59,7 +59,7 @@ std::expected<std::unordered_map<QString, std::size_t>, QueryError> compilePrope
 /**
  * @brief Compile array of schemas (for allOf, anyOf, oneOf)
  */
-std::expected<std::vector<std::size_t>, QueryError> compileSchemaArray(CompileContext&   ctx,
+std::expected<std::vector<std::size_t>, Error> compileSchemaArray(CompileContext&   ctx,
                                                                        const QJsonValue& arrayValue)
 {
     std::vector<std::size_t> result{};
@@ -68,7 +68,7 @@ std::expected<std::vector<std::size_t>, QueryError> compileSchemaArray(CompileCo
         return result;
 
     if (!arrayValue.isArray())
-        return std::unexpected(QueryError(ParseError::InvalidKeywordValue));
+        return std::unexpected(Error(ParseError::InvalidKeywordValue));
 
     const auto arr{asArray(arrayValue)};
     result.reserve(static_cast<std::size_t>(arr.size()));
@@ -87,7 +87,7 @@ std::expected<std::vector<std::size_t>, QueryError> compileSchemaArray(CompileCo
 /**
  * @brief Compile an optional sub-schema
  */
-std::expected<std::optional<std::size_t>, QueryError> compileOptionalSchema(CompileContext&   ctx,
+std::expected<std::optional<std::size_t>, Error> compileOptionalSchema(CompileContext&   ctx,
                                                                             const QJsonValue& schemaValue)
 {
     if (schemaValue.isUndefined())
@@ -216,7 +216,7 @@ void processSchemaId(CompileContext& ctx, const QJsonObject& schemaObj, const QJ
 /**
  * @brief Register anchor in context, checking for duplicates
  */
-[[nodiscard]] std::expected<void, QueryError>
+[[nodiscard]] std::expected<void, Error>
 registerAnchor(CompileContext& ctx, const QString& anchorName, std::size_t nodeIndex)
 {
     const auto scopedKey{ctx.scopedAnchorKey(anchorName)};
@@ -237,7 +237,7 @@ struct BaseUriScope
 };
 
 // Forward declaration: compileSchemaNode and compileDefinitionsBlock are mutually recursive
-[[nodiscard]] std::expected<void, QueryError> compileDefinitionsBlock(CompileContext&    ctx,
+[[nodiscard]] std::expected<void, Error> compileDefinitionsBlock(CompileContext&    ctx,
                                                                       const QJsonObject& rootObj,
                                                                       const QString&     keyword,
                                                                       const QString&     pathPrefix);
@@ -249,7 +249,7 @@ struct BaseUriScope
  * $defs are compiled inline after $id sets the base URI, ensuring correct
  * relative URI resolution at every nesting level.
  */
-std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, const QJsonValue& schemaValue)
+std::expected<std::size_t, Error> compileSchemaNode(CompileContext& ctx, const QJsonValue& schemaValue)
 {
     using json_query::literals::operator""_qt_s;
 
@@ -258,7 +258,7 @@ std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, co
         return ctx.addNode(BooleanSchema{schemaValue.toBool()});
 
     if (!schemaValue.isObject())
-        return std::unexpected(QueryError(ParseError::InvalidSchemaStructure));
+        return std::unexpected(Error(ParseError::InvalidSchemaStructure));
 
     const auto schemaObj{schemaValue.toObject()};
 
@@ -395,7 +395,7 @@ void extractRootMetadata(const QJsonObject& rootObj, internal::CompiledSchema& c
 /**
  * @brief Compile definitions block ($defs or definitions)
  */
-[[nodiscard]] std::expected<void, QueryError> compileDefinitionsBlock(CompileContext&    ctx,
+[[nodiscard]] std::expected<void, Error> compileDefinitionsBlock(CompileContext&    ctx,
                                                                       const QJsonObject& rootObj,
                                                                       const QString&     keyword,
                                                                       const QString&     pathPrefix)
@@ -815,7 +815,7 @@ void resolveAllReferences(internal::CompiledSchema&                        compi
  * @param schemaValue The root schema value
  * @return Success or error
  */
-[[nodiscard]] std::expected<void, QueryError>
+[[nodiscard]] std::expected<void, Error>
 phase1_BuildSymbolTable(internal::CompiledSchema& compiled, CompileContext& ctx, const QJsonValue& schemaValue)
 {
     using json_query::literals::operator""_qt_s;
@@ -844,7 +844,7 @@ phase1_BuildSymbolTable(internal::CompiledSchema& compiled, CompileContext& ctx,
  * @param schemaValue The root schema value
  * @return Success or error
  */
-[[nodiscard]] std::expected<void, QueryError>
+[[nodiscard]] std::expected<void, Error>
 phase2_CompileSchemaTree(internal::CompiledSchema& compiled, CompileContext& ctx, const QJsonValue& schemaValue)
 {
     auto rootResult{compileSchemaNode(ctx, schemaValue)};
@@ -899,14 +899,14 @@ void phase3_LinkReferences(internal::CompiledSchema&                  compiled,
  * @param schemaValue The JSON Schema document (object or boolean)
  * @return Compiled schema or error
  */
-std::expected<std::shared_ptr<internal::CompiledSchema>, QueryError>
+std::expected<std::shared_ptr<internal::CompiledSchema>, Error>
 compileSchema(const QJsonValue& schemaValue, SchemaFetcher fetcher, SchemaOptions options)
 {
     using json_query::literals::operator""_qt_s;
 
     // Validate input
     if (schemaValue.isNull() || schemaValue.isUndefined())
-        return std::unexpected(QueryError(ParseError::EmptySchema));
+        return std::unexpected(Error(ParseError::EmptySchema));
 
     // Initialize compilation context
     auto           compiled{std::make_shared<internal::CompiledSchema>()};

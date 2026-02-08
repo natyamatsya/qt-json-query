@@ -4,7 +4,7 @@
 
 #include "JSONPointerParsing.hpp"
 #include "internal/PointerEvalCtx.hpp"
-#include "json-query/utils/JSONQueryError.hpp"
+#include "json-query/utils/JSONError.hpp"
 #include "json-query/utils/SanitizerCompat.hpp"
 
 #include <QJsonValue>
@@ -80,18 +80,18 @@ namespace json_query::json_pointer::detail
     return current; // success
 }
 
-// Public API that converts domain errors to QueryError
-[[nodiscard]] inline std::expected<QJsonValue, json_query::QueryError>
+// Public API that converts domain errors to Error
+[[nodiscard]] inline std::expected<QJsonValue, json_query::Error>
 evaluatePointer(const std::vector<Token>& tokens, const QJsonValue& root) noexcept
 {
     auto result = evaluatePointerImpl(tokens, root);
     if (!result)
-        return std::unexpected(json_query::QueryError{result.error()});
+        return std::unexpected(json_query::Error{result.error()});
     return *result;
 }
 
 // Convenience overload taking a PointerEvalCtx to mirror JSONPath's API
-[[nodiscard]] inline std::expected<QJsonValue, json_query::QueryError> evaluatePointer(const PointerEvalCtx& ctx,
+[[nodiscard]] inline std::expected<QJsonValue, json_query::Error> evaluatePointer(const PointerEvalCtx& ctx,
                                                                                        const QJsonValue& root) noexcept
 {
     return evaluatePointer(ctx.tokens, root);

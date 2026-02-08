@@ -127,14 +127,14 @@ inline std::expected<QJsonValue, json_query::json_path::ParseError> evalExp(QStr
     auto compiled{JSONPath::create(path)};
     if (!compiled)
     {
-        // Convert QueryError to ParseError
+        // Convert Error to ParseError
         return std::unexpected(static_cast<json_query::json_path::ParseError>(compiled.error().code));
     }
 
     auto result{compiled->evaluate(doc)};
     if (!result)
     {
-        // Convert QueryError to ParseError
+        // Convert Error to ParseError
         return std::unexpected(static_cast<json_query::json_path::ParseError>(result.error().code));
     }
     return *result;

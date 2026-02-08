@@ -26,7 +26,7 @@
 using json_query::as;
 using json_query::JSONPath;
 using json_query::JSONPointer;
-using json_query::QueryError;
+using json_query::Error;
 
 using namespace Qt::StringLiterals;
 
@@ -153,7 +153,7 @@ static QStringList titlesAbovePrice_plain(const QJsonDocument& doc, double thres
 
 static auto log_query_error(const QString& context)
 {
-    return [&](const QueryError& error)
+    return [&](const Error& error)
     {
         qWarning() << context << ":" << error.message_qt();
         return error;
@@ -204,7 +204,7 @@ static auto log_query_error(const QString& context)
     { return JSONPath::create(QString(u"$.inventory[?(@.price > %1)].title").arg(thr)); };
     const auto evaluate = [&doc](const JSONPath& p)
     {
-        return p.evaluate(doc); // expected<QJsonValue, QueryError>
+        return p.evaluate(doc); // expected<QJsonValue, Error>
     };
     const auto normalize_to_array = [](const QJsonValue& v) -> QJsonArray
     {

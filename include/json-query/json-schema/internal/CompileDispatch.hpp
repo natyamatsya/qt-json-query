@@ -19,7 +19,7 @@ namespace json_query::json_schema::internal
  * Similar to ValidateNodeFn, this breaks the circular dependency
  * by allowing the dispatch handlers to call back into the main compiler.
  */
-using CompileSchemaFn = std::expected<std::size_t, QueryError>(CompileContext&, const QJsonValue&);
+using CompileSchemaFn = std::expected<std::size_t, Error>(CompileContext&, const QJsonValue&);
 
 /**
  * @brief Helper macro replacement: try parsing a keyword and assign result
@@ -27,7 +27,7 @@ using CompileSchemaFn = std::expected<std::size_t, QueryError>(CompileContext&, 
  * Uses C++23 monadic operations for clean error propagation.
  */
 template <typename T, typename Parser>
-[[nodiscard]] inline std::expected<void, QueryError>
+[[nodiscard]] inline std::expected<void, Error>
 tryParseKeyword(const QJsonObject& obj, const QString& key, std::optional<T>& target, Parser parser)
 {
     auto result{parser(obj[key])};
@@ -40,7 +40,7 @@ tryParseKeyword(const QJsonObject& obj, const QString& key, std::optional<T>& ta
 /**
  * @brief Compile string-related keywords (pattern, minLength, maxLength, format)
  */
-[[nodiscard]] inline std::expected<void, QueryError> compileStringKeywords(const QJsonObject& schemaObj,
+[[nodiscard]] inline std::expected<void, Error> compileStringKeywords(const QJsonObject& schemaObj,
                                                                            ObjectSchema&      node,
                                                                            bool validationVocabActive = true)
 {
@@ -74,7 +74,7 @@ tryParseKeyword(const QJsonObject& obj, const QString& key, std::optional<T>& ta
 /**
  * @brief Compile numeric-related keywords (minimum, maximum, exclusiveMinimum, exclusiveMaximum, multipleOf)
  */
-[[nodiscard]] inline std::expected<void, QueryError> compileNumericKeywords(const QJsonObject& schemaObj,
+[[nodiscard]] inline std::expected<void, Error> compileNumericKeywords(const QJsonObject& schemaObj,
                                                                             ObjectSchema&      node)
 {
     using json_query::literals::operator""_qt_s;
@@ -110,7 +110,7 @@ tryParseKeyword(const QJsonObject& obj, const QString& key, std::optional<T>& ta
 /**
  * @brief Compile array-related keywords (minItems, maxItems, uniqueItems, prefixItems, items, contains)
  */
-[[nodiscard]] inline std::expected<void, QueryError>
+[[nodiscard]] inline std::expected<void, Error>
 compileArrayKeywords(CompileContext& ctx, const QJsonObject& schemaObj, ObjectSchema& node, CompileSchemaFn& compile)
 {
     using json_query::literals::operator""_qt_s;
@@ -188,7 +188,7 @@ compileArrayKeywords(CompileContext& ctx, const QJsonObject& schemaObj, ObjectSc
 /**
  * @brief Compile object-related keywords (properties, required, additionalProperties, etc.)
  */
-[[nodiscard]] inline std::expected<void, QueryError>
+[[nodiscard]] inline std::expected<void, Error>
 compileObjectKeywords(CompileContext& ctx, const QJsonObject& schemaObj, ObjectSchema& node, CompileSchemaFn& compile)
 {
     using json_query::literals::operator""_qt_s;
@@ -240,7 +240,7 @@ compileObjectKeywords(CompileContext& ctx, const QJsonObject& schemaObj, ObjectS
         {
             SchemaRegex regex{};
             if (!regex.compile(it.key()))
-                return std::unexpected(QueryError(ParseError::InvalidRegexPattern));
+                return std::unexpected(Error(ParseError::InvalidRegexPattern));
 
             auto r{compile(ctx, it.value())};
             if (!r)
@@ -330,7 +330,7 @@ compileObjectKeywords(CompileContext& ctx, const QJsonObject& schemaObj, ObjectS
 /**
  * @brief Compile combinator keywords (allOf, anyOf, oneOf, not, if/then/else)
  */
-[[nodiscard]] inline std::expected<void, QueryError> compileCombinatorKeywords(CompileContext&    ctx,
+[[nodiscard]] inline std::expected<void, Error> compileCombinatorKeywords(CompileContext&    ctx,
                                                                                const QJsonObject& schemaObj,
                                                                                ObjectSchema&      node,
                                                                                CompileSchemaFn&   compile)
@@ -446,7 +446,7 @@ struct KeywordCategoryHandler;
 template <>
 struct KeywordCategoryHandler<KeywordCategory::TypeConstraints>
 {
-    [[nodiscard]] static std::expected<void, QueryError>
+    [[nodiscard]] static std::expected<void, Error>
     compile(CompileContext& ctx, const QJsonObject& schemaObj, ObjectSchema& node, CompileSchemaFn&)
     {
         if (!ctx.validationVocabActive)
@@ -472,7 +472,7 @@ struct KeywordCategoryHandler<KeywordCategory::TypeConstraints>
 template <>
 struct KeywordCategoryHandler<KeywordCategory::StringKeywords>
 {
-    [[nodiscard]] static std::expected<void, QueryError>
+    [[nodiscard]] static std::expected<void, Error>
     compile(CompileContext& ctx, const QJsonObject& schemaObj, ObjectSchema& node, CompileSchemaFn&)
     {
         return compileStringKeywords(schemaObj, node, ctx.validationVocabActive);
@@ -482,7 +482,7 @@ struct KeywordCategoryHandler<KeywordCategory::StringKeywords>
 template <>
 struct KeywordCategoryHandler<KeywordCategory::NumericKeywords>
 {
-    [[nodiscard]] static std::expected<void, QueryError>
+    [[nodiscard]] static std::expected<void, Error>
     compile(CompileContext& ctx, const QJsonObject& schemaObj, ObjectSchema& node, CompileSchemaFn&)
     {
         if (!ctx.validationVocabActive)
@@ -494,7 +494,7 @@ struct KeywordCategoryHandler<KeywordCategory::NumericKeywords>
 template <>
 struct KeywordCategoryHandler<KeywordCategory::ArrayKeywords>
 {
-    [[nodiscard]] static std::expected<void, QueryError>
+    [[nodiscard]] static std::expected<void, Error>
     compile(CompileContext& ctx, const QJsonObject& schemaObj, ObjectSchema& node, CompileSchemaFn& compileFn)
     {
         return compileArrayKeywords(ctx, schemaObj, node, compileFn);
@@ -504,7 +504,7 @@ struct KeywordCategoryHandler<KeywordCategory::ArrayKeywords>
 template <>
 struct KeywordCategoryHandler<KeywordCategory::ObjectKeywords>
 {
-    [[nodiscard]] static std::expected<void, QueryError>
+    [[nodiscard]] static std::expected<void, Error>
     compile(CompileContext& ctx, const QJsonObject& schemaObj, ObjectSchema& node, CompileSchemaFn& compileFn)
     {
         return compileObjectKeywords(ctx, schemaObj, node, compileFn);
@@ -514,7 +514,7 @@ struct KeywordCategoryHandler<KeywordCategory::ObjectKeywords>
 template <>
 struct KeywordCategoryHandler<KeywordCategory::Combinators>
 {
-    [[nodiscard]] static std::expected<void, QueryError>
+    [[nodiscard]] static std::expected<void, Error>
     compile(CompileContext& ctx, const QJsonObject& schemaObj, ObjectSchema& node, CompileSchemaFn& compileFn)
     {
         return compileCombinatorKeywords(ctx, schemaObj, node, compileFn);
@@ -524,7 +524,7 @@ struct KeywordCategoryHandler<KeywordCategory::Combinators>
 template <>
 struct KeywordCategoryHandler<KeywordCategory::Metadata>
 {
-    [[nodiscard]] static std::expected<void, QueryError>
+    [[nodiscard]] static std::expected<void, Error>
     compile(CompileContext&, const QJsonObject& schemaObj, ObjectSchema& node, CompileSchemaFn&)
     {
         compileMetadataKeywords(schemaObj, node);
@@ -542,7 +542,7 @@ struct KeywordDispatchTable;
 template <KeywordCategory First, KeywordCategory... Rest>
 struct KeywordDispatchTable<First, Rest...>
 {
-    [[nodiscard]] static std::expected<void, QueryError>
+    [[nodiscard]] static std::expected<void, Error>
     dispatch(CompileContext& ctx, const QJsonObject& schemaObj, ObjectSchema& node, CompileSchemaFn& compileFn)
     {
         // Compile this category
@@ -558,7 +558,7 @@ struct KeywordDispatchTable<First, Rest...>
 template <>
 struct KeywordDispatchTable<>
 {
-    [[nodiscard]] static std::expected<void, QueryError>
+    [[nodiscard]] static std::expected<void, Error>
     dispatch(CompileContext&, const QJsonObject&, ObjectSchema&, CompileSchemaFn&)
     {
         return {};

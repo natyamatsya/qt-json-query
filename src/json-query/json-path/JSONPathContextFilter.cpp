@@ -131,7 +131,7 @@ struct ContextBuilder
 };
 
 // Helper: Evaluate absolute path against root with proper error handling
-std::expected<QJsonValue, QueryError>
+std::expected<QJsonValue, Error>
 evaluateAbsolutePathSafe(const QString& path, const QJsonValue& root, const QJsonValue& node)
 {
     if (path == "$")

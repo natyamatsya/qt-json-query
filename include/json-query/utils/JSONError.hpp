@@ -128,46 +128,46 @@ inline constexpr bool is_domain_enum_v =
     std::is_same_v<E, json_schema::EvalError>;
 
 // The compact, unified error type
-struct QueryError
+struct Error
 {
     ErrorDomain  domain{};
     std::uint8_t code{};
 
-    constexpr QueryError() = default;
-    constexpr QueryError(ErrorDomain d, std::uint8_t c) : domain(d), code(c) {}
+    constexpr Error() = default;
+    constexpr Error(ErrorDomain d, std::uint8_t c) : domain(d), code(c) {}
 
     // Explicit constructors for each domain error type
-    constexpr explicit QueryError(json_path::ParseError e) noexcept
+    constexpr explicit Error(json_path::ParseError e) noexcept
         : domain(ErrorDomain::PathParse), code(static_cast<std::uint8_t>(e))
     {
     }
 
-    constexpr explicit QueryError(json_pointer::ParseError e) noexcept
+    constexpr explicit Error(json_pointer::ParseError e) noexcept
         : domain(ErrorDomain::PointerParse), code(static_cast<std::uint8_t>(e))
     {
     }
 
-    constexpr explicit QueryError(json_path::EvalError e) noexcept
+    constexpr explicit Error(json_path::EvalError e) noexcept
         : domain(ErrorDomain::PathEval), code(static_cast<std::uint8_t>(e))
     {
     }
 
-    constexpr explicit QueryError(json_pointer::EvalError e) noexcept
+    constexpr explicit Error(json_pointer::EvalError e) noexcept
         : domain(ErrorDomain::PointerEval), code(static_cast<std::uint8_t>(e))
     {
     }
 
-    constexpr explicit QueryError(ConvertError e) noexcept
+    constexpr explicit Error(ConvertError e) noexcept
         : domain(ErrorDomain::Convert), code(static_cast<std::uint8_t>(e))
     {
     }
 
-    constexpr explicit QueryError(json_schema::ParseError e) noexcept
+    constexpr explicit Error(json_schema::ParseError e) noexcept
         : domain(ErrorDomain::SchemaParse), code(static_cast<std::uint8_t>(e))
     {
     }
 
-    constexpr explicit QueryError(json_schema::EvalError e) noexcept
+    constexpr explicit Error(json_schema::EvalError e) noexcept
         : domain(ErrorDomain::SchemaEval), code(static_cast<std::uint8_t>(e))
     {
     }
@@ -175,7 +175,7 @@ struct QueryError
     // Fallback template for any other enum type that maps to a domain
     template <class E>
         requires is_domain_enum_v<E>
-    constexpr QueryError(E e) noexcept
+    constexpr Error(E e) noexcept
         : domain(error_domain<E>::value), code(static_cast<std::uint8_t>(std::to_underlying(e)))
     {
     }
@@ -185,11 +185,11 @@ struct QueryError
     {
         return static_cast<std::uint16_t>((static_cast<std::uint16_t>(domain) << 8) | code);
     }
-    [[nodiscard]] static constexpr QueryError from_numeric(std::uint16_t n) noexcept
+    [[nodiscard]] static constexpr Error from_numeric(std::uint16_t n) noexcept
     {
         const auto d = static_cast<ErrorDomain>((n >> 8) & 0xFF);
         const auto c = static_cast<std::uint8_t>(n & 0xFF);
-        return QueryError{d, c};
+        return Error{d, c};
     }
 
     // Human-readable error message (defined after to_std_sv/to_qt_sv below)
@@ -206,21 +206,21 @@ struct QueryError
     [[nodiscard]] constexpr bool is_schema_eval() const noexcept { return domain == ErrorDomain::SchemaEval; }
 
     // Equality (so it works nicely in tests)
-    friend constexpr bool operator==(QueryError a, QueryError b) noexcept
+    friend constexpr bool operator==(Error a, Error b) noexcept
     {
         return a.domain == b.domain && a.code == b.code;
     }
-    friend constexpr bool operator!=(QueryError a, QueryError b) noexcept { return !(a == b); }
+    friend constexpr bool operator!=(Error a, Error b) noexcept { return !(a == b); }
 };
 
-static_assert(sizeof(QueryError) == 2, "QueryError should remain compact (2 bytes).");
+static_assert(sizeof(Error) == 2, "Error should remain compact (2 bytes).");
 /**
- * @brief Convert a QueryError to a human-readable string view
+ * @brief Convert a Error to a human-readable string view
  *
  * @param e The query error to convert
  * @return std::string_view A descriptive error message for the evaluation error
  */
-[[nodiscard]] constexpr std::string_view to_std_sv(QueryError e) noexcept
+[[nodiscard]] constexpr std::string_view to_std_sv(Error e) noexcept
 {
     using enum ErrorDomain;
     switch (e.domain)
@@ -246,12 +246,12 @@ static_assert(sizeof(QueryError) == 2, "QueryError should remain compact (2 byte
 }
 
 /**
- * @brief Convert a QueryError to a human-readable QStringView
+ * @brief Convert a Error to a human-readable QStringView
  *
  * @param e The query error to convert
  * @return QStringView A view of a descriptive error message
  */
-[[nodiscard]] constexpr QStringView to_qt_sv(QueryError e) noexcept
+[[nodiscard]] constexpr QStringView to_qt_sv(Error e) noexcept
 {
     using enum ErrorDomain;
     switch (e.domain)
@@ -277,7 +277,7 @@ static_assert(sizeof(QueryError) == 2, "QueryError should remain compact (2 byte
 }
 
 // Out-of-line definitions (depend on to_std_sv/to_qt_sv above)
-constexpr std::string_view QueryError::message() const noexcept { return to_std_sv(*this); }
-constexpr QStringView      QueryError::message_qt() const noexcept { return to_qt_sv(*this); }
+constexpr std::string_view Error::message() const noexcept { return to_std_sv(*this); }
+constexpr QStringView      Error::message_qt() const noexcept { return to_qt_sv(*this); }
 
 } // namespace json_query

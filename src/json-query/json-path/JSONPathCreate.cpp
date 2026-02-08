@@ -3,7 +3,7 @@
 #include "json-query/json-path/JSONPath.hpp"
 #include "json-query/json-path/JSONPathCompile.hpp"
 #include "json-query/json-path/JSONPathLog.hpp"
-#include "json-query/utils/JSONQueryError.hpp"
+#include "json-query/utils/JSONError.hpp"
 
 namespace json_query::json_path
 {
@@ -19,7 +19,7 @@ JSONPath::ParseResult JSONPath::create(QStringView rawPath)
         qCDebug(jsonPathLog) << "DEBUG: JSONPath::create() compile FAILED with error:"
                              << to_qt_sv(compileResult.error());
         qCDebug(jsonPathLog) << "JSONPath::create() compile failed with error:" << to_qt_sv(compileResult.error());
-        return std::unexpected(QueryError{ErrorDomain::PathParse, static_cast<std::uint8_t>(compileResult.error())});
+        return std::unexpected(Error{ErrorDomain::PathParse, static_cast<std::uint8_t>(compileResult.error())});
     }
 
     qCDebug(jsonPathLog) << "DEBUG: JSONPath::create() compile SUCCEEDED, creating JSONPath with"

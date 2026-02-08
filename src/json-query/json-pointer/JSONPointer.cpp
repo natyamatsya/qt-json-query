@@ -2,7 +2,7 @@
 
 #include "json-query/json-pointer/JSONPointer.hpp"
 #include "json-query/utils/JSONQueryUtils.hpp"
-#include "json-query/utils/JSONQueryError.hpp"
+#include "json-query/utils/JSONError.hpp"
 #include "json-query/json-pointer/JSONPointerParsing.hpp"
 #include "json-query/json-pointer/JSONPointerEvaluation.hpp"
 
@@ -20,7 +20,7 @@ JSONPointer::ParseResult JSONPointer::create(QStringView pointer) noexcept
 {
     JSONPointer jp;
     if (auto parseResult = json_pointer::detail::parsePointer(pointer, jp.m_tokens); !parseResult)
-        return std::unexpected(QueryError{parseResult.error()});
+        return std::unexpected(Error{parseResult.error()});
     return jp;
 }
 
@@ -52,21 +52,21 @@ std::expected<QJsonValue, EvalError> evaluateDocumentImpl(const std::vector<json
 }
 } // namespace
 
-// Public API that converts domain errors to QueryError
+// Public API that converts domain errors to Error
 JSONPointer::EvalResult JSONPointer::evaluate(const QJsonDocument& doc) const
 {
     auto result = evaluateDocumentImpl(m_tokens, doc);
     if (!result)
-        return std::unexpected(QueryError{result.error()});
+        return std::unexpected(Error{result.error()});
     return *result;
 }
 
-// Public API that converts domain errors to QueryError
+// Public API that converts domain errors to Error
 JSONPointer::EvalResult JSONPointer::evaluate(const QJsonValue& value) const
 {
     auto result = evaluateImpl(m_tokens, value);
     if (!result)
-        return std::unexpected(QueryError{result.error()});
+        return std::unexpected(Error{result.error()});
     return *result;
 }
 

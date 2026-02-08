@@ -13,7 +13,7 @@
 
 #include "JSONSchemaError.hpp"
 #include "JSONSchemaResult.hpp"
-#include "json-query/utils/JSONQueryError.hpp"
+#include "json-query/utils/JSONError.hpp"
 namespace json_query::json_schema::internal { struct CompiledSchema; }
 
 namespace json_query::json_schema
@@ -85,7 +85,7 @@ class JSONSchema
 {
   public:
     // Type aliases matching JSONPath/JSONPointer patterns
-    using ParseResult = std::expected<JSONSchema, json_query::QueryError>;
+    using ParseResult = std::expected<JSONSchema, json_query::Error>;
 
     /**
      * @brief Create a compiled schema from a JSON object

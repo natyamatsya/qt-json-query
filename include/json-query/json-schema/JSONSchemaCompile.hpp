@@ -10,7 +10,7 @@
 #include "JSONSchema.hpp"
 #include "JSONSchemaError.hpp"
 #include "internal/SchemaNode.hpp"
-#include "json-query/utils/JSONQueryError.hpp"
+#include "json-query/utils/JSONError.hpp"
 
 namespace json_query::json_schema
 {
@@ -25,7 +25,7 @@ namespace json_query::json_schema
  * @param fetcher Optional callback for resolving remote $ref URIs
  * @return Compiled schema or error
  */
-[[nodiscard]] std::expected<std::shared_ptr<internal::CompiledSchema>, QueryError>
+[[nodiscard]] std::expected<std::shared_ptr<internal::CompiledSchema>, Error>
 compileSchema(const QJsonValue& schemaValue, SchemaFetcher fetcher = {}, SchemaOptions options = {});
 
 } // namespace json_query::json_schema

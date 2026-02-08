@@ -24,7 +24,7 @@
 #include "json-query/json-path/JSONPathOption.hpp"
 #include "json-query/json-path/JSONPathHelpers.hpp"
 #include "json-query/utils/JSONQueryUtils.hpp"
-#include "json-query/utils/JSONQueryError.hpp"
+#include "json-query/utils/JSONError.hpp"
 #include "json-query/json-pointer/JSONPointer.hpp"
 
 // ======================================================================
@@ -39,15 +39,15 @@ class JSONPath
     // -----------------------------------------------------------------
     //  Factory (replaces throwing constructor)
     // -----------------------------------------------------------------
-    using ParseResult = std::expected<JSONPath, json_query::QueryError>;
+    using ParseResult = std::expected<JSONPath, json_query::Error>;
 
     static ParseResult create(QStringView path);
 
     // -----------------------------------------------------------------
     //  Evaluation API with error reporting (std::expected)
     // -----------------------------------------------------------------
-    using EvalResult      = std::expected<QJsonValue, json_query::QueryError>;
-    using EvalArrayResult = std::expected<QJsonArray, json_query::QueryError>;
+    using EvalResult      = std::expected<QJsonValue, json_query::Error>;
+    using EvalArrayResult = std::expected<QJsonArray, json_query::Error>;
 
     [[nodiscard]] EvalResult evaluate(const QJsonDocument& doc) const;
     [[nodiscard]] EvalResult evaluate(const QJsonValue& value) const;

@@ -3,7 +3,7 @@
 #pragma once
 
 #include "JSONPointerError.hpp"
-#include "json-query/utils/JSONQueryError.hpp"
+#include "json-query/utils/JSONError.hpp"
 
 #include <QString>
 #include <QStringView>

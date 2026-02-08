@@ -3,7 +3,7 @@
 #include "json-query/json-path/JSONPath.hpp"
 #include "json-query/json-path/JSONPathTokenEvaluators.hpp"
 #include "json-query/json-path/JSONPathEvaluate.hpp"
-#include "json-query/utils/JSONQueryError.hpp"
+#include "json-query/utils/JSONError.hpp"
 
 #include <vector>
 #include <deque>
@@ -29,13 +29,13 @@ JSONPath::EvalResult JSONPath::evaluate(const QJsonValue& value) const
 {
     json_path::detail::PathEvalCtx ctx{m_tokens, value, m_func};
 
-    // C++23 Monadic Chain - Elegant error propagation with unified QueryError
+    // C++23 Monadic Chain - Elegant error propagation with unified Error
     return json_path::detail::evaluate(ctx, value)
         .or_else(
             [](json_path::EvalError error) -> EvalResult
             {
                 return std::unexpected(
-                    json_query::QueryError{json_query::ErrorDomain::PathEval, static_cast<std::uint8_t>(error)});
+                    json_query::Error{json_query::ErrorDomain::PathEval, static_cast<std::uint8_t>(error)});
             });
 }
 
@@ -53,13 +53,13 @@ JSONPath::EvalArrayResult JSONPath::evaluateAll(const QJsonValue& value) const
 {
     json_path::detail::PathEvalCtx ctx{m_tokens, value, m_func};
 
-    // C++23 Monadic Chain - Elegant error propagation with unified QueryError
+    // C++23 Monadic Chain - Elegant error propagation with unified Error
     return json_path::detail::evaluateAll(ctx, value)
         .or_else(
             [](json_path::EvalError error) -> EvalArrayResult
             {
                 return std::unexpected(
-                    json_query::QueryError{json_query::ErrorDomain::PathEval, static_cast<std::uint8_t>(error)});
+                    json_query::Error{json_query::ErrorDomain::PathEval, static_cast<std::uint8_t>(error)});
             });
 }
 
