@@ -13,7 +13,7 @@ using namespace json_query::json_schema;
 
 int main(int argc, char* argv[])
 {
-    QCoreApplication app(argc, argv);
+    QCoreApplication app{argc, argv};
 
     // ── 1. Define a JSON Schema ─────────────────────────────────────
     const auto schemaJson{QJsonObject{

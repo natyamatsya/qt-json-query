@@ -1,54 +1,45 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "json-query/JSONQuery"
+
 #include <QCoreApplication>
+#include <QDebug>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QJsonArray>
-#include <QDebug>
-
-#include "json-query/JSONQuery"
 
 int main(int argc, char** argv)
 {
     using namespace json_query;
     using namespace json_query::json_path;
 
-    QCoreApplication app(argc, argv);
+    QCoreApplication app{argc, argv};
 
-    // Create a simple JSON document with an array of objects
-    QJsonArray    books{QJsonObject{{"title", "Book 1"}, {"price", 10}},
-                     QJsonObject{{"title", "Book 2"}, {"price", 20}},
-                     QJsonObject{{"title", "Book 3"}, {"price", 30}}};
-    QJsonObject   store{{"books", books}};
-    QJsonDocument doc(store);
+    const auto doc{QJsonDocument{QJsonObject{
+        {"books",
+         QJsonArray{
+             QJsonObject{{"title", "Book 1"}, {"price", 10}},
+             QJsonObject{{"title", "Book 2"}, {"price", 20}},
+             QJsonObject{{"title", "Book 3"}, {"price", 30}},
+         }},
+    }}};
 
-    // Small utility: whatever comes back, give me a QJsonArray
-    const auto toArray = [](const QJsonValue& v) -> QJsonArray
+    const auto path{JSONPath::create(u"$.books[*].title")};
+    if (!path)
     {
-        if (v.isArray())
-            return v.toArray();
-        if (!v.isUndefined())
-            return QJsonArray{v};
-        return {};
-    };
-
-    auto pathResult{JSONPath::create(u"$.books[*].title")};
-    if (!pathResult)
-    {
-        qDebug() << "Failed to compile JSONPath";
+        qWarning() << "Failed to compile JSONPath:" << path.error().message_qt();
         return EXIT_FAILURE;
     }
 
-    auto evalResult{pathResult->evaluate(doc)};
-    if (!evalResult)
+    const auto results{path->evaluate(doc)};
+    if (!results)
     {
-        qDebug() << "Failed to evaluate JSONPath";
+        qWarning() << "Failed to evaluate JSONPath:" << results.error().message_qt();
         return EXIT_FAILURE;
     }
 
-    auto titles = toArray(*evalResult);
     qDebug() << "Book titles:";
-    for (const auto& title : titles)
+    for (const auto& title : *results)
         qDebug() << "  -" << title.toString();
 
     return EXIT_SUCCESS;

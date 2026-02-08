@@ -1,29 +1,23 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <QCoreApplication>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QJsonArray>
-#include <QDebug>
-#include <QString>
-#include <expected>
-
-// Enable string literal operators for QString
-using namespace Qt::StringLiterals;
-
 #include "json-query/JSONQuery"
 
-using json_query::Error;
+#include <QCoreApplication>
+#include <QDebug>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+
 using json_query::JSONPointer;
 
-// Helper function to evaluate a JSON Pointer and print the result
-void evaluateAndPrint(const JSONPointer& pointer, const QJsonDocument& doc, QStringView description)
+// Create a pointer, evaluate it, and print the result
+static void evaluatePointer(QStringView path, const QJsonValue& doc, QStringView description)
 {
-    qDebug().noquote() << "\n" << description << ":";
-    qDebug() << "  Pointer:" << (pointer.to_string().isEmpty() ? "\"\" (empty string)" : pointer.to_string());
+    qDebug().noquote() << "\n" << description;
 
-    // Evaluate the pointer against the document
-    auto result = pointer.evaluate(doc);
+    const auto result{
+        JSONPointer::create(path)
+            .and_then([&](const JSONPointer& ptr) { return ptr.evaluate(doc); })};
 
     if (!result)
     {
@@ -31,94 +25,54 @@ void evaluateAndPrint(const JSONPointer& pointer, const QJsonDocument& doc, QStr
         return;
     }
 
-    // Special case: Show the whole document for empty pointer
-    if (pointer.to_string().isEmpty())
-    {
-        qDebug() << "  Result: (whole document)";
-        qDebug().noquote() << "  " << QJsonDocument(result->toObject()).toJson(QJsonDocument::Indented);
-    }
+    if (result->isObject() || result->isArray())
+        qDebug().noquote() << "  =" << QJsonDocument{result->toObject()}.toJson(QJsonDocument::Compact);
     else
-    {
-        // Convert the result to a string for display
-        QString resultStr;
-        if (result->isObject() || result->isArray())
-            resultStr = QJsonDocument(result->toObject()).toJson(QJsonDocument::Compact);
-        else
-            resultStr = result->toVariant().toString();
-
-        qDebug() << "  Result:" << resultStr;
-    }
-}
-
-// Helper function to create and evaluate a pointer
-bool evaluatePointer(QStringView path, const QJsonDocument& doc, QStringView description)
-{
-    // Create the JSON Pointer
-    auto pointer = JSONPointer::create(path);
-    if (!pointer)
-    {
-        qWarning() << "Failed to create pointer:" << path << "-" << description;
-        qWarning() << "  Error:" << pointer.error().message_qt();
-        return false;
-    }
-
-    evaluateAndPrint(*pointer, doc, description);
-    return true;
+        qDebug() << "  =" << result->toVariant().toString();
 }
 
 int main(int argc, char** argv)
 {
-    QCoreApplication app(argc, argv);
+    QCoreApplication app{argc, argv};
 
-    // Sample JSON document demonstrating various JSON Pointer features
-    QJsonObject docObj{
+    const auto doc{QJsonValue{QJsonObject{
         {"name", "John Doe"},
         {"age", 42},
         {"active", true},
         {"address",
          QJsonObject{{"street", "123 Main St"}, {"city", "Anytown"}, {"coordinates", QJsonArray{12.34, 56.78}}}},
         {"tags", QJsonArray{"dev", "qt", "c++"}},
-        {"special/chars", "value"}, // Key with a forward slash
-        {"escaped~chars", "value"}, // Key with a tilde
+        {"special/chars", "value"},
+        {"escaped~chars", "value"},
         {"nested/array",
-         QJsonArray{QJsonObject{{"id", 1}, {"value", "first"}}, QJsonObject{{"id", 2}, {"value", "second"}}}}};
+         QJsonArray{QJsonObject{{"id", 1}, {"value", "first"}}, QJsonObject{{"id", 2}, {"value", "second"}}}},
+    }}};
 
-    QJsonDocument doc(docObj);
+    qDebug() << "=== JSON Pointer (RFC 6901) ===";
 
-    qDebug() << "=== JSON Document ===";
-    qDebug().noquote() << doc.toJson(QJsonDocument::Indented);
-    qDebug() << "====================";
+    // Basic access
+    evaluatePointer(u"", doc, u"Empty pointer → entire document");
+    evaluatePointer(u"/name", doc, u"Simple property");
+    evaluatePointer(u"/age", doc, u"Numeric value");
+    evaluatePointer(u"/active", doc, u"Boolean value");
 
-    // 1. Basic access
-    evaluatePointer(u"", doc, u"1. Empty pointer references the entire document");
-    evaluatePointer(u"/name", doc, u"2. Simple property access");
-    evaluatePointer(u"/age", doc, u"3. Numeric value access");
-    evaluatePointer(u"/active", doc, u"4. Boolean value access");
+    // Nested + array access
+    evaluatePointer(u"/address/street", doc, u"Nested property");
+    evaluatePointer(u"/address/coordinates/0", doc, u"Nested array element");
+    evaluatePointer(u"/tags/0", doc, u"Array element (zero-based)");
+    evaluatePointer(u"/tags/1", doc, u"Second array element");
 
-    // 2. Nested object access
-    evaluatePointer(u"/address/street", doc, u"5. Nested object property");
-    evaluatePointer(u"/address/coordinates/0", doc, u"6. Nested array access (first element)");
+    // Escape sequences: '~0' = '~', '~1' = '/'
+    evaluatePointer(u"/special~1chars", doc, u"Key containing '/' (escaped as ~1)");
+    evaluatePointer(u"/escaped~0chars", doc, u"Key containing '~' (escaped as ~0)");
+    evaluatePointer(u"/nested~1array/1/value", doc, u"Combined escaping + nested access");
 
-    // 3. Array access
-    evaluatePointer(u"/tags/0", doc, u"7. First array element (zero-based)");
-    evaluatePointer(u"/tags/1", doc, u"8. Second array element");
-
-    // 4. Special characters in keys
-    evaluatePointer(u"/special~1chars", doc, u"9. Key with '/' (escaped as '~1')");
-    evaluatePointer(u"/escaped~0chars", doc, u"10. Key with '~' (escaped as '~0')");
-
-    // 5. Complex nested access
-    evaluatePointer(u"/nested~1array/1/value", doc, u"11. Nested array with special characters in key");
-
-    // 6. Error cases
-    evaluatePointer(u"/nonexistent", doc, u"12. Non-existent path");
-    evaluatePointer(u"/tags/10", doc, u"13. Array index out of bounds");
-    evaluatePointer(u"/address/coordinates/not_an_index", doc, u"14. Invalid array index");
-
-    // 7. Invalid pointer syntax
-    qDebug() << "\n=== Error Cases ===";
-    evaluatePointer(u"no_leading_slash", doc, u"15. Missing leading slash (invalid)");
-    evaluatePointer(u"/invalid~escape", doc, u"16. Invalid escape sequence (invalid)");
+    // Error cases
+    qDebug() << "\n=== Error cases ===";
+    evaluatePointer(u"/nonexistent", doc, u"Non-existent path");
+    evaluatePointer(u"/tags/10", doc, u"Array index out of bounds");
+    evaluatePointer(u"no_leading_slash", doc, u"Missing leading slash");
+    evaluatePointer(u"/invalid~escape", doc, u"Invalid escape sequence");
 
     return EXIT_SUCCESS;
 }

@@ -8,134 +8,71 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 
-using namespace json_query;
-
-// Import the as<T> function
 using json_query::as;
 
 int main(int argc, char* argv[])
 {
-    QCoreApplication app(argc, argv);
+    QCoreApplication app{argc, argv};
 
-    // Example JSON data
-    const char* jsonData = R"(
-    {
-        "store": {
-            "name": "The Book Emporium",
-            "book": [
-                {
-                    "title": "The Great Gatsby",
-                    "author": "F. Scott Fitzgerald",
-                    "price": 12.99,
-                    "inStock": true
-                },
-                {
-                    "title": "To Kill a Mockingbird",
-                    "author": "Harper Lee",
-                    "price": 10.50,
-                    "inStock": false
-                }
-            ],
-            "inventory": [
-                {
-                    "id": 1,
-                    "inStock": true,
-                    "quantity": 5
-                }
-            ]
-        }
-    }
-    )";
+    const auto doc{QJsonDocument{QJsonObject{
+        {"store",
+         QJsonObject{
+             {"name", "The Book Emporium"},
+             {"book",
+              QJsonArray{
+                  QJsonObject{{"title", "The Great Gatsby"}, {"author", "F. Scott Fitzgerald"}, {"price", 12.99}, {"inStock", true}},
+                  QJsonObject{{"title", "To Kill a Mockingbird"}, {"author", "Harper Lee"}, {"price", 10.50}, {"inStock", false}},
+              }},
+             {"inventory",
+              QJsonArray{
+                  QJsonObject{{"id", 1}, {"inStock", true}, {"quantity", 5}},
+              }},
+         }},
+    }}};
 
-    // Parse the JSON document
-    QJsonParseError error;
-    QJsonDocument   doc = QJsonDocument::fromJson(jsonData, &error);
-    if (doc.isNull())
-    {
-        qWarning() << "Failed to parse JSON:" << error.errorString();
-        return 1;
-    }
+    const auto root{doc.object()};
 
-    qDebug() << "=== Demonstrating as<T> Function ===\n";
+    qDebug() << "=== as<T> Type-Safe Conversions ===";
 
-    // 1. Get store name as string
-    auto storeName = as<QString>(doc["store"]["name"]);
-    if (storeName)
-        qDebug() << "1. Store name:" << *storeName;
-    else
-        qDebug() << "1. Error getting store name:" << storeName.error().message_qt();
+    // ── 1. Call syntax: as<T>(value) ────────────────────────────────
+    qDebug() << "\n-- Call syntax --";
 
-    // 1b. Same using the PIPE syntax
-    auto storeNamePipe = (doc["store"]["name"] | as<QString>);
-    if (storeNamePipe)
-        qDebug() << "1b. Store name (pipe):" << *storeNamePipe;
-    else
-        qDebug() << "1b. Error getting store name (pipe):" << storeNamePipe.error().message_qt();
+    const auto storeName{as<QString>(root["store"]["name"])};
+    qDebug() << "Store name:" << storeName.value_or("(error)");
 
-    // 2. Get the first book
-    auto firstBook = as<QJsonObject>(doc["store"]["book"][0]);
-    if (firstBook)
-    {
-        // 2.1 Get book title as string
-        auto title = as<QString>((*firstBook)["title"]);
-        if (title)
-            qDebug() << "2.1 Book title:" << *title;
-        else
-            qDebug() << "2.1 Error getting title:" << title.error().message_qt();
+    const auto price{as<double>(root["store"]["book"][0]["price"])};
+    if (price)
+        qDebug() << "First book price:" << *price;
 
-        // 2.1b Title using PIPE syntax
-        auto titlePipe = (((*firstBook)["title"]) | as<QString>);
-        if (titlePipe)
-            qDebug() << "2.1b Book title (pipe):" << *titlePipe;
-        else
-            qDebug() << "2.1b Error getting title (pipe):" << titlePipe.error().message_qt();
+    const auto inStock{as<bool>(root["store"]["book"][0]["inStock"])};
+    if (inStock)
+        qDebug() << "First book in stock:" << *inStock;
 
-        // 2.2 Get book price as double
-        auto price = as<double>((*firstBook)["price"]);
-        if (price)
-            qDebug() << "2.2 Book price:" << *price;
-        else
-            qDebug() << "2.2 Error getting price:" << price.error().message_qt();
+    // ── 2. Pipe syntax: value | as<T> ──────────────────────────────
+    qDebug() << "\n-- Pipe syntax --";
 
-        // 2.2b Price using PIPE syntax
-        auto pricePipe = (((*firstBook)["price"]) | as<double>);
-        if (pricePipe)
-            qDebug() << "2.2b Book price (pipe):" << *pricePipe;
-        else
-            qDebug() << "2.2b Error getting price (pipe):" << pricePipe.error().message_qt();
-    }
-    else
-    {
-        qDebug() << "2. Error getting first book:" << firstBook.error().message_qt();
-    }
+    const auto title{root["store"]["book"][0]["title"] | as<QString>};
+    qDebug() << "First book title:" << title.value_or("(error)");
 
-    // 3. Check inventory status
-    auto store = as<QJsonObject>(doc["store"]);
-    if (store)
-    {
-        auto inventory = as<QJsonArray>((*store)["inventory"]);
-        if (inventory && !inventory->isEmpty())
-        {
-            auto firstItem = as<QJsonObject>((*inventory)[0]);
-            if (firstItem)
-                qDebug() << "3. First item in stock:" << (*firstItem)["inStock"].toBool();
-            else
-                qWarning() << "3. Error getting first inventory item:" << firstItem.error().message_qt();
-        }
-        else
-        {
-            qDebug() << "3. No inventory items found";
-        }
-    }
-    else
-    {
-        qDebug() << "3. Error getting store:" << store.error().message_qt();
-    }
+    const auto author{root["store"]["book"][1]["author"] | as<QString>};
+    qDebug() << "Second book author:" << author.value_or("(error)");
 
-    // 4. Pipe example for a missing key (to show error propagation)
-    auto missingPipe = (doc["store"]["doesNotExist"] | as<QString>);
-    if (!missingPipe)
-        qDebug() << "4. Pipe error example:" << missingPipe.error().message_qt();
+    const auto quantity{root["store"]["inventory"][0]["quantity"] | as<int>};
+    if (quantity)
+        qDebug() << "Inventory quantity:" << *quantity;
+
+    // ── 3. Error handling ──────────────────────────────────────────
+    qDebug() << "\n-- Error cases --";
+
+    // Missing key
+    const auto missing{root["store"]["doesNotExist"] | as<QString>};
+    if (!missing)
+        qDebug() << "Missing key:" << missing.error().message_qt();
+
+    // Type mismatch: name is a string, not an int
+    const auto wrongType{as<int>(root["store"]["name"])};
+    if (!wrongType)
+        qDebug() << "Wrong type:" << wrongType.error().message_qt();
 
     return 0;
 }
