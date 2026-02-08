@@ -97,13 +97,13 @@ struct ObjectSchema
     std::optional<QJsonValue> constValue;
 
     // Object keywords
-    std::unordered_map<QString, std::size_t>                properties; // property name → node index
+    std::unordered_map<QString, std::size_t>         properties; // property name → node index
     std::vector<std::pair<SchemaRegex, std::size_t>> patternProperties;
-    std::optional<std::size_t>                              additionalProperties;
-    std::vector<QString>                                    required{};
-    std::optional<std::size_t>                              minProperties;
-    std::optional<std::size_t>                              maxProperties;
-    std::optional<std::size_t>                              propertyNames; // schema for property names
+    std::optional<std::size_t>                       additionalProperties;
+    std::vector<QString>                             required{};
+    std::optional<std::size_t>                       minProperties;
+    std::optional<std::size_t>                       maxProperties;
+    std::optional<std::size_t>                       propertyNames; // schema for property names
 
     // Array keywords
     std::optional<std::size_t> items;       // node index for items schema (2020-12 style)
@@ -117,9 +117,9 @@ struct ObjectSchema
 
     // String keywords
     std::optional<SchemaRegex> pattern;
-    std::optional<std::size_t>        minLength;
-    std::optional<std::size_t>        maxLength;
-    std::optional<QString>            format;
+    std::optional<std::size_t> minLength;
+    std::optional<std::size_t> maxLength;
+    std::optional<QString>     format;
 
     // Numeric keywords
     std::optional<double> minimum;
@@ -149,7 +149,7 @@ struct ObjectSchema
 
     // Node identity (for resource scope management during validation)
     static constexpr std::size_t kNoIndex{std::numeric_limits<std::size_t>::max()};
-    std::size_t selfIndex{kNoIndex};
+    std::size_t                  selfIndex{kNoIndex};
 
     // Metadata (not used for validation, but stored for introspection)
     std::optional<QString> title;
@@ -167,10 +167,10 @@ struct DynamicRefSchema
     static constexpr std::size_t kUnresolved{std::numeric_limits<std::size_t>::max()};
 
     std::size_t targetIndex{kUnresolved}; // Static fallback target
-    QString     anchorName;              // Dynamic anchor name to search for at runtime
-    std::size_t selfIndex{kUnresolved};  // Own node index for resource scope push
-    QString     originalRef;             // Original $dynamicRef string for error messages
-    QString     baseUri;                 // Base URI at compile time for relative ref resolution
+    QString     anchorName;               // Dynamic anchor name to search for at runtime
+    std::size_t selfIndex{kUnresolved};   // Own node index for resource scope push
+    QString     originalRef;              // Original $dynamicRef string for error messages
+    QString     baseUri;                  // Base URI at compile time for relative ref resolution
 
     [[nodiscard]] bool isResolved() const noexcept { return targetIndex != kUnresolved; }
 };

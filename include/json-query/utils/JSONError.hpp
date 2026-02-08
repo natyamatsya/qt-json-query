@@ -210,10 +210,7 @@ struct Error
     [[nodiscard]] constexpr bool is_schema_eval() const noexcept { return domain == ErrorDomain::SchemaEval; }
 
     // Equality — compares domain + code only (detail is context, not identity)
-    friend constexpr bool operator==(Error a, Error b) noexcept
-    {
-        return a.domain == b.domain && a.code == b.code;
-    }
+    friend constexpr bool operator==(Error a, Error b) noexcept { return a.domain == b.domain && a.code == b.code; }
     friend constexpr bool operator!=(Error a, Error b) noexcept { return !(a == b); }
 };
 

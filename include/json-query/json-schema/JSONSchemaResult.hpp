@@ -27,10 +27,10 @@ namespace json_query::json_schema
  */
 struct ValidationError
 {
-    QString   instanceLocation; // JSON Pointer to failing data (e.g., "/address/zip")
-    QString   schemaLocation;   // JSON Pointer within schema (e.g., "#/properties/address")
-    QString   message;          // Human-readable description
-    json_query::Error code{}; // Machine-readable error code (unified across modules)
+    QString           instanceLocation; // JSON Pointer to failing data (e.g., "/address/zip")
+    QString           schemaLocation;   // JSON Pointer within schema (e.g., "#/properties/address")
+    QString           message;          // Human-readable description
+    json_query::Error code{};           // Machine-readable error code (unified across modules)
 
     // For nested errors (e.g., from allOf/anyOf)
     std::vector<ValidationError> nested{};

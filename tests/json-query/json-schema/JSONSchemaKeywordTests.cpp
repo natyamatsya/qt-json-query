@@ -642,7 +642,7 @@ TEST_F(JSONSchemaKeywordTest, UnevaluatedPropertiesFalse)
     EXPECT_TRUE(schemaResult->validate(valid).isValid());
 
     QJsonObject invalid{};
-    invalid[u"foo"_qt_s] = u"bar"_qt_s;
+    invalid[u"foo"_qt_s]   = u"bar"_qt_s;
     invalid[u"extra"_qt_s] = 1;
     EXPECT_FALSE(schemaResult->validate(invalid).isValid());
 }
@@ -686,8 +686,8 @@ TEST_F(JSONSchemaKeywordTest, UnevaluatedPropertiesWithAnyOf)
     EXPECT_TRUE(schemaResult->validate(valid).isValid());
 
     QJsonObject invalid{};
-    invalid[u"foo"_qt_s] = u"foo"_qt_s;
-    invalid[u"bar"_qt_s] = u"bar"_qt_s;
+    invalid[u"foo"_qt_s]   = u"foo"_qt_s;
+    invalid[u"bar"_qt_s]   = u"bar"_qt_s;
     invalid[u"extra"_qt_s] = 1;
     EXPECT_FALSE(schemaResult->validate(invalid).isValid());
 }
@@ -717,8 +717,8 @@ TEST_F(JSONSchemaKeywordTest, UnevaluatedPropertiesWithIfThenElse)
 
     // extra property not evaluated by any branch
     QJsonObject invalid{};
-    invalid[u"foo"_qt_s] = u"yes"_qt_s;
-    invalid[u"bar"_qt_s] = u"b"_qt_s;
+    invalid[u"foo"_qt_s]   = u"yes"_qt_s;
+    invalid[u"bar"_qt_s]   = u"b"_qt_s;
     invalid[u"extra"_qt_s] = 1;
     EXPECT_FALSE(schemaResult->validate(invalid).isValid());
 }
@@ -733,12 +733,12 @@ TEST_F(JSONSchemaKeywordTest, UnevaluatedPropertiesSchema)
     ASSERT_TRUE(schemaResult.has_value());
 
     QJsonObject valid{};
-    valid[u"foo"_qt_s] = u"bar"_qt_s;
+    valid[u"foo"_qt_s]   = u"bar"_qt_s;
     valid[u"extra"_qt_s] = 42;
     EXPECT_TRUE(schemaResult->validate(valid).isValid());
 
     QJsonObject invalid{};
-    invalid[u"foo"_qt_s] = u"bar"_qt_s;
+    invalid[u"foo"_qt_s]   = u"bar"_qt_s;
     invalid[u"extra"_qt_s] = u"not a number"_qt_s;
     EXPECT_FALSE(schemaResult->validate(invalid).isValid());
 }

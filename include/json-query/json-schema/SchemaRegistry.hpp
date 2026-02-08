@@ -78,8 +78,7 @@ class SchemaRegistry
      * @param options  Compilation options
      * @return The compiled schema, or a compilation error
      */
-    JSONSchema::ParseResult add(const QString& uri, const QJsonValue& schema,
-                                SchemaOptions options = {});
+    JSONSchema::ParseResult add(const QString& uri, const QJsonValue& schema, SchemaOptions options = {});
 
     /**
      * @brief Retrieve a previously compiled schema by URI

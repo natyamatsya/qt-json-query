@@ -21,8 +21,7 @@ namespace json_query::json_schema::internal
 /**
  * @brief Parse the 'type' keyword
  */
-[[nodiscard]] inline std::expected<std::optional<TypeConstraint>, Error>
-parseTypeKeyword(const QJsonValue& typeValue)
+[[nodiscard]] inline std::expected<std::optional<TypeConstraint>, Error> parseTypeKeyword(const QJsonValue& typeValue)
 {
     if (typeValue.isUndefined())
         return std::nullopt;
@@ -141,8 +140,7 @@ parsePatternKeyword(const QJsonValue& patternValue)
 /**
  * @brief Parse the 'required' keyword
  */
-[[nodiscard]] inline std::expected<std::vector<QString>, Error>
-parseRequiredKeyword(const QJsonValue& requiredValue)
+[[nodiscard]] inline std::expected<std::vector<QString>, Error> parseRequiredKeyword(const QJsonValue& requiredValue)
 {
     std::vector<QString> result{};
 

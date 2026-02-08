@@ -131,24 +131,14 @@ inline void validateArray(ValidateContext&    ctx,
 
         if (matchCount < minC)
         {
-            const auto msg{QString(u"Array contains %1 matching items, minimum is %2")
-                               .arg(matchCount)
-                               .arg(minC)};
-            ctx.result.addError(instancePath,
-                                schemaPath + u"/minContains"_qt_s,
-                                msg,
-                                EvalError::ContainsViolation);
+            const auto msg{QString(u"Array contains %1 matching items, minimum is %2").arg(matchCount).arg(minC)};
+            ctx.result.addError(instancePath, schemaPath + u"/minContains"_qt_s, msg, EvalError::ContainsViolation);
         }
 
         if (maxC && matchCount > *maxC)
         {
-            const auto msg{QString(u"Array contains %1 matching items, maximum is %2")
-                               .arg(matchCount)
-                               .arg(*maxC)};
-            ctx.result.addError(instancePath,
-                                schemaPath + u"/maxContains"_qt_s,
-                                msg,
-                                EvalError::ContainsViolation);
+            const auto msg{QString(u"Array contains %1 matching items, maximum is %2").arg(matchCount).arg(*maxC)};
+            ctx.result.addError(instancePath, schemaPath + u"/maxContains"_qt_s, msg, EvalError::ContainsViolation);
         }
     }
 }
@@ -176,7 +166,7 @@ inline void validateUnevaluatedItems(ValidateContext&    ctx,
         if (ctx.tracker->items.contains(i))
             continue;
 
-        const auto itemPath{instancePath + u"/"_qt_s + QString::number(i)};
+        const auto  itemPath{instancePath + u"/"_qt_s + QString::number(i)};
         const auto& unevalNode{ctx.schema.nodeAt(*node.unevaluatedItems)};
 
         if (const auto* boolSchema = std::get_if<BooleanSchema>(&unevalNode))
@@ -184,10 +174,8 @@ inline void validateUnevaluatedItems(ValidateContext&    ctx,
             if (!boolSchema->value)
             {
                 const auto msg{QString(u"Unevaluated item at index %1 is not allowed").arg(i)};
-                ctx.result.addError(itemPath,
-                                    schemaPath + u"/unevaluatedItems"_qt_s,
-                                    msg,
-                                    EvalError::UnevaluatedItemsInvalid);
+                ctx.result.addError(
+                    itemPath, schemaPath + u"/unevaluatedItems"_qt_s, msg, EvalError::UnevaluatedItemsInvalid);
             }
         }
         else

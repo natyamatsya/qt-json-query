@@ -44,7 +44,7 @@ struct DynamicScopeGuard
 {
     std::vector<DynamicScopeEntry>& stack;
 
-    explicit DynamicScopeGuard(std::vector<DynamicScopeEntry>& s,
+    explicit DynamicScopeGuard(std::vector<DynamicScopeEntry>&                 s,
                                const std::unordered_map<QString, std::size_t>& anchors)
         : stack{s}
     {

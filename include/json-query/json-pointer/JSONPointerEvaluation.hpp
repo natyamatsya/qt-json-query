@@ -57,8 +57,8 @@ struct DetailedEvalError
 // incompatibility with Qt's copy-on-write semantics under AddressSanitizer.
 // The sanitizer's memory layout changes interfere with QJsonArray/QJsonObject operations,
 // causing functional test failures (not memory safety issues).
-[[nodiscard]] inline std::expected<QJsonValue, DetailedEvalError> evaluatePointerImpl(
-    const std::vector<Token>& tokens, const QJsonValue& root) noexcept
+[[nodiscard]] inline std::expected<QJsonValue, DetailedEvalError> evaluatePointerImpl(const std::vector<Token>& tokens,
+                                                                                      const QJsonValue& root) noexcept
 {
     if (tokens.empty())
         return root; // success with root value
@@ -89,8 +89,8 @@ struct DetailedEvalError
 }
 
 // Public API that converts domain errors to Error (with token index in detail)
-[[nodiscard]] inline std::expected<QJsonValue, json_query::Error>
-evaluatePointer(const std::vector<Token>& tokens, const QJsonValue& root) noexcept
+[[nodiscard]] inline std::expected<QJsonValue, json_query::Error> evaluatePointer(const std::vector<Token>& tokens,
+                                                                                  const QJsonValue& root) noexcept
 {
     auto result{evaluatePointerImpl(tokens, root)};
     if (!result)
@@ -100,7 +100,7 @@ evaluatePointer(const std::vector<Token>& tokens, const QJsonValue& root) noexce
 
 // Convenience overload taking a PointerEvalCtx to mirror JSONPath's API
 [[nodiscard]] inline std::expected<QJsonValue, json_query::Error> evaluatePointer(const PointerEvalCtx& ctx,
-                                                                                       const QJsonValue& root) noexcept
+                                                                                  const QJsonValue&     root) noexcept
 {
     return evaluatePointer(ctx.tokens, root);
 }

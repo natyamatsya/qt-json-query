@@ -133,7 +133,7 @@ inline bool validateSingleProperty(ValidateContext&    ctx,
                      propPath,
                      json_pointer::appendToken(schemaPath + u"/properties"_qt_s, propName));
         ctx.tracker = parentTracker;
-        evaluated = true;
+        evaluated   = true;
     }
 
     // Check patternProperties
@@ -145,7 +145,7 @@ inline bool validateSingleProperty(ValidateContext&    ctx,
             validateNode(
                 ctx, ctx.schema.nodeAt(schemaIndex), propValue, propPath, schemaPath + u"/patternProperties"_qt_s);
             ctx.tracker = parentTracker;
-            evaluated = true;
+            evaluated   = true;
         }
     }
 
@@ -256,7 +256,7 @@ inline void validateUnevaluatedProperties(ValidateContext&    ctx,
             continue;
 
         // Property was not evaluated — validate against unevaluatedProperties schema
-        const auto propPath{json_pointer::appendToken(instancePath, it.key())};
+        const auto  propPath{json_pointer::appendToken(instancePath, it.key())};
         const auto& unevalNode{ctx.schema.nodeAt(*node.unevaluatedProperties)};
 
         if (const auto* boolSchema = std::get_if<BooleanSchema>(&unevalNode))

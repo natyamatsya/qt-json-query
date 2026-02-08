@@ -14,7 +14,10 @@
 #include "JSONSchemaError.hpp"
 #include "JSONSchemaResult.hpp"
 #include "json-query/utils/JSONError.hpp"
-namespace json_query::json_schema::internal { struct CompiledSchema; }
+namespace json_query::json_schema::internal
+{
+struct CompiledSchema;
+}
 
 namespace json_query::json_schema
 {

@@ -40,9 +40,8 @@ tryParseKeyword(const QJsonObject& obj, const QString& key, std::optional<T>& ta
 /**
  * @brief Compile string-related keywords (pattern, minLength, maxLength, format)
  */
-[[nodiscard]] inline std::expected<void, Error> compileStringKeywords(const QJsonObject& schemaObj,
-                                                                           ObjectSchema&      node,
-                                                                           bool validationVocabActive = true)
+[[nodiscard]] inline std::expected<void, Error>
+compileStringKeywords(const QJsonObject& schemaObj, ObjectSchema& node, bool validationVocabActive = true)
 {
     using json_query::literals::operator""_qt_s;
 
@@ -75,7 +74,7 @@ tryParseKeyword(const QJsonObject& obj, const QString& key, std::optional<T>& ta
  * @brief Compile numeric-related keywords (minimum, maximum, exclusiveMinimum, exclusiveMaximum, multipleOf)
  */
 [[nodiscard]] inline std::expected<void, Error> compileNumericKeywords(const QJsonObject& schemaObj,
-                                                                            ObjectSchema&      node)
+                                                                       ObjectSchema&      node)
 {
     using json_query::literals::operator""_qt_s;
 
@@ -133,7 +132,8 @@ compileArrayKeywords(CompileContext& ctx, const QJsonObject& schemaObj, ObjectSc
     }
 
     // prefixItems - array of schemas (2020-12+ only)
-    if (ctx.prefixItemsSupported && schemaObj.contains(u"prefixItems"_qt_s) && schemaObj[u"prefixItems"_qt_s].isArray())
+    if (ctx.prefixItemsSupported && schemaObj.contains(u"prefixItems"_qt_s) &&
+        schemaObj[u"prefixItems"_qt_s].isArray())
     {
         for (const auto& item : schemaObj[u"prefixItems"_qt_s].toArray())
         {
@@ -331,9 +331,9 @@ compileObjectKeywords(CompileContext& ctx, const QJsonObject& schemaObj, ObjectS
  * @brief Compile combinator keywords (allOf, anyOf, oneOf, not, if/then/else)
  */
 [[nodiscard]] inline std::expected<void, Error> compileCombinatorKeywords(CompileContext&    ctx,
-                                                                               const QJsonObject& schemaObj,
-                                                                               ObjectSchema&      node,
-                                                                               CompileSchemaFn&   compile)
+                                                                          const QJsonObject& schemaObj,
+                                                                          ObjectSchema&      node,
+                                                                          CompileSchemaFn&   compile)
 {
     using json_query::literals::operator""_qt_s;
 
@@ -423,7 +423,6 @@ inline void compileMetadataKeywords(const QJsonObject& schemaObj, ObjectSchema& 
     if (schemaObj.contains(u"description"_qt_s) && schemaObj[u"description"_qt_s].isString())
         node.description = schemaObj[u"description"_qt_s].toString();
 }
-
 
 // ────────────────────────────────────────────────────────────────────────────
 // TableGen-Inspired Keyword Category Dispatch

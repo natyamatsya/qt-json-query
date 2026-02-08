@@ -84,7 +84,7 @@ void validateObjectSchema(ValidateContext&    ctx,
     // Set up evaluation tracking if this schema uses unevaluatedProperties/unevaluatedItems.
     // Always create a local tracker so this schema only sees its own evaluations,
     // not evaluations from sibling keywords in a parent schema.
-    const auto needsTracker{node.unevaluatedProperties || node.unevaluatedItems};
+    const auto         needsTracker{node.unevaluatedProperties || node.unevaluatedItems};
     EvaluationTracker  localTracker{};
     EvaluationTracker* savedTracker{ctx.tracker};
     if (needsTracker)
@@ -198,7 +198,8 @@ void validateNode(ValidateContext&  ctx,
                 if (!schemaVariant.anchorName.isEmpty() && !schemaVariant.anchorName.startsWith(u'/'))
                 {
                     const auto anchorIt{ctx.schema.nodeDynAnchorNames.find(targetIndex)};
-                    if (anchorIt != ctx.schema.nodeDynAnchorNames.end() && anchorIt->second == schemaVariant.anchorName)
+                    if (anchorIt != ctx.schema.nodeDynAnchorNames.end() &&
+                        anchorIt->second == schemaVariant.anchorName)
                     {
                         if (const auto resolved{ctx.resolveDynamicAnchor(schemaVariant.anchorName)})
                             targetIndex = *resolved;

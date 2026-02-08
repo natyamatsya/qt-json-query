@@ -34,7 +34,7 @@ std::expected<std::size_t, Error> compileSchemaNode(CompileContext& ctx, const Q
  * @brief Compile properties keyword
  */
 std::expected<std::unordered_map<QString, std::size_t>, Error> compileProperties(CompileContext&   ctx,
-                                                                                      const QJsonValue& propsValue)
+                                                                                 const QJsonValue& propsValue)
 {
     std::unordered_map<QString, std::size_t> result;
 
@@ -59,8 +59,7 @@ std::expected<std::unordered_map<QString, std::size_t>, Error> compileProperties
 /**
  * @brief Compile array of schemas (for allOf, anyOf, oneOf)
  */
-std::expected<std::vector<std::size_t>, Error> compileSchemaArray(CompileContext&   ctx,
-                                                                       const QJsonValue& arrayValue)
+std::expected<std::vector<std::size_t>, Error> compileSchemaArray(CompileContext& ctx, const QJsonValue& arrayValue)
 {
     std::vector<std::size_t> result{};
 
@@ -88,7 +87,7 @@ std::expected<std::vector<std::size_t>, Error> compileSchemaArray(CompileContext
  * @brief Compile an optional sub-schema
  */
 std::expected<std::optional<std::size_t>, Error> compileOptionalSchema(CompileContext&   ctx,
-                                                                            const QJsonValue& schemaValue)
+                                                                       const QJsonValue& schemaValue)
 {
     if (schemaValue.isUndefined())
         return std::nullopt;
@@ -104,10 +103,17 @@ std::expected<std::optional<std::size_t>, Error> compileOptionalSchema(CompileCo
 // ────────────────────────────────────────────────────────────────────────────
 
 /// Metadata-only keywords that don't affect validation
-static constexpr std::array kMetadataOnlyKeys{
-    u"$ref",         u"$anchor",        u"$id",          u"$schema",
-    u"$defs",        u"definitions",    u"title",        u"description",
-    u"$comment",     u"$dynamicRef",    u"$dynamicAnchor"};
+static constexpr std::array kMetadataOnlyKeys{u"$ref",
+                                              u"$anchor",
+                                              u"$id",
+                                              u"$schema",
+                                              u"$defs",
+                                              u"definitions",
+                                              u"title",
+                                              u"description",
+                                              u"$comment",
+                                              u"$dynamicRef",
+                                              u"$dynamicAnchor"};
 
 /**
  * @brief Check if schema contains validation keywords beyond metadata
@@ -184,7 +190,7 @@ void processSchemaId(CompileContext& ctx, const QJsonObject& schemaObj, const QJ
     if (schemaObj.contains(u"$id"_qt_s) && schemaObj[u"$id"_qt_s].isString())
     {
         const auto rawId{schemaObj[u"$id"_qt_s].toString()};
-        ctx.baseUri = resolveUri(rawId, ctx.baseUri);
+        ctx.baseUri                        = resolveUri(rawId, ctx.baseUri);
         ctx.resourceDocuments[ctx.baseUri] = schemaValue;
     }
 }
@@ -238,9 +244,9 @@ struct BaseUriScope
 
 // Forward declaration: compileSchemaNode and compileDefinitionsBlock are mutually recursive
 [[nodiscard]] std::expected<void, Error> compileDefinitionsBlock(CompileContext&    ctx,
-                                                                      const QJsonObject& rootObj,
-                                                                      const QString&     keyword,
-                                                                      const QString&     pathPrefix);
+                                                                 const QJsonObject& rootObj,
+                                                                 const QString&     keyword,
+                                                                 const QString&     pathPrefix);
 
 /**
  * @brief Compile a single schema node (recursive worker function)
@@ -308,30 +314,38 @@ std::expected<std::size_t, Error> compileSchemaNode(CompileContext& ctx, const Q
     };
 
     if (hasRef && !hasDynRef && !hasValidationKeywords(schemaObj))
-        return registerIdForFastPath(ctx.addNode(RefSchema{RefSchema::kUnresolved, qualifyRef(schemaObj[u"$ref"_qt_s].toString()), RefSchema::kNoIndex, ctx.baseUri}));
+        return registerIdForFastPath(ctx.addNode(RefSchema{RefSchema::kUnresolved,
+                                                           qualifyRef(schemaObj[u"$ref"_qt_s].toString()),
+                                                           RefSchema::kNoIndex,
+                                                           ctx.baseUri}));
 
     if (hasDynRef && !hasRef && !hasValidationKeywords(schemaObj))
     {
         const auto dynRefStr{qualifyRef(schemaObj[u"$dynamicRef"_qt_s].toString())};
-        auto fragment{dynRefStr};
+        auto       fragment{dynRefStr};
         if (const auto hashPos{dynRefStr.indexOf(u'#')}; hashPos >= 0)
             fragment = dynRefStr.mid(hashPos + 1);
-        return registerIdForFastPath(ctx.addNode(DynamicRefSchema{DynamicRefSchema::kUnresolved, fragment, DynamicRefSchema::kUnresolved, dynRefStr, ctx.baseUri}));
+        return registerIdForFastPath(ctx.addNode(DynamicRefSchema{
+            DynamicRefSchema::kUnresolved, fragment, DynamicRefSchema::kUnresolved, dynRefStr, ctx.baseUri}));
     }
 
     // Phase 3: Build ObjectSchema via dispatch
     ObjectSchema node{};
 
     if (hasRef)
-        node.allOf.push_back(ctx.addNode(RefSchema{RefSchema::kUnresolved, qualifyRef(schemaObj[u"$ref"_qt_s].toString()), RefSchema::kNoIndex, ctx.baseUri}));
+        node.allOf.push_back(ctx.addNode(RefSchema{RefSchema::kUnresolved,
+                                                   qualifyRef(schemaObj[u"$ref"_qt_s].toString()),
+                                                   RefSchema::kNoIndex,
+                                                   ctx.baseUri}));
 
     if (hasDynRef)
     {
         const auto dynRefStr{qualifyRef(schemaObj[u"$dynamicRef"_qt_s].toString())};
-        auto fragment{dynRefStr};
+        auto       fragment{dynRefStr};
         if (const auto hashPos{dynRefStr.indexOf(u'#')}; hashPos >= 0)
             fragment = dynRefStr.mid(hashPos + 1);
-        node.allOf.push_back(ctx.addNode(DynamicRefSchema{DynamicRefSchema::kUnresolved, fragment, DynamicRefSchema::kUnresolved, dynRefStr, ctx.baseUri}));
+        node.allOf.push_back(ctx.addNode(DynamicRefSchema{
+            DynamicRefSchema::kUnresolved, fragment, DynamicRefSchema::kUnresolved, dynRefStr, ctx.baseUri}));
     }
 
     if (auto r{FullKeywordDispatcher::dispatch(ctx, schemaObj, node, compileSchemaNode)}; !r)
@@ -354,10 +368,10 @@ std::expected<std::size_t, Error> compileSchemaNode(CompileContext& ctx, const Q
     if (dynAnchorName)
     {
         const auto scopedKey{ctx.scopedAnchorKey(*dynAnchorName)};
-        ctx.anchors[scopedKey] = nodeIndex;
+        ctx.anchors[scopedKey]        = nodeIndex;
         ctx.dynamicAnchors[scopedKey] = nodeIndex;
         // Also register unscoped for simple fragment lookup
-        ctx.anchors[*dynAnchorName] = nodeIndex;
+        ctx.anchors[*dynAnchorName]        = nodeIndex;
         ctx.dynamicAnchors[*dynAnchorName] = nodeIndex;
         // Record for per-resource map building
         ctx.pendingDynamicAnchors.push_back({ctx.baseUri, *dynAnchorName, nodeIndex});
@@ -396,9 +410,9 @@ void extractRootMetadata(const QJsonObject& rootObj, internal::CompiledSchema& c
  * @brief Compile definitions block ($defs or definitions)
  */
 [[nodiscard]] std::expected<void, Error> compileDefinitionsBlock(CompileContext&    ctx,
-                                                                      const QJsonObject& rootObj,
-                                                                      const QString&     keyword,
-                                                                      const QString&     pathPrefix)
+                                                                 const QJsonObject& rootObj,
+                                                                 const QString&     keyword,
+                                                                 const QString&     pathPrefix)
 {
     using json_query::literals::operator""_qt_s;
 
@@ -434,7 +448,7 @@ QString percentDecode(const QString& input)
         if (input[i] == u'%' && i + 2 < input.size())
         {
             const auto hex{input.mid(i + 1, 2)};
-            bool ok{false};
+            bool       ok{false};
             const auto ch{static_cast<char>(hex.toInt(&ok, 16))};
             if (ok)
             {
@@ -456,13 +470,12 @@ QString percentDecode(const QString& input)
  * the nodes vector. Callers must NOT hold references into the vector across
  * this call — use the returned index to write back via the stable vector index.
  */
-[[nodiscard]] std::optional<std::size_t>
-resolveRef(const QString&                                   ref,
-           const QString&                                   refBaseUri,
-           std::size_t                                      rootIndex,
-           const std::unordered_map<QString, std::size_t>&  anchors,
-           const QJsonValue&                                rootSchema,
-           CompileContext&                                   ctx)
+[[nodiscard]] std::optional<std::size_t> resolveRef(const QString&                                  ref,
+                                                    const QString&                                  refBaseUri,
+                                                    std::size_t                                     rootIndex,
+                                                    const std::unordered_map<QString, std::size_t>& anchors,
+                                                    const QJsonValue&                               rootSchema,
+                                                    CompileContext&                                 ctx)
 {
     using json_query::literals::operator""_qt_s;
 
@@ -489,7 +502,7 @@ resolveRef(const QString&                                   ref,
         // Try JSON Pointer resolution against the root schema document
         if (fragment.startsWith(u"/"_qt_s))
         {
-            const auto decoded{percentDecode(fragment)};
+            const auto                       decoded{percentDecode(fragment)};
             std::vector<json_pointer::Token> tokens{};
             if (json_pointer::detail::parsePointer(decoded, tokens))
             {
@@ -509,7 +522,7 @@ resolveRef(const QString&                                   ref,
     if (ref.contains(u'#'))
     {
         const auto hashPos{ref.lastIndexOf(u'#')};
-        auto baseUri{ref.left(hashPos)};
+        auto       baseUri{ref.left(hashPos)};
         const auto fragment{ref.mid(hashPos + 1)};
 
         // Try the full ref as a direct anchor match (e.g., scoped dynamic anchor key)
@@ -540,7 +553,7 @@ resolveRef(const QString&                                   ref,
             const auto docIt{ctx.resourceDocuments.find(baseUri)};
             if (docIt != ctx.resourceDocuments.end())
             {
-                const auto decoded{percentDecode(fragment)};
+                const auto                       decoded{percentDecode(fragment)};
                 std::vector<json_pointer::Token> tokens{};
                 if (json_pointer::detail::parsePointer(decoded, tokens))
                 {
@@ -612,9 +625,9 @@ resolveRef(const QString&                                   ref,
  *
  * @return true if the schema was fetched and compiled successfully
  */
-bool fetchAndCompileRemoteSchema(CompileContext&                                  ctx,
-                                 const QString&                                   uri,
-                                 std::unordered_map<QString, std::size_t>&        anchors)
+bool fetchAndCompileRemoteSchema(CompileContext&                           ctx,
+                                 const QString&                            uri,
+                                 std::unordered_map<QString, std::size_t>& anchors)
 {
     using json_query::literals::operator""_qt_s;
 
@@ -667,14 +680,13 @@ bool fetchAndCompileRemoteSchema(CompileContext&                                
  * Takes originalRef and anchorName by value to avoid dangling references
  * (resolveRef may reallocate the nodes vector).
  */
-[[nodiscard]] std::optional<std::size_t>
-resolveDynRef(const QString&                                   originalRef,
-              const QString&                                   anchorName,
-              const QString&                                   refBaseUri,
-              std::size_t                                      rootIndex,
-              const std::unordered_map<QString, std::size_t>&  anchors,
-              const QJsonValue&                                rootSchema,
-              CompileContext&                                   ctx)
+[[nodiscard]] std::optional<std::size_t> resolveDynRef(const QString&                                  originalRef,
+                                                       const QString&                                  anchorName,
+                                                       const QString&                                  refBaseUri,
+                                                       std::size_t                                     rootIndex,
+                                                       const std::unordered_map<QString, std::size_t>& anchors,
+                                                       const QJsonValue&                               rootSchema,
+                                                       CompileContext&                                 ctx)
 {
     using json_query::literals::operator""_qt_s;
 
@@ -716,14 +728,14 @@ QString extractRefBaseUri(const QString& ref)
     return hashPos >= 0 ? ref.left(hashPos) : ref;
 }
 
-void resolveAllReferences(internal::CompiledSchema&                        compiled,
-                          std::unordered_map<QString, std::size_t>&        anchors,
-                          const QJsonValue&                               rootSchema,
-                          CompileContext&                                  ctx)
+void resolveAllReferences(internal::CompiledSchema&                 compiled,
+                          std::unordered_map<QString, std::size_t>& anchors,
+                          const QJsonValue&                         rootSchema,
+                          CompileContext&                           ctx)
 {
     // Resolve in bounded passes: newly compiled schemas may introduce new refs
     static constexpr int kMaxPasses{16};
-    std::size_t start{0};
+    std::size_t          start{0};
     for (int pass{0}; pass < kMaxPasses; ++pass)
     {
         const auto end{compiled.nodes.size()};
@@ -749,7 +761,7 @@ void resolveAllReferences(internal::CompiledSchema&                        compi
             {
                 if (dynRefNode->isResolved())
                     continue;
-                const auto origRef{dynRefNode->originalRef};   // copy before potential realloc
+                const auto origRef{dynRefNode->originalRef}; // copy before potential realloc
                 const auto anchor{dynRefNode->anchorName};
                 const auto base{dynRefNode->baseUri};
                 if (auto target{resolveDynRef(origRef, anchor, base, compiled.rootIndex, anchors, rootSchema, ctx)})
@@ -769,7 +781,7 @@ void resolveAllReferences(internal::CompiledSchema&                        compi
                 {
                     if (!refNode->isResolved())
                     {
-                        uri = extractRefBaseUri(refNode->originalRef);
+                        uri  = extractRefBaseUri(refNode->originalRef);
                         base = refNode->baseUri;
                     }
                 }
@@ -777,7 +789,7 @@ void resolveAllReferences(internal::CompiledSchema&                        compi
                 {
                     if (!dynRefNode->isResolved())
                     {
-                        uri = extractRefBaseUri(dynRefNode->originalRef);
+                        uri  = extractRefBaseUri(dynRefNode->originalRef);
                         base = dynRefNode->baseUri;
                     }
                 }
@@ -861,10 +873,10 @@ phase2_CompileSchemaTree(internal::CompiledSchema& compiled, CompileContext& ctx
  * Resolves all $ref references to their target node indices using the anchor table.
  * JSON Pointer refs are resolved by walking the original schema document.
  */
-void phase3_LinkReferences(internal::CompiledSchema&                  compiled,
+void phase3_LinkReferences(internal::CompiledSchema&                 compiled,
                            std::unordered_map<QString, std::size_t>& anchors,
                            const QJsonValue&                         rootSchema,
-                           CompileContext&                            ctx)
+                           CompileContext&                           ctx)
 {
     resolveAllReferences(compiled, anchors, rootSchema, ctx);
 }
@@ -910,7 +922,8 @@ compileSchema(const QJsonValue& schemaValue, SchemaFetcher fetcher, SchemaOption
 
     // Initialize compilation context
     auto           compiled{std::make_shared<internal::CompiledSchema>()};
-    CompileContext ctx{compiled->nodes, compiled->anchors, compiled->dynamicAnchors, {}, {}, fetcher ? &fetcher : nullptr};
+    CompileContext ctx{
+        compiled->nodes, compiled->anchors, compiled->dynamicAnchors, {}, {}, fetcher ? &fetcher : nullptr};
 
     // Phase 1: Symbol Table Construction
     if (auto r{phase1_BuildSymbolTable(*compiled, ctx, schemaValue)}; !r)
@@ -931,12 +944,12 @@ compileSchema(const QJsonValue& schemaValue, SchemaFetcher fetcher, SchemaOption
                 if (vocabObj.isObject())
                 {
                     const auto vocabObject{vocabObj.toObject()};
-                    ctx.validationVocabActive = vocabObject.contains(
-                        u"https://json-schema.org/draft/2020-12/vocab/validation"_qt_s);
+                    ctx.validationVocabActive =
+                        vocabObject.contains(u"https://json-schema.org/draft/2020-12/vocab/validation"_qt_s);
                     // Auto mode: derive format assertion from vocabulary
                     if (options.formatValidation == FormatValidation::Auto)
-                        compiled->formatAssertionEnabled = vocabObject.contains(
-                            u"https://json-schema.org/draft/2020-12/vocab/format-assertion"_qt_s);
+                        compiled->formatAssertionEnabled =
+                            vocabObject.contains(u"https://json-schema.org/draft/2020-12/vocab/format-assertion"_qt_s);
                 }
             }
         }

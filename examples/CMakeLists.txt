@@ -42,7 +42,12 @@ if(TARGET function_ref_interface)
   target_link_libraries(simple_schema PRIVATE function_ref_interface)
 endif()
 
-install(TARGETS simple_pointer monadic_error_handling_demo simple_path
-                complex_query refactor_potential as_function_demo
-                simple_schema
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}/examples)
+install(
+  TARGETS simple_pointer
+          monadic_error_handling_demo
+          simple_path
+          complex_query
+          refactor_potential
+          as_function_demo
+          simple_schema
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}/examples)

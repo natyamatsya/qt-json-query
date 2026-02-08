@@ -14,7 +14,8 @@
 #endif
 
 #if defined(JSON_QUERY_IDN_LIBIDN2)
-extern "C" {
+extern "C"
+{
 #include <idn2.h>
 }
 #elif defined(JSON_QUERY_IDN_ADA)
@@ -298,12 +299,11 @@ FormatValidationResult isHostname(QStringView value) noexcept
 std::pair<QString, bool> normalizeIdnDots(const QString& str)
 {
     auto normalized{str};
-    normalized.replace(QChar(0x3002), QChar(u'.'));  // Ideographic full stop
-    normalized.replace(QChar(0xFF0E), QChar(u'.'));  // Fullwidth full stop
-    normalized.replace(QChar(0xFF61), QChar(u'.'));  // Halfwidth ideographic full stop
+    normalized.replace(QChar(0x3002), QChar(u'.')); // Ideographic full stop
+    normalized.replace(QChar(0xFF0E), QChar(u'.')); // Fullwidth full stop
+    normalized.replace(QChar(0xFF61), QChar(u'.')); // Halfwidth ideographic full stop
 
-    const auto valid{!normalized.startsWith(u'.') && !normalized.endsWith(u'.')
-                     && !normalized.contains(u"..")};
+    const auto valid{!normalized.startsWith(u'.') && !normalized.endsWith(u'.') && !normalized.contains(u"..")};
     return {normalized, valid};
 }
 
@@ -314,7 +314,7 @@ FormatValidationResult isIdnHostname(QStringView value) noexcept
 
     // Fast path: if it's pure ASCII, use the strict RFC 1123 validator
     const auto str{value.toString()};
-    auto allAscii{true};
+    auto       allAscii{true};
     for (const auto ch : str)
         if (ch.unicode() > 127)
         {
@@ -331,11 +331,9 @@ FormatValidationResult isIdnHostname(QStringView value) noexcept
 #if defined(JSON_QUERY_IDN_LIBIDN2)
     // libidn2: full IDNA 2008 with contextual rules (RFC 5891/5892)
     const auto utf8{normalized.toUtf8()};
-    char* output{nullptr};
+    char*      output{nullptr};
     const auto rc{idn2_lookup_u8(
-        reinterpret_cast<const uint8_t*>(utf8.constData()),
-        reinterpret_cast<uint8_t**>(&output),
-        IDN2_NFC_INPUT)};
+        reinterpret_cast<const uint8_t*>(utf8.constData()), reinterpret_cast<uint8_t**>(&output), IDN2_NFC_INPUT)};
     if (output)
         idn2_free(output);
     if (rc != IDN2_OK)
@@ -343,8 +341,7 @@ FormatValidationResult isIdnHostname(QStringView value) noexcept
 #elif defined(JSON_QUERY_IDN_ADA)
     // ada-url/idna: UTS #46 implementation
     const auto utf8{normalized.toUtf8()};
-    const auto ascii{ada::idna::to_ascii(
-        std::string_view{utf8.constData(), static_cast<std::size_t>(utf8.size())})};
+    const auto ascii{ada::idna::to_ascii(std::string_view{utf8.constData(), static_cast<std::size_t>(utf8.size())})};
     if (ascii.empty())
         return semanticInvalid;
     // Validate output labels
@@ -610,8 +607,8 @@ FormatValidationResult isDuration(QStringView value) noexcept
                 if (str[pos] == units[j])
                 {
                     ++pos;
-                    ui = j + 1;
-                    found = true;
+                    ui      = j + 1;
+                    found   = true;
                     matched = true;
                     break;
                 }
@@ -627,7 +624,7 @@ FormatValidationResult isDuration(QStringView value) noexcept
 
     // Date part: [nY][nM][nD]
     static constexpr QChar dateUnits[]{u'Y', u'M', u'D'};
-    const auto hasDatePart{parseComponents(dateUnits, 3, false)};
+    const auto             hasDatePart{parseComponents(dateUnits, 3, false)};
 
     // Time part: T[nH][nM][nS]
     bool hasTimePart{false};
@@ -655,7 +652,7 @@ FormatValidationResult isRegex(QStringView value) noexcept
     // SRELL: ECMAScript-compatible regex with Unicode property escapes
     try
     {
-        const auto str{value.toString().toStdU16String()};
+        const auto      str{value.toString().toStdU16String()};
         srell::u16regex re{str, srell::regex_constants::ECMAScript};
     }
     catch (...)

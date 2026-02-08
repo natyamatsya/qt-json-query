@@ -43,7 +43,8 @@ static const QString kRemotesDir{
 
 SchemaFetcher makeFileBasedFetcher()
 {
-    return [](const QString& uri) -> std::optional<QJsonValue> {
+    return [](const QString& uri) -> std::optional<QJsonValue>
+    {
         // Map http://localhost:1234/path to remotes/path
         QString path{uri};
         if (path.startsWith(kRemoteBaseUrl))
@@ -52,12 +53,12 @@ SchemaFetcher makeFileBasedFetcher()
             path = path.mid(1);
 
         const auto filePath{kRemotesDir + u"/"_qt_s + path};
-        QFile file{filePath};
+        QFile      file{filePath};
         if (!file.open(QIODevice::ReadOnly))
             return std::nullopt;
 
         QJsonParseError err{};
-        const auto doc{QJsonDocument::fromJson(file.readAll(), &err)};
+        const auto      doc{QJsonDocument::fromJson(file.readAll(), &err)};
         if (err.error != QJsonParseError::NoError)
             return std::nullopt;
 
@@ -74,12 +75,12 @@ SchemaFetcher makeFileBasedFetcher()
 // ----------------------------------------------------------------------------
 struct SchemaTestCase
 {
-    QString    fileName;      // source file name
-    QString    groupDesc;     // test group description
-    QString    testDesc;      // individual test description
-    QJsonValue schema;        // the schema to compile
-    QJsonValue data;          // instance data to validate
-    bool       expectedValid; // expected validation result
+    QString    fileName;              // source file name
+    QString    groupDesc;             // test group description
+    QString    testDesc;              // individual test description
+    QJsonValue schema;                // the schema to compile
+    QJsonValue data;                  // instance data to validate
+    bool       expectedValid;         // expected validation result
     bool       formatAssertion{true}; // whether format validation is assertion (optional/format/) or auto
 };
 
@@ -185,11 +186,11 @@ static QList<SchemaTestCase> collectAllTestCases()
     {
         const auto filePath{it.next()};
         // Tests in optional/format/ need format assertion; format.json tests annotation-only behavior
-        const auto needsFormatAssertion{filePath.contains(u"/optional/format/"_qt_s)
-                                        || filePath.contains(u"/optional/format-assertion"_qt_s)};
-        const auto isFormatAnnotation{QFileInfo{filePath}.fileName() == u"format.json"_qt_s
-                                      && !filePath.contains(u"/optional/"_qt_s)};
-        auto cases{loadTestFile(filePath)};
+        const auto needsFormatAssertion{filePath.contains(u"/optional/format/"_qt_s) ||
+                                        filePath.contains(u"/optional/format-assertion"_qt_s)};
+        const auto isFormatAnnotation{QFileInfo{filePath}.fileName() == u"format.json"_qt_s &&
+                                      !filePath.contains(u"/optional/"_qt_s)};
+        auto       cases{loadTestFile(filePath)};
         for (auto& tc : cases)
             tc.formatAssertion = needsFormatAssertion || (!isFormatAnnotation);
         all.append(cases);
@@ -212,9 +213,9 @@ TEST_P(IETFJsonSchemaTest, ValidatesPerSpec)
     const SchemaTestCase& tc{GetParam()};
 
     // Compile schema with file-based fetcher for remote $ref resolution
-    static const auto fetcher{makeFileBasedFetcher()};
+    static const auto   fetcher{makeFileBasedFetcher()};
     const SchemaOptions opts{tc.formatAssertion ? FormatValidation::Assertion : FormatValidation::Auto};
-    auto schemaResult{JSONSchema::create(tc.schema, fetcher, opts)};
+    auto                schemaResult{JSONSchema::create(tc.schema, fetcher, opts)};
     if (!schemaResult)
     {
         FAIL() << "Schema compilation failed for: " << tc.groupDesc.toStdString()

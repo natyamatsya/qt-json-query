@@ -21,22 +21,21 @@ JSONSchema::ParseResult JSONSchema::create(const QJsonObject& schemaObject, Sche
     return create(QJsonValue(schemaObject), std::move(fetcher));
 }
 
-JSONSchema::ParseResult JSONSchema::create(const QJsonObject& schemaObject, SchemaFetcher fetcher, SchemaOptions options)
+JSONSchema::ParseResult
+JSONSchema::create(const QJsonObject& schemaObject, SchemaFetcher fetcher, SchemaOptions options)
 {
     return create(QJsonValue(schemaObject), std::move(fetcher), options);
 }
 
-JSONSchema::ParseResult JSONSchema::create(const QJsonDocument& schemaDoc)
-{
-    return create(schemaDoc, {});
-}
+JSONSchema::ParseResult JSONSchema::create(const QJsonDocument& schemaDoc) { return create(schemaDoc, {}); }
 
 JSONSchema::ParseResult JSONSchema::create(const QJsonDocument& schemaDoc, SchemaFetcher fetcher)
 {
     return create(schemaDoc, std::move(fetcher), SchemaOptions{FormatValidation::Assertion});
 }
 
-JSONSchema::ParseResult JSONSchema::create(const QJsonDocument& schemaDoc, SchemaFetcher fetcher, SchemaOptions options)
+JSONSchema::ParseResult
+JSONSchema::create(const QJsonDocument& schemaDoc, SchemaFetcher fetcher, SchemaOptions options)
 {
     if (schemaDoc.isObject())
         return create(schemaDoc.object(), std::move(fetcher), options);
@@ -45,10 +44,7 @@ JSONSchema::ParseResult JSONSchema::create(const QJsonDocument& schemaDoc, Schem
     return std::unexpected(Error(ParseError::EmptySchema));
 }
 
-JSONSchema::ParseResult JSONSchema::create(const QJsonValue& schemaValue)
-{
-    return create(schemaValue, {});
-}
+JSONSchema::ParseResult JSONSchema::create(const QJsonValue& schemaValue) { return create(schemaValue, {}); }
 
 JSONSchema::ParseResult JSONSchema::create(const QJsonValue& schemaValue, SchemaFetcher fetcher)
 {

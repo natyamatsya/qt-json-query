@@ -52,7 +52,7 @@ struct BraceSafe
 
     // Explicit unwrap
     [[nodiscard]] const T& get() const& { return value; }
-    [[nodiscard]] T&& get() && { return std::move(value); }
+    [[nodiscard]] T&&      get() && { return std::move(value); }
 
     // Implicit conversion for passing to functions expecting the container
     [[nodiscard]] operator const T&() const& { return value; }
@@ -61,14 +61,8 @@ struct BraceSafe
 
 // Factory functions
 
-[[nodiscard]] inline BraceSafe<QJsonArray> asArray(const QJsonValue& v)
-{
-    return {v.toArray()};
-}
+[[nodiscard]] inline BraceSafe<QJsonArray> asArray(const QJsonValue& v) { return {v.toArray()}; }
 
-[[nodiscard]] inline BraceSafe<QJsonObject> asObject(const QJsonValue& v)
-{
-    return {v.toObject()};
-}
+[[nodiscard]] inline BraceSafe<QJsonObject> asObject(const QJsonValue& v) { return {v.toObject()}; }
 
 } // namespace json_query

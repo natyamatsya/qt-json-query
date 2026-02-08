@@ -129,15 +129,16 @@ TEST_F(SchemaRegistryTest, AddCachesUnderBothUriAndSchemaId)
 TEST_F(SchemaRegistryTest, CachingFetcherAvoidsRedundantFetches)
 {
     int fetchCount{0};
-    registry.setFetcher([&fetchCount](const QString& uri) -> std::optional<QJsonValue>
-    {
-        if (uri == u"https://example.com/remote-type")
+    registry.setFetcher(
+        [&fetchCount](const QString& uri) -> std::optional<QJsonValue>
         {
-            ++fetchCount;
-            return QJsonDocument::fromJson(R"({"type": "integer"})").object();
-        }
-        return std::nullopt;
-    });
+            if (uri == u"https://example.com/remote-type")
+            {
+                ++fetchCount;
+                return QJsonDocument::fromJson(R"({"type": "integer"})").object();
+            }
+            return std::nullopt;
+        });
 
     // Schema that references a remote type
     const auto schema1{parseSchema(R"({
@@ -165,11 +166,12 @@ TEST_F(SchemaRegistryTest, CachingFetcherAvoidsRedundantFetches)
 TEST_F(SchemaRegistryTest, AddedDocumentServesAsFetchCache)
 {
     int fetchCount{0};
-    registry.setFetcher([&fetchCount](const QString&) -> std::optional<QJsonValue>
-    {
-        ++fetchCount;
-        return std::nullopt;
-    });
+    registry.setFetcher(
+        [&fetchCount](const QString&) -> std::optional<QJsonValue>
+        {
+            ++fetchCount;
+            return std::nullopt;
+        });
 
     // Pre-register a schema
     const auto remoteSchema{parseSchema(R"({

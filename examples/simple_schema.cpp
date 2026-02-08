@@ -20,26 +20,31 @@ int main(int argc, char* argv[])
         {"$schema", "https://json-schema.org/draft/2020-12/schema"},
         {"type", "object"},
         {"required", QJsonArray{"name", "age", "email"}},
-        {"properties", QJsonObject{
-            {"name", QJsonObject{
-                {"type", "string"},
-                {"minLength", 1},
-            }},
-            {"age", QJsonObject{
-                {"type", "integer"},
-                {"minimum", 0},
-                {"maximum", 150},
-            }},
-            {"email", QJsonObject{
-                {"type", "string"},
-                {"format", "email"},
-            }},
-            {"tags", QJsonObject{
-                {"type", "array"},
-                {"items", QJsonObject{{"type", "string"}}},
-                {"uniqueItems", true},
-            }},
-        }},
+        {"properties",
+         QJsonObject{
+             {"name",
+              QJsonObject{
+                  {"type", "string"},
+                  {"minLength", 1},
+              }},
+             {"age",
+              QJsonObject{
+                  {"type", "integer"},
+                  {"minimum", 0},
+                  {"maximum", 150},
+              }},
+             {"email",
+              QJsonObject{
+                  {"type", "string"},
+                  {"format", "email"},
+              }},
+             {"tags",
+              QJsonObject{
+                  {"type", "array"},
+                  {"items", QJsonObject{{"type", "string"}}},
+                  {"uniqueItems", true},
+              }},
+         }},
         {"additionalProperties", false},
     }};
 
@@ -61,7 +66,7 @@ int main(int argc, char* argv[])
     }};
 
     auto result1{schema->validate(QJsonValue{validPerson})};
-    qDebug() << "=== Valid person ===" ;
+    qDebug() << "=== Valid person ===";
     if (result1)
         qDebug() << "  Result: VALID\n";
     else
@@ -69,11 +74,11 @@ int main(int argc, char* argv[])
 
     // ── 4. Validate an INVALID instance ─────────────────────────────
     const auto invalidPerson{QJsonObject{
-        {"name", ""},             // violates minLength: 1
-        {"age", -5},              // violates minimum: 0
-                                  // missing "email" (required)
+        {"name", ""},                   // violates minLength: 1
+        {"age", -5},                    // violates minimum: 0
+                                        // missing "email" (required)
         {"tags", QJsonArray{"a", "a"}}, // violates uniqueItems
-        {"extra", true},          // violates additionalProperties: false
+        {"extra", true},                // violates additionalProperties: false
     }};
 
     auto result2{schema->validate(QJsonValue{invalidPerson})};
@@ -86,10 +91,7 @@ int main(int argc, char* argv[])
     {
         qDebug() << "  Result: INVALID (" << result2.errorCount() << "errors)";
         for (const auto& err : result2.errors())
-        {
-            qDebug().noquote()
-                << "  •" << err.instanceLocation << "—" << err.message;
-        }
+            qDebug().noquote() << "  •" << err.instanceLocation << "—" << err.message;
         qDebug() << "";
     }
 

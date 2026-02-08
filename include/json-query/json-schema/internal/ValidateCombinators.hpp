@@ -46,9 +46,9 @@ inline void validateCombinators(ValidateContext&    ctx,
         bool anyValid{false};
         for (std::size_t i{0}; i < node.anyOf.size(); ++i)
         {
-            ValidationResult   tempResult{};
-            EvaluationTracker   tempTracker{};
-            ValidateContext    tempCtx{ctx.schema, tempResult, true, ctx.tracker ? &tempTracker : nullptr};
+            ValidationResult  tempResult{};
+            EvaluationTracker tempTracker{};
+            ValidateContext   tempCtx{ctx.schema, tempResult, true, ctx.tracker ? &tempTracker : nullptr};
             validateNode(tempCtx,
                          ctx.schema.nodeAt(node.anyOf[i]),
                          instance,
@@ -76,11 +76,11 @@ inline void validateCombinators(ValidateContext&    ctx,
     if (!node.oneOf.empty())
     {
         int               matchCount{0};
-        EvaluationTracker  matchedTracker{};
+        EvaluationTracker matchedTracker{};
         for (std::size_t i{0}; i < node.oneOf.size(); ++i)
         {
             ValidationResult  tempResult{};
-            EvaluationTracker  tempTracker{};
+            EvaluationTracker tempTracker{};
             ValidateContext   tempCtx{ctx.schema, tempResult, true, ctx.tracker ? &tempTracker : nullptr};
             validateNode(tempCtx,
                          ctx.schema.nodeAt(node.oneOf[i]),
@@ -123,7 +123,7 @@ inline void validateCombinators(ValidateContext&    ctx,
     if (node.ifSchema)
     {
         ValidationResult  ifResult{};
-        EvaluationTracker  ifTracker{};
+        EvaluationTracker ifTracker{};
         ValidateContext   ifCtx{ctx.schema, ifResult, true, ctx.tracker ? &ifTracker : nullptr};
         validateNode(ifCtx, ctx.schema.nodeAt(*node.ifSchema), instance, instancePath, schemaPath + u"/if"_qt_s);
 

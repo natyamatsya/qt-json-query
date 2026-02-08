@@ -24,9 +24,9 @@
 #include <variant>
 
 using json_query::as;
+using json_query::Error;
 using json_query::JSONPath;
 using json_query::JSONPointer;
-using json_query::Error;
 
 using namespace Qt::StringLiterals;
 

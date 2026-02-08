@@ -9,10 +9,7 @@
 namespace json_query::json_schema
 {
 
-void SchemaRegistry::setFetcher(SchemaFetcher fetcher)
-{
-    m_userFetcher = std::move(fetcher);
-}
+void SchemaRegistry::setFetcher(SchemaFetcher fetcher) { m_userFetcher = std::move(fetcher); }
 
 JSONSchema::ParseResult SchemaRegistry::add(const QString& uri, const QJsonValue& schema, SchemaOptions options)
 {
@@ -83,25 +80,13 @@ void SchemaRegistry::clear()
     m_documents.clear();
 }
 
-std::size_t SchemaRegistry::compiledCount() const noexcept
-{
-    return m_compiled.size();
-}
+std::size_t SchemaRegistry::compiledCount() const noexcept { return m_compiled.size(); }
 
-std::size_t SchemaRegistry::documentCount() const noexcept
-{
-    return m_documents.size();
-}
+std::size_t SchemaRegistry::documentCount() const noexcept { return m_documents.size(); }
 
-bool SchemaRegistry::contains(const QString& uri) const
-{
-    return m_compiled.contains(uri);
-}
+bool SchemaRegistry::contains(const QString& uri) const { return m_compiled.contains(uri); }
 
-bool SchemaRegistry::containsDocument(const QString& uri) const
-{
-    return m_documents.contains(uri);
-}
+bool SchemaRegistry::containsDocument(const QString& uri) const { return m_documents.contains(uri); }
 
 SchemaFetcher SchemaRegistry::makeCachingFetcher()
 {

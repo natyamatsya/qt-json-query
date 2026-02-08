@@ -30,9 +30,8 @@ JSONPath::EvalResult JSONPath::evaluate(const QJsonValue& value) const
     json_path::detail::PathEvalCtx ctx{m_tokens, value, m_func};
 
     return json_path::detail::evaluate(ctx, value)
-        .or_else(
-            [](const json_path::detail::DetailedEvalError& e) -> EvalResult
-            { return std::unexpected(json_query::Error{e.error, e.tokenIndex}); });
+        .or_else([](const json_path::detail::DetailedEvalError& e) -> EvalResult
+                 { return std::unexpected(json_query::Error{e.error, e.tokenIndex}); });
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -50,9 +49,8 @@ JSONPath::EvalArrayResult JSONPath::evaluateAll(const QJsonValue& value) const
     json_path::detail::PathEvalCtx ctx{m_tokens, value, m_func};
 
     return json_path::detail::evaluateAll(ctx, value)
-        .or_else(
-            [](const json_path::detail::DetailedEvalError& e) -> EvalArrayResult
-            { return std::unexpected(json_query::Error{e.error, e.tokenIndex}); });
+        .or_else([](const json_path::detail::DetailedEvalError& e) -> EvalArrayResult
+                 { return std::unexpected(json_query::Error{e.error, e.tokenIndex}); });
 }
 
 } // namespace json_query::json_path

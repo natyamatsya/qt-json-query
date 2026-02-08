@@ -72,8 +72,8 @@ std::optional<QJsonValue> lookupBuiltinSchema(const QString& uri)
     {
         if (uri == QString::fromUtf8(schemaUri))
         {
-            const auto doc{QJsonDocument::fromJson(
-                QByteArray::fromRawData(json, static_cast<qsizetype>(std::strlen(json))))};
+            const auto doc{
+                QJsonDocument::fromJson(QByteArray::fromRawData(json, static_cast<qsizetype>(std::strlen(json))))};
             if (!doc.isNull())
                 return QJsonValue{doc.object()};
         }
