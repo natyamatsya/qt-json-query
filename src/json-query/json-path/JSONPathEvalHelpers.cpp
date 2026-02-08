@@ -8,8 +8,6 @@
 #include "json-query/json-path/JSONPathWildcardRecursive.hpp"
 #include "json-query/utils/SanitizerCompat.hpp"
 #include "json-query/json-path/internal/ArrayPool.hpp"
-#include "json-query/json-path/internal/ArrayPool.hpp" // acquirePooledArray, emptyResult
-#include "json-query/json-path/internal/ContextAwareContainerCursor.hpp"
 #include "json-query/json-path/JSONPathLog.hpp"
 
 #include <QJsonDocument>
@@ -28,7 +26,6 @@ namespace json_query::json_path::detail
 
 using internal::acquirePooledArray;
 using internal::emptyResult;
-using json_query::json_path::internal::ContainerCursor;
 
 // ---------------------------------------------------------------------------
 //  Basic evaluation helpers
@@ -151,7 +148,7 @@ std::expected<QJsonArray, EvalError> processUnionTokens(const PathEvalCtx&      
         return std::unexpected(lastError);
 
     // Copy-init: brace-init would trigger QJsonArray's initializer_list constructor (ADR-001)
-    auto mergedResults = mergeTokenResults(resultArrays, root);
+    auto mergedResults = mergeTokenResults(resultArrays);
     return mergedResults;
 }
 
@@ -166,57 +163,33 @@ bool isSelectorToken(const Token& token)
            token.kind == Token::Kind::Wildcard || token.kind == Token::Kind::Slice;
 }
 
-// Helper: Collect consecutive selector tokens starting from a given index
-std::vector<qsizetype> collectConsecutiveSelectorTokens(const PathEvalCtx& ctx, qsizetype startIndex)
+UnionDetectionResult detectUnionTokens(const PathEvalCtx& ctx, qsizetype startIndex)
 {
+    // Collect consecutive selector tokens
     std::vector<qsizetype> unionTokens;
     unionTokens.push_back(startIndex);
 
-    auto j{startIndex + 1};
-    while (j < ctx.tokens.size())
+    for (auto j{startIndex + 1}; j < ctx.tokens.size() && isSelectorToken(ctx.tokens[j]); ++j)
+        unionTokens.push_back(j);
+
+    // A union requires 2+ tokens from the same bracket group
+    auto shouldUseUnion{false};
+    if (unionTokens.size() > 1)
     {
-        const auto& nextTk = ctx.tokens[j];
-        if (isSelectorToken(nextTk))
+        const auto firstGroupId{ctx.tokens[unionTokens[0]].bracketGroupId};
+        if (firstGroupId > 0)
         {
-            unionTokens.push_back(j);
-            ++j;
-        }
-        else
-        {
-            break; // Stop at non-selector tokens (e.g., Recursive)
+            shouldUseUnion = true;
+            for (qsizetype i{1}; i < static_cast<qsizetype>(unionTokens.size()); ++i)
+                if (ctx.tokens[unionTokens[i]].bracketGroupId != firstGroupId)
+                {
+                    shouldUseUnion = false;
+                    break;
+                }
         }
     }
 
-    return unionTokens;
-}
-
-// Helper: Check if all tokens are from the same bracket group
-bool areTokensFromSameBracketGroup(const PathEvalCtx& ctx, const std::vector<qsizetype>& tokenIndices)
-{
-    if (tokenIndices.size() <= 1)
-        return false;
-
-    auto firstBracketGroupId{ctx.tokens[tokenIndices[0]].bracketGroupId};
-
-    // If first token is not from a bracket, this can't be a bracket union
-    if (firstBracketGroupId <= 0)
-        return false;
-
-    // Check if all subsequent tokens have the same bracket group ID
-    for (qsizetype i = 1; i < tokenIndices.size(); ++i)
-        if (ctx.tokens[tokenIndices[i]].bracketGroupId != firstBracketGroupId)
-            return false;
-
-    return true;
-}
-
-UnionDetectionResult detectUnionTokens(const PathEvalCtx& ctx, qsizetype startIndex)
-{
-    auto unionTokens    = collectConsecutiveSelectorTokens(ctx, startIndex);
-    auto shouldUseUnion = areTokensFromSameBracketGroup(ctx, unionTokens);
-    auto nextIndex{startIndex + unionTokens.size()};
-
-    return {unionTokens, shouldUseUnion, static_cast<qsizetype>(nextIndex)};
+    return {unionTokens, shouldUseUnion, startIndex + static_cast<qsizetype>(unionTokens.size())};
 }
 
 std::expected<QJsonArray, EvalError> processBranchUniqueSelection(
@@ -246,7 +219,7 @@ std::expected<QJsonArray, EvalError> processBranchUniqueSelection(
     }
 
     // Deduplicate results
-    return deduplicateJsonValues(results, root);
+    return deduplicateJsonValues(results);
 }
 
 bool addsMultiplicity(const Token& tk)
@@ -264,7 +237,7 @@ bool addsMultiplicity(const Token& tk)
     }
 }
 
-QJsonValue squash(QJsonArray arr, bool multi)
+QJsonValue squash(QJsonArray&& arr, bool multi)
 {
     if (multi || arr.size() != 1)
         return arr;
@@ -369,7 +342,7 @@ processSingleUnionToken(const PathEvalCtx& ctx, qsizetype tokenIdx, const QJsonA
 }
 
 // Helper: Merge results from multiple tokens using simple concatenation
-QJsonArray mergeTokenResults(const std::vector<QJsonArray>& resultArrays, const QJsonValue& root)
+QJsonArray mergeTokenResults(const std::vector<QJsonArray>& resultArrays)
 {
     QJsonArray collectedResults;
 
@@ -424,32 +397,33 @@ void processObjectForNonLeafSelection(const QJsonObject&          obj,
 }
 
 // Helper: Deduplicate JSON values using hash-based approach
-QJsonArray deduplicateJsonValues(const QJsonArray& input, const QJsonValue& root)
+// Primitives are always kept; objects/arrays are deduplicated by content hash.
+QJsonArray deduplicateJsonValues(const QJsonArray& input)
 {
     QSet<uint> seen;
-    QJsonArray dedup;
+    seen.reserve(input.size());
 
-    auto workingDedupCursor{json_query::json_path::internal::makeSimpleContextCursor(input, root, root)};
-    for (const auto& [v2, context] : workingDedupCursor)
+    auto  pooledDedup{acquirePooledArray()};
+    auto& dedup = *pooledDedup;
+
+    for (const auto& v : input)
     {
-        if (v2.isObject())
+        if (!v.isObject() && !v.isArray())
         {
-            uint h = qHash(QJsonDocument(v2.toObject()).toJson());
-            if (seen.contains(h))
-                continue;
-            seen.insert(h);
+            dedup.append(v);
+            continue;
         }
-        else if (v2.isArray())
-        {
-            uint h = qHash(QJsonDocument(v2.toArray()).toJson());
-            if (seen.contains(h))
-                continue;
-            seen.insert(h);
-        }
-        dedup.append(v2);
-    }
 
-    return dedup;
+        const auto h{v.isObject() ? qHash(QJsonDocument(v.toObject()).toJson())
+                                  : qHash(QJsonDocument(v.toArray()).toJson())};
+
+        if (!seen.contains(h))
+        {
+            seen.insert(h);
+            dedup.append(v);
+        }
+    }
+    return std::move(dedup);
 }
 
 } // namespace json_query::json_path::detail

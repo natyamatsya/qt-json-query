@@ -28,7 +28,7 @@ std::expected<QJsonArray, EvalError> evalSlice(const QJsonArray& array, const Sl
 
 // Token analysis helpers
 bool       addsMultiplicity(const Token& tk);
-QJsonValue squash(QJsonArray arr, bool multi);
+QJsonValue squash(QJsonArray&& arr, bool multi);
 QJsonValue applyTrailing(json_path::FunctionType fn, const QJsonValue& v);
 
 // ---------------------------------------------------------------------------
@@ -55,17 +55,15 @@ struct KeyCollectionResult
     qsizetype            nextIndex;
 };
 
-// Union detection micro-helpers
+// Union detection
 bool                   isSelectorToken(const Token& token);
-std::vector<qsizetype> collectConsecutiveSelectorTokens(const PathEvalCtx& ctx, qsizetype startIndex);
-bool                 areTokensFromSameBracketGroup(const PathEvalCtx& ctx, const std::vector<qsizetype>& tokenIndices);
 UnionDetectionResult detectUnionTokens(const PathEvalCtx& ctx, qsizetype startIndex);
 
 // Union processing micro-helpers
 TokenProcessingResult
 processSingleUnionToken(const PathEvalCtx& ctx, qsizetype tokenIdx, const QJsonArray& working, const QJsonValue& root);
 
-QJsonArray mergeTokenResults(const std::vector<QJsonArray>& resultArrays, const QJsonValue& root);
+QJsonArray mergeTokenResults(const std::vector<QJsonArray>& resultArrays);
 
 std::expected<QJsonArray, EvalError> processUnionTokens(const PathEvalCtx&            ctx,
                                                         const std::vector<qsizetype>& unionTokens,
@@ -83,7 +81,7 @@ void                processObjectForNonLeafSelection(const QJsonObject&         
                                                      const std::vector<QString>& keys,
                                                      const QJsonValue&           v,
                                                      QJsonArray*                 results);
-QJsonArray          deduplicateJsonValues(const QJsonArray& input, const QJsonValue& root);
+QJsonArray          deduplicateJsonValues(const QJsonArray& input);
 
 std::expected<QJsonArray, EvalError> processBranchUniqueSelection(
     const PathEvalCtx& ctx, qsizetype& i, const QJsonArray& working, const QJsonValue& root, bool isLeaf);

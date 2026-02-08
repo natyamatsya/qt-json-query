@@ -2,79 +2,22 @@
 
 #include "json-query/json-path/JSONPathEvaluate.hpp"
 #include "json-query/utils/BraceSafe.hpp"
-#include "json-query/json-path/JSONPathTokenEvaluators.hpp"
-#include "json-query/json-path/JSONPathTokenDispatch.hpp"
-#include "json-query/json-path/JSONPathWildcardRecursive.hpp"
 #include "json-query/json-path/JSONPathEvalHelpers.hpp"
 #include "json-query/json-path/JSONPathLog.hpp"
-#include "json-query/utils/SanitizerCompat.hpp"
 #include "json-query/json-path/internal/ArrayPool.hpp"
 #include "json-query/json-path/internal/PathEvalCtx.hpp"
-#include "json-query/json-path/internal/ContainerCursor.hpp"
-#include "json-query/json-path/internal/ContextAwareContainerCursor.hpp"
-#include "json-query/json-path/internal/ResultStreamer.hpp"
-#include "json-query/json-path/internal/PathPatternSpecializations.hpp"
 
-#include "json-query/json-path/JSONPathPointerConversion.hpp"
-#include "json-query/json-path/internal/QtHash.hpp"
-
-#include <array>
-#include <deque>
 #include <expected>
-#include <QSet>
-#include <QJsonDocument>
-#include <QStringList>
-#include <QString>
-#include <QDebug>
-#include <algorithm>
-#include "json-query/json-path/internal/IterativeRecursiveDescent.hpp"
-#include "json-query/json-path/internal/ArenaAllocator.hpp"
 
 namespace json_query::json_path::detail
 {
 
-// Forward declaration for fanOut function used in TokenProcessingStrategy
-std::expected<QJsonArray, EvalError>
-fanOut(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src, qsizetype tokenPos);
-
 using internal::acquirePooledArray;
 using internal::emptyResult;
-using internal::IterativeRecursiveDescent;
-using json_query::json_path::internal::ContainerCursor;
-using json_query::json_path::internal::ResultCollector;
 
 // ---------------------------------------------------------------------------
 //  Token processing: apply one selector to the working node set
 // ---------------------------------------------------------------------------
-
-
-static std::expected<QJsonArray, EvalError> deduplicateAfterRecursive(QJsonArray&& result)
-{
-    QSet<uint> seen;
-    seen.reserve(result.size());
-
-    auto  pooledDedup{acquirePooledArray()};
-    auto& dedup = *pooledDedup;
-
-    for (const auto& v : result)
-    {
-        if (!v.isObject() && !v.isArray())
-        {
-            dedup.append(v);
-            continue;
-        }
-
-        const auto h{v.isObject() ? qHash(QJsonDocument(v.toObject()).toJson())
-                                  : qHash(QJsonDocument(v.toArray()).toJson())};
-
-        if (!seen.contains(h))
-        {
-            seen.insert(h);
-            dedup.append(v);
-        }
-    }
-    return std::move(dedup);
-}
 
 static std::expected<QJsonArray, EvalError> processToken(const PathEvalCtx& ctx,
                                                           qsizetype&         i,
@@ -130,7 +73,7 @@ static std::expected<QJsonArray, EvalError> processToken(const PathEvalCtx& ctx,
 
     // Deduplicate containers after recursive descent
     if (prevRecursive)
-        return deduplicateAfterRecursive(std::move(*result));
+        return deduplicateJsonValues(*result);
 
     return std::move(*result);
 }
