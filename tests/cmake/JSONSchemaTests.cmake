@@ -5,11 +5,11 @@
 
 # JSON Schema unit test sources
 set(JSON_SCHEMA_TEST_SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-schema/JSONSchemaBasicTests.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-schema/JSONSchemaFormatTests.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-schema/JSONSchemaKeywordTests.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-schema/JSONSchemaRefTests.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-schema/SchemaRegistryTests.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-schema/JSONSchemaBasicGTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-schema/JSONSchemaFormatGTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-schema/JSONSchemaKeywordGTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-schema/JSONSchemaRefGTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-schema/JSONSchemaRegistryGTest.cpp)
 
 function(add_json_schema_tests)
   if(JSON_SCHEMA_TEST_SOURCES)
