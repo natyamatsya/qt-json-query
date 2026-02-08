@@ -66,8 +66,6 @@ static std::expected<QJsonArray, EvalError> processToken(const PathEvalCtx& ctx,
     multi = multi || addsMultiplicity(tk);
 
     auto result{fanOut(ctx, tk, working, i)};
-    if (!result)
-        return std::unexpected(result.error());
     if (result->empty())
         return emptyResult();
 

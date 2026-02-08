@@ -2,13 +2,12 @@
 
 #include "json-query/json-path/JSONPathTokenEvaluators.hpp"
 #include "json-query/utils/BraceSafe.hpp"
-#include "json-query/json-path/JSONPathEvaluate.hpp"                     // normalizeIndex, evalSlice
-#include "json-query/json-path/JSONPathWildcardRecursive.hpp"            // wildcardObject, wildcardArray, evaluateRecursive
-#include "json-query/json-path/internal/ContainerCursor.hpp"             // ContainerCursor for optimized iteration
-#include "json-query/json-path/internal/ContextAwareContainerCursor.hpp" // ContextAwareContainerCursor for context-aware iteration
-#include "json-query/json-path/internal/ArrayPool.hpp"                   // acquirePooledArray, emptyResult
+#include "json-query/json-path/JSONPathEvaluate.hpp"
+#include "json-query/json-path/JSONPathWildcardRecursive.hpp"
+#include "json-query/json-path/internal/ArrayPool.hpp"
 #include "json-query/json-path/internal/FilterSpecializations.hpp"
 #include "json-query/json-path/JSONPathLog.hpp"
+
 #include <expected>
 
 namespace json_query::json_path::detail
@@ -16,64 +15,42 @@ namespace json_query::json_path::detail
 
 using internal::acquirePooledArray;
 using internal::emptyResult;
-using json_query::json_path::internal::ContainerCursor;
 
 // --- Key -------------------------------------------------------------------
 template <>
 std::expected<QJsonArray, EvalError>
 eval<Token::Kind::Key>(const PathEvalCtx& /*ctx*/, const Token& tk, const QJsonValue& v)
 {
-    // Fast path: direct object key lookup without unnecessary allocations
     if (!v.isObject())
-        return emptyResult(); // Empty result for non-objects
+        return emptyResult();
 
     const auto obj{v.toObject()};
     const auto it{obj.find(tk.key)};
     if (it == obj.end())
-        return emptyResult(); // Key not found
+        return emptyResult();
 
-    // Use ArrayPool for result to optimize memory allocation
     auto  pooledArray{acquirePooledArray()};
     auto& result = *pooledArray;
     result.append(it.value());
-
-    // SANITIZER WORKAROUND: Avoid QJsonArray copy constructor corruption
-    // Same issue as in main evaluation pipeline - sanitizer corrupts QJsonArray copy constructor
-    // SOLUTION: Return the pooled array directly via std::move to avoid copy constructor
     return std::move(result);
 }
 
 // --- Index -----------------------------------------------------------------
 template <>
 std::expected<QJsonArray, EvalError>
-eval<Token::Kind::Index>(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
+eval<Token::Kind::Index>(const PathEvalCtx& /*ctx*/, const Token& tk, const QJsonValue& v)
 {
-    qCDebug(jsonPathLog) << "Index token: index=" << tk.index << "valueType=" << v.type() << "value=" << v;
-
-    // RFC 9535 compliance: "Nothing is selected from a value that is not an array"
     if (!v.isArray())
-    {
-        qCDebug(jsonPathLog) << "Index token: returning empty (value is not an array)";
-        return emptyResult(); // Empty result for non-arrays (not an error per RFC 9535)
-    }
+        return emptyResult();
 
-    // SANITIZER WORKAROUND: Access the source array and avoid copying result arrays
-    // Sanitizer instrumentation can corrupt QJsonArray (copy/move) constructors. We therefore
-    // construct the result via ArrayPool and return it with std::move to avoid problematic copies.
-    const QJsonArray originalArray = v.toArray();
-    const auto       idx           = normalizeIndex(tk.index, originalArray.size());
+    const auto arr = v.toArray();
+    const auto idx{normalizeIndex(tk.index, arr.size())};
+    if (idx < 0 || idx >= arr.size())
+        return emptyResult();
 
-    // RFC 9535 compliance: "Nothing is selected, and it is not an error, if the index lies outside the range of the
-    // array"
-    if (idx < 0 || idx >= originalArray.size())
-        return emptyResult(); // Empty result for out-of-range (not an error per RFC 9535)
-
-    // Use ArrayPool for result to optimize memory allocation and avoid copy/move constructor issues
     auto  pooledArray{acquirePooledArray()};
     auto& out = *pooledArray;
-    out.append(originalArray[idx]);
-
-    // SANITIZER WORKAROUND: Avoid QJsonArray copy constructor corruption by returning via std::move
+    out.append(arr[idx]);
     return std::move(out);
 }
 
@@ -82,23 +59,9 @@ template <>
 std::expected<QJsonArray, EvalError>
 eval<Token::Kind::Slice>(const PathEvalCtx& /*ctx*/, const Token& tk, const QJsonValue& v)
 {
-    qCDebug(jsonPathLog) << "Slice token: start=" << tk.slice.start << "end=" << tk.slice.end
-                         << "step=" << tk.slice.step << "valueType=" << v.type();
-
-    // Monadic approach: extract array and apply slice if present
-    auto asArray = [&v]() -> std::optional<QJsonArray>
-    { return v.isArray() ? std::make_optional(v.toArray()) : std::nullopt; };
-
-    auto result = asArray()
-                      .and_then([&tk](const QJsonArray& arr) -> std::optional<std::expected<QJsonArray, EvalError>>
-                                { return std::make_optional(evalSlice(arr, tk.slice)); })
-                      .value_or(std::expected<QJsonArray, EvalError>{
-                          emptyResult()}); // Empty result for non-arrays (not an error in JSONPath)
-
     if (!v.isArray())
-        qCDebug(jsonPathLog) << "Slice token: returning empty (value is not an array)";
-
-    return result;
+        return emptyResult();
+    return evalSlice(v.toArray(), tk.slice);
 }
 
 // --- Wildcard --------------------------------------------------------------
@@ -160,79 +123,37 @@ template <>
 std::expected<QJsonArray, EvalError>
 eval<Token::Kind::Filter>(const PathEvalCtx& ctx, const Token& tk, const QJsonValue& v)
 {
-    qCDebug(jsonPathLog) << "Filter token: key=" << tk.key << "valueType=" << v.type();
-
     // First try pattern-aware filter optimization
-    if (auto result = internal::PatternAwareFilterEvaluator::evaluate(ctx, tk, v))
-    {
-        qCDebug(jsonPathLog) << "Filter token: PatternAwareFilterEvaluator handled -> early return";
+    if (auto result{internal::PatternAwareFilterEvaluator::evaluate(ctx, tk, v)})
         return result;
-    }
 
-    qCDebug(jsonPathLog) << "Filter token: fallback to embedded filter evaluation";
-
-    // Fall back to embedded filter evaluation for complex patterns
-    // Use ArrayPool for result to optimize memory allocation
+    // Fall back to embedded filter evaluation
     auto  pooledArray{acquirePooledArray()};
     auto& out = *pooledArray;
 
-    // Check for embedded filters (zero-overhead)
-    if (tk.hasEmbeddedFilter())
-    {
-        qCDebug(jsonPathLog) << "Filter token: has embedded filter -> process";
-        // Pre-compute context requirement check to avoid repeated string operations
-        const auto needsRootContext{tk.key.contains("value($")};
-
-        if (v.isArray())
-        {
-            const auto arr{asArray(v)};
-            qCDebug(jsonPathLog) << "Filter token: processing array size=" << arr.size();
-
-            for (const auto& item : arr)
-            {
-                if (jsonPathLog().isDebugEnabled())
-                    qCDebug(jsonPathLog) << "Filter token: array item=" << item;
-                const bool pass = needsRootContext ? tk.evaluateEmbeddedContextFilter(item, ctx.rootDocument)
-                                                   : tk.evaluateEmbeddedFilter(item);
-                if (jsonPathLog().isDebugEnabled())
-                    qCDebug(jsonPathLog) << "Filter token: array item pass=" << pass;
-                if (pass)
-                    out.append(item);
-            }
-            qCDebug(jsonPathLog) << "Filter token: array processing complete, outSize=" << out.size();
-        }
-        else if (v.isObject())
-        {
-            const auto obj{v.toObject()};
-            qCDebug(jsonPathLog) << "Filter token: processing object members=" << obj.size();
-
-            // RFC 9535: When filtering an object, the filter applies to its children (member values).
-            // Iterate each member value and include those for which the predicate evaluates to true.
-            for (auto it = obj.constBegin(); it != obj.constEnd(); ++it)
-            {
-                const QJsonValue& memberValue = it.value();
-                if (jsonPathLog().isDebugEnabled())
-                    qCDebug(jsonPathLog) << "Filter token: object member key=" << it.key() << "value=" << memberValue;
-                const bool pass = needsRootContext ? tk.evaluateEmbeddedContextFilter(memberValue, ctx.rootDocument)
-                                                   : tk.evaluateEmbeddedFilter(memberValue);
-                if (jsonPathLog().isDebugEnabled())
-                    qCDebug(jsonPathLog) << "Filter token: object member pass=" << pass;
-                if (pass)
-                    out.append(memberValue);
-            }
-
-            qCDebug(jsonPathLog) << "Filter token: object processing complete, outSize=" << out.size();
-        }
-
-        // SANITIZER WORKAROUND: Avoid QJsonArray copy constructor corruption
-        // Same issue as in main evaluation pipeline - sanitizer corrupts QJsonArray copy constructor
-        // SOLUTION: Return the pooled array directly via std::move to avoid copy constructor
+    if (!tk.hasEmbeddedFilter())
         return std::move(out);
+
+    const auto needsRootContext{tk.key.contains("value($")};
+
+    auto applyFilter = [&](const QJsonValue& item)
+    {
+        const auto pass{needsRootContext ? tk.evaluateEmbeddedContextFilter(item, ctx.rootDocument)
+                                         : tk.evaluateEmbeddedFilter(item)};
+        if (pass)
+            out.append(item);
+    };
+
+    if (v.isArray())
+        for (const auto& item : asArray(v))
+            applyFilter(item);
+    else if (v.isObject())
+    {
+        const auto obj{v.toObject()};
+        for (auto it{obj.constBegin()}; it != obj.constEnd(); ++it)
+            applyFilter(it.value());
     }
 
-    // SANITIZER WORKAROUND: Avoid QJsonArray copy constructor corruption
-    // Same issue as in main evaluation pipeline - sanitizer corrupts QJsonArray copy constructor
-    // SOLUTION: Return the pooled array directly via std::move to avoid copy constructor
     return std::move(out);
 }
 
@@ -241,9 +162,8 @@ template <>
 std::expected<QJsonArray, EvalError>
 eval<Token::Kind::KeyList>(const PathEvalCtx& /*ctx*/, const Token& tk, const QJsonValue& v)
 {
-    // Direct type check and processing - avoid monadic overhead
     if (!v.isObject())
-        return emptyResult(); // Empty result for non-objects
+        return emptyResult();
 
     const auto        obj{v.toObject()};
     const QStringList keys = tk.key.split(u'\n');
@@ -254,9 +174,6 @@ eval<Token::Kind::KeyList>(const PathEvalCtx& /*ctx*/, const Token& tk, const QJ
         if (obj.contains(key))
             results.append(obj.value(key));
 
-    // SANITIZER WORKAROUND: Avoid QJsonArray copy constructor corruption
-    // Same issue as in main evaluation pipeline - sanitizer corrupts QJsonArray copy constructor
-    // SOLUTION: Return the pooled array directly via std::move to avoid copy constructor
     return std::move(results);
 }
 
