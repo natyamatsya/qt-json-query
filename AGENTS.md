@@ -113,11 +113,11 @@ schemaPath + "/type"
 
 ### 6. Error Handling with std::expected
 
-Return `std::expected<T, QueryError>` for fallible operations:
+Return `std::expected<T, Error>` for fallible operations:
 
 ```cpp
 // ✅ Correct
-std::expected<JSONSchema, QueryError> JSONSchema::create(const QJsonValue& schema);
+std::expected<JSONSchema, Error> JSONSchema::create(const QJsonValue& schema);
 
 // Usage
 auto result{JSONSchema::create(schemaJson)};

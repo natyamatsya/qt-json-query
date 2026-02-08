@@ -5,6 +5,7 @@
 This document outlines how to extend the **qt-json-query** library with JSON Schema validation capabilities, following the architectural principles established in the design document and adapting them to the existing codebase patterns.
 
 The qt-json-query library currently provides:
+
 - **JSONPointer** (RFC 6901) - Direct access to JSON elements
 - **JSONPath** (RFC 9535) - Query-based access with filters and wildcards
 
@@ -20,10 +21,10 @@ The codebase establishes clear patterns that the schema validation module must a
 
 | Pattern | Current Implementation | Schema Validation Equivalent |
 |---------|----------------------|------------------------------|
-| **Factory creation** | `JSONPath::create()` → `std::expected<JSONPath, QueryError>` | `JSONSchema::create()` → `std::expected<JSONSchema, QueryError>` |
-| **Evaluation** | `path.evaluate(doc)` → `std::expected<QJsonValue, QueryError>` | `schema.validate(doc)` → `std::expected<ValidationResult, QueryError>` |
+| **Factory creation** | `JSONPath::create()` → `std::expected<JSONPath, Error>` | `JSONSchema::create()` → `std::expected<JSONSchema, Error>` |
+| **Evaluation** | `path.evaluate(doc)` → `std::expected<QJsonValue, Error>` | `schema.validate(doc)` → `std::expected<ValidationResult, Error>` |
 | **Error domains** | `ErrorDomain::PathParse`, `PathEval`, `PointerParse`, `PointerEval` | `ErrorDomain::SchemaParse`, `SchemaEval` |
-| **Compact errors** | `QueryError` (2 bytes: domain + code) | Extend with schema-specific codes |
+| **Compact errors** | `Error` (2 bytes: domain + code) | Extend with schema-specific codes |
 | **Namespace** | `json_query::json_path`, `json_query::json_pointer` | `json_query::json_schema` |
 | **Header structure** | `include/json-query/json-path/*.hpp` | `include/json-query/json-schema/*.hpp` |
 
@@ -80,7 +81,7 @@ tests/
 #include <QJsonDocument>
 #include <QJsonValue>
 #include <expected>
-#include "json-query/utils/JSONQueryError.hpp"
+#include "json-query/utils/JSONError.hpp"
 #include "json-query/json-schema/JSONSchemaResult.hpp"
 
 namespace json_query::json_schema
@@ -90,7 +91,7 @@ class JSONSchema
 {
   public:
     // Factory (mirrors JSONPath::create and JSONPointer::create)
-    using ParseResult = std::expected<JSONSchema, json_query::QueryError>;
+    using ParseResult = std::expected<JSONSchema, json_query::Error>;
     
     static ParseResult create(const QJsonObject& schemaObject);
     static ParseResult create(const QJsonDocument& schemaDoc);
@@ -167,7 +168,7 @@ class ValidationResult
 
 ### 2.3 Error Integration
 
-Extend the existing `QueryError` system in `JSONQueryError.hpp`:
+Extend the existing `Error` system in `JSONError.hpp`:
 
 ```cpp
 // Add to ErrorDomain enum
@@ -331,6 +332,7 @@ struct CompiledSchema
 ### 3.2 Leveraging Existing JSONPointer
 
 The schema validator will **reuse JSONPointer** for:
+
 - Resolving `$ref` fragments (e.g., `#/definitions/Address`)
 - Reporting error locations in instances
 - Navigating schema structure during compilation
@@ -338,10 +340,10 @@ The schema validator will **reuse JSONPointer** for:
 ```cpp
 // Example: resolving a $ref using existing JSONPointer
 auto resolveRef(const QString& ref, const QJsonObject& rootSchema) 
-    -> std::expected<QJsonValue, QueryError>
+    -> std::expected<QJsonValue, Error>
 {
     if (!ref.startsWith(u'#')) {
-        return std::unexpected(QueryError(ParseError::UnresolvedReference));
+        return std::unexpected(Error(ParseError::UnresolvedReference));
     }
     
     QString fragment = ref.mid(1); // Remove '#'
@@ -366,13 +368,13 @@ Per the design document, use `QRegularExpression` (PCRE2-based) for `pattern` ke
 ```cpp
 // During schema compilation - compile patterns once
 auto compilePattern(const QString& pattern) 
-    -> std::expected<QRegularExpression, QueryError>
+    -> std::expected<QRegularExpression, Error>
 {
     QRegularExpression regex(pattern);
     
     if (!regex.isValid()) {
         // Return parse error with pattern error details
-        return std::unexpected(QueryError(ParseError::InvalidRegexPattern));
+        return std::unexpected(Error(ParseError::InvalidRegexPattern));
     }
     
     // Enable JIT optimization for repeated use
@@ -575,31 +577,36 @@ void handleValidationError(const QJsonDocument& doc,
 ## 6. Implementation Phases
 
 ### Phase 1: Core Infrastructure (2-3 weeks)
+
 - [ ] Create directory structure and CMake integration
 - [ ] Implement `JSONSchemaError.hpp` with error enums
-- [ ] Extend `QueryError` with schema domains
+- [ ] Extend `Error` with schema domains
 - [ ] Implement basic `JSONSchema` class with factory pattern
 - [ ] Schema parsing for primitive keywords: `type`, `enum`, `const`
 
 ### Phase 2: Object & Array Keywords (2-3 weeks)
+
 - [ ] Object keywords: `properties`, `required`, `additionalProperties`
 - [ ] Array keywords: `items`, `prefixItems`, `minItems`, `maxItems`
 - [ ] String keywords: `minLength`, `maxLength`, `pattern`
 - [ ] Numeric keywords: `minimum`, `maximum`, `multipleOf`
 
 ### Phase 3: Combinators & References (2-3 weeks)
+
 - [ ] Combinators: `allOf`, `anyOf`, `oneOf`, `not`
 - [ ] Conditional: `if`/`then`/`else`
 - [ ] `$ref` resolution using JSONPointer
 - [ ] `$defs`/`definitions` support
 
 ### Phase 4: Advanced Features (2-3 weeks)
+
 - [ ] `unevaluatedProperties`, `unevaluatedItems`
 - [ ] `$dynamicRef`, `$dynamicAnchor`
 - [ ] `format` keyword with common validators
 - [ ] `dependentRequired`, `dependentSchemas`
 
 ### Phase 5: Compliance & Performance (2-3 weeks)
+
 - [ ] Integrate official JSON Schema Test Suite
 - [ ] Achieve 100% pass rate for Draft 2020-12
 - [ ] Performance profiling and optimization
@@ -612,6 +619,7 @@ void handleValidationError(const QJsonDocument& doc,
 ### 7.1 Compile-Once, Validate-Many
 
 The compiled schema (`CompiledSchema`) is:
+
 - **Immutable** after creation
 - **Thread-safe** for concurrent validation
 - **Cache-friendly** with flat node array (indices instead of pointers)
@@ -703,9 +711,9 @@ TEST_P(JSONSchemaComplianceTest, OfficialTestCase)
 ### Factory Methods
 
 ```cpp
-JSONSchema::create(const QJsonObject&)    → std::expected<JSONSchema, QueryError>
-JSONSchema::create(const QJsonDocument&)  → std::expected<JSONSchema, QueryError>
-JSONSchema::fromFile(const QString&)      → std::expected<JSONSchema, QueryError>
+JSONSchema::create(const QJsonObject&)    → std::expected<JSONSchema, Error>
+JSONSchema::create(const QJsonDocument&)  → std::expected<JSONSchema, Error>
+JSONSchema::fromFile(const QString&)      → std::expected<JSONSchema, Error>
 ```
 
 ### Validation Methods
