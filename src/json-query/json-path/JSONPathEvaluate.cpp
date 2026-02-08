@@ -136,6 +136,67 @@ static std::expected<QJsonArray, EvalError> processToken(const PathEvalCtx& ctx,
 }
 
 // ---------------------------------------------------------------------------
+//  isDefinitePath — true when every selector after $ is Key or Index
+// ---------------------------------------------------------------------------
+static bool isDefinitePath(const std::vector<Token>& tokens)
+{
+    for (qsizetype i{1}; i < static_cast<qsizetype>(tokens.size()); ++i)
+    {
+        const auto& tk{tokens[i]};
+        if (tk.kind != Token::Kind::Key && tk.kind != Token::Kind::Index)
+            return false;
+        // Bracket groups indicate union selectors (e.g., $[0,2]) — not definite
+        if (tk.bracketGroupId > 0)
+            return false;
+    }
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+//  evaluateDefinite — fast path for paths with only Key/Index selectors
+// ---------------------------------------------------------------------------
+std::expected<NodeList, DetailedEvalError> evaluateDefinite(const std::vector<Token>& tokens,
+                                                            const QJsonValue&         root) noexcept
+{
+    using enum Token::Kind;
+
+    auto cur{root};
+
+    for (qsizetype i{1}; i < static_cast<qsizetype>(tokens.size()); ++i)
+    {
+        const auto& tk{tokens[i]};
+        switch (tk.kind)
+        {
+        case Key:
+        {
+            if (!cur.isObject())
+                return NodeList{};
+            const auto obj{cur.toObject()};
+            const auto it{obj.constFind(tk.key)};
+            if (it == obj.constEnd())
+                return NodeList{};
+            cur = *it;
+            break;
+        }
+        case Index:
+        {
+            if (!cur.isArray())
+                return NodeList{};
+            const auto arr{asArray(cur)};
+            const auto normalIdx{normalizeIndex(tk.index, arr.size())};
+            if (normalIdx < 0 || normalIdx >= arr.size())
+                return NodeList{};
+            cur = arr[normalIdx];
+            break;
+        }
+        default:
+            return NodeList{};
+        }
+    }
+    return NodeList{QJsonArray{cur}, false};
+}
+
+// ---------------------------------------------------------------------------
 //  evaluateTokenStream — walk tokens left-to-right over a working node set
 // ---------------------------------------------------------------------------
 std::expected<NodeList, DetailedEvalError> evaluateTokenStream(const PathEvalCtx& ctx, const QJsonValue& root)
@@ -146,6 +207,10 @@ std::expected<NodeList, DetailedEvalError> evaluateTokenStream(const PathEvalCtx
     // Root-only selector ($): the document itself is the sole node
     if (ctx.tokens.size() == 1)
         return NodeList{QJsonArray{root}, false};
+
+    // Fast path: definite paths (Key/Index only) skip the full pipeline
+    if (isDefinitePath(ctx.tokens))
+        return evaluateDefinite(ctx.tokens, root);
 
     // Initialize working set with the root as the sole node (RFC 9535 §2.2)
     auto  pooledWorkingArray{acquirePooledArray()};
@@ -170,60 +235,6 @@ std::expected<NodeList, DetailedEvalError> evaluateTokenStream(const PathEvalCtx
     }
 
     return NodeList{*std::move(working), multi};
-}
-
-// ---------------------------------------------------------------------------
-//  evaluateDefinite - Evaluate a JSONPath with no wildcards or filters
-// ---------------------------------------------------------------------------
-std::expected<QJsonValue, DetailedEvalError> evaluateDefinite(const std::vector<Token>& tokens,
-                                                              const QJsonValue&         root) noexcept
-{
-    using enum Token::Kind;
-
-    auto cur{root};
-    // Skip leading root token ('$' or '@') if present
-    auto startIdx{0};
-    if (!tokens.empty() && tokens.front().kind == Token::Kind::Key)
-    {
-        const auto& k{tokens.front().key};
-        if (k == u"$" || k == u"@")
-            startIdx = 1;
-    }
-
-    for (int i{startIdx}; i < tokens.size(); ++i)
-    {
-        const auto  idx16{static_cast<std::uint16_t>(i)};
-        const auto& tk{tokens[i]};
-        switch (tk.kind)
-        {
-        case Key:
-        {
-            if (!cur.isObject())
-                return std::unexpected(DetailedEvalError{EvalError::TypeMismatchObject, idx16});
-            const auto obj{cur.toObject()};
-            auto       it{obj.constFind(tk.key)};
-            if (it == obj.constEnd())
-                return std::unexpected(DetailedEvalError{EvalError::KeyNotFound, idx16});
-            cur = *it;
-            break;
-        }
-        case Index:
-        {
-            if (!cur.isArray())
-                return std::unexpected(DetailedEvalError{EvalError::TypeMismatchArray, idx16});
-            const auto arr{asArray(cur)};
-            auto       normalIdx{normalizeIndex(tk.index, arr.size())};
-            if (normalIdx < 0 || normalIdx >= arr.size())
-                return std::unexpected(DetailedEvalError{EvalError::IndexOutOfRange, idx16});
-            cur = arr[normalIdx];
-            break;
-        }
-        default:
-            // This function only handles definite paths (no wildcards/filters)
-            return std::unexpected(DetailedEvalError{EvalError::TypeMismatchObject, idx16});
-        }
-    }
-    return cur;
 }
 
 // ---------------------------------------------------------------------------

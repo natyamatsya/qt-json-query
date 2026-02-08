@@ -44,10 +44,9 @@ std::expected<NodeList, DetailedEvalError> evaluateTokenStream(const PathEvalCtx
 std::expected<QJsonArray, DetailedEvalError> evaluateAll(const PathEvalCtx& ctx, const QJsonValue& root);
 std::expected<QJsonValue, DetailedEvalError> evaluate(const PathEvalCtx& ctx, const QJsonValue& root);
 
-// Evaluate a *definite* JSONPath (no wildcard/recursive/filter) sequentially
-// This is a specialized fast path for simple JSONPaths that don't require complex evaluation
-std::expected<QJsonValue, DetailedEvalError> evaluateDefinite(const std::vector<Token>& tokens,
-                                                              const QJsonValue&         root) noexcept;
+// Fast path for definite JSONPaths (only Key/Index selectors, no wildcard/recursive/filter)
+std::expected<NodeList, DetailedEvalError> evaluateDefinite(const std::vector<Token>& tokens,
+                                                            const QJsonValue&         root) noexcept;
 
 // Apply a single token to every element in src, collecting results
 std::expected<QJsonArray, EvalError>
