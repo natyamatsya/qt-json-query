@@ -36,9 +36,11 @@ cmake --build build
 Run tests:
 
 ```bash
-cmake --build build --target json_query_tests
-ctest --test-dir build
+ctest --test-dir build                                    # all tests
+cmake --build build --target rfc9535_compliance_tests      # specific suite
 ```
+
+See [`tests/README.md`](tests/README.md) for the full list of test targets and CMake options.
 
 ## Integration
 
