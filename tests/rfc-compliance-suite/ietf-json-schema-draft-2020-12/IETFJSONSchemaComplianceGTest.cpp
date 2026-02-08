@@ -35,6 +35,41 @@ namespace
 {
 
 // ----------------------------------------------------------------------------
+// File-based schema fetcher for remote $ref resolution -------------------------
+// ----------------------------------------------------------------------------
+static const QString kRemoteBaseUrl{u"http://localhost:1234"_qt_s};
+static const QString kRemotesDir{
+    QStringLiteral(JSON_QUERY_SOURCE_DIR "/compliance/ietf-json-schema-draft-2020-12/remotes")};
+
+SchemaFetcher makeFileBasedFetcher()
+{
+    return [](const QString& uri) -> std::optional<QJsonValue> {
+        // Map http://localhost:1234/path to remotes/path
+        QString path{uri};
+        if (path.startsWith(kRemoteBaseUrl))
+            path = path.mid(kRemoteBaseUrl.size());
+        if (path.startsWith(u'/'))
+            path = path.mid(1);
+
+        const auto filePath{kRemotesDir + u"/"_qt_s + path};
+        QFile file{filePath};
+        if (!file.open(QIODevice::ReadOnly))
+            return std::nullopt;
+
+        QJsonParseError err{};
+        const auto doc{QJsonDocument::fromJson(file.readAll(), &err)};
+        if (err.error != QJsonParseError::NoError)
+            return std::nullopt;
+
+        if (doc.isObject())
+            return QJsonValue(doc.object());
+        if (doc.isArray())
+            return QJsonValue(doc.array());
+        return std::nullopt;
+    };
+}
+
+// ----------------------------------------------------------------------------
 // Test-case representation ----------------------------------------------------
 // ----------------------------------------------------------------------------
 struct SchemaTestCase
@@ -168,8 +203,9 @@ TEST_P(IETFJsonSchemaTest, ValidatesPerSpec)
 {
     const SchemaTestCase& tc{GetParam()};
 
-    // Compile schema
-    auto schemaResult{JSONSchema::create(tc.schema)};
+    // Compile schema with file-based fetcher for remote $ref resolution
+    static const auto fetcher{makeFileBasedFetcher()};
+    auto schemaResult{JSONSchema::create(tc.schema, fetcher)};
     if (!schemaResult)
     {
         FAIL() << "Schema compilation failed for: " << tc.groupDesc.toStdString()

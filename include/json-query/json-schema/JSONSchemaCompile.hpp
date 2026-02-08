@@ -7,6 +7,7 @@
 #include <expected>
 #include <memory>
 
+#include "JSONSchema.hpp"
 #include "JSONSchemaError.hpp"
 #include "internal/SchemaNode.hpp"
 #include "json-query/utils/JSONQueryError.hpp"
@@ -21,9 +22,10 @@ namespace json_query::json_schema
  * document into an optimized internal representation for fast validation.
  *
  * @param schemaValue The JSON Schema (object or boolean)
+ * @param fetcher Optional callback for resolving remote $ref URIs
  * @return Compiled schema or error
  */
 [[nodiscard]] std::expected<std::shared_ptr<internal::CompiledSchema>, QueryError>
-compileSchema(const QJsonValue& schemaValue);
+compileSchema(const QJsonValue& schemaValue, SchemaFetcher fetcher = {});
 
 } // namespace json_query::json_schema

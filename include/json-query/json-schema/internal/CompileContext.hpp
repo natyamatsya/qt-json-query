@@ -7,6 +7,8 @@
 
 #include <QString>
 #include <QStringView>
+#include <functional>
+#include <optional>
 #include <unordered_map>
 #include <vector>
 
@@ -18,6 +20,9 @@ namespace json_query::json_schema::internal
  *
  * Maintains state during recursive schema compilation.
  */
+/// Callback type for resolving remote schema URIs (non-owning reference in context)
+using SchemaFetcherFn = std::function<std::optional<QJsonValue>(const QString& uri)>;
+
 struct CompileContext
 {
     std::vector<SchemaNode>&                  nodes;
@@ -25,6 +30,9 @@ struct CompileContext
     std::unordered_map<QString, std::size_t>& dynamicAnchors;
     QString                                   basePath{};
     QString                                   baseUri{};
+
+    /// Non-owning pointer to the schema fetcher (null if no remote resolution)
+    const SchemaFetcherFn* fetcher{nullptr};
 
     /// Pending dynamic anchor registrations: {resourceUri, anchorName, nodeIndex}
     struct PendingDynAnchor

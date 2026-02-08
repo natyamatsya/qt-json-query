@@ -595,6 +595,58 @@ void resolveReference(RefSchema&                                      refNode,
 }
 
 /**
+ * @brief Fetch and compile a remote schema document via the SchemaFetcher callback
+ *
+ * Calls the user-provided fetcher to retrieve the schema at the given URI,
+ * compiles it into the current context (registering anchors, $defs, etc.),
+ * and registers the compiled root under the URI in the anchor table.
+ *
+ * @return true if the schema was fetched and compiled successfully
+ */
+bool fetchAndCompileRemoteSchema(CompileContext&                                  ctx,
+                                 const QString&                                   uri,
+                                 std::unordered_map<QString, std::size_t>&        anchors)
+{
+    using json_query::literals::operator""_qt_s;
+
+    if (!ctx.fetcher)
+        return false;
+
+    // Avoid re-fetching URIs we already have
+    if (ctx.resourceDocuments.contains(uri) || anchors.contains(uri))
+        return false;
+
+    const auto fetched{(*ctx.fetcher)(uri)};
+    if (!fetched)
+        return false;
+
+    // Set base URI scope for the fetched document
+    BaseUriScope uriScope{ctx};
+    ctx.baseUri = uri;
+
+    // Store the document for JSON Pointer resolution
+    ctx.resourceDocuments[uri] = *fetched;
+
+    // Compile $defs first (Phase 1 for the fetched document)
+    if (fetched->isObject())
+    {
+        const auto fetchedObj{fetched->toObject()};
+        compileDefinitionsBlock(ctx, fetchedObj, u"$defs"_qt_s, u""_qt_s);
+        compileDefinitionsBlock(ctx, fetchedObj, u"definitions"_qt_s, u""_qt_s);
+        scanDefsInSchemaTree(ctx, *fetched);
+    }
+
+    // Compile the root of the fetched document
+    auto compiled{compileSchemaNode(ctx, *fetched)};
+    if (!compiled)
+        return false;
+
+    // Register the compiled root under the URI
+    anchors[uri] = *compiled;
+    return true;
+}
+
+/**
  * @brief Resolve a DynamicRefSchema's static fallback target
  */
 void resolveDynamicReference(DynamicRefSchema&                                   dynRef,
@@ -646,26 +698,68 @@ void resolveDynamicReference(DynamicRefSchema&                                  
     }
 }
 
+/**
+ * @brief Extract the base URI from a $ref string (strip fragment)
+ */
+QString extractRefBaseUri(const QString& ref)
+{
+    if (ref.startsWith(u'#'))
+        return {};
+    const auto hashPos{ref.indexOf(u'#')};
+    return hashPos >= 0 ? ref.left(hashPos) : ref;
+}
+
 void resolveAllReferences(internal::CompiledSchema&                        compiled,
-                          const std::unordered_map<QString, std::size_t>& anchors,
+                          std::unordered_map<QString, std::size_t>&        anchors,
                           const QJsonValue&                               rootSchema,
                           CompileContext&                                  ctx)
 {
     // Resolve in bounded passes: newly compiled schemas may introduce new refs
-    static constexpr int kMaxPasses{8};
+    static constexpr int kMaxPasses{16};
     std::size_t start{0};
     for (int pass{0}; pass < kMaxPasses; ++pass)
     {
         const auto end{compiled.nodes.size()};
         if (start >= end)
             break;
+
+        // Local resolution pass
         for (std::size_t i{start}; i < end; ++i)
         {
-            if (auto* refNode = std::get_if<RefSchema>(&compiled.nodes[i]))
+            if (auto* refNode{std::get_if<RefSchema>(&compiled.nodes[i])})
                 resolveReference(*refNode, compiled.rootIndex, anchors, rootSchema, ctx);
-            else if (auto* dynRefNode = std::get_if<DynamicRefSchema>(&compiled.nodes[i]))
+            else if (auto* dynRefNode{std::get_if<DynamicRefSchema>(&compiled.nodes[i])})
                 resolveDynamicReference(*dynRefNode, compiled.rootIndex, anchors, rootSchema, ctx);
         }
+
+        // Remote fetch pass: try to fetch any still-unresolved refs
+        if (ctx.fetcher)
+        {
+            bool fetched{false};
+            for (std::size_t i{0}; i < compiled.nodes.size(); ++i)
+            {
+                QString uri{};
+                if (const auto* refNode{std::get_if<RefSchema>(&compiled.nodes[i])})
+                {
+                    if (!refNode->isResolved())
+                        uri = extractRefBaseUri(refNode->originalRef);
+                }
+                else if (const auto* dynRefNode{std::get_if<DynamicRefSchema>(&compiled.nodes[i])})
+                {
+                    if (!dynRefNode->isResolved())
+                        uri = extractRefBaseUri(dynRefNode->originalRef);
+                }
+                if (!uri.isEmpty())
+                    fetched |= fetchAndCompileRemoteSchema(ctx, uri, anchors);
+            }
+            if (fetched)
+            {
+                // Re-run local resolution from the beginning since new anchors are available
+                start = 0;
+                continue;
+            }
+        }
+
         start = end;
         if (compiled.nodes.size() == end)
             break; // No new nodes added — done
@@ -742,10 +836,10 @@ phase2_CompileSchemaTree(internal::CompiledSchema& compiled, CompileContext& ctx
  * Resolves all $ref references to their target node indices using the anchor table.
  * JSON Pointer refs are resolved by walking the original schema document.
  */
-void phase3_LinkReferences(internal::CompiledSchema&                        compiled,
-                           const std::unordered_map<QString, std::size_t>& anchors,
-                           const QJsonValue&                               rootSchema,
-                           CompileContext&                                  ctx)
+void phase3_LinkReferences(internal::CompiledSchema&                  compiled,
+                           std::unordered_map<QString, std::size_t>& anchors,
+                           const QJsonValue&                         rootSchema,
+                           CompileContext&                            ctx)
 {
     resolveAllReferences(compiled, anchors, rootSchema, ctx);
 }
@@ -786,7 +880,8 @@ void phase3_LinkReferences(internal::CompiledSchema&                        comp
  * @param schemaValue The JSON Schema document (object or boolean)
  * @return Compiled schema or error
  */
-std::expected<std::shared_ptr<internal::CompiledSchema>, QueryError> compileSchema(const QJsonValue& schemaValue)
+std::expected<std::shared_ptr<internal::CompiledSchema>, QueryError>
+compileSchema(const QJsonValue& schemaValue, SchemaFetcher fetcher)
 {
     using json_query::literals::operator""_qt_s;
 
@@ -796,7 +891,7 @@ std::expected<std::shared_ptr<internal::CompiledSchema>, QueryError> compileSche
 
     // Initialize compilation context
     auto           compiled{std::make_shared<internal::CompiledSchema>()};
-    CompileContext ctx{compiled->nodes, compiled->anchors, compiled->dynamicAnchors, {}, {}};
+    CompileContext ctx{compiled->nodes, compiled->anchors, compiled->dynamicAnchors, {}, {}, fetcher ? &fetcher : nullptr};
 
     // Phase 1: Symbol Table Construction
     if (auto r{phase1_BuildSymbolTable(*compiled, ctx, schemaValue)}; !r)

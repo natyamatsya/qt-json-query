@@ -7,7 +7,9 @@
 #include <QtCore/QString>
 
 #include <expected>
+#include <functional>
 #include <memory>
+#include <optional>
 
 #include "JSONSchemaError.hpp"
 #include "JSONSchemaResult.hpp"
@@ -45,6 +47,25 @@ namespace json_query::json_schema
  * }
  * @endcode
  */
+/**
+ * @brief Callback for resolving remote schema references
+ *
+ * When a JSON Schema contains a `$ref` pointing to an external URI,
+ * the compiler calls this function to fetch the remote schema document.
+ * Return std::nullopt if the URI cannot be resolved.
+ *
+ * @code
+ * auto fetcher = [](const QString& uri) -> std::optional<QJsonValue> {
+ *     auto response = httpGet(uri);
+ *     if (!response)
+ *         return std::nullopt;
+ *     return QJsonDocument::fromJson(response->body).object();
+ * };
+ * auto schema = JSONSchema::create(schemaJson, std::move(fetcher));
+ * @endcode
+ */
+using SchemaFetcher = std::function<std::optional<QJsonValue>(const QString& uri)>;
+
 class JSONSchema
 {
   public:
@@ -58,6 +79,7 @@ class JSONSchema
      * @return ParseResult containing the compiled schema or an error
      */
     static ParseResult create(const QJsonObject& schemaObject);
+    static ParseResult create(const QJsonObject& schemaObject, SchemaFetcher fetcher);
 
     /**
      * @brief Create a compiled schema from a JSON document
@@ -66,6 +88,7 @@ class JSONSchema
      * @return ParseResult containing the compiled schema or an error
      */
     static ParseResult create(const QJsonDocument& schemaDoc);
+    static ParseResult create(const QJsonDocument& schemaDoc, SchemaFetcher fetcher);
 
     /**
      * @brief Create a compiled schema from a JSON value (object or boolean)
@@ -76,6 +99,7 @@ class JSONSchema
      * @return ParseResult containing the compiled schema or an error
      */
     static ParseResult create(const QJsonValue& schemaValue);
+    static ParseResult create(const QJsonValue& schemaValue, SchemaFetcher fetcher);
 
     /**
      * @brief Validate a JSON value against this schema

@@ -9,29 +9,36 @@ namespace json_query::json_schema
 
 JSONSchema::ParseResult JSONSchema::create(const QJsonObject& schemaObject)
 {
-    return create(QJsonValue(schemaObject));
+    return create(QJsonValue(schemaObject), {});
+}
+
+JSONSchema::ParseResult JSONSchema::create(const QJsonObject& schemaObject, SchemaFetcher fetcher)
+{
+    return create(QJsonValue(schemaObject), std::move(fetcher));
 }
 
 JSONSchema::ParseResult JSONSchema::create(const QJsonDocument& schemaDoc)
 {
+    return create(schemaDoc, {});
+}
+
+JSONSchema::ParseResult JSONSchema::create(const QJsonDocument& schemaDoc, SchemaFetcher fetcher)
+{
     if (schemaDoc.isObject())
-    {
-        return create(schemaDoc.object());
-    }
-    else if (schemaDoc.isArray())
-    {
-        // Arrays are not valid schemas
+        return create(schemaDoc.object(), std::move(fetcher));
+    if (schemaDoc.isArray())
         return std::unexpected(QueryError(ParseError::InvalidSchemaStructure));
-    }
-    else
-    {
-        return std::unexpected(QueryError(ParseError::EmptySchema));
-    }
+    return std::unexpected(QueryError(ParseError::EmptySchema));
 }
 
 JSONSchema::ParseResult JSONSchema::create(const QJsonValue& schemaValue)
 {
-    auto compileResult{compileSchema(schemaValue)};
+    return create(schemaValue, {});
+}
+
+JSONSchema::ParseResult JSONSchema::create(const QJsonValue& schemaValue, SchemaFetcher fetcher)
+{
+    auto compileResult{compileSchema(schemaValue, std::move(fetcher))};
     if (!compileResult)
         return std::unexpected(compileResult.error());
 
