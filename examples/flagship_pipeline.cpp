@@ -89,8 +89,7 @@ static QJsonObject responseSchema()
                             {"name", QJsonObject{{"type", "string"}, {"minLength", 1}}},
                             {"role", QJsonObject{{"type", "string"}}},
                             {"salary", QJsonObject{{"type", "integer"}, {"minimum", 0}}},
-                            {"skills",
-                             QJsonObject{{"type", "array"}, {"items", QJsonObject{{"type", "string"}}}}},
+                            {"skills", QJsonObject{{"type", "array"}, {"items", QJsonObject{{"type", "string"}}}}},
                             {"active", QJsonObject{{"type", "boolean"}}},
                         }},
                    }},
@@ -140,10 +139,9 @@ static std::vector<Employee> findHighEarners(const JSONSchema& schema, const QJs
     qDebug() << "  Schema validation passed";
 
     // Step 2: Query with JSONPath filter — one expression does the filtering
-    const auto matches{
-        JSONPath::create(u"$.employees[?(@.active == true && @.salary > 100000)]")
-            .and_then([&](const JSONPath& path) { return path.evaluate(response); })
-            .transform_error(logError("JSONPath query"))};
+    const auto matches{JSONPath::create(u"$.employees[?(@.active == true && @.salary > 100000)]")
+                           .and_then([&](const JSONPath& path) { return path.evaluate(response); })
+                           .transform_error(logError("JSONPath query"))};
 
     if (!matches)
         return {};
@@ -169,10 +167,8 @@ static std::vector<Employee> findHighEarners(const JSONSchema& schema, const QJs
     }
 
     for (const auto& emp : result)
-        qDebug().noquote() << QString("  %1 (%2) — $%3 — [%4]")
-                                  .arg(emp.name, emp.role)
-                                  .arg(emp.salary)
-                                  .arg(emp.skills.join(", "));
+        qDebug().noquote()
+            << QString("  %1 (%2) — $%3 — [%4]").arg(emp.name, emp.role).arg(emp.salary).arg(emp.skills.join(", "));
 
     return result;
 }
@@ -187,29 +183,26 @@ static void directAccess(const QJsonValue& response)
     qDebug() << "\n── Pipeline 2: Direct access via JSONPointer + as<T> ──";
 
     // Department name in one monadic chain
-    const auto dept{
-        JSONPointer::create(u"/department")
-            .and_then([&](const JSONPointer& ptr) { return ptr.evaluate(response); })
-            .and_then(as<QString>)
-            .transform_error(logError("department lookup"))};
+    const auto dept{JSONPointer::create(u"/department")
+                        .and_then([&](const JSONPointer& ptr) { return ptr.evaluate(response); })
+                        .and_then(as<QString>)
+                        .transform_error(logError("department lookup"))};
 
     qDebug().noquote() << "  Department:" << dept.value_or("(unknown)");
 
     // First employee's name
-    const auto firstName{
-        JSONPointer::create(u"/employees/0/name")
-            .and_then([&](const JSONPointer& ptr) { return ptr.evaluate(response); })
-            .and_then(as<QString>)
-            .transform_error(logError("first employee lookup"))};
+    const auto firstName{JSONPointer::create(u"/employees/0/name")
+                             .and_then([&](const JSONPointer& ptr) { return ptr.evaluate(response); })
+                             .and_then(as<QString>)
+                             .transform_error(logError("first employee lookup"))};
 
     qDebug().noquote() << "  First employee:" << firstName.value_or("(unknown)");
 
     // Salary of third employee (index 2)
-    const auto salary{
-        JSONPointer::create(u"/employees/2/salary")
-            .and_then([&](const JSONPointer& ptr) { return ptr.evaluate(response); })
-            .and_then(as<int>)
-            .transform_error(logError("salary lookup"))};
+    const auto salary{JSONPointer::create(u"/employees/2/salary")
+                          .and_then([&](const JSONPointer& ptr) { return ptr.evaluate(response); })
+                          .and_then(as<int>)
+                          .transform_error(logError("salary lookup"))};
 
     if (salary)
         qDebug().noquote() << QString("  Third employee salary: $%1").arg(*salary);
@@ -225,10 +218,9 @@ static void aggregateQueries(const QJsonValue& response)
     qDebug() << "\n── Pipeline 3: Recursive descent + evaluateSingle ──";
 
     // All skills across all employees
-    const auto allSkills{
-        JSONPath::create(u"$.employees[*].skills[*]")
-            .and_then([&](const JSONPath& path) { return path.evaluate(response); })
-            .transform_error(logError("skills query"))};
+    const auto allSkills{JSONPath::create(u"$.employees[*].skills[*]")
+                             .and_then([&](const JSONPath& path) { return path.evaluate(response); })
+                             .transform_error(logError("skills query"))};
 
     if (allSkills)
     {
@@ -241,11 +233,10 @@ static void aggregateQueries(const QJsonValue& response)
     }
 
     // evaluateSingle — get exactly one value, no array wrapping
-    const auto version{
-        JSONPath::create(u"$.version")
-            .and_then([&](const JSONPath& path) { return path.evaluateSingle(response); })
-            .and_then(as<QString>)
-            .transform_error(logError("version query"))};
+    const auto version{JSONPath::create(u"$.version")
+                           .and_then([&](const JSONPath& path) { return path.evaluateSingle(response); })
+                           .and_then(as<QString>)
+                           .transform_error(logError("version query"))};
 
     qDebug().noquote() << "  API version:" << version.value_or("(unknown)");
 }

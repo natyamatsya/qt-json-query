@@ -120,11 +120,11 @@ static auto log_query_error(const QString& context)
 [[nodiscard]] static std::optional<QString> editionIsbn_path(const QJsonDocument& doc, int index)
 {
     const auto create_path{[](int idx)
-    { return JSONPath::create(QString(u"$.inventory[%1].details.edition.isbn").arg(idx)); }};
+                           { return JSONPath::create(QString(u"$.inventory[%1].details.edition.isbn").arg(idx)); }};
 
     const auto evaluate{[&doc](const JSONPath& path) { return path.evaluate(doc); }};
     const auto try_select_first{[](const QJsonArray& array) -> QJsonValue
-    { return array.isEmpty() ? QJsonValue::Undefined : array.first(); }};
+                                { return array.isEmpty() ? QJsonValue::Undefined : array.first(); }};
     const auto to_optional{[](const QString& s) -> std::optional<QString> { return s; }};
 
     return create_path(index)
@@ -142,19 +142,20 @@ static auto log_query_error(const QString& context)
 [[nodiscard]] static QStringList titlesAbovePrice_jsonquery(const QJsonDocument& doc, double threshold)
 {
     const auto create_path{[&](double thr)
-    { return JSONPath::create(QString(u"$.inventory[?(@.price > %1)].title").arg(thr)); }};
+                           { return JSONPath::create(QString(u"$.inventory[?(@.price > %1)].title").arg(thr)); }};
     const auto evaluate{[&doc](const JSONPath& p) { return p.evaluate(doc); }};
     const auto collect_titles{[](const QJsonArray& arr) -> QStringList
-    {
-        QStringList out;
-        out.reserve(arr.size());
-        for (const auto& item : arr)
-            if (auto s{as<QString>(item)})
-                out << *s;
-            else
-                qWarning() << "Skipping non-string title:" << item << "Error:" << s.error().message_qt();
-        return out;
-    }};
+                              {
+                                  QStringList out;
+                                  out.reserve(arr.size());
+                                  for (const auto& item : arr)
+                                      if (auto s{as<QString>(item)})
+                                          out << *s;
+                                      else
+                                          qWarning() << "Skipping non-string title:" << item
+                                                     << "Error:" << s.error().message_qt();
+                                  return out;
+                              }};
 
     return create_path(threshold)
         .transform_error(log_query_error("JSONPath creation failed"))
@@ -167,8 +168,8 @@ static auto log_query_error(const QString& context)
 int main(int argc, char** argv)
 {
     QCoreApplication app{argc, argv};
-    const auto          doc{loadTestDocument()};
-    constexpr double    threshold{25.0};
+    const auto       doc{loadTestDocument()};
+    constexpr double threshold{25.0};
 
     // Test title queries
     const auto plainTitles{titlesAbovePrice_plain(doc, threshold)};

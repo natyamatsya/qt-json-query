@@ -20,11 +20,11 @@ using internal::emptyResult;
 // ---------------------------------------------------------------------------
 
 static std::expected<QJsonArray, EvalError> processToken(const PathEvalCtx& ctx,
-                                                          qsizetype&         i,
-                                                          const QJsonArray&  working,
-                                                          const QJsonValue&  root,
-                                                          bool&              multi,
-                                                          bool               prevRecursive)
+                                                         qsizetype&         i,
+                                                         const QJsonArray&  working,
+                                                         const QJsonValue&  root,
+                                                         bool&              multi,
+                                                         bool               prevRecursive)
 {
     const auto& tk{ctx.tokens[i]};
 
@@ -56,7 +56,7 @@ static std::expected<QJsonArray, EvalError> processToken(const PathEvalCtx& ctx,
     if (prevRecursive && (tk.kind == Token::Kind::KeyList || tk.kind == Token::Kind::Key))
     {
         const auto isLeaf{i + 1 == ctx.tokens.size()};
-        auto result{processBranchUniqueSelection(ctx, i, working, root, isLeaf)};
+        auto       result{processBranchUniqueSelection(ctx, i, working, root, isLeaf)};
         if (result && result->empty())
             return emptyResult();
         return result;
@@ -161,7 +161,7 @@ std::expected<NodeList, DetailedEvalError> evaluateTokenStream(const PathEvalCtx
     workingArray.append(root);
 
     std::expected<QJsonArray, EvalError> working = std::move(workingArray);
-    auto multi{false};
+    auto                                 multi{false};
 
     // Apply each token (selector) to the working node set
     for (qsizetype i{1}; i < ctx.tokens.size() && working; ++i)

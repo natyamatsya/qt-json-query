@@ -35,16 +35,22 @@ eval(const json_query::json_path::detail::PathEvalCtx& ctx, const Token& tk, con
 
 // Explicit template specialization declarations for eval
 template <>
-std::expected<QJsonArray, EvalError>
-eval<Token::Kind::Key>(const json_query::json_path::detail::PathEvalCtx& ctx, const Token& tk, const QJsonValue& v, qsizetype tokenPos);
+std::expected<QJsonArray, EvalError> eval<Token::Kind::Key>(const json_query::json_path::detail::PathEvalCtx& ctx,
+                                                            const Token&                                      tk,
+                                                            const QJsonValue&                                 v,
+                                                            qsizetype tokenPos);
 
 template <>
-std::expected<QJsonArray, EvalError>
-eval<Token::Kind::Index>(const json_query::json_path::detail::PathEvalCtx& ctx, const Token& tk, const QJsonValue& v, qsizetype tokenPos);
+std::expected<QJsonArray, EvalError> eval<Token::Kind::Index>(const json_query::json_path::detail::PathEvalCtx& ctx,
+                                                              const Token&                                      tk,
+                                                              const QJsonValue&                                 v,
+                                                              qsizetype tokenPos);
 
 template <>
-std::expected<QJsonArray, EvalError>
-eval<Token::Kind::Slice>(const json_query::json_path::detail::PathEvalCtx& ctx, const Token& tk, const QJsonValue& v, qsizetype tokenPos);
+std::expected<QJsonArray, EvalError> eval<Token::Kind::Slice>(const json_query::json_path::detail::PathEvalCtx& ctx,
+                                                              const Token&                                      tk,
+                                                              const QJsonValue&                                 v,
+                                                              qsizetype tokenPos);
 
 template <>
 std::expected<QJsonArray, EvalError> eval<Token::Kind::Wildcard>(const json_query::json_path::detail::PathEvalCtx& ctx,
@@ -57,8 +63,10 @@ std::expected<QJsonArray, EvalError> eval<Token::Kind::Recursive>(
     const json_query::json_path::detail::PathEvalCtx& ctx, const Token& tk, const QJsonValue& v, qsizetype tokenPos);
 
 template <>
-std::expected<QJsonArray, EvalError>
-eval<Token::Kind::Filter>(const json_query::json_path::detail::PathEvalCtx& ctx, const Token& tk, const QJsonValue& v, qsizetype tokenPos);
+std::expected<QJsonArray, EvalError> eval<Token::Kind::Filter>(const json_query::json_path::detail::PathEvalCtx& ctx,
+                                                               const Token&                                      tk,
+                                                               const QJsonValue&                                 v,
+                                                               qsizetype tokenPos);
 
 template <>
 std::expected<QJsonArray, EvalError> eval<Token::Kind::KeyList>(const json_query::json_path::detail::PathEvalCtx& ctx,

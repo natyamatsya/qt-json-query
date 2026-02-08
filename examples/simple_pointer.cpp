@@ -15,9 +15,7 @@ static void evaluatePointer(QStringView path, const QJsonValue& doc, QStringView
 {
     qDebug().noquote() << "\n" << description;
 
-    const auto result{
-        JSONPointer::create(path)
-            .and_then([&](const JSONPointer& ptr) { return ptr.evaluate(doc); })};
+    const auto result{JSONPointer::create(path).and_then([&](const JSONPointer& ptr) { return ptr.evaluate(doc); })};
 
     if (!result)
     {

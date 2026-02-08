@@ -57,7 +57,8 @@ struct EventProcessor
              QJsonObject{
                  {"timestamp", QJsonObject{{"type", "string"}}},
                  {"service", QJsonObject{{"type", "string"}, {"minLength", 1}}},
-                 {"level", QJsonObject{{"type", "string"}, {"enum", QJsonArray{"debug", "info", "warn", "error", "fatal"}}}},
+                 {"level",
+                  QJsonObject{{"type", "string"}, {"enum", QJsonArray{"debug", "info", "warn", "error", "fatal"}}}},
                  {"message", QJsonObject{{"type", "string"}}},
                  {"metadata", QJsonObject{{"type", "object"}}},
              }},
@@ -103,12 +104,34 @@ struct EventProcessor
 static std::vector<QJsonObject> simulatedEvents()
 {
     return {
-        {{"timestamp", "2026-02-08T22:01:00Z"}, {"service", "auth"},    {"level", "info"},  {"message", "User login successful"},           {"metadata", QJsonObject{{"user_id", "u-1234"}}}},
-        {{"timestamp", "2026-02-08T22:01:05Z"}, {"service", "payment"}, {"level", "error"}, {"message", "Payment gateway timeout"},          {"metadata", QJsonObject{{"tx_id", "tx-5678"}, {"retry", 3}}}},
-        {{"timestamp", "2026-02-08T22:01:10Z"}, {"service", "auth"},    {"level", "warn"},  {"message", "Rate limit approaching"},           {"metadata", QJsonObject{{"requests_per_min", 450}}}},
-        {{"timestamp", "2026-02-08T22:01:15Z"}, {"service", "search"},  {"level", "debug"}, {"message", "Cache miss for query 'widgets'"}},
-        {{"timestamp", "2026-02-08T22:01:20Z"}, {"service", "payment"}, {"level", "fatal"}, {"message", "Database connection pool exhausted"}},
-        {{"timestamp", "2026-02-08T22:01:25Z"}, {"service", "auth"},    {"level", "info"},  {"message", "Token refreshed"},                  {"metadata", QJsonObject{{"user_id", "u-1234"}}}},
+        {{"timestamp", "2026-02-08T22:01:00Z"},
+         {"service", "auth"},
+         {"level", "info"},
+         {"message", "User login successful"},
+         {"metadata", QJsonObject{{"user_id", "u-1234"}}}},
+        {{"timestamp", "2026-02-08T22:01:05Z"},
+         {"service", "payment"},
+         {"level", "error"},
+         {"message", "Payment gateway timeout"},
+         {"metadata", QJsonObject{{"tx_id", "tx-5678"}, {"retry", 3}}}},
+        {{"timestamp", "2026-02-08T22:01:10Z"},
+         {"service", "auth"},
+         {"level", "warn"},
+         {"message", "Rate limit approaching"},
+         {"metadata", QJsonObject{{"requests_per_min", 450}}}},
+        {{"timestamp", "2026-02-08T22:01:15Z"},
+         {"service", "search"},
+         {"level", "debug"},
+         {"message", "Cache miss for query 'widgets'"}},
+        {{"timestamp", "2026-02-08T22:01:20Z"},
+         {"service", "payment"},
+         {"level", "fatal"},
+         {"message", "Database connection pool exhausted"}},
+        {{"timestamp", "2026-02-08T22:01:25Z"},
+         {"service", "auth"},
+         {"level", "info"},
+         {"message", "Token refreshed"},
+         {"metadata", QJsonObject{{"user_id", "u-1234"}}}},
         // Invalid event — missing required "level" field
         {{"timestamp", "2026-02-08T22:01:30Z"}, {"service", "billing"}, {"message", "Invoice generated"}},
     };
@@ -149,8 +172,7 @@ int main(int argc, char* argv[])
         {
             ++invalid;
             const auto svc{processor->servicePtr.evaluate(eventValue).and_then(as<QString>)};
-            qDebug().noquote() << QString("  REJECTED [%1]: %2")
-                                      .arg(svc.value_or("?"), result.firstError());
+            qDebug().noquote() << QString("  REJECTED [%1]: %2").arg(svc.value_or("?"), result.firstError());
             continue;
         }
 
@@ -188,8 +210,8 @@ int main(int argc, char* argv[])
             const auto svc{obj["service"] | as<QString>};
             const auto msg{obj["message"] | as<QString>};
             const auto lvl{obj["level"] | as<QString>};
-            qDebug().noquote() << QString("  [%1] %2: %3")
-                                      .arg(lvl.value_or("?"), svc.value_or("?"), msg.value_or("?"));
+            qDebug().noquote()
+                << QString("  [%1] %2: %3").arg(lvl.value_or("?"), svc.value_or("?"), msg.value_or("?"));
         }
     }
 

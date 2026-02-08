@@ -9,7 +9,8 @@ set(JSON_SCHEMA_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-schema/JSONSchemaFormatGTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-schema/JSONSchemaKeywordGTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-schema/JSONSchemaRefGTest.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-schema/JSONSchemaRegistryGTest.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-schema/JSONSchemaRegistryGTest.cpp
+)
 
 function(add_json_schema_tests)
   if(JSON_SCHEMA_TEST_SOURCES)

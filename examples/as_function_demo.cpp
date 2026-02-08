@@ -20,8 +20,14 @@ int main(int argc, char* argv[])
              {"name", "The Book Emporium"},
              {"book",
               QJsonArray{
-                  QJsonObject{{"title", "The Great Gatsby"}, {"author", "F. Scott Fitzgerald"}, {"price", 12.99}, {"inStock", true}},
-                  QJsonObject{{"title", "To Kill a Mockingbird"}, {"author", "Harper Lee"}, {"price", 10.50}, {"inStock", false}},
+                  QJsonObject{{"title", "The Great Gatsby"},
+                              {"author", "F. Scott Fitzgerald"},
+                              {"price", 12.99},
+                              {"inStock", true}},
+                  QJsonObject{{"title", "To Kill a Mockingbird"},
+                              {"author", "Harper Lee"},
+                              {"price", 10.50},
+                              {"inStock", false}},
               }},
              {"inventory",
               QJsonArray{

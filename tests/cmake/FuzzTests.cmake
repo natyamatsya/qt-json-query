@@ -51,9 +51,9 @@ function(configure_fuzz_target target_name source_file)
   endif()
 
   # Add -fsanitize=fuzzer for the LibFuzzer entry point and mutation engine.
-  # ASan/UBSan flags are applied globally in the top-level CMakeLists.txt
-  # when ENABLE_FUZZ_TESTS=ON, so the library and fuzz targets share
-  # the same instrumentation.
+  # ASan/UBSan flags are applied globally in the top-level CMakeLists.txt when
+  # ENABLE_FUZZ_TESTS=ON, so the library and fuzz targets share the same
+  # instrumentation.
   target_compile_options(${target_name} PRIVATE -fsanitize=fuzzer -g -O1)
   target_link_options(${target_name} PRIVATE -fsanitize=fuzzer)
 

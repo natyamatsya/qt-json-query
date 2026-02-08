@@ -86,8 +86,8 @@ QString JSONPointer::to_string() const
     }
 
     // ─────────────────────────────── single allocation ──────────────────────────
-    QString out(cap, Qt::Uninitialized);
-    QChar*  dst{out.data()};
+    QString   out(cap, Qt::Uninitialized);
+    QChar*    dst{out.data()};
     qsizetype wr{0};
 
     auto writeIndex = [&](qsizetype value)

@@ -33,11 +33,10 @@ int normalizeIndex(int idx, int size) { return idx < 0 ? size + idx : idx; }
 //  evalSlice — RFC 9535 §2.3.5 array slicing
 // ---------------------------------------------------------------------------
 
-
 std::expected<QJsonArray, EvalError> evalSlice(const QJsonArray& array, const Slice& s)
 {
     constexpr qsizetype SENTINEL{std::numeric_limits<qsizetype>::max()};
-    const auto len{array.size()};
+    const auto          len{array.size()};
 
     // RFC 9535: step == 0 selects nothing
     if (s.step == 0)
@@ -52,12 +51,18 @@ std::expected<QJsonArray, EvalError> evalSlice(const QJsonArray& array, const Sl
         qsizetype start{s.start == SENTINEL ? 0 : s.start};
         qsizetype stop{s.end == SENTINEL ? len : s.end};
 
-        if (start < 0) start += len;
-        if (stop < 0)  stop += len;
-        if (start < 0) start = 0;
-        if (start > len) start = len;
-        if (stop < 0) stop = 0;
-        if (stop > len) stop = len;
+        if (start < 0)
+            start += len;
+        if (stop < 0)
+            stop += len;
+        if (start < 0)
+            start = 0;
+        if (start > len)
+            start = len;
+        if (stop < 0)
+            stop = 0;
+        if (stop > len)
+            stop = len;
 
         for (qsizetype i{start}; i < stop;)
         {
@@ -77,12 +82,18 @@ std::expected<QJsonArray, EvalError> evalSlice(const QJsonArray& array, const Sl
         qsizetype start{s.start == SENTINEL ? len - 1 : s.start};
         qsizetype stop{s.end == SENTINEL ? -1 : s.end};
 
-        if (start < 0) start += len;
-        if (stop < 0)  stop += len;
-        if (start < -1) start = -1;
-        if (start >= len) start = len - 1;
-        if (stop < -1) stop = -1;
-        if (stop >= len) stop = len - 1;
+        if (start < 0)
+            start += len;
+        if (stop < 0)
+            stop += len;
+        if (start < -1)
+            start = -1;
+        if (start >= len)
+            start = len - 1;
+        if (stop < -1)
+            stop = -1;
+        if (stop >= len)
+            stop = len - 1;
 
         // Restore sentinel semantics after negative adjustment
         if (s.end == SENTINEL)

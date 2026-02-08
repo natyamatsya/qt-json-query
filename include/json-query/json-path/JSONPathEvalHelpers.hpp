@@ -56,7 +56,7 @@ struct KeyCollectionResult
 };
 
 // Union detection
-bool                   isSelectorToken(const Token& token);
+bool                 isSelectorToken(const Token& token);
 UnionDetectionResult detectUnionTokens(const PathEvalCtx& ctx, qsizetype startIndex);
 
 // Union processing micro-helpers
