@@ -35,6 +35,10 @@ struct CompileContext
     };
     std::vector<PendingDynAnchor> pendingDynamicAnchors{};
 
+    /// Resource JSON documents for sub-resource JSON Pointer resolution
+    /// Maps $id → QJsonValue of the resource root
+    std::unordered_map<QString, QJsonValue> resourceDocuments{};
+
     /**
      * @brief Add a node and return its index
      */

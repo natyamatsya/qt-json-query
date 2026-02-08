@@ -46,6 +46,15 @@ void validateObjectSchema(ValidateContext&    ctx,
                           const QString&      instancePath,
                           const QString&      schemaPath)
 {
+    // Push resource dynamic anchors if this ObjectSchema is a resource root
+    std::optional<DynamicScopeGuard> resourceGuard;
+    if (node.selfIndex != ObjectSchema::kNoIndex)
+    {
+        const auto rdaIt{ctx.schema.resourceDynamicAnchors.find(node.selfIndex)};
+        if (rdaIt != ctx.schema.resourceDynamicAnchors.end())
+            resourceGuard.emplace(ctx.dynamicScope, rdaIt->second);
+    }
+
     // Set up evaluation tracking if this schema uses unevaluatedProperties/unevaluatedItems
     // and no parent tracker is already active
     const auto needsTracker{(node.unevaluatedProperties || node.unevaluatedItems) && !ctx.tracker};
@@ -130,9 +139,19 @@ void validateNode(ValidateContext&  ctx,
                 if (!schemaVariant.isResolved())
                     return; // Unresolved remote $ref — treat as true (accept all)
 
-                // Push resource dynamic anchors if the target is a resource root
                 const auto& rdaMap{ctx.schema.resourceDynamicAnchors};
-                const auto  rdaIt{rdaMap.find(schemaVariant.targetIndex)};
+
+                // Push this node's own resource scope (e.g., second_scope with $defs/$dynamicAnchor)
+                std::optional<DynamicScopeGuard> selfGuard;
+                if (schemaVariant.selfIndex != RefSchema::kNoIndex)
+                {
+                    const auto selfRda{rdaMap.find(schemaVariant.selfIndex)};
+                    if (selfRda != rdaMap.end())
+                        selfGuard.emplace(ctx.dynamicScope, selfRda->second);
+                }
+
+                // Push resource dynamic anchors if the target is a resource root
+                const auto rdaIt{rdaMap.find(schemaVariant.targetIndex)};
                 if (rdaIt != rdaMap.end())
                 {
                     DynamicScopeGuard guard{ctx.dynamicScope, rdaIt->second};
@@ -150,14 +169,14 @@ void validateNode(ValidateContext&  ctx,
                 if (!schemaVariant.isResolved())
                     return; // Unresolved — treat as true
 
-                // Check if the static target has a $dynamicAnchor with the same name
-                // (bookending requirement). If so, walk the dynamic scope.
+                // Bookending requirement: only do dynamic resolution if
+                // 1) the anchor name is a plain fragment (not a JSON Pointer starting with '/')
+                // 2) the static target node itself has $dynamicAnchor with the same name
                 auto targetIndex{schemaVariant.targetIndex};
-                if (!schemaVariant.anchorName.isEmpty())
+                if (!schemaVariant.anchorName.isEmpty() && !schemaVariant.anchorName.startsWith(u'/'))
                 {
-                    // Check if the static target is in a resource that has a matching $dynamicAnchor
-                    const auto staticHasDynAnchor{ctx.schema.dynamicAnchors.contains(schemaVariant.anchorName)};
-                    if (staticHasDynAnchor)
+                    const auto anchorIt{ctx.schema.nodeDynAnchorNames.find(targetIndex)};
+                    if (anchorIt != ctx.schema.nodeDynAnchorNames.end() && anchorIt->second == schemaVariant.anchorName)
                     {
                         if (const auto resolved{ctx.resolveDynamicAnchor(schemaVariant.anchorName)})
                             targetIndex = *resolved;

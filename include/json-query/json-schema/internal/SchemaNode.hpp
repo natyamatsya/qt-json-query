@@ -69,9 +69,11 @@ struct BooleanSchema
 struct RefSchema
 {
     static constexpr std::size_t kUnresolved{std::numeric_limits<std::size_t>::max()};
+    static constexpr std::size_t kNoIndex{std::numeric_limits<std::size_t>::max()};
 
     std::size_t targetIndex{kUnresolved}; // Index into CompiledSchema::nodes
     QString     originalRef;              // Original $ref string for error messages
+    std::size_t selfIndex{kNoIndex};      // Own node index for resource scope push
 
     [[nodiscard]] bool isResolved() const noexcept { return targetIndex != kUnresolved; }
 };
@@ -142,6 +144,10 @@ struct ObjectSchema
     std::optional<std::size_t> unevaluatedProperties;
     std::optional<std::size_t> unevaluatedItems;
 
+    // Node identity (for resource scope management during validation)
+    static constexpr std::size_t kNoIndex{std::numeric_limits<std::size_t>::max()};
+    std::size_t selfIndex{kNoIndex};
+
     // Metadata (not used for validation, but stored for introspection)
     std::optional<QString> title;
     std::optional<QString> description;
@@ -159,6 +165,7 @@ struct DynamicRefSchema
 
     std::size_t targetIndex{kUnresolved}; // Static fallback target
     QString     anchorName;              // Dynamic anchor name to search for at runtime
+    std::size_t selfIndex{kUnresolved};  // Own node index for resource scope push
     QString     originalRef;             // Original $dynamicRef string for error messages
 
     [[nodiscard]] bool isResolved() const noexcept { return targetIndex != kUnresolved; }
@@ -184,6 +191,10 @@ struct CompiledSchema
     // Per-resource dynamic anchor maps for $dynamicRef scope resolution
     // Maps resource root node index → {anchor name → target node index}
     std::unordered_map<std::size_t, std::unordered_map<QString, std::size_t>> resourceDynamicAnchors;
+
+    // Per-node $dynamicAnchor name for bookending check
+    // Maps node index → anchor name (only for nodes that have $dynamicAnchor)
+    std::unordered_map<std::size_t, QString> nodeDynAnchorNames;
 
     // Schema metadata
     QString schemaId; // $id if present
