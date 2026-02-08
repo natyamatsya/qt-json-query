@@ -26,6 +26,15 @@ struct CompileContext
     QString                                   basePath{};
     QString                                   baseUri{};
 
+    /// Pending dynamic anchor registrations: {resourceUri, anchorName, nodeIndex}
+    struct PendingDynAnchor
+    {
+        QString     resourceUri;
+        QString     anchorName;
+        std::size_t nodeIndex;
+    };
+    std::vector<PendingDynAnchor> pendingDynamicAnchors{};
+
     /**
      * @brief Add a node and return its index
      */

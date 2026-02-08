@@ -455,7 +455,8 @@ inline void compileMetadataKeywords(const QJsonObject& schemaObj, ObjectSchema& 
 compileNestedDefs(CompileContext&, const QJsonObject&, CompileSchemaFn&)
 {
     // $defs are compiled at root level in Phase 1 (symbol table construction)
-    // before Phase 2 (recursive schema compilation) to prevent infinite recursion
+    // before Phase 2 (recursive schema compilation) to prevent infinite recursion.
+    // Nested $defs inside $ref-only schemas are handled by compileSchemaNode's fast path.
     return {};
 }
 

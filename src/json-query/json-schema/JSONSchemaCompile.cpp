@@ -104,7 +104,9 @@ std::expected<std::optional<std::size_t>, QueryError> compileOptionalSchema(Comp
 
 /// Metadata-only keywords that don't affect validation
 static constexpr std::array kMetadataOnlyKeys{
-    u"$ref", u"$anchor", u"$id", u"$schema", u"$defs", u"definitions", u"title", u"description", u"$comment"};
+    u"$ref",         u"$anchor",        u"$id",          u"$schema",
+    u"$defs",        u"definitions",    u"title",        u"description",
+    u"$comment",     u"$dynamicRef",    u"$dynamicAnchor"};
 
 /**
  * @brief Check if schema contains validation keywords beyond metadata
@@ -137,6 +139,18 @@ void processSchemaId(CompileContext& ctx, const QJsonObject& schemaObj)
 
     if (schemaObj.contains(u"$anchor"_qt_s) && schemaObj[u"$anchor"_qt_s].isString())
         return schemaObj[u"$anchor"_qt_s].toString();
+    return std::nullopt;
+}
+
+/**
+ * @brief Extract $dynamicAnchor name if present
+ */
+[[nodiscard]] std::optional<QString> extractDynamicAnchorName(const QJsonObject& schemaObj)
+{
+    using json_query::literals::operator""_qt_s;
+
+    if (schemaObj.contains(u"$dynamicAnchor"_qt_s) && schemaObj[u"$dynamicAnchor"_qt_s].isString())
+        return schemaObj[u"$dynamicAnchor"_qt_s].toString();
     return std::nullopt;
 }
 
@@ -201,17 +215,90 @@ std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, co
     BaseUriScope uriScope{ctx};
     processSchemaId(ctx, schemaObj);
     const auto anchorName{extractAnchorName(schemaObj)};
+    const auto dynAnchorName{extractDynamicAnchorName(schemaObj)};
 
-    // Phase 2: Fast path for $ref-only schemas
+    // Phase 2: Fast path for $ref-only or $dynamicRef-only schemas
     const auto hasRef{schemaObj.contains(u"$ref"_qt_s)};
-    if (hasRef && !hasValidationKeywords(schemaObj))
-        return ctx.addNode(RefSchema{RefSchema::kUnresolved, schemaObj[u"$ref"_qt_s].toString()});
+    const auto hasDynRef{schemaObj.contains(u"$dynamicRef"_qt_s)};
+
+    // Helper: compile nested $defs in schemas that take the fast path
+    // This ensures $dynamicAnchor entries in nested $defs get registered
+    auto compileNestedDefsIfPresent = [&]() -> std::expected<void, QueryError>
+    {
+        for (const auto& kw : {u"$defs"_qt_s, u"definitions"_qt_s})
+        {
+            if (!schemaObj.contains(kw) || !schemaObj[kw].isObject())
+                continue;
+            const auto defsObj{schemaObj[kw].toObject()};
+            for (auto it = defsObj.begin(); it != defsObj.end(); ++it)
+            {
+                auto defResult{compileSchemaNode(ctx, it.value())};
+                if (!defResult)
+                    return std::unexpected(defResult.error());
+                const auto path{kw + u"/"_qt_s + it.key()};
+                if (!ctx.anchors.contains(path))
+                    ctx.anchors[path] = *defResult;
+            }
+        }
+        return {};
+    };
+
+    // Helper: register $id, $anchor, $dynamicAnchor for fast-path nodes
+    auto registerFastPathAnchors = [&](std::size_t nodeIndex) -> std::expected<std::size_t, QueryError>
+    {
+        if (anchorName)
+        {
+            if (auto r{registerAnchor(ctx, *anchorName, nodeIndex)}; !r)
+                return std::unexpected(r.error());
+        }
+        if (dynAnchorName)
+        {
+            const auto scopedKey{ctx.scopedAnchorKey(*dynAnchorName)};
+            ctx.anchors[scopedKey] = nodeIndex;
+            ctx.dynamicAnchors[scopedKey] = nodeIndex;
+            ctx.anchors[*dynAnchorName] = nodeIndex;
+            ctx.dynamicAnchors[*dynAnchorName] = nodeIndex;
+            ctx.pendingDynamicAnchors.push_back({ctx.baseUri, *dynAnchorName, nodeIndex});
+        }
+        if (schemaObj.contains(u"$id"_qt_s) && schemaObj[u"$id"_qt_s].isString())
+            ctx.anchors[schemaObj[u"$id"_qt_s].toString()] = nodeIndex;
+        return nodeIndex;
+    };
+
+    if (hasRef && !hasDynRef && !hasValidationKeywords(schemaObj))
+    {
+        if (auto r{compileNestedDefsIfPresent()}; !r)
+            return std::unexpected(r.error());
+        const auto nodeIndex{ctx.addNode(RefSchema{RefSchema::kUnresolved, schemaObj[u"$ref"_qt_s].toString()})};
+        return registerFastPathAnchors(nodeIndex);
+    }
+
+    if (hasDynRef && !hasRef && !hasValidationKeywords(schemaObj))
+    {
+        if (auto r{compileNestedDefsIfPresent()}; !r)
+            return std::unexpected(r.error());
+        const auto dynRefStr{schemaObj[u"$dynamicRef"_qt_s].toString()};
+        auto fragment{dynRefStr};
+        if (const auto hashPos{dynRefStr.indexOf(u'#')}; hashPos >= 0)
+            fragment = dynRefStr.mid(hashPos + 1);
+        const auto nodeIndex{ctx.addNode(DynamicRefSchema{DynamicRefSchema::kUnresolved, fragment, dynRefStr})};
+        return registerFastPathAnchors(nodeIndex);
+    }
 
     // Phase 3: Build ObjectSchema via dispatch
     ObjectSchema node{};
 
     if (hasRef)
         node.allOf.push_back(ctx.addNode(RefSchema{RefSchema::kUnresolved, schemaObj[u"$ref"_qt_s].toString()}));
+
+    if (hasDynRef)
+    {
+        const auto dynRefStr{schemaObj[u"$dynamicRef"_qt_s].toString()};
+        auto fragment{dynRefStr};
+        if (const auto hashPos{dynRefStr.indexOf(u'#')}; hashPos >= 0)
+            fragment = dynRefStr.mid(hashPos + 1);
+        node.allOf.push_back(ctx.addNode(DynamicRefSchema{DynamicRefSchema::kUnresolved, fragment, dynRefStr}));
+    }
 
     if (auto r{FullKeywordDispatcher::dispatch(ctx, schemaObj, node, compileSchemaNode)}; !r)
         return std::unexpected(r.error());
@@ -223,6 +310,19 @@ std::expected<std::size_t, QueryError> compileSchemaNode(CompileContext& ctx, co
     {
         if (auto r{registerAnchor(ctx, *anchorName, nodeIndex)}; !r)
             return std::unexpected(r.error());
+    }
+
+    // Register $dynamicAnchor: stored in both anchors (for static $ref fallback) and dynamicAnchors
+    if (dynAnchorName)
+    {
+        const auto scopedKey{ctx.scopedAnchorKey(*dynAnchorName)};
+        ctx.anchors[scopedKey] = nodeIndex;
+        ctx.dynamicAnchors[scopedKey] = nodeIndex;
+        // Also register unscoped for simple fragment lookup
+        ctx.anchors[*dynAnchorName] = nodeIndex;
+        ctx.dynamicAnchors[*dynAnchorName] = nodeIndex;
+        // Record for per-resource map building
+        ctx.pendingDynamicAnchors.push_back({ctx.baseUri, *dynAnchorName, nodeIndex});
     }
 
     // Register $id URI so $ref can resolve against it
@@ -386,8 +486,52 @@ void resolveReference(RefSchema&                                      refNode,
 }
 
 /**
- * @brief Resolve all $ref references in compiled nodes
+ * @brief Resolve a DynamicRefSchema's static fallback target
  */
+void resolveDynamicReference(DynamicRefSchema&                                   dynRef,
+                             std::size_t                                         rootIndex,
+                             const std::unordered_map<QString, std::size_t>&     anchors)
+{
+    using json_query::literals::operator""_qt_s;
+
+    if (dynRef.isResolved())
+        return;
+
+    // Static fallback: look up the anchor name in the anchors table
+    if (anchors.contains(dynRef.anchorName))
+    {
+        dynRef.targetIndex = anchors.at(dynRef.anchorName);
+        return;
+    }
+
+    // Try the full original ref as anchor key
+    const auto& ref{dynRef.originalRef};
+    if (ref == u"#")
+    {
+        dynRef.targetIndex = rootIndex;
+        return;
+    }
+
+    // URI with fragment (e.g., "extended#meta")
+    if (ref.contains(u'#'))
+    {
+        const auto hashPos{ref.lastIndexOf(u'#')};
+        const auto fragment{ref.mid(hashPos + 1)};
+        if (anchors.contains(fragment))
+        {
+            dynRef.targetIndex = anchors.at(fragment);
+            return;
+        }
+        // Try scoped key
+        const auto baseUri{ref.left(hashPos)};
+        const auto lastSlash{baseUri.lastIndexOf(u'/')};
+        const auto filename{lastSlash >= 0 ? baseUri.mid(lastSlash + 1) : baseUri};
+        const auto scopedKey{filename + u"#"_qt_s + fragment};
+        if (anchors.contains(scopedKey))
+            dynRef.targetIndex = anchors.at(scopedKey);
+    }
+}
+
 void resolveAllReferences(internal::CompiledSchema&                        compiled,
                           const std::unordered_map<QString, std::size_t>& anchors,
                           const QJsonValue&                               rootSchema,
@@ -402,8 +546,12 @@ void resolveAllReferences(internal::CompiledSchema&                        compi
         if (start >= end)
             break;
         for (std::size_t i{start}; i < end; ++i)
+        {
             if (auto* refNode = std::get_if<RefSchema>(&compiled.nodes[i]))
                 resolveReference(*refNode, compiled.rootIndex, anchors, rootSchema, ctx);
+            else if (auto* dynRefNode = std::get_if<DynamicRefSchema>(&compiled.nodes[i]))
+                resolveDynamicReference(*dynRefNode, compiled.rootIndex, anchors);
+        }
         start = end;
         if (compiled.nodes.size() == end)
             break; // No new nodes added — done
@@ -542,6 +690,19 @@ std::expected<std::shared_ptr<internal::CompiledSchema>, QueryError> compileSche
 
     // Phase 3: Reference Resolution (Linking)
     phase3_LinkReferences(*compiled, ctx.anchors, schemaValue, ctx);
+
+    // Phase 4: Build per-resource dynamic anchor maps
+    for (const auto& [resourceUri, anchorName, nodeIndex] : ctx.pendingDynamicAnchors)
+    {
+        // Find the resource root's node index
+        std::size_t resourceNodeIndex{compiled->rootIndex}; // default: root resource
+        if (!resourceUri.isEmpty())
+        {
+            if (const auto it{ctx.anchors.find(resourceUri)}; it != ctx.anchors.end())
+                resourceNodeIndex = it->second;
+        }
+        compiled->resourceDynamicAnchors[resourceNodeIndex][anchorName] = nodeIndex;
+    }
 
     return compiled;
 }

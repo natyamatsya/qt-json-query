@@ -148,9 +148,26 @@ struct ObjectSchema
 };
 
 /**
+ * @brief Dynamic reference to another schema (resolved at validation time)
+ *
+ * Like RefSchema, but walks the dynamic scope chain at validation time
+ * to find the outermost $dynamicAnchor with the matching name.
+ */
+struct DynamicRefSchema
+{
+    static constexpr std::size_t kUnresolved{std::numeric_limits<std::size_t>::max()};
+
+    std::size_t targetIndex{kUnresolved}; // Static fallback target
+    QString     anchorName;              // Dynamic anchor name to search for at runtime
+    QString     originalRef;             // Original $dynamicRef string for error messages
+
+    [[nodiscard]] bool isResolved() const noexcept { return targetIndex != kUnresolved; }
+};
+
+/**
  * @brief Variant type for all schema node types
  */
-using SchemaNode = std::variant<BooleanSchema, ObjectSchema, RefSchema>;
+using SchemaNode = std::variant<BooleanSchema, ObjectSchema, RefSchema, DynamicRefSchema>;
 
 /**
  * @brief Compiled schema - flat array of nodes for cache-friendly traversal
@@ -162,7 +179,11 @@ struct CompiledSchema
 
     // Anchor registry for $ref resolution
     std::unordered_map<QString, std::size_t> anchors;        // $anchor → node index
-    std::unordered_map<QString, std::size_t> dynamicAnchors; // $dynamicAnchor → node index
+    std::unordered_map<QString, std::size_t> dynamicAnchors; // $dynamicAnchor → node index (flat)
+
+    // Per-resource dynamic anchor maps for $dynamicRef scope resolution
+    // Maps resource root node index → {anchor name → target node index}
+    std::unordered_map<std::size_t, std::unordered_map<QString, std::size_t>> resourceDynamicAnchors;
 
     // Schema metadata
     QString schemaId; // $id if present
