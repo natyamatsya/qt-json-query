@@ -138,14 +138,14 @@ static std::expected<QJsonArray, EvalError> processToken(const PathEvalCtx& ctx,
 // ---------------------------------------------------------------------------
 //  evaluateTokenStream — walk tokens left-to-right over a working node set
 // ---------------------------------------------------------------------------
-std::expected<QJsonValue, DetailedEvalError> evaluateTokenStream(const PathEvalCtx& ctx, const QJsonValue& root)
+std::expected<NodeList, DetailedEvalError> evaluateTokenStream(const PathEvalCtx& ctx, const QJsonValue& root)
 {
     if (ctx.tokens.empty())
-        return QJsonValue{QJsonValue::Undefined};
+        return NodeList{};
 
-    // Root-only selector ($): return the document itself
+    // Root-only selector ($): the document itself is the sole node
     if (ctx.tokens.size() == 1)
-        return root;
+        return NodeList{QJsonArray{root}, false};
 
     // Initialize working set with the root as the sole node (RFC 9535 §2.2)
     auto  pooledWorkingArray{acquirePooledArray()};
@@ -166,14 +166,10 @@ std::expected<QJsonValue, DetailedEvalError> evaluateTokenStream(const PathEvalC
             return std::unexpected(DetailedEvalError{working.error(), static_cast<std::uint16_t>(i)});
 
         if (working->empty())
-            return emptyResult();
+            return NodeList{};
     }
 
-    auto collapsed{squash(*std::move(working), multi)};
-    if (collapsed.isUndefined())
-        return emptyResult();
-
-    return applyTrailing(ctx.trailingFn, collapsed);
+    return NodeList{*std::move(working), multi};
 }
 
 // ---------------------------------------------------------------------------

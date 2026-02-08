@@ -26,23 +26,30 @@ struct DetailedEvalError
     std::uint16_t tokenIndex{};
 };
 
+// Raw evaluation result: the RFC 9535 node list + whether the path selects multiple nodes
+struct NodeList
+{
+    QJsonArray nodes{};
+    bool       multi{false};
+};
+
 // ---------------------------------------------------------------------------
 //  Core evaluation API with std::expected error handling
 // ---------------------------------------------------------------------------
 
-// Complete evaluation pipelines with std::expected error handling
-std::expected<QJsonValue, DetailedEvalError> evaluateTokenStream(const PathEvalCtx& ctx, const QJsonValue& root);
+// Walk the token stream and return the raw node list (no squash, no trailing fn)
+std::expected<NodeList, DetailedEvalError> evaluateTokenStream(const PathEvalCtx& ctx, const QJsonValue& root);
+
+// Convenience wrappers that squash / apply trailing function
 std::expected<QJsonArray, DetailedEvalError> evaluateAll(const PathEvalCtx& ctx, const QJsonValue& root);
+std::expected<QJsonValue, DetailedEvalError> evaluate(const PathEvalCtx& ctx, const QJsonValue& root);
 
 // Evaluate a *definite* JSONPath (no wildcard/recursive/filter) sequentially
 // This is a specialized fast path for simple JSONPaths that don't require complex evaluation
 std::expected<QJsonValue, DetailedEvalError> evaluateDefinite(const std::vector<Token>& tokens,
                                                               const QJsonValue&         root) noexcept;
 
-// Convenience top-level entry that uses std::expected
-std::expected<QJsonValue, DetailedEvalError> evaluate(const PathEvalCtx& ctx, const QJsonValue& root);
-
-// Direct array-based fan-out using TableGen dispatch - critical hot path
+// Apply a single token to every element in src, collecting results
 std::expected<QJsonArray, EvalError>
 fanOut(const PathEvalCtx& ctx, const Token& tk, const QJsonArray& src, qsizetype tokenPos);
 

@@ -21,12 +21,40 @@ using internal::ResultCollector;
 // =============================================================================
 
 /**
- * @brief Inline convenience entry point for single value evaluation - critical hot path
+ * @brief Single-value evaluation: squash the node list + apply trailing function.
  */
 QT_QUERY_JSON_ALWAYS_INLINE
 std::expected<QJsonValue, DetailedEvalError> evaluate(const PathEvalCtx& ctx, const QJsonValue& root)
 {
-    return evaluateTokenStream(ctx, root);
+    return evaluateTokenStream(ctx, root)
+        .transform([&ctx](NodeList&& nl) -> QJsonValue {
+            auto collapsed{squash(std::move(nl.nodes), nl.multi)};
+            return applyTrailing(ctx.trailingFn, collapsed);
+        });
+}
+
+/**
+ * @brief Array evaluation: return the RFC 9535 node list directly.
+ *
+ * When a trailing function is present (e.g. `.length()`), the result is
+ * collapsed first and then re-wrapped, since trailing functions reduce the
+ * node list to a single value.
+ */
+QT_QUERY_JSON_ALWAYS_INLINE
+std::expected<QJsonArray, DetailedEvalError> evaluateAll(const PathEvalCtx& ctx, const QJsonValue& root)
+{
+    return evaluateTokenStream(ctx, root)
+        .transform([&ctx](NodeList&& nl) -> QJsonArray {
+            // Common case: no trailing function → return the node list as-is
+            if (QT_QUERY_JSON_LIKELY(ctx.trailingFn == json_path::FunctionType::None))
+                return std::move(nl.nodes);
+
+            // Trailing function collapses the node list to a single value
+            auto collapsed{squash(std::move(nl.nodes), nl.multi)};
+            auto result{applyTrailing(ctx.trailingFn, collapsed)};
+            if (result.isUndefined() || result.isNull()) return {};
+            return QJsonArray{result};
+        });
 }
 
 /**
@@ -49,29 +77,6 @@ std::expected<QJsonArray, EvalError> fanOut(const PathEvalCtx& ctx, const Token&
     qCDebug(jsonPathLog) << "fanOut: tokenPos=" << tokenPos << "kind=" << static_cast<int>(tk.kind)
                          << "results=" << result.size();
     return std::move(result);
-}
-
-/**
- * @brief Inline convenience entry point for array evaluation - critical hot path
- */
-QT_QUERY_JSON_ALWAYS_INLINE
-std::expected<QJsonArray, DetailedEvalError> evaluateAll(const PathEvalCtx& ctx, const QJsonValue& root)
-{
-    return evaluate(ctx, root)
-        .transform([&ctx](const QJsonValue& res) -> QJsonArray {
-            // Root-only selector ($): wrap the document as a single result
-            const auto isRootOnly{ctx.tokens.size() == 1};
-            if (QT_QUERY_JSON_UNLIKELY(isRootOnly))
-            {
-                if (res.isUndefined() || res.isNull()) return {};
-                return QJsonArray{res};
-            }
-
-            // Non-root selectors: expand arrays into individual results
-            if (QT_QUERY_JSON_LIKELY(res.isArray())) return res.toArray();
-            if (res.isUndefined() || res.isNull()) return {};
-            return QJsonArray{res};
-        });
 }
 
 } // namespace json_query::json_path::detail
