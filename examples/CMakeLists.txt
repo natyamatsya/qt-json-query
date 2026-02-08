@@ -35,6 +35,12 @@ if(TARGET function_ref_interface)
   target_link_libraries(flagship_pipeline PRIVATE function_ref_interface)
 endif()
 
+add_executable(compile_once_reuse compile_once_reuse.cpp)
+target_link_libraries(compile_once_reuse PRIVATE json_query Qt6::Core)
+if(TARGET function_ref_interface)
+  target_link_libraries(compile_once_reuse PRIVATE function_ref_interface)
+endif()
+
 install(
   TARGETS simple_pointer
           simple_path
@@ -42,4 +48,5 @@ install(
           as_function_demo
           simple_schema
           flagship_pipeline
+          compile_once_reuse
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}/examples)
