@@ -1,6 +1,6 @@
 # JSON Schema Compliance Roadmap
 
-## Current Score: 1907/1994 IETF (95.6%)
+## Current Score: 1932/1994 IETF (96.9%)
 
 | Category     | Passing | Total | Status           |
 | ------------ | ------- | ----- | ---------------- |
@@ -8,145 +8,97 @@
 | dynamicRef   | 46      | 46    | ✅ Complete      |
 | refRemote    | 31      | 31    | ✅ Complete      |
 | unevaluated* | 196     | 196   | ✅ Complete      |
-| IETF overall | 1907    | 1994  | 🔧 87 remaining |
+| vocabulary   | 5       | 5     | ✅ Complete      |
+| IETF overall | 1932    | 1994  | 🔧 62 remaining  |
 
 ### Remaining Failures Breakdown
 
-- **81 optional format** — idn-hostname (24), ecmascript-regex (23), format (19), hostname (15)
-- **6 core** — detailed below
+All 62 remaining failures are optional format validators requiring heavyweight features:
+
+- **hostname + idn-hostname** (76) — Need IDNA 2008 Unicode processing (RFC 5891/5892)
+- **ecmascript-regex** (46) — Need ECMA-262 regex syntax validator
+- **idn-email** (2) — Need IDN-aware email validation
 
 ---
 
-## Phase 1: Quick Wins (+2 tests)
+## Completed Phases
 
-### 1.1 float-overflow (optional, +1)
+### Phase 1: Quick Wins ✅ (+2 tests → 1909)
 
-**Test**: `float-overflow.json` — `1e308` with `{"type": "integer", "multipleOf": 0.5}`
+- **1.1 float-overflow**: `std::fmod` fallback when multipleOf quotient overflows to inf
+- **1.2 URI format**: Removed over-aggressive userinfo slash check (percent-encoded `%2f` is valid)
 
-**Problem**: `1e308 / 0.5 = 2e308 = inf`, triggering our overflow guard. But all integers ARE multiples of 0.5.
+### Phase 2: Bundle Meta-Schema ✅ (+2 tests → 1911)
 
-**Fix**: Use `std::fmod` as a fallback when the quotient overflows:
+Embedded 8 official 2020-12 meta-schema files as `.inc` raw string literals under
+`src/json-query/json-schema/meta-schemas/draft-2020-12/`. Served from `lookupBuiltinSchema()`
+before the user's fetcher in `fetchAndCompileRemoteSchema`.
+
+### Phase 3: Vocabulary Support ✅ (+1 test → 1912)
+
+Extract `$vocabulary` from `$schema` metaschema in `compileSchema()`. The
+`ctx.validationVocabActive` flag skips TypeConstraints, NumericKeywords, and
+validation parts of StringKeywords when the validation vocabulary is absent.
+
+### Phase 4: Cross-Draft Support ✅ (+1 test → 1913)
+
+Detect `$schema` version on fetched remote schemas. Disable `prefixItems`
+(2020-12-only keyword) when compiling schemas from older drafts via
+`ctx.prefixItemsSupported` flag.
+
+### Phase 5a: Format Annotation-Only ✅ (+19 tests → 1932)
+
+Added `FormatValidation` enum and `SchemaOptions` to the public API:
 
 ```cpp
-if (!std::isfinite(quotient))
-{
-    // Fallback: fmod handles large values without overflow
-    if (std::fmod(value, divisor) != 0.0)
-        // report error
-}
+enum class FormatValidation { Auto, Assertion, Annotation };
+struct SchemaOptions { FormatValidation formatValidation{FormatValidation::Auto}; };
 ```
 
-**Effort**: ~5 min, single function change in `ValidateNumeric.hpp`
+- **Auto**: Derive from `$vocabulary` — annotation-only for standard 2020-12 meta-schema
+- **Assertion**: Always validate format (library default for backward compatibility)
+- **Annotation**: Never validate format
 
-### 1.2 URI format edge case (optional, +1)
-
-**Test**: `uri.json` — "a valid URL with many special characters"
-
-**Problem**: Our URI format validator rejects a valid URI with special characters.
-
-**Fix**: Audit and fix the URI regex/parser in `FormatValidators.cpp`.
-
-**Effort**: ~30 min, format validator fix
+`CompiledSchema::formatAssertionEnabled` controls validation at runtime.
 
 ---
 
-## Phase 2: Bundle Meta-Schema (+2 tests)
+## Remaining: Phase 5b — Unicode Format Validators (+62 tests)
 
-### 2.1 Embed the 2020-12 meta-schema
+### Hostname / IDN-hostname (+76 tests)
 
-**Tests fixed**: `ref.json/"remote ref, containing refs itself"` + `defs.json/"validate definition against metaschema"`
+All failures involve internationalized hostnames: Hangul, Punycode, PVALID exceptions,
+ZERO WIDTH JOINER/NON-JOINER, Arabic-Indic digits, etc.
 
-Both reference `$ref: "https://json-schema.org/draft/2020-12/schema"`. Without the meta-schema available, these fail.
+**Requires**: IDNA 2008 (RFC 5891/5892) — Unicode category tables, bidi rules, contextual rules.
 
-**Approach** (following nlohmann's pattern):
+**Options**: ICU library, or a standalone IDNA implementation.
 
-1. Download the official 2020-12 meta-schema JSON
-2. Embed it as a `constexpr` string literal or `QByteArray` in a generated `.cpp` file
-3. In `fetchAndCompileRemoteSchema`, check for the meta-schema URI before calling the user's fetcher
-4. Register the built-in meta-schema as a fallback
+### ECMA-262 regex validation (+46 tests)
 
-**Effort**: ~2 hours
+Failures involve Unicode property escapes (`\p{Space_Separator}`), line terminators,
+and other ECMA-262-specific regex features different from PCRE/Qt regex.
 
-**Files**:
+**Requires**: Dedicated ECMA-262 regex syntax validator (not a full engine, just syntax checking).
 
-- New: `src/json-query/json-schema/meta-schema-2020-12.cpp` (embedded JSON)
-- Modified: `JSONSchemaCompile.cpp` (built-in fetcher fallback)
+### IDN-email (+2 tests)
 
----
+Hangul domain names in email addresses.
 
-## Phase 3: Vocabulary Support (+1 test)
+**Requires**: IDN-aware email validation (depends on hostname/IDN-hostname fix).
 
-### 3.1 Parse `$vocabulary` from meta-schemas
-
-**Test**: `vocabulary.json` — custom metaschema with no validation vocabulary
-
-**Problem**: When a schema's `$schema` points to a metaschema that declares `$vocabulary` without the validation vocabulary, validation keywords (type, minimum, etc.) should be ignored.
-
-**Approach**:
-
-1. When compiling a schema, fetch and parse its `$schema` metaschema
-2. Extract `$vocabulary` to determine which keyword groups are active
-3. Skip compilation of keywords from disabled vocabularies
-4. Define vocabulary → keyword group mapping
-
-**Effort**: ~1 day (new feature, touches compilation pipeline)
-
-**Files**:
-
-- Modified: `CompileContext.hpp` (active vocabularies state)
-- Modified: `JSONSchemaCompile.cpp` (vocabulary-aware compilation)
-- Modified: `CompileDispatch.hpp` (conditional keyword dispatch)
-
----
-
-## Phase 4: Cross-Draft Support (+1 test, optional)
-
-### 4.1 Historic draft detection and processing
-
-**Test**: `cross-draft.json` — `$ref` to a draft-2019-09 schema
-
-**Problem**: When `$ref` targets a schema with `$schema` pointing to an older draft, that schema should be processed under the rules of that draft (e.g., `items` instead of `prefixItems`).
-
-**Approach**:
-
-1. Detect `$schema` version on fetched remote schemas
-2. Apply draft-specific keyword aliases (e.g., `items` → `prefixItems` in 2019-09)
-3. Potentially maintain per-draft compilation rules
-
-**Effort**: ~2-3 days (architectural, requires draft-version abstraction)
-
-**Recommendation**: Defer to post-1.0 unless full compliance is a hard requirement.
-
----
-
-## Phase 5: Optional Format Validators (+81 tests)
-
-### 5.1 IDN hostname validation (+24)
-
-Requires Unicode IDNA (RFC 5891) — typically via ICU or a dedicated library.
-
-### 5.2 ECMA-262 regex validation (+23)
-
-Requires an ECMA-262 regex engine (different from PCRE/Qt regex).
-
-### 5.3 Hostname validation improvements (+15)
-
-Fix edge cases in hostname format checking.
-
-### 5.4 Format validator fixes (+19)
-
-IRI-reference, URI-reference, and other format edge cases.
-
-**Recommendation**: These are all *optional* per the spec (format is annotation-only by default in 2020-12). Prioritize based on user demand.
+**Recommendation**: These are all *optional* per the spec (format is annotation-only by default
+in 2020-12). Prioritize based on user demand. Consider ICU as a dependency for IDNA support.
 
 ---
 
 ## Summary
 
-| Phase   | Tests | Effort    | Priority  | Cumulative |
-| ------- | ----- | --------- | --------- | ---------- |
-| Phase 1 | +2    | ~1 hour   | Do now    | 1909/1994  |
-| Phase 2 | +2    | ~2 hours  | Do now    | 1911/1994  |
-| Phase 3 | +1    | ~1 day    | Pre-1.0   | 1912/1994  |
-| Phase 4 | +1    | ~2-3 days | Post-1.0  | 1913/1994  |
-| Phase 5 | +81   | ~1-2 wks  | On demand | 1994/1994  |
+| Phase    | Tests | Status    | Cumulative |
+| -------- | ----- | --------- | ---------- |
+| Phase 1  | +2    | ✅ Done   | 1909/1994  |
+| Phase 2  | +2    | ✅ Done   | 1911/1994  |
+| Phase 3  | +1    | ✅ Done   | 1912/1994  |
+| Phase 4  | +1    | ✅ Done   | 1913/1994  |
+| Phase 5a | +19   | ✅ Done   | 1932/1994  |
+| Phase 5b | +62   | ⏳ Future | 1994/1994  |
