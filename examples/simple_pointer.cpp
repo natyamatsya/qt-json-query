@@ -14,7 +14,7 @@ using namespace Qt::StringLiterals;
 #include "json-query/JSONQuery"
 
 using json_query::JSONPointer;
-using json_query::QueryError;
+using json_query::Error;
 
 // Helper function to evaluate a JSON Pointer and print the result
 void evaluateAndPrint(const JSONPointer& pointer, const QJsonDocument& doc, QStringView description)

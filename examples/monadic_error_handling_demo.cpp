@@ -46,8 +46,7 @@ std::expected<JSONPath, QString> createOptimizedPath(const QString& validPath)
 
     auto result{JSONPath::create(validPath)};
     if (!result)
-        return std::unexpected(QString::fromStdString(std::string("JSONPath creation failed: ") +
-                                                      std::string(result.error().message())));
+        return std::unexpected(QStringLiteral("JSONPath creation failed: ") + result.error().formatted_message());
 
     return std::move(*result);
 }
@@ -59,8 +58,7 @@ std::expected<QJsonArray, QString> executeEvaluation(const JSONPath& path, const
 
     auto result{path.evaluateAll(doc)};
     if (!result)
-        return std::unexpected(
-            QString::fromStdString(std::string("Evaluation failed: ") + std::string(result.error().message())));
+        return std::unexpected(QStringLiteral("Evaluation failed: ") + result.error().formatted_message());
 
     return *result;
 }

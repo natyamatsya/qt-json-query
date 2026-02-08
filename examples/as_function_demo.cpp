@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 #include "json-query/JSONQuery"
 
 #include <QCoreApplication>
@@ -8,9 +10,8 @@
 
 using namespace json_query;
 
-// Import the as<T> function and error utilities
+// Import the as<T> function
 using json_query::as;
-// QueryError::message_qt() provides human-readable QStringView
 
 int main(int argc, char* argv[])
 {
