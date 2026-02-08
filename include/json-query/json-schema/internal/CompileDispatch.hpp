@@ -238,10 +238,9 @@ compileObjectKeywords(CompileContext& ctx, const QJsonObject& schemaObj, ObjectS
         const auto patternPropsObj{schemaObj[u"patternProperties"_qt_s].toObject()};
         for (auto it = patternPropsObj.begin(); it != patternPropsObj.end(); ++it)
         {
-            QRegularExpression regex{it.key()};
-            if (!regex.isValid())
+            SchemaRegex regex{};
+            if (!regex.compile(it.key()))
                 return std::unexpected(QueryError(ParseError::InvalidRegexPattern));
-            regex.optimize();
 
             auto r{compile(ctx, it.value())};
             if (!r)

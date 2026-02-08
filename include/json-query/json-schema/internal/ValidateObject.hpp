@@ -139,7 +139,7 @@ inline bool validateSingleProperty(ValidateContext&    ctx,
     // Check patternProperties
     for (const auto& [pattern, schemaIndex] : node.patternProperties)
     {
-        if (pattern.match(propName).hasMatch())
+        if (pattern.hasMatch(propName))
         {
             ctx.tracker = nullptr;
             validateNode(

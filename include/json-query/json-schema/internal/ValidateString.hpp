@@ -37,7 +37,7 @@ inline void validateString(ValidateContext&    ctx,
         ctx.result.addError(instancePath, schemaPath + u"/maxLength"_qt_s, msg, EvalError::MaxLengthViolation);
     }
 
-    if (node.pattern && !node.pattern->match(str).hasMatch())
+    if (node.pattern && !node.pattern->hasMatch(str))
     {
         ctx.result.addError(instancePath,
                             schemaPath + u"/pattern"_qt_s,

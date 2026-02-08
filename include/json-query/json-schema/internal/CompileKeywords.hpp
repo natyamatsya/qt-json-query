@@ -122,7 +122,7 @@ parseTypeKeyword(const QJsonValue& typeValue)
 /**
  * @brief Parse the 'pattern' keyword
  */
-[[nodiscard]] inline std::expected<std::optional<QRegularExpression>, QueryError>
+[[nodiscard]] inline std::expected<std::optional<SchemaRegex>, QueryError>
 parsePatternKeyword(const QJsonValue& patternValue)
 {
     if (patternValue.isUndefined())
@@ -131,11 +131,10 @@ parsePatternKeyword(const QJsonValue& patternValue)
     if (!patternValue.isString())
         return std::unexpected(QueryError(ParseError::InvalidKeywordValue));
 
-    QRegularExpression regex(patternValue.toString());
-    if (!regex.isValid())
+    SchemaRegex regex{};
+    if (!regex.compile(patternValue.toString()))
         return std::unexpected(QueryError(ParseError::InvalidRegexPattern));
 
-    regex.optimize();
     return regex;
 }
 

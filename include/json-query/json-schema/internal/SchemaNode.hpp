@@ -3,8 +3,9 @@
 
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonValue>
-#include <QtCore/QRegularExpression>
 #include <QtCore/QString>
+
+#include "json-query/json-schema/internal/SchemaRegex.hpp"
 
 #include <cmath>
 #include <cstddef>
@@ -97,7 +98,7 @@ struct ObjectSchema
 
     // Object keywords
     std::unordered_map<QString, std::size_t>                properties; // property name → node index
-    std::vector<std::pair<QRegularExpression, std::size_t>> patternProperties;
+    std::vector<std::pair<SchemaRegex, std::size_t>> patternProperties;
     std::optional<std::size_t>                              additionalProperties;
     std::vector<QString>                                    required{};
     std::optional<std::size_t>                              minProperties;
@@ -115,7 +116,7 @@ struct ObjectSchema
     bool                       uniqueItems = false;
 
     // String keywords
-    std::optional<QRegularExpression> pattern;
+    std::optional<SchemaRegex> pattern;
     std::optional<std::size_t>        minLength;
     std::optional<std::size_t>        maxLength;
     std::optional<QString>            format;
