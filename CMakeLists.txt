@@ -174,11 +174,16 @@ add_subdirectory(src/json-query)
 # ---------------------------------------------------------------------------
 # Examples and tests
 # ---------------------------------------------------------------------------
-# Build example executables (simple_pointer, simple_path, ...)
-add_subdirectory(examples)
+option(JSON_QUERY_BUILD_EXAMPLES "Build example executables" ON)
+option(JSON_QUERY_BUILD_PERF "Build performance test executables" ON)
 
-# Add organized subdirectories
-add_subdirectory(perf)
+if(JSON_QUERY_BUILD_EXAMPLES)
+  add_subdirectory(examples)
+endif()
+
+if(JSON_QUERY_BUILD_PERF)
+  add_subdirectory(perf)
+endif()
 
 # Unit tests (GoogleTest)
 if(BUILD_TESTING)
