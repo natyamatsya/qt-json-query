@@ -14,15 +14,29 @@ permissions:
 jobs:
   report:
     name: Publish test reports
+    # Only report on successful ci runs; a failed run may not have uploaded
+    # its test-result artifacts and would just add a second red X.
+    if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        # Must mirror the build-and-test matrix in ci.yml
+        # (artifact: test-results-<os>-<compiler>).
+        include:
+          - os: ubuntu-latest
+            compiler: default
+          - os: ubuntu-latest
+            compiler: clang
+          - os: macos-latest
+            compiler: default
+          - os: windows-latest
+            compiler: default
 
     steps:
       - uses: dorny/test-reporter@v2
         with:
-          artifact: test-results-${{ matrix.os }}
-          name: Test Report (${{ matrix.os }})
+          artifact: test-results-${{ matrix.os }}-${{ matrix.compiler }}
+          name: Test Report (${{ matrix.os }}, ${{ matrix.compiler }})
           path: "*.xml"
           reporter: java-junit

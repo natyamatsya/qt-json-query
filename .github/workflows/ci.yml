@@ -45,13 +45,17 @@ jobs:
           - os: macos-latest
             compiler: default
             qt_arch: ""
+          # Linux needs the icu archive: the Qt binaries link against the
+          # bundled ICU 73, which is not part of the qtbase archive.
           - os: ubuntu-latest
             compiler: default
             qt_arch: linux_gcc_64
+            qt_archives: "icu qtbase"
           # Second compiler leg: LLVM clang + libstdc++ on Linux
           - os: ubuntu-latest
             compiler: clang
             qt_arch: linux_gcc_64
+            qt_archives: "icu qtbase"
 
     steps:
       - name: Checkout repository
@@ -67,7 +71,7 @@ jobs:
         with:
           version: 6.8.3
           cache: true
-          archives: "qtbase"
+          archives: ${{ matrix.qt_archives || 'qtbase' }}
           arch: ${{ matrix.qt_arch || '' }}
 
       - name: Set up MSVC dev cmd (Windows only)
@@ -106,16 +110,16 @@ jobs:
         continue-on-error: true
         shell: bash
         run: |
-          if [ -f "./build/json_benchmark" ]; then
-            ./build/json_benchmark --benchmark_format=json --benchmark_out=benchmarks-${{ matrix.os }}.json
+          if [ -f "./build/benchmarks/json_benchmark" ]; then
+            ./build/benchmarks/json_benchmark --benchmark_format=json --benchmark_out=benchmarks-${{ matrix.os }}.json
           fi
 
       - name: Run benchmarks (Windows)
         if: runner.os == 'Windows'
         continue-on-error: true
         run: |
-          if (Test-Path ".\build\json_benchmark.exe") {
-            .\build\json_benchmark.exe --benchmark_format=json --benchmark_out=benchmarks-${{ matrix.os }}.json
+          if (Test-Path ".\build\benchmarks\json_benchmark.exe") {
+            .\build\benchmarks\json_benchmark.exe --benchmark_format=json --benchmark_out=benchmarks-${{ matrix.os }}.json
           }
 
       - name: Upload test results
@@ -151,7 +155,7 @@ jobs:
         with:
           version: 6.8.3
           cache: true
-          archives: "qtbase"
+          archives: "icu qtbase"
           arch: linux_gcc_64
 
       - name: Configure CMake (ASan + UBSan)
@@ -191,7 +195,7 @@ jobs:
         with:
           version: 6.8.3
           cache: true
-          archives: "qtbase"
+          archives: "icu qtbase"
           arch: linux_gcc_64
 
       - name: Configure, build, install
@@ -231,7 +235,7 @@ jobs:
         with:
           version: 6.8.3
           cache: true
-          archives: "qtbase"
+          archives: "icu qtbase"
           arch: linux_gcc_64
 
       - name: Configure (clang + LibFuzzer)
