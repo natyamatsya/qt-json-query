@@ -93,16 +93,16 @@ endif()
 # Override via an earlier FetchContent_Declare(function_ref ...) or
 # FETCHCONTENT_SOURCE_DIR_FUNCTION_REF.
 # ---------------------------------------------------------------------------
+# SOURCE_SUBDIR include: the include/ directory has no CMakeLists.txt, so
+# FetchContent_MakeAvailable only populates the sources without executing
+# upstream's project files (v1.0.0's CMakeLists fetches tl_cmake via the
+# deprecated FetchContent_Populate and warns on every configure). We only need
+# the header; the bridge target below wires up the include dir.
 FetchContent_Declare(
   function_ref
   GIT_REPOSITORY https://github.com/TartanLlama/function_ref.git
   GIT_TAG v1.0.0
-  FIND_PACKAGE_ARGS NAMES tl-function-ref)
-
-# Disable function_ref tests to avoid build issues
-set(FUNCTION_REF_ENABLE_TESTS
-    OFF
-    CACHE BOOL "" FORCE)
+  SOURCE_SUBDIR include FIND_PACKAGE_ARGS NAMES tl-function-ref)
 
 FetchContent_MakeAvailable(function_ref)
 
