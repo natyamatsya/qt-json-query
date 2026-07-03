@@ -98,6 +98,12 @@ app-internal documents.
       pinned FetchContent fallback); bridge targets forward to the imported
       targets; SRELL overridable via `JSON_QUERY_SRELL_INCLUDE_DIR`; consumer
       override mechanisms documented in README "Dependency resolution".
+- [x] **SBOM generation.** *Resolved 2026-07-03:* `JSON_QUERY_ENABLE_SBOM`
+      installs an SPDX 3.0.1 JSON-LD SBOM via CMake 4.3's native
+      (experimental) `install(SBOM)`, derived from the `json_queryTargets`
+      export set. Also fixed a duplicate-export bug (`json_query` was added
+      to the export set twice). The experimental UUID is pinned for the
+      CMake 4.3 series; revisit when the feature stabilizes.
 - [ ] **Working install/export.** Wire `configure_package_config_file()` +
       `write_basic_package_version_file()` (`cmake/cmake.config.in` is
       currently orphaned and stale — wrong targets file name, missing

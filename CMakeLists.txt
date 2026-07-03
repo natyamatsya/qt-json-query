@@ -250,12 +250,9 @@ endif()
 # ---------------------------------------------------------------------------
 if(JSON_QUERY_ENABLE_INSTALL)
   include(GNUInstallDirs)
-  install(
-    TARGETS json_query ctre_interface function_ref_interface
-    EXPORT json_queryTargets
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+  # json_query itself is added to the export set in src/json-query/CMakeLists.txt
+  install(TARGETS ctre_interface function_ref_interface
+          EXPORT json_queryTargets)
   install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
   # Export for downstream find_package(json_query)
@@ -264,6 +261,38 @@ if(JSON_QUERY_ENABLE_INSTALL)
     FILE json_queryTargets.cmake
     NAMESPACE json_query::
     DESTINATION ${CMAKE_INSTALL_DATADIR}/json_query/cmake)
+
+  # -------------------------------------------------------------------------
+  # SBOM generation (optional; SPDX 3.0.1 JSON-LD via CMake's native
+  # install(SBOM), added in CMake 4.3 as an experimental feature)
+  # -------------------------------------------------------------------------
+  option(JSON_QUERY_ENABLE_SBOM
+         "Install an SPDX SBOM generated from the export set (CMake 4.3+)" OFF)
+
+  if(JSON_QUERY_ENABLE_SBOM)
+    if(CMAKE_VERSION VERSION_LESS 4.3)
+      message(
+        FATAL_ERROR
+          "JSON_QUERY_ENABLE_SBOM requires CMake 4.3+ for install(SBOM); "
+          "this is CMake ${CMAKE_VERSION}")
+    endif()
+
+    # Opt in to the experimental feature. The UUID is CMake-release-specific
+    # and must be updated when upgrading CMake until the feature is stable
+    # (see Help/dev/experimental.rst in the CMake sources; this value is for
+    # the CMake 4.3 series).
+    set(CMAKE_EXPERIMENTAL_GENERATE_SBOM
+        "ca494ed3-b261-4205-a01f-603c95e4cae0")
+
+    install(
+      SBOM json_query
+      EXPORT json_queryTargets
+      VERSION ${PROJECT_VERSION}
+      LICENSE "Apache-2.0 WITH LLVM-exception"
+      DESCRIPTION
+        "JSON Pointer (RFC 6901), JSONPath (RFC 9535), and JSON Schema (Draft 2020-12) for Qt"
+      HOMEPAGE_URL "https://github.com/natyamatsya/qt-json-query")
+  endif()
 endif()
 
 # ---------------------------------------------------------------------------
