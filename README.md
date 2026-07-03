@@ -143,8 +143,8 @@ if (!path)
     return;
 }
 
-// evaluateAll returns std::expected<QJsonArray, Error>
-auto titles{path->evaluateAll(doc)};
+// evaluate returns the full nodelist: std::expected<QJsonArray, Error>
+auto titles{path->evaluate(doc)};
 if (titles)
     qDebug() << "Titles:" << *titles; // ["Book 1", "Book 2", "Book 3"]
 
@@ -152,7 +152,7 @@ if (titles)
 auto expensive{JSONPath::create("$.books[?(@.price > 12)].title")};
 if (expensive)
 {
-    auto result{expensive->evaluateAll(doc)};
+    auto result{expensive->evaluate(doc)};
     if (result)
         qDebug() << "Expensive:" << *result; // ["Book 2", "Book 3"]
 }
