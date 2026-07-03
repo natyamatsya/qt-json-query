@@ -14,12 +14,14 @@
 #include "JSONSchemaError.hpp"
 #include "JSONSchemaResult.hpp"
 #include "json-query/utils/JSONError.hpp"
-namespace json_query::json_schema::internal
+#include "json-query/config/AbiNamespace.hpp"
+
+namespace json_query::inline JSON_QUERY_ABI_NS::json_schema::internal
 {
 struct CompiledSchema;
 }
 
-namespace json_query::json_schema
+namespace json_query::inline JSON_QUERY_ABI_NS::json_schema
 {
 
 /**

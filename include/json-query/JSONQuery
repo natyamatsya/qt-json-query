@@ -7,7 +7,9 @@
 #include "json-schema/JSONSchema.hpp"
 #include "utils/JSONValueUtils.hpp"
 
-namespace json_query
+#include "json-query/config/AbiNamespace.hpp"
+
+namespace json_query::inline JSON_QUERY_ABI_NS
 {
 
 using JSONPath    = json_path::JSONPath;

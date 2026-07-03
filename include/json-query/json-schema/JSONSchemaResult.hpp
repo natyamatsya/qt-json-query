@@ -15,7 +15,9 @@
 #include "json-query/utils/JSONError.hpp"
 #include "json-query/utils/QtStringLiterals.hpp"
 
-namespace json_query::json_schema
+#include "json-query/config/AbiNamespace.hpp"
+
+namespace json_query::inline JSON_QUERY_ABI_NS::json_schema
 {
 
 /**

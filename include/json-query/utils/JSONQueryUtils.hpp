@@ -14,7 +14,9 @@
 #include <QByteArray>
 #include <ctre.hpp>
 
-namespace json_query::utils
+#include "json-query/config/AbiNamespace.hpp"
+
+namespace json_query::inline JSON_QUERY_ABI_NS::utils
 {
 // --- String Conversions ---
 [[nodiscard]] inline std::string qstring_to_std_string(const QString& qstr)

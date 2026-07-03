@@ -6,7 +6,9 @@
 #include <QStringView>
 #include "json-query/utils/QtStringLiterals.hpp"
 
-namespace json_query::json_pointer
+#include "json-query/config/AbiNamespace.hpp"
+
+namespace json_query::inline JSON_QUERY_ABI_NS::json_pointer
 {
 /**
  * @brief Escape a JSON Pointer token according to RFC 6901

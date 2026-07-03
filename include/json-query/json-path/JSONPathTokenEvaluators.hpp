@@ -9,12 +9,14 @@
 #include <QJsonValue>
 #include <expected>
 
-namespace json_query::json_path
+#include "json-query/config/AbiNamespace.hpp"
+
+namespace json_query::inline JSON_QUERY_ABI_NS::json_path
 {
 class JSONPath; // Forward declaration
 }
 
-namespace json_query::json_path::detail
+namespace json_query::inline JSON_QUERY_ABI_NS::json_path::detail
 {
 
 /**

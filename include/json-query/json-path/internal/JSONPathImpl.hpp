@@ -7,7 +7,9 @@
 #include <QString>
 #include <vector>
 
-namespace json_query::json_path::detail
+#include "json-query/config/AbiNamespace.hpp"
+
+namespace json_query::inline JSON_QUERY_ABI_NS::json_path::detail
 {
 
 /// Compiled JSONPath state, hidden behind the public pimpl (JSONPath.hpp).

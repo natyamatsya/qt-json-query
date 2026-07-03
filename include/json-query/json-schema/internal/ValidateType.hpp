@@ -12,7 +12,9 @@
 #include <QJsonValue>
 #include <QString>
 
-namespace json_query::json_schema::internal
+#include "json-query/config/AbiNamespace.hpp"
+
+namespace json_query::inline JSON_QUERY_ABI_NS::json_schema::internal
 {
 
 /**

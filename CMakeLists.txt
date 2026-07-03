@@ -1,8 +1,10 @@
 cmake_minimum_required(VERSION 3.24)
 
+# NOTE: when bumping <major>.<minor>, also bump JSON_QUERY_ABI_NS in
+# include/json-query/config/AbiNamespace.hpp (see doc/adr/005)
 project(
   json_query
-  VERSION 0.3.0
+  VERSION 0.4.0
   LANGUAGES CXX)
 
 # ---------------------------------------------------------------------------

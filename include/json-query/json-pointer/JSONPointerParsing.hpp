@@ -13,7 +13,9 @@
 #include <cstring>
 #include <vector>
 
-namespace json_query::json_pointer
+#include "json-query/config/AbiNamespace.hpp"
+
+namespace json_query::inline JSON_QUERY_ABI_NS::json_pointer
 {
 struct Token
 {
@@ -28,7 +30,7 @@ struct Token
 };
 } // namespace json_query::json_pointer
 
-namespace json_query::json_pointer::detail
+namespace json_query::inline JSON_QUERY_ABI_NS::json_pointer::detail
 {
 
 [[nodiscard]] inline QString decodeToken(QStringView token) noexcept

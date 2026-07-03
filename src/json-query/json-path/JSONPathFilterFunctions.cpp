@@ -9,7 +9,9 @@
 #include <QJsonParseError>
 #include <ctre.hpp>
 
-namespace json_query::json_path::detail
+#include "json-query/config/AbiNamespace.hpp"
+
+namespace json_query::inline JSON_QUERY_ABI_NS::json_path::detail
 {
 
 using json_query::json_path::detail::parseJsonLiteral;

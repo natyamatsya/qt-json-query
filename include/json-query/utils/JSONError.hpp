@@ -14,7 +14,9 @@
 #include <utility>
 
 // Conversion (QJsonValue -> T) errors live in this small enum
-namespace json_query
+#include "json-query/config/AbiNamespace.hpp"
+
+namespace json_query::inline JSON_QUERY_ABI_NS
 {
 
 enum class ConvertError : std::uint8_t

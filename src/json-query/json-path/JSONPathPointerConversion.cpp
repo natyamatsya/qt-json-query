@@ -7,7 +7,9 @@
 #include <vector> // added include for std::vector
 using namespace Qt::StringLiterals;
 
-namespace json_query::json_path::detail
+#include "json-query/config/AbiNamespace.hpp"
+
+namespace json_query::inline JSON_QUERY_ABI_NS::json_path::detail
 {
 
 // escapePointerSegment is now inline in the header, delegating to json_pointer::escapeToken

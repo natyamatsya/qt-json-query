@@ -13,7 +13,9 @@
 #include <vector>
 #include <expected>
 
-namespace json_query::json_pointer::detail
+#include "json-query/config/AbiNamespace.hpp"
+
+namespace json_query::inline JSON_QUERY_ABI_NS::json_pointer::detail
 {
 
 [[nodiscard]] inline bool stepObject(QJsonValue& current, const QString& key) noexcept

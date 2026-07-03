@@ -4,7 +4,9 @@
 #include "json-query/json-path/JSONPathFilterParsers.hpp"
 #include "json-query/json-path/JSONPathLog.hpp"
 
-namespace json_query::json_path::detail
+#include "json-query/config/AbiNamespace.hpp"
+
+namespace json_query::inline JSON_QUERY_ABI_NS::json_path::detail
 {
 
 using json_query::json_path::FilterFn;
@@ -28,7 +30,7 @@ const std::array<RuleFn, 10> rules = {
 
 } // namespace json_query::json_path::detail
 
-namespace json_query::json_path
+namespace json_query::inline JSON_QUERY_ABI_NS::json_path
 {
 
 // Main filter compilation orchestration

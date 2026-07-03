@@ -68,6 +68,12 @@ target_link_libraries(your_target PRIVATE json_query::json_query)
 static library only — shared builds are unsupported until a symbol-visibility
 story exists (planned for v1.0).
 
+Safe to embed in multiple libraries within one application: all symbols live
+in a versioned inline ABI namespace (`json_query::v0_4::…`, transparent to
+source code — you still write `json_query::JSONPath`) and the archive is
+built with hidden visibility, so different embedded versions cannot collide
+or interpose each other (see `doc/adr/005`).
+
 ### Dependency resolution (vcpkg-friendly)
 
 Internal dependencies are resolved with `find_package` first and fetched via

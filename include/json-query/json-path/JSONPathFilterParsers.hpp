@@ -19,13 +19,15 @@
 #include "json-query/utils/JSONQueryUtils.hpp"
 #include <ctre.hpp>
 
-namespace json_query::json_path
+#include "json-query/config/AbiNamespace.hpp"
+
+namespace json_query::inline JSON_QUERY_ABI_NS::json_path
 {
 using FilterFn = std::function<bool(const QJsonValue&)>;
 struct Token;
 } // namespace json_query::json_path
 
-namespace json_query::json_path::detail
+namespace json_query::inline JSON_QUERY_ABI_NS::json_path::detail
 {
 
 using json_query::utils::to_qt_s;

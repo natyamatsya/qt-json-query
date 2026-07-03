@@ -16,7 +16,9 @@
 #include <ranges>
 #endif
 
-namespace json_query::json_path::internal
+#include "json-query/config/AbiNamespace.hpp"
+
+namespace json_query::inline JSON_QUERY_ABI_NS::json_path::internal
 {
 
 /**
@@ -224,7 +226,7 @@ template <>
 inline constexpr bool enable_borrowed_range<json_query::json_path::internal::ContainerCursor> = true;
 } // namespace std::ranges
 
-namespace json_query::ranges
+namespace json_query::inline JSON_QUERY_ABI_NS::ranges
 {
 /**
  * @brief Custom range view for JSON container traversal

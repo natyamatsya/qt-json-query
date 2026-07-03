@@ -2,6 +2,20 @@
 
 Pre-1.0: minor versions may contain breaking changes (see `ROADMAP.md`).
 
+## 0.4.0 — 2026-07-03
+
+### Changed
+- **Versioned inline ABI namespace** (ADR-005, the nlohmann_json/fmt
+  pattern): all symbols now live in `json_query::v0_4::...` via
+  `namespace json_query::inline JSON_QUERY_ABI_NS`. Source-compatible
+  (inline namespaces are transparent — `json_query::JSONPath` keeps
+  working), but ABI-incompatible with 0.3.x: different embedded json_query
+  versions can now coexist in one process without ODR violations or
+  dynamic-linker interposition.
+- The static library is built with hidden visibility
+  (`CXX_VISIBILITY_PRESET hidden`, `VISIBILITY_INLINES_HIDDEN`) so shared
+  libraries embedding it do not re-export its symbols.
+
 ## 0.3.0 — 2026-07-03
 
 First tagged release, following the production-readiness hardening pass.

@@ -42,6 +42,13 @@ set(JSON_QUERY_SOURCES
 # until v1.0 revisits this.
 add_library(json_query STATIC ${JSON_QUERY_SOURCES})
 
+# Static-library hygiene for shared-library consumers: hidden visibility keeps
+# json_query symbols private to any .so/.dylib that embeds this archive, so
+# two shared libraries each embedding json_query cannot interpose each other's
+# copies. Complements the versioned inline ABI namespace (doc/adr/005).
+set_target_properties(json_query PROPERTIES CXX_VISIBILITY_PRESET hidden
+                                            VISIBILITY_INLINES_HIDDEN ON)
+
 # Public include directories (header-only consumers) Use PROJECT_SOURCE_DIR to
 # reference top-level include folder
 

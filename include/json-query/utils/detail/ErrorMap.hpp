@@ -7,7 +7,9 @@
 #include <string_view>
 #include <type_traits>
 
-namespace json_query::utils::detail
+#include "json-query/config/AbiNamespace.hpp"
+
+namespace json_query::inline JSON_QUERY_ABI_NS::utils::detail
 {
 
 // Helper macro to define both UTF-8 and UTF-16 string literals

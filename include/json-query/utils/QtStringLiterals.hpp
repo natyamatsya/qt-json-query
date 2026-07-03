@@ -27,7 +27,9 @@
  *   auto view = u"hello"_qt_sv;  // QStringView
  *   auto l1   = "hello"_qt_l1;   // QLatin1String
  */
-namespace json_query::literals
+#include "json-query/config/AbiNamespace.hpp"
+
+namespace json_query::inline JSON_QUERY_ABI_NS::literals
 {
 
 /// Creates QString from UTF-16 string literal

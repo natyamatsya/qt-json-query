@@ -10,7 +10,9 @@
 
 #include <QJsonValue>
 
-namespace json_query::json_path::detail
+#include "json-query/config/AbiNamespace.hpp"
+
+namespace json_query::inline JSON_QUERY_ABI_NS::json_path::detail
 {
 
 // ──────────────────────────────────────────────────────────────────────
@@ -800,7 +802,7 @@ const BracketRuleMetadata* BracketRuleDispatcher::findRuleByName(const char* nam
 //  EmbeddedBracketRuleDispatcher Implementation (Zero-Overhead)
 // ──────────────────────────────────────────────────────────────────────
 
-namespace json_query::json_path::detail
+namespace json_query::inline JSON_QUERY_ABI_NS::json_path::detail
 {
 
 std::vector<EmbeddedBracketRuleMetadata> EmbeddedBracketRuleDispatcher::createRules()

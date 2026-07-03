@@ -6,7 +6,9 @@
 #include "json-query/json-path/internal/ArrayPool.hpp"
 #include "json-query/json-path/internal/IterativeRecursiveDescent.hpp"
 
-namespace json_query::json_path::detail
+#include "json-query/config/AbiNamespace.hpp"
+
+namespace json_query::inline JSON_QUERY_ABI_NS::json_path::detail
 {
 
 using internal::acquirePooledArray;

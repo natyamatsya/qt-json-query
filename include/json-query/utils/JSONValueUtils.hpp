@@ -15,7 +15,9 @@
 #include <utility>
 #include <type_traits>
 
-namespace json_query
+#include "json-query/config/AbiNamespace.hpp"
+
+namespace json_query::inline JSON_QUERY_ABI_NS
 {
 
 //------------------------------------------------------------------------------

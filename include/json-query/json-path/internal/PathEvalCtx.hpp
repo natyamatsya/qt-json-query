@@ -9,7 +9,9 @@
 #include "json-query/json-path/JSONPathCompile.hpp" // for Token, FunctionType, Slice
 #include "json-query/json-path/JSONPathOption.hpp"
 
-namespace json_query::json_path::detail
+#include "json-query/config/AbiNamespace.hpp"
+
+namespace json_query::inline JSON_QUERY_ABI_NS::json_path::detail
 {
 
 // A lightweight, immutable context object passed to pure evaluation helpers.

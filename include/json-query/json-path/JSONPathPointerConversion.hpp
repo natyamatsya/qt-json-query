@@ -8,7 +8,9 @@
 #include "json-query/json-path/JSONPathCompile.hpp"
 #include "json-query/json-pointer/JSONPointerUtils.hpp"
 
-namespace json_query::json_path::detail
+#include "json-query/config/AbiNamespace.hpp"
+
+namespace json_query::inline JSON_QUERY_ABI_NS::json_path::detail
 {
 
 // Escapes a JSON Pointer segment according to RFC 6901 (~ -> ~0, / -> ~1)

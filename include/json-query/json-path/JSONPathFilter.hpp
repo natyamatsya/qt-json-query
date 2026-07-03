@@ -23,7 +23,9 @@
 // ======================================================================
 //  Public API – filter compilation entry point
 // ======================================================================
-namespace json_query::json_path
+#include "json-query/config/AbiNamespace.hpp"
+
+namespace json_query::inline JSON_QUERY_ABI_NS::json_path
 {
 
 /**
@@ -40,7 +42,7 @@ std::optional<Token> compileFilter(const QString& expr, std::vector<FilterFn>& o
 // ======================================================================
 //  Internal helpers, functions, and orchestration
 // ======================================================================
-namespace json_query::json_path::detail
+namespace json_query::inline JSON_QUERY_ABI_NS::json_path::detail
 {
 
 using Token      = json_path::Token;

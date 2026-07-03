@@ -2,7 +2,9 @@
 
 #pragma once
 
-namespace json_query::json_path
+#include "json-query/config/AbiNamespace.hpp"
+
+namespace json_query::inline JSON_QUERY_ABI_NS::json_path
 {
 
 // High-level evaluation options formerly nested inside JSONPath.

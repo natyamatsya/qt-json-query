@@ -6,7 +6,9 @@
 #include <QString>
 #include <optional>
 
-namespace json_query::json_path::detail
+#include "json-query/config/AbiNamespace.hpp"
+
+namespace json_query::inline JSON_QUERY_ABI_NS::json_path::detail
 {
 
 // Import types from the main namespace

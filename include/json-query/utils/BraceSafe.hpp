@@ -26,7 +26,9 @@
  * See ADR-001: doc/adr/001-no-brace-init-for-qt-json-containers.md
  */
 
-namespace json_query
+#include "json-query/config/AbiNamespace.hpp"
+
+namespace json_query::inline JSON_QUERY_ABI_NS
 {
 
 template <typename T>
