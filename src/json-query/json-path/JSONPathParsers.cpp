@@ -6,6 +6,8 @@
 #include "json-query/json-path/JSONPathBracketRules.hpp"
 #include "json-query/json-path/JSONPathLog.hpp"
 
+#include <atomic>
+
 namespace json_query::json_path::detail
 {
 
@@ -188,9 +190,10 @@ std::expected<qsizetype, ParseError> parseBracket(qsizetype                     
     auto content{sv.mid(pos + 1, end - pos - 1)};
     qCDebug(jsonPathLog) << "parseBracket: content=" << content.toString();
 
-    // Generate unique bracket group ID for union tracking
-    static int nextBracketGroupId = 1;
-    auto       currentBracketGroupId{nextBracketGroupId++};
+    // Generate unique bracket group ID for union tracking (atomic: create()
+    // may be called from multiple threads concurrently)
+    static std::atomic<int> nextBracketGroupId{1};
+    auto currentBracketGroupId{nextBracketGroupId.fetch_add(1, std::memory_order_relaxed)};
 
     // Create BracketSink for token emission
     BracketSink sink(tokens, kb, contextFilters, filters, currentBracketGroupId);
@@ -289,9 +292,10 @@ std::expected<qsizetype, ParseError> parseEmbeddedBracket(
     auto content{sv.mid(pos + 1, end - pos - 1)};
     qCDebug(jsonPathLog) << "parseEmbeddedBracket: content=" << content.toString();
 
-    // Generate unique bracket group ID for union tracking
-    static int nextBracketGroupId = 1;
-    auto       currentBracketGroupId{nextBracketGroupId++};
+    // Generate unique bracket group ID for union tracking (atomic: create()
+    // may be called from multiple threads concurrently)
+    static std::atomic<int> nextBracketGroupId{1};
+    auto currentBracketGroupId{nextBracketGroupId.fetch_add(1, std::memory_order_relaxed)};
 
     // Create EmbeddedBracketSink for token emission (zero-overhead)
     EmbeddedBracketSink sink(tokens, kb, currentBracketGroupId);
