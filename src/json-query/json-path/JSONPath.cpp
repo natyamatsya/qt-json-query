@@ -111,7 +111,7 @@ JSONPath::EvalArrayResult JSONPath::evaluate(const QJsonDocument& doc) const
 }
 
 // Thread-local reusable single-element QJsonArray for definite path evaluation.
-// See docs/adr/ADR-001-thread-local-jsonarray-cache.md for rationale.
+// See doc/adr/006-thread-local-jsonarray-cache.md for rationale.
 static QJsonArray& reusableSingleElementArray()
 {
     thread_local auto arr{QJsonArray{QJsonValue{}}};

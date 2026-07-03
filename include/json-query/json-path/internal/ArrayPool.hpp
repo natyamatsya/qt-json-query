@@ -5,7 +5,6 @@
 #include <QJsonArray>
 #include <vector>
 #include <memory>
-#include <mutex>
 #include <json-query/Common.h>
 
 #include "json-query/config/AbiNamespace.hpp"
@@ -14,11 +13,16 @@ namespace json_query::inline JSON_QUERY_ABI_NS::json_path::internal
 {
 
 /**
- * @brief Thread-safe object pool for QJsonArray instances to reduce allocations
+ * @brief Per-thread object pool for QJsonArray instances to reduce allocations
  *
- * This pool maintains a collection of pre-allocated QJsonArray objects that can be
- * reused across JSONPath evaluations, significantly reducing memory allocation overhead
- * in hot paths like recursive descent and fanOut operations.
+ * This pool maintains a collection of pre-allocated QJsonArray objects that can
+ * be reused across JSONPath evaluations, significantly reducing memory
+ * allocation overhead in hot paths like recursive descent and fanOut.
+ *
+ * One pool exists per thread (see threadLocalArrayPool()), so acquire/return
+ * are lock-free. Constraint: a PooledArray must be destroyed on the thread it
+ * was acquired on (internal evaluation code never migrates it; the arrays
+ * returned to callers are plain QJsonArray values, unaffected).
  */
 class ArrayPool
 {
@@ -79,15 +83,6 @@ class ArrayPool
     };
 
     /**
-     * @brief Get the singleton instance of the array pool
-     */
-    static ArrayPool& instance()
-    {
-        static ArrayPool pool;
-        return pool;
-    }
-
-    /**
      * @brief Acquire a pooled QJsonArray instance
      *
      * Returns a clean, empty QJsonArray wrapped in a RAII container.
@@ -109,7 +104,6 @@ class ArrayPool
 
     Stats getStats() const
     {
-        std::lock_guard<std::mutex> lock(mutex_);
         return {pool_.size(),
                 totalCreated_,
                 acquisitions_,
@@ -122,27 +116,24 @@ class ArrayPool
      */
     void clear()
     {
-        std::lock_guard<std::mutex> lock(mutex_);
         pool_.clear();
         totalCreated_ = 0;
         acquisitions_ = 0;
         returns_      = 0;
     }
 
-    // Non-copyable, non-movable singleton
+    // Non-copyable, non-movable
     ArrayPool(const ArrayPool&)            = delete;
     ArrayPool& operator=(const ArrayPool&) = delete;
     ArrayPool(ArrayPool&&)                 = delete;
     ArrayPool& operator=(ArrayPool&&)      = delete;
 
-  private:
     ArrayPool()  = default;
     ~ArrayPool() = default;
 
+  private:
     QT_QUERY_JSON_ALWAYS_INLINE PooledArray acquireImpl()
     {
-        std::lock_guard<std::mutex> lock(mutex_);
-
         std::unique_ptr<QJsonArray> array;
         if (QT_QUERY_JSON_LIKELY(!pool_.empty()))
         {
@@ -165,8 +156,6 @@ class ArrayPool
         if (!array)
             return;
 
-        std::lock_guard<std::mutex> lock(mutex_);
-
         // Limit pool size to prevent unbounded growth
         constexpr size_t MAX_POOL_SIZE = 32;
         if (pool_.size() < MAX_POOL_SIZE)
@@ -180,7 +169,6 @@ class ArrayPool
 
     friend class PooledArray;
 
-    mutable std::mutex                       mutex_;
     std::vector<std::unique_ptr<QJsonArray>> pool_;
 
     // Statistics
@@ -189,10 +177,17 @@ class ArrayPool
     size_t returns_{0};
 };
 
+/// The calling thread's pool (lock-free; constructed on first use)
+inline ArrayPool& threadLocalArrayPool()
+{
+    thread_local ArrayPool pool;
+    return pool;
+}
+
 /**
- * @brief Convenience function to acquire a pooled array
+ * @brief Convenience function to acquire a pooled array from this thread's pool
  */
-[[nodiscard]] inline ArrayPool::PooledArray acquirePooledArray() { return ArrayPool::instance().acquire(); }
+[[nodiscard]] inline ArrayPool::PooledArray acquirePooledArray() { return threadLocalArrayPool().acquire(); }
 
 /**
  * @brief Returns an empty QJsonArray optimized for common empty result cases

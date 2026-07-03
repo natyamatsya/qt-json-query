@@ -1,4 +1,4 @@
-# ADR-001: Thread-Local QJsonArray Cache for Definite Path Evaluation
+# ADR-006: Thread-Local QJsonArray Cache for Definite Path Evaluation
 
 **Status**: Accepted
 **Date**: 2026-02-08

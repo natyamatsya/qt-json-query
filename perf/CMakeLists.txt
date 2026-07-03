@@ -12,17 +12,6 @@ if(TARGET function_ref_interface)
   target_link_libraries(memory_allocation_test PRIVATE function_ref_interface)
 endif()
 
-# Memory optimization test for validating optimization strategies
-add_executable(memory_optimization_test src/memory_optimization_test.cpp)
-target_link_libraries(memory_optimization_test PRIVATE json_query Qt6::Core)
-target_include_directories(
-  memory_optimization_test PRIVATE ${PROJECT_SOURCE_DIR}/include
-                                   ${PROJECT_SOURCE_DIR}/include/json-query)
-target_compile_features(memory_optimization_test PRIVATE cxx_std_23)
-if(TARGET function_ref_interface)
-  target_link_libraries(memory_optimization_test PRIVATE function_ref_interface)
-endif()
-
 # Qt memory tracker for Qt-specific memory analysis
 add_executable(qt_memory_tracker src/qt_memory_tracker.cpp)
 target_link_libraries(qt_memory_tracker PRIVATE json_query Qt6::Core)

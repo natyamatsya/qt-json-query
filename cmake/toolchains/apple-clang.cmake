@@ -2,7 +2,9 @@
 # Clang compiler
 
 set(CMAKE_SYSTEM_NAME Darwin)
-set(CMAKE_SYSTEM_PROCESSOR x86_64)
+# Match the host architecture (was hardcoded x86_64, which is wrong on
+# Apple Silicon)
+set(CMAKE_SYSTEM_PROCESSOR ${CMAKE_HOST_SYSTEM_PROCESSOR})
 
 # Set the compiler
 set(CMAKE_C_COMPILER clang)
