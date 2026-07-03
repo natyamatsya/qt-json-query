@@ -15,10 +15,13 @@ set(gtest_force_shared_crt
     CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
-# Suppress -Wundef warnings from GoogleTest headers when using Clang
+# Suppress warnings from GoogleTest's own strict build when using Clang: -Wundef
+# (config macros) and -Wcharacter-conversion (char8_t in gtest-printers.h, first
+# diagnosed by clang 21; unknown -Wno- options are silently ignored by older
+# clangs)
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  target_compile_options(gtest PRIVATE -Wno-undef)
-  target_compile_options(gtest_main PRIVATE -Wno-undef)
-  target_compile_options(gmock PRIVATE -Wno-undef)
-  target_compile_options(gmock_main PRIVATE -Wno-undef)
+  foreach(gtest_target gtest gtest_main gmock gmock_main)
+    target_compile_options(${gtest_target} PRIVATE -Wno-undef
+                                                   -Wno-character-conversion)
+  endforeach()
 endif()

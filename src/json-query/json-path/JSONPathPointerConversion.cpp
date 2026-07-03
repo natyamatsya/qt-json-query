@@ -17,7 +17,7 @@ namespace json_query::inline JSON_QUERY_ABI_NS::json_path::detail
 QString tokensToPointer(QStringList& segments, const std::vector<Token>& tokens)
 {
     // assume tokens[0] is root ($)
-    for (qsizetype i = 1; i < tokens.size(); ++i)
+    for (qsizetype i = 1; i < std::ssize(tokens); ++i)
     {
         const auto& tk = tokens[i];
         switch (tk.kind)
@@ -35,4 +35,4 @@ QString tokensToPointer(QStringList& segments, const std::vector<Token>& tokens)
     return QStringLiteral("/") + segments.join(u'/');
 }
 
-} // namespace json_query::json_path::detail
+} // namespace json_query::inline JSON_QUERY_ABI_NS::json_path::detail

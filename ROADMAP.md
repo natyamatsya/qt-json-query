@@ -219,8 +219,10 @@ M0–M3, collected here so they are not lost in the resolved entries above:
   is retired).
 - Set `FormatValidation` explicitly if you expect `format` to be enforced
   (2020-12 default is annotation-only).
-- Keep `JSON_QUERY_FORMAT_IDN` off, or use the `ada` backend — libidn2 is
-  LGPL-3.0 (relevant for statically-linked proprietary apps).
+- The default build pulls only permissively licensed dependencies. The
+  LGPL-3.0 libidn2 IDN backend requires an explicit
+  `JSON_QUERY_IDN_BACKEND=libidn2` opt-in (the default `ada` backend is
+  Apache-2.0/MIT); relevant for statically-linked proprietary apps.
 - Never persist or transmit `Error::numeric()` / `Error::code` values —
   they are not stable across library versions (ADR-004). Branch on the
   enumerators instead.

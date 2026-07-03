@@ -42,7 +42,7 @@ TEST_F(SchemaRegistryTest, AddSchemaByUri)
 TEST_F(SchemaRegistryTest, AddSchemaAlsoCachesDocument)
 {
     const auto schema{parseSchema(R"({"type": "integer"})")};
-    registry.add(u"https://example.com/int-schema"_s, schema);
+    ASSERT_TRUE(registry.add(u"https://example.com/int-schema"_s, schema).has_value());
 
     EXPECT_TRUE(registry.containsDocument(u"https://example.com/int-schema"_s));
     EXPECT_EQ(registry.documentCount(), 1u);
@@ -56,7 +56,7 @@ TEST_F(SchemaRegistryTest, GetReturnsNulloptForUnknownUri)
 TEST_F(SchemaRegistryTest, GetReturnsCachedSchema)
 {
     const auto schema{parseSchema(R"({"type": "string"})")};
-    registry.add(u"https://example.com/s"_s, schema);
+    ASSERT_TRUE(registry.add(u"https://example.com/s"_s, schema).has_value());
 
     const auto cached{registry.get(u"https://example.com/s"_s)};
     ASSERT_TRUE(cached.has_value());
@@ -105,7 +105,7 @@ TEST_F(SchemaRegistryTest, CreateWithoutIdDoesNotCache)
 {
     const auto schema{parseSchema(R"({"type": "string"})")};
 
-    registry.create(schema);
+    ASSERT_TRUE(registry.create(schema).has_value());
     EXPECT_EQ(registry.compiledCount(), 0u);
 }
 
@@ -116,7 +116,7 @@ TEST_F(SchemaRegistryTest, AddCachesUnderBothUriAndSchemaId)
         "type": "string"
     })")};
 
-    registry.add(u"https://example.com/alias"_s, schema);
+    ASSERT_TRUE(registry.add(u"https://example.com/alias"_s, schema).has_value());
 
     EXPECT_TRUE(registry.contains(u"https://example.com/alias"_s));
     EXPECT_TRUE(registry.contains(u"https://example.com/actual-id"_s));
@@ -178,13 +178,13 @@ TEST_F(SchemaRegistryTest, AddedDocumentServesAsFetchCache)
         "$id": "https://example.com/defs",
         "type": "object"
     })")};
-    registry.add(u"https://example.com/defs"_s, remoteSchema);
+    ASSERT_TRUE(registry.add(u"https://example.com/defs"_s, remoteSchema).has_value());
 
     // Now compile a schema that references it — should not call the fetcher
     const auto schema{parseSchema(R"({
         "$ref": "https://example.com/defs"
     })")};
-    registry.create(schema);
+    ASSERT_TRUE(registry.create(schema).has_value());
 
     EXPECT_EQ(fetchCount, 0);
 }
@@ -196,7 +196,7 @@ TEST_F(SchemaRegistryTest, AddedDocumentServesAsFetchCache)
 TEST_F(SchemaRegistryTest, RemoveDeletesBothCaches)
 {
     const auto schema{parseSchema(R"({"type": "string"})")};
-    registry.add(u"https://example.com/to-remove"_s, schema);
+    ASSERT_TRUE(registry.add(u"https://example.com/to-remove"_s, schema).has_value());
 
     EXPECT_TRUE(registry.contains(u"https://example.com/to-remove"_s));
     EXPECT_TRUE(registry.containsDocument(u"https://example.com/to-remove"_s));
@@ -213,8 +213,8 @@ TEST_F(SchemaRegistryTest, RemoveReturnsFalseForUnknown)
 
 TEST_F(SchemaRegistryTest, ClearRemovesEverything)
 {
-    registry.add(u"https://example.com/a"_s, parseSchema(R"({"type": "string"})"));
-    registry.add(u"https://example.com/b"_s, parseSchema(R"({"type": "number"})"));
+    ASSERT_TRUE(registry.add(u"https://example.com/a"_s, parseSchema(R"({"type": "string"})")).has_value());
+    ASSERT_TRUE(registry.add(u"https://example.com/b"_s, parseSchema(R"({"type": "number"})")).has_value());
 
     EXPECT_EQ(registry.compiledCount(), 2u);
     EXPECT_EQ(registry.documentCount(), 2u);
@@ -241,7 +241,7 @@ TEST_F(SchemaRegistryTest, CachedSchemaValidatesCorrectly)
         "required": ["name"]
     })")};
 
-    registry.add(u"https://example.com/person"_s, schema);
+    ASSERT_TRUE(registry.add(u"https://example.com/person"_s, schema).has_value());
 
     const auto cached{registry.get(u"https://example.com/person"_s)};
     ASSERT_TRUE(cached.has_value());

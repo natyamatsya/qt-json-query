@@ -34,7 +34,7 @@ jobs:
             compiler: default
 
     steps:
-      - uses: dorny/test-reporter@v2
+      - uses: dorny/test-reporter@v3
         with:
           artifact: test-results-${{ matrix.os }}-${{ matrix.compiler }}
           name: Test Report (${{ matrix.os }}, ${{ matrix.compiler }})

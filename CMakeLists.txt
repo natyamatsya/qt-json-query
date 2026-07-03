@@ -29,8 +29,8 @@ option(WITH_REFACTORING_TOOLS "Build C++ modernization refactoring tools" OFF)
 # ---------------------------------------------------------------------------
 # JSON_QUERY_ENABLE_SANITIZERS builds everything with ASan+UBSan (standalone
 # memory-safety validation, e.g. the CI sanitizer job). When fuzz testing is
-# enabled, the entire project (including the library) must also be compiled
-# with ASan/UBSan so that fuzz targets can link against it.
+# enabled, the entire project (including the library) must also be compiled with
+# ASan/UBSan so that fuzz targets can link against it.
 option(JSON_QUERY_ENABLE_SANITIZERS
        "Build with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 option(ENABLE_FUZZ_TESTS "Enable LibFuzzer-based fuzz testing" OFF)
@@ -55,13 +55,12 @@ include(FetchContent)
 # ---------------------------------------------------------------------------
 # Header-only CTRE (compile-time regular expressions)
 #
-# Resolution order (package-manager friendly, e.g. vcpkg):
-#   1. find_package(ctre CONFIG) — satisfied by vcpkg's `ctre` port or any
-#      system install, letting consumers control the version
-#   2. FetchContent fallback pinned below
-# Consumers can also override the fetched version by calling
-# FetchContent_Declare(ctre ...) before add_subdirectory of this project
-# (first declaration wins), or by setting FETCHCONTENT_SOURCE_DIR_CTRE.
+# Resolution order (package-manager friendly, e.g. vcpkg): 1. find_package(ctre
+# CONFIG) — satisfied by vcpkg's `ctre` port or any system install, letting
+# consumers control the version 2. FetchContent fallback pinned below Consumers
+# can also override the fetched version by calling FetchContent_Declare(ctre
+# ...) before add_subdirectory of this project (first declaration wins), or by
+# setting FETCHCONTENT_SOURCE_DIR_CTRE.
 # ---------------------------------------------------------------------------
 FetchContent_Declare(
   ctre
@@ -70,12 +69,11 @@ FetchContent_Declare(
   # v3.10.0 + 2 commits (includes a GCC warning fix); pinned for reproducible
   # builds — CTRE is a public compile-time dependency baked into our headers
   GIT_TAG 6225211806c48230e5d17a1e555ef69e7325051c
-  SOURCE_SUBDIR single-header
-  FIND_PACKAGE_ARGS NAMES ctre)
+  SOURCE_SUBDIR single-header FIND_PACKAGE_ARGS NAMES ctre)
 FetchContent_MakeAvailable(ctre)
 
-# Bridge target used throughout the build: forwards to the package target
-# when find_package satisfied the dependency, to the fetched tree otherwise.
+# Bridge target used throughout the build: forwards to the package target when
+# find_package satisfied the dependency, to the fetched tree otherwise.
 if(NOT TARGET ctre_interface)
   add_library(ctre_interface INTERFACE)
   if(TARGET ctre::ctre)
@@ -128,8 +126,8 @@ endif()
 option(JSON_QUERY_FORMAT_ECMA_REGEX
        "Enable ECMA-262 regex format validation (fetches SRELL)" OFF)
 
-# SRELL has no official vcpkg port; consumers can point this at their own
-# copy (e.g. a vcpkg overlay port) to skip the download.
+# SRELL has no official vcpkg port; consumers can point this at their own copy
+# (e.g. a vcpkg overlay port) to skip the download.
 set(JSON_QUERY_SRELL_INCLUDE_DIR
     ""
     CACHE PATH "Directory containing srell.hpp (overrides the download)")
@@ -159,17 +157,23 @@ if(JSON_QUERY_FORMAT_ECMA_REGEX)
 endif()
 
 # ---------------------------------------------------------------------------
-# Optional: IDN hostname and IDN email format validation Backend choices:
-# libidn2 - Full IDNA 2008 / RFC 5891+5892, LGPL-3.0 (system library) ada     -
-# UTS #46 via ada-url/idna, Apache-2.0/MIT (fetched via FetchContent)
+# Optional: IDN hostname and IDN email format validation Backend choices: ada -
+# UTS #46 via ada-url/idna, Apache-2.0/MIT (fetched via FetchContent) libidn2 -
+# Full IDNA 2008 / RFC 5891+5892, LGPL-3.0 (system library)
+#
+# The default is the permissively licensed ada backend: this library is
+# static-only, so an LGPL dependency imposes relink obligations on every
+# consumer binary (LGPL-3.0 s4(d)). libidn2 stays available for its fuller RFC
+# 5892 coverage, but only as an explicit opt-in.
 # ---------------------------------------------------------------------------
 option(JSON_QUERY_FORMAT_IDN "Enable IDN hostname format validation" OFF)
 set(JSON_QUERY_IDN_BACKEND
-    "libidn2"
+    "ada"
     CACHE
       STRING
-      "IDN library backend: 'libidn2' (LGPL, system) or 'ada' (MIT, fetched)")
-set_property(CACHE JSON_QUERY_IDN_BACKEND PROPERTY STRINGS libidn2 ada)
+      "IDN library backend: 'ada' (Apache-2.0/MIT, fetched) or 'libidn2' (LGPL-3.0, system, explicit opt-in)"
+)
+set_property(CACHE JSON_QUERY_IDN_BACKEND PROPERTY STRINGS ada libidn2)
 
 if(JSON_QUERY_FORMAT_IDN)
   if(JSON_QUERY_IDN_BACKEND STREQUAL "libidn2")
@@ -186,7 +190,10 @@ if(JSON_QUERY_FORMAT_IDN)
           PROPERTIES IMPORTED_LOCATION "${IDN2_LIBRARY}"
                      INTERFACE_INCLUDE_DIRECTORIES "${IDN2_INCLUDE_DIR}")
       endif()
-      message(STATUS "IDN backend: libidn2 (${IDN2_LIBRARY})")
+      message(
+        STATUS
+          "IDN backend: libidn2 (${IDN2_LIBRARY}) -- LGPL-3.0: statically linking consumers must honor its relink obligations"
+      )
     else()
       message(
         FATAL_ERROR
@@ -212,12 +219,18 @@ if(JSON_QUERY_FORMAT_IDN)
     set(BUILD_TESTING
         ${BUILD_TESTING_SAVED}
         CACHE BOOL "" FORCE)
+    # ada-idna exports /WX /W3 /sdl as INTERFACE compile options on MSVC,
+    # forcing warnings-as-errors onto every consuming translation unit; keep its
+    # build flags out of ours.
+    if(TARGET ada-idna)
+      set_target_properties(ada-idna PROPERTIES INTERFACE_COMPILE_OPTIONS "")
+    endif()
     message(STATUS "IDN backend: ada-url/idna (fetched)")
 
   else()
     message(
       FATAL_ERROR
-        "Invalid JSON_QUERY_IDN_BACKEND: '${JSON_QUERY_IDN_BACKEND}'. Use 'libidn2' or 'ada'."
+        "Invalid JSON_QUERY_IDN_BACKEND: '${JSON_QUERY_IDN_BACKEND}'. Use 'ada' (default, permissive) or 'libidn2' (LGPL-3.0)."
     )
   endif()
 endif()
@@ -256,9 +269,10 @@ endif()
 # ---------------------------------------------------------------------------
 if(JSON_QUERY_ENABLE_INSTALL)
   include(GNUInstallDirs)
-  # json_query itself is added to the export set in src/json-query/CMakeLists.txt.
-  # CTRE/function_ref are PRIVATE build dependencies (not part of the public
-  # header surface since the pimpl) and are deliberately NOT exported.
+  # json_query itself is added to the export set in
+  # src/json-query/CMakeLists.txt. CTRE/function_ref are PRIVATE build
+  # dependencies (not part of the public header surface since the pimpl) and are
+  # deliberately NOT exported.
   install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
   # Export for downstream find_package(json_query)
@@ -306,21 +320,25 @@ if(JSON_QUERY_ENABLE_INSTALL)
           "this is CMake ${CMAKE_VERSION}")
     endif()
 
-    # Opt in to the experimental feature. The UUID is CMake-release-specific
-    # and must be updated when upgrading CMake until the feature is stable
-    # (see Help/dev/experimental.rst in the CMake sources; this value is for
-    # the CMake 4.3 series).
-    set(CMAKE_EXPERIMENTAL_GENERATE_SBOM
-        "ca494ed3-b261-4205-a01f-603c95e4cae0")
+    # Opt in to the experimental feature. The UUID is CMake-release-specific and
+    # must be updated when upgrading CMake until the feature is stable (see
+    # Help/dev/experimental.rst in the CMake sources; this value is for the
+    # CMake 4.3 series).
+    set(CMAKE_EXPERIMENTAL_GENERATE_SBOM "ca494ed3-b261-4205-a01f-603c95e4cae0")
 
     install(
-      SBOM json_query
-      EXPORT json_queryTargets
-      VERSION ${PROJECT_VERSION}
-      LICENSE "Apache-2.0 WITH LLVM-exception OR MIT"
+      SBOM
+      json_query
+      EXPORT
+      json_queryTargets
+      VERSION
+      ${PROJECT_VERSION}
+      LICENSE
+      "Apache-2.0 WITH LLVM-exception OR MIT"
       DESCRIPTION
-        "JSON Pointer (RFC 6901), JSONPath (RFC 9535), and JSON Schema (Draft 2020-12) for Qt"
-      HOMEPAGE_URL "https://github.com/natyamatsya/qt-json-query")
+      "JSON Pointer (RFC 6901), JSONPath (RFC 9535), and JSON Schema (Draft 2020-12) for Qt"
+      HOMEPAGE_URL
+      "https://github.com/natyamatsya/qt-json-query")
   endif()
 endif()
 

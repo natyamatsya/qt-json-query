@@ -166,7 +166,7 @@ std::expected<NodeList, DetailedEvalError> evaluateTokenStream(const PathEvalCtx
     auto                                 multi{false};
 
     // Apply each token (selector) to the working node set
-    for (qsizetype i{1}; i < ctx.tokens.size() && working; ++i)
+    for (qsizetype i{1}; i < std::ssize(ctx.tokens) && working; ++i)
     {
         const auto prevRecursive{i > 0 && ctx.tokens[i - 1].kind == Token::Kind::Recursive};
 
@@ -191,4 +191,4 @@ std::expected<NodeList, DetailedEvalError> evaluateTokenStream(const PathEvalCtx
 // are included via the header file to enable compiler inlining while keeping
 // headers clean.
 
-} // namespace json_query::json_path::detail
+} // namespace json_query::inline JSON_QUERY_ABI_NS::json_path::detail

@@ -181,7 +181,7 @@ UnionDetectionResult detectUnionTokens(const PathEvalCtx& ctx, qsizetype startIn
     std::vector<qsizetype> unionTokens;
     unionTokens.push_back(startIndex);
 
-    for (auto j{startIndex + 1}; j < ctx.tokens.size() && isSelectorToken(ctx.tokens[j]); ++j)
+    for (auto j{startIndex + 1}; j < std::ssize(ctx.tokens) && isSelectorToken(ctx.tokens[j]); ++j)
         unionTokens.push_back(j);
 
     // A union requires 2+ tokens from the same bracket group
@@ -315,7 +315,7 @@ KeyCollectionResult collectKeysFromTokens(const PathEvalCtx& ctx, qsizetype star
     std::vector<QString> keys;
     auto                 i{startIndex};
 
-    while (i < ctx.tokens.size())
+    while (i < std::ssize(ctx.tokens))
     {
         const auto& token = ctx.tokens[i];
         if (token.kind == Token::Kind::Key)
@@ -368,4 +368,4 @@ processSingleUnionToken(const PathEvalCtx& ctx, qsizetype tokenIdx, const QJsonA
     return {.success = false, .results = QJsonArray{}, .error = lastError};
 }
 
-} // namespace json_query::json_path::detail
+} // namespace json_query::inline JSON_QUERY_ABI_NS::json_path::detail

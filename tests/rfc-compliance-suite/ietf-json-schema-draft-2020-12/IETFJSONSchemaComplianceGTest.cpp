@@ -218,6 +218,10 @@ bool isKnownFailure(const SchemaTestCase& tc)
     if (matchesKnownFailure(kKnownFailuresNoIdn, tc.fileName, tc.groupDesc, tc.testDesc))
         return true;
 #endif
+#ifdef JSON_QUERY_TEST_IDN_ADA
+    if (matchesKnownFailure(kKnownFailuresIdnAda, tc.fileName, tc.groupDesc, tc.testDesc))
+        return true;
+#endif
     return false;
 }
 
@@ -283,9 +287,8 @@ TEST_P(IETFJsonSchemaTest, ValidatesPerSpec)
 
     if (isValid != tc.expectedValid && knownFailure)
     {
-        GTEST_SKIP() << "Known failure (optional-feature gap, see KnownFailures.hpp): "
-                     << tc.fileName.toStdString() << " / " << tc.groupDesc.toStdString() << " / "
-                     << tc.testDesc.toStdString();
+        GTEST_SKIP() << "Known failure (optional-feature gap, see KnownFailures.hpp): " << tc.fileName.toStdString()
+                     << " / " << tc.groupDesc.toStdString() << " / " << tc.testDesc.toStdString();
     }
 
     ASSERT_FALSE(isValid == tc.expectedValid && knownFailure)

@@ -34,14 +34,17 @@ function(add_ietf_json_schema_draft_2020_12_tests)
     # Feature flags select which known-failure (xfail) buckets apply — see
     # KnownFailures.hpp next to the test driver
     if(JSON_QUERY_FORMAT_ECMA_REGEX)
-      target_compile_definitions(
-        ietf_json_schema_draft_2020_12_compliance_tests
-        PRIVATE JSON_QUERY_TEST_HAS_ECMA_REGEX)
+      target_compile_definitions(ietf_json_schema_draft_2020_12_compliance_tests
+                                 PRIVATE JSON_QUERY_TEST_HAS_ECMA_REGEX)
     endif()
     if(JSON_QUERY_FORMAT_IDN)
-      target_compile_definitions(
-        ietf_json_schema_draft_2020_12_compliance_tests
-        PRIVATE JSON_QUERY_TEST_HAS_IDN)
+      target_compile_definitions(ietf_json_schema_draft_2020_12_compliance_tests
+                                 PRIVATE JSON_QUERY_TEST_HAS_IDN)
+      if(JSON_QUERY_IDN_BACKEND STREQUAL "ada")
+        target_compile_definitions(
+          ietf_json_schema_draft_2020_12_compliance_tests
+          PRIVATE JSON_QUERY_TEST_IDN_ADA)
+      endif()
     endif()
 
     target_compile_features(ietf_json_schema_draft_2020_12_compliance_tests

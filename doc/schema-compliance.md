@@ -81,9 +81,17 @@ cmake -DJSON_QUERY_FORMAT_ECMA_REGEX=ON -DJSON_QUERY_FORMAT_IDN=ON ...
 - Compile definition: `JSON_QUERY_HAS_SRELL`
 - **Fixes**: All 46 ecmascript-regex tests (44 from `pattern` keyword, 2 from `regex` format)
 
-### libidn2 (IDNA 2008 / RFC 5891+5892, LGPL-3.0)
+### libidn2 (IDNA 2008 / RFC 5891+5892, LGPL-3.0 — explicit opt-in)
 
 **[gnu.org/software/libidn](https://www.gnu.org/software/libidn/)** — system library
+
+> **License note**: the default IDN backend is [ada-url/idna](https://github.com/ada-url/idna)
+> (UTS #46, Apache-2.0/MIT, fetched automatically). libidn2 is LGPL-3.0, which
+> imposes relink obligations on statically linked consumers, so it must be
+> selected explicitly with `JSON_QUERY_IDN_BACKEND=libidn2`.
+> Under the ada backend, 14 idn-hostname suite cases that need the RFC 5892
+> CONTEXTO rules stay xfail-skipped (`kKnownFailuresIdnAda` in
+> `tests/.../KnownFailures.hpp`); libidn2 resolves them.
 
 Install: `brew install libidn2` (macOS) or `apt install libidn2-dev` (Linux)
 

@@ -2,6 +2,38 @@
 
 Pre-1.0: minor versions may contain breaking changes (see `ROADMAP.md`).
 
+## Unreleased
+
+### Changed
+- The IDN backend (`JSON_QUERY_IDN_BACKEND`) now defaults to `ada`
+  (ada-url/idna, Apache-2.0/MIT, fetched) instead of `libidn2` (LGPL-3.0,
+  system). The library is static-only, so the default build must not impose
+  LGPL relink obligations on consumer binaries; libidn2 remains available as
+  an explicit opt-in for its fuller RFC 5892 coverage. A new
+  `kKnownFailuresIdnAda` xfail bucket covers the 14 CONTEXTO-rule suite cases
+  UTS #46 cannot enforce (full suite stays green on both backends), and
+  ada-idna's leaked `INTERFACE /WX /W3 /sdl` MSVC options are stripped so the
+  dependency cannot force warnings-as-errors onto consumers.
+
+### Fixed
+- Warning hygiene: five signed/unsigned comparisons (`qsizetype` vs
+  `std::vector::size()`, MSVC C4018 at /W3) now use `std::ssize`;
+  the schema-registry test asserts every `add()`/`create()` result instead of
+  discarding `[[nodiscard]]` values (MSVC C4834); GoogleTest's own build
+  suppresses clang 21's `-Wcharacter-conversion` alongside the existing
+  `-Wundef`.
+
+### Infrastructure
+- CI is green again: the Linux legs now install the Qt `icu` archive (the
+  Linux Qt binaries link the bundled ICU, which broke every Linux link), the
+  clang leg uses clang 20 (clang < 19 cannot use libstdc++'s C++23
+  `<expected>`), the Test Report workflow downloads the artifact names ci
+  actually uploads, and the benchmark steps run the binary from its real
+  location so benchmark artifacts are no longer silently empty.
+- Actions bumped off deprecated Node 20 runtimes: checkout v7,
+  upload-artifact v7, setup-python v6, gha-setup-ninja v6, dorny/test-reporter
+  v3.
+
 ## 0.5.0 — 2026-07-03
 
 ### Changed

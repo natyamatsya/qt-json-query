@@ -66,14 +66,15 @@ inline void validateArray(ValidateContext&    ctx,
     auto* parentTracker{ctx.tracker};
 
     // Validate prefixItems — each index is evaluated
-    for (std::size_t i{0}; i < node.prefixItems.size(); ++i)
+    for (qsizetype i{0}; i < std::ssize(node.prefixItems); ++i)
     {
         if (i >= arr.size() || !ctx.shouldContinue())
             break;
         const auto itemPath{instancePath + u"/"_qt_s + QString::number(i)};
         const auto itemSchemaPath{schemaPath + u"/prefixItems/"_qt_s + QString::number(i)};
         ctx.tracker = nullptr;
-        validateNode(ctx, ctx.schema.nodeAt(node.prefixItems[i]), arr[static_cast<int>(i)], itemPath, itemSchemaPath);
+        validateNode(
+            ctx, ctx.schema.nodeAt(node.prefixItems[static_cast<std::size_t>(i)]), arr[i], itemPath, itemSchemaPath);
         ctx.tracker = parentTracker;
         if (ctx.tracker)
             ctx.tracker->items.insert(static_cast<int>(i));
@@ -190,4 +191,4 @@ inline void validateUnevaluatedItems(ValidateContext&    ctx,
     }
 }
 
-} // namespace json_query::json_schema::internal
+} // namespace json_query::inline JSON_QUERY_ABI_NS::json_schema::internal

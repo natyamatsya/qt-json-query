@@ -32,7 +32,13 @@ A modern C++23 library providing [JSON Pointer (RFC 6901)](https://www.rfc-edito
 | Dependency | CMake Option | Purpose |
 |---|---|---|
 | **SRELL** | `JSON_QUERY_FORMAT_ECMA_REGEX=ON` | ECMA-262 regex for `pattern` + `regex` format |
-| **libidn2** | `JSON_QUERY_FORMAT_IDN=ON` | IDN hostname/email validation |
+| **ada-url/idna** | `JSON_QUERY_FORMAT_IDN=ON` | IDN hostname/email validation (UTS #46, Apache-2.0/MIT, fetched) |
+| **libidn2** | `JSON_QUERY_FORMAT_IDN=ON` + `JSON_QUERY_IDN_BACKEND=libidn2` | Fuller IDNA 2008 / RFC 5892 coverage — **LGPL-3.0**, explicit opt-in |
+
+All default dependencies are permissively licensed. Because the library is
+static-only, an LGPL dependency would impose relink obligations on every
+consumer binary, so the LGPL-3.0 libidn2 backend is never selected by
+default — consumers must opt in via `JSON_QUERY_IDN_BACKEND=libidn2`.
 
 ## Building
 
