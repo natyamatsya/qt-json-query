@@ -190,6 +190,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
+      # install(SBOM) is a CMake 4.3 experimental feature (the opt-in UUID in
+      # CMakeLists.txt is specific to the 4.3 series); the image ships an
+      # older CMake, so install 4.3 for this job.
+      - name: Install CMake 4.3 (for experimental install(SBOM))
+        run: |
+          curl -fsSL https://github.com/Kitware/CMake/releases/download/v4.3.4/cmake-4.3.4-linux-x86_64.tar.gz \
+            | sudo tar -xz --strip-components=1 -C /usr/local
+          cmake --version
+
       # Ninja is preinstalled on all GitHub-hosted images (ubuntu, macOS,
       # Windows); no setup action needed.
       - name: Install Qt 6
@@ -208,9 +217,27 @@ jobs:
                 -DBUILD_BENCHMARKING=OFF \
                 -DJSON_QUERY_BUILD_EXAMPLES=OFF \
                 -DJSON_QUERY_BUILD_PERF=OFF \
-                -DJSON_QUERY_ENABLE_INSTALL=ON
+                -DJSON_QUERY_ENABLE_INSTALL=ON \
+                -DJSON_QUERY_ENABLE_SBOM=ON
           cmake --build build --parallel
           cmake --install build --prefix "$GITHUB_WORKSPACE/prefix"
+
+      - name: Verify SBOM was installed
+        run: |
+          sbom=$(find "$GITHUB_WORKSPACE/prefix" -iname '*.spdx*' -o -iname '*sbom*' | head -n1)
+          if [ -z "$sbom" ]; then
+            echo "::error::no SPDX SBOM found in the install prefix"
+            find "$GITHUB_WORKSPACE/prefix" -type f | sort
+            exit 1
+          fi
+          echo "SBOM: $sbom"
+          python3 -m json.tool "$sbom" > /dev/null && echo "SBOM is valid JSON"
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v7
+        with:
+          name: sbom
+          path: prefix/**/*.spdx*
 
       - name: Build and run find_package consumer
         run: |
