@@ -139,18 +139,25 @@ documents.
 ## M3 — Hardening & polish (ongoing)
 
 - [ ] Widen CI: LLVM-clang leg, a second Qt version, Debug builds, coverage.
-- [ ] `ArrayPool` global mutex serializes concurrent evaluation — measure and
-      consider per-thread pools.
-- [ ] `JSONPointer::create`/`evaluate` are `noexcept` but allocate
-      (terminate on OOM) — drop `noexcept` or make allocation-free.
-- [ ] Remove dead throwing code (`ArenaAllocator` is unreferenced) and the
-      `utils::to_sv()` thread-local dangling-view trap from public headers.
-- [ ] Repo hygiene: merge `doc/` and `docs/` (ADRs split across both), delete
-      stale `src/Plan.md`, decide fate of `refactoring/` tooling.
-- [ ] Toolchain files: remove hardcoded Homebrew rpath workaround
-      (`llvm-clang.cmake`) once libc++ mismatch is resolved; fix
-      `apple-clang.cmake` hardcoded `x86_64`; never use these for
-      distributable builds.
+- [x] `ArrayPool`: *resolved 2026-07-03* — converted to lock-free
+      `thread_local` pools; measured 4.6x faster 8-thread evaluation (the
+      global mutex had produced negative scaling).
+- [x] `noexcept`-on-allocating-paths: *resolved 2026-07-03 as policy, not
+      defect* — the library never throws (errors via `std::expected`);
+      `noexcept` documents that OOM is fatal (`std::terminate`), matching Qt.
+      Policy documented on both `create()` factories; `JSONPath::create` is
+      now also `noexcept` for consistency.
+- [x] Dead code / header traps: *resolved 2026-07-03* — `ArenaAllocator`
+      deleted (unreferenced), `to_sv()` lifetime warning strengthened (no
+      longer reachable from the public umbrella since the pimpl).
+- [x] Repo hygiene: *resolved 2026-07-03* — `docs/adr` merged into
+      `doc/adr` (renumbered 006), stale `src/Plan.md` deleted earlier,
+      `refactoring/` tooling kept (opt-in via `WITH_REFACTORING_TOOLS`),
+      broken `memory_optimization_test` perf tool deleted.
+- [x] Toolchain files: *resolved 2026-07-03* — `apple-clang.cmake` now uses
+      the host architecture; the `llvm-clang.cmake` rpath workaround stays
+      (it is what makes macOS fuzzing link, documented in `tests/README.md`)
+      with the standing rule: never use these toolchains for distributables.
 
 ---
 

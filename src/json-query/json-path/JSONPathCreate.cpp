@@ -12,7 +12,7 @@
 namespace json_query::inline JSON_QUERY_ABI_NS::json_path
 {
 
-JSONPath::ParseResult JSONPath::create(QStringView rawPath)
+JSONPath::ParseResult JSONPath::create(QStringView rawPath) noexcept
 {
     auto compileResult{compile(rawPath)};
     if (!compileResult)

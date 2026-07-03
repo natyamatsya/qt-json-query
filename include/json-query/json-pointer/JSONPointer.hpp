@@ -7,19 +7,15 @@
 #include <QStringView>
 
 #include <expected>
-#include <memory>
+#include <vector>
 
+#include "json-query/json-pointer/JSONPointerParsing.hpp"
 #include "json-query/utils/JSONError.hpp"
 
 #include "json-query/config/AbiNamespace.hpp"
 
 namespace json_query::inline JSON_QUERY_ABI_NS::json_pointer
 {
-
-namespace detail
-{
-struct JSONPointerImpl; // compiled token list — internal
-}
 
 /**
  * @brief Compiled RFC 6901 JSON Pointer.
@@ -40,6 +36,11 @@ class JSONPointer
      * @brief Compile a JSON Pointer (e.g. "/foo/0/bar"; "" addresses the root).
      * @return The compiled pointer, or an Error with
      *         ErrorDomain::PointerParse on invalid RFC 6901 syntax.
+     *
+     * Exception policy: the library never throws — all recoverable errors are
+     * reported via std::expected. noexcept is therefore a statement that
+     * memory exhaustion (the only conceivable throw, from the allocator) is
+     * treated as fatal (std::terminate), matching Qt's own behavior.
      */
     static ParseResult create(QStringView pointer) noexcept;
 
@@ -58,19 +59,14 @@ class JSONPointer
     /// The pointer in its original RFC 6901 string form.
     [[nodiscard]] QString to_string() const;
 
-    //  Moves are cheap; copies clone the compiled state (defined in .cpp,
-    //  where the pimpl is a complete type)
-    JSONPointer(JSONPointer&&) noexcept;
-    JSONPointer(const JSONPointer&);
-    JSONPointer& operator=(JSONPointer&&) noexcept;
-    JSONPointer& operator=(const JSONPointer&);
-    ~JSONPointer();
-
   private:
-    // Private pimpl ctor — used only by the factory
-    explicit JSONPointer(std::unique_ptr<const detail::JSONPointerImpl> impl) noexcept;
+    // No pimpl here on purpose: Token is first-party (no third-party headers
+    // leak into the public surface), and an inline member keeps create()
+    // free of the extra pimpl allocation. JSONPath, whose compile machinery
+    // would drag CTRE into consumer TUs, is pimpl'd instead.
+    JSONPointer() = default; // internal default ctor for factory
 
-    std::unique_ptr<const detail::JSONPointerImpl> m_impl;
+    std::vector<Token> m_tokens;
 };
 
 } // namespace json_query::json_pointer

@@ -5,12 +5,10 @@
 #include "json-query/utils/JSONError.hpp"
 #include "json-query/json-pointer/JSONPointerParsing.hpp"
 #include "json-query/json-pointer/JSONPointerEvaluation.hpp"
-#include "json-query/json-pointer/internal/JSONPointerImpl.hpp"
 
 #include <charconv> // std::to_chars
 #include <cmath>    // std::log10 (for capacity guess)
 #include <expected>
-#include <memory>
 
 #include "json-query/config/AbiNamespace.hpp"
 
@@ -18,35 +16,14 @@ namespace json_query::inline JSON_QUERY_ABI_NS::json_pointer
 {
 
 // ────────────────────────────────────────────────────────────────────
-//  Pimpl boilerplate
-// ────────────────────────────────────────────────────────────────────
-JSONPointer::JSONPointer(std::unique_ptr<const detail::JSONPointerImpl> impl) noexcept : m_impl(std::move(impl)) {}
-
-JSONPointer::JSONPointer(JSONPointer&&) noexcept            = default;
-JSONPointer& JSONPointer::operator=(JSONPointer&&) noexcept = default;
-
-JSONPointer::JSONPointer(const JSONPointer& other) : m_impl(std::make_unique<detail::JSONPointerImpl>(*other.m_impl))
-{
-}
-
-JSONPointer& JSONPointer::operator=(const JSONPointer& other)
-{
-    if (this != &other)
-        m_impl = std::make_unique<detail::JSONPointerImpl>(*other.m_impl);
-    return *this;
-}
-
-JSONPointer::~JSONPointer() = default;
-
-// ────────────────────────────────────────────────────────────────────
 //  Factory
 // ────────────────────────────────────────────────────────────────────
 JSONPointer::ParseResult JSONPointer::create(QStringView pointer) noexcept
 {
-    auto impl{std::make_unique<detail::JSONPointerImpl>()};
-    if (auto parseResult{json_pointer::detail::parsePointer(pointer, impl->tokens)}; !parseResult)
+    JSONPointer jp;
+    if (auto parseResult{json_pointer::detail::parsePointer(pointer, jp.m_tokens)}; !parseResult)
         return std::unexpected(Error{parseResult.error()});
-    return JSONPointer(std::move(impl));
+    return jp;
 }
 
 // ────────────────────────────────────────────────────────────
@@ -83,17 +60,16 @@ JSONPointer::EvalResult toPublicError(const std::expected<QJsonValue, DetailedEv
 
 JSONPointer::EvalResult JSONPointer::evaluate(const QJsonDocument& doc) const
 {
-    return toPublicError(evaluateDocumentImpl(m_impl->tokens, doc));
+    return toPublicError(evaluateDocumentImpl(m_tokens, doc));
 }
 
 JSONPointer::EvalResult JSONPointer::evaluate(const QJsonValue& value) const
 {
-    return toPublicError(evaluateImpl(m_impl->tokens, value));
+    return toPublicError(evaluateImpl(m_tokens, value));
 }
 
 QString JSONPointer::to_string() const
 {
-    const auto& m_tokens{m_impl->tokens}; // alias to keep encoding code unchanged
     if (m_tokens.empty())
         return {};
 

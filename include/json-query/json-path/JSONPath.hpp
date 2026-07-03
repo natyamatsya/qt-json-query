@@ -49,9 +49,14 @@ class JSONPath
     /**
      * @brief Compile a JSONPath expression (e.g. "$.store.book[?(@.price < 10)]").
      * @return The compiled path, or an Error with ErrorDomain::PathParse on
-     *         invalid RFC 9535 syntax. Never throws.
+     *         invalid RFC 9535 syntax.
+     *
+     * Exception policy: the library never throws — all recoverable errors are
+     * reported via std::expected. noexcept is therefore a statement that
+     * memory exhaustion (the only conceivable throw, from the allocator) is
+     * treated as fatal (std::terminate), matching Qt's own behavior.
      */
-    static ParseResult create(QStringView path);
+    static ParseResult create(QStringView path) noexcept;
 
     // -----------------------------------------------------------------
     //  Evaluation API with error reporting (std::expected)
