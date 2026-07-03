@@ -5,7 +5,6 @@
 #include "JSONPointerParsing.hpp"
 #include "internal/PointerEvalCtx.hpp"
 #include "json-query/utils/JSONError.hpp"
-#include "json-query/utils/SanitizerCompat.hpp"
 
 #include <QJsonValue>
 #include <QJsonObject>
@@ -29,19 +28,16 @@ namespace json_query::json_pointer::detail
 
 [[nodiscard]] inline bool stepArray(QJsonValue& current, qsizetype index) noexcept
 {
-    // Work directly with the original array to avoid the problematic copy constructor.
-    // This is an unexpected interaction between Qt's copy-on-write semantics and sanitizer instrumentation.
-
     if (!current.isArray())
         return false;
 
-    // Get the original array and work with it directly (avoid copy constructor)
-    const QJsonArray originalArray = current.toArray();
-    if (index < 0 || index >= originalArray.size())
+    // Copy-init, not brace-init: QJsonArray{...} would select the
+    // initializer_list constructor and wrap the array (see ADR-001)
+    const QJsonArray arr = current.toArray();
+    if (index < 0 || index >= arr.size())
         return false;
 
-    // Access element directly from original array
-    current = originalArray.at(index);
+    current = arr.at(index);
     return true;
 }
 
@@ -53,10 +49,6 @@ struct DetailedEvalError
 };
 
 // Internal implementation that returns domain-specific errors with token index
-// IMPORTANT: This function is excluded from sanitizer instrumentation due to
-// incompatibility with Qt's copy-on-write semantics under AddressSanitizer.
-// The sanitizer's memory layout changes interfere with QJsonArray/QJsonObject operations,
-// causing functional test failures (not memory safety issues).
 [[nodiscard]] inline std::expected<QJsonValue, DetailedEvalError> evaluatePointerImpl(const std::vector<Token>& tokens,
                                                                                       const QJsonValue& root) noexcept
 {

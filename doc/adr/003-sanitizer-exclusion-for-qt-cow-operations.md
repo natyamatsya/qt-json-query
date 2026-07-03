@@ -1,8 +1,56 @@
 # ADR-003: Sanitizer Exclusion for Qt Copy-on-Write Operations
 
-- **Status:** Accepted
+- **Status:** Superseded (2026-07-03) — see "Re-evaluation" below
 - **Date:** 2026-02-08
 - **Context:** AddressSanitizer test failures in JSON Pointer evaluation
+
+## Re-evaluation (2026-07-03)
+
+The sanitizer exclusion described below is **no longer present and no longer
+needed**. Verification on the current codebase (AppleClang, Qt 6.8.3, Debug,
+`-fsanitize=address,undefined -fno-omit-frame-pointer`,
+`ASAN_OPTIONS=detect_stack_use_after_return=1`):
+
+- All suites pass under ASan+UBSan with **zero sanitizer reports and zero
+  functional failures**: core 15/15, internal 74/74, RFC 6901 33/33,
+  RFC 9535 CTS 443/443 (+1 known upstream skip), schema unit 116/116,
+  IETF 2020-12 1932/1994 (the 62 failures are the documented optional
+  regex/IDN format gaps, identical to non-sanitized builds).
+- The `JSON_QUERY_NO_SANITIZE_QT_COMPAT` attribute had already been removed
+  from `evaluatePointerImpl()`/`stepArray()` at some earlier point; only the
+  unused macro (`utils/SanitizerCompat.hpp`), stale comments, and this ADR
+  remained. All three have now been removed.
+
+### Probable true root cause of the original symptom
+
+The documented symptom — `/foo/0` returning `[["bar","baz"]]` (the entire
+array wrapped in an outer array) instead of `["bar"]` — is byte-for-byte what
+**brace initialization of `QJsonArray`** produces:
+
+```cpp
+const QJsonArray arr{current.toArray()}; // WRONG: initializer_list ctor
+                                         // → array CONTAINING the array
+const QJsonArray arr = current.toArray(); // correct copy
+```
+
+`QJsonArray`'s `std::initializer_list<QJsonValue>` constructor wins overload
+resolution in list-initialization because `QJsonArray` converts to
+`QJsonValue` — exactly the footgun documented in ADR-001 ("no brace init for
+Qt JSON containers"). During the 2026-07-03 re-verification this was
+accidentally reintroduced in `stepArray()` and reproduced the identical
+"wrapped array" failures in a **plain Release build with no sanitizer
+involved** — demonstrating the symptom never required ASan. The historical
+correlation with ASan builds was coincidental (different code state or build
+configuration), not causal: ASan does not alter the results of correct code.
+
+If a wrong-result symptom ever reappears — under a sanitizer or otherwise —
+check for Qt container brace-init first, and treat any genuinely
+ASan-dependent behavior change as a real memory bug to root-cause. Do not
+re-suppress instrumentation.
+
+---
+
+*Original ADR text below, retained for the historical record.*
 
 ## Problem
 
