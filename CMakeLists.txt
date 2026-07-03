@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.24)
 
 project(
   json_query
-  VERSION 0.2
+  VERSION 0.3.0
   LANGUAGES CXX)
 
 # ---------------------------------------------------------------------------
@@ -254,9 +254,9 @@ endif()
 # ---------------------------------------------------------------------------
 if(JSON_QUERY_ENABLE_INSTALL)
   include(GNUInstallDirs)
-  # json_query itself is added to the export set in src/json-query/CMakeLists.txt
-  install(TARGETS ctre_interface function_ref_interface
-          EXPORT json_queryTargets)
+  # json_query itself is added to the export set in src/json-query/CMakeLists.txt.
+  # CTRE/function_ref are PRIVATE build dependencies (not part of the public
+  # header surface since the pimpl) and are deliberately NOT exported.
   install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
   # Export for downstream find_package(json_query)
@@ -265,6 +265,29 @@ if(JSON_QUERY_ENABLE_INSTALL)
     FILE json_queryTargets.cmake
     NAMESPACE json_query::
     DESTINATION ${CMAKE_INSTALL_DATADIR}/json_query/cmake)
+
+  # Package config + version file so find_package(json_query) works
+  include(CMakePackageConfigHelpers)
+  configure_package_config_file(
+    cmake/json_queryConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/json_queryConfig.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_DATADIR}/json_query/cmake)
+  # Pre-1.0: minor versions may break API, so compatibility is SameMinorVersion
+  write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/json_queryConfigVersion.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMinorVersion)
+  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/json_queryConfig.cmake
+                ${CMAKE_CURRENT_BINARY_DIR}/json_queryConfigVersion.cmake
+          DESTINATION ${CMAKE_INSTALL_DATADIR}/json_query/cmake)
+
+  if(JSON_QUERY_FORMAT_IDN AND JSON_QUERY_IDN_BACKEND STREQUAL "ada")
+    message(
+      WARNING
+        "JSON_QUERY_ENABLE_INSTALL with the fetched 'ada' IDN backend is not "
+        "supported (the ada-idna target is not exported); use the libidn2 "
+        "backend for installed builds.")
+  endif()
 
   # -------------------------------------------------------------------------
   # SBOM generation (optional; SPDX 3.0.1 JSON-LD via CMake's native

@@ -158,3 +158,42 @@ jobs:
           ASAN_OPTIONS: detect_stack_use_after_return=1:strict_string_checks=1
           UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
         run: ctest --output-on-failure
+
+  # ---------------------------------------------------------------------------
+  # Install + find_package consumer smoke test
+  # ---------------------------------------------------------------------------
+  install-package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v4
+
+      - name: Install Qt 6
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: 6.8.3
+          cache: true
+          archives: "qtbase"
+          arch: linux_gcc_64
+
+      - name: Configure, build, install
+        run: |
+          cmake -S . -B build -G Ninja \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DBUILD_TESTING=OFF \
+                -DBUILD_BENCHMARKING=OFF \
+                -DJSON_QUERY_BUILD_EXAMPLES=OFF \
+                -DJSON_QUERY_BUILD_PERF=OFF \
+                -DJSON_QUERY_ENABLE_INSTALL=ON
+          cmake --build build --parallel
+          cmake --install build --prefix "$GITHUB_WORKSPACE/prefix"
+
+      - name: Build and run find_package consumer
+        run: |
+          cmake -S tests/consumer-smoke -B consumer-build -G Ninja \
+                -DCMAKE_PREFIX_PATH="$GITHUB_WORKSPACE/prefix"
+          cmake --build consumer-build
+          ./consumer-build/consumer_smoke
