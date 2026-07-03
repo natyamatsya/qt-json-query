@@ -611,9 +611,7 @@ struct Token
     template <FilterConcept Filter>
     void embedFilter(Filter&& filter)
     {
-        qDebug() << "DEBUG: embedFilter called for token key:" << key;
         embeddedFilter = EmbeddedFilter(std::forward<Filter>(filter));
-        qDebug() << "DEBUG: embedFilter completed, embeddedFilter is now:" << (embeddedFilter ? "set" : "null");
     }
 
     /**
@@ -633,20 +631,7 @@ struct Token
      */
     [[nodiscard]] bool evaluateEmbeddedFilter(const QJsonValue& value) const
     {
-        qDebug() << "DEBUG: evaluateEmbeddedFilter called for token key:" << key
-                 << "embeddedFilter:" << (embeddedFilter ? "set" : "null");
-        qDebug() << "DEBUG: evaluateEmbeddedFilter value passed:" << value << "type:" << value.type();
-        if (embeddedFilter)
-        {
-            bool result = embeddedFilter->evaluate(value);
-            qDebug() << "DEBUG: evaluateEmbeddedFilter result:" << result;
-            return result;
-        }
-        else
-        {
-            qDebug() << "DEBUG: evaluateEmbeddedFilter returning false (no embeddedFilter)";
-            return false;
-        }
+        return embeddedFilter ? embeddedFilter->evaluate(value) : false;
     }
 
     /**

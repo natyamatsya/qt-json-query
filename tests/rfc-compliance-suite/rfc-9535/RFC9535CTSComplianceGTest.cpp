@@ -189,15 +189,11 @@ TEST_P(CtsJsonPathTest, EvaluatesPerSpec)
         FAIL() << "CTS document for test '" << tc.name.toStdString() << "' is not object/array";
 
     // Compile selector
-    qDebug() << "DEBUG: About to compile selector:" << tc.selector;
     auto maybePath{JSONPath::create(tc.selector)};
-    qDebug() << "DEBUG: JSONPath::create result:" << maybePath.has_value();
     ASSERT_TRUE(maybePath.has_value()) << "Failed to compile: " << tc.selector.toStdString();
 
     const JSONPath& path = *maybePath;
-    qDebug() << "DEBUG: About to evaluate with document";
     auto result{path.evaluateSingle(doc)};
-    qDebug() << "DEBUG: Evaluation result has_value:" << result.has_value();
     if (!result.has_value())
     {
         std::cout << "Evaluation error for " << tc.selector.toStdString() << ": " << to_std_sv(result.error())
