@@ -1,21 +1,23 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT
 
 #pragma once
-#include <QJsonValue>
-#include <optional>
-#include <expected>
-
 #include <QJsonDocument>
-#include <QJsonObject>
-#include <QJsonArray>
-#include "json-query/json-pointer/JSONPointerParsing.hpp"
-#include "json-query/json-pointer/JSONPointerEvaluation.hpp"
-#include "json-query/utils/JSONError.hpp"
+#include <QJsonValue>
+#include <QString>
+#include <QStringView>
 
-#include <vector>
+#include <expected>
+#include <memory>
+
+#include "json-query/utils/JSONError.hpp"
 
 namespace json_query::json_pointer
 {
+
+namespace detail
+{
+struct JSONPointerImpl; // compiled token list — internal
+}
 
 /**
  * @brief Compiled RFC 6901 JSON Pointer.
@@ -54,10 +56,19 @@ class JSONPointer
     /// The pointer in its original RFC 6901 string form.
     [[nodiscard]] QString to_string() const;
 
-  private:
-    JSONPointer() = default; // internal default ctor for factory
+    //  Moves are cheap; copies clone the compiled state (defined in .cpp,
+    //  where the pimpl is a complete type)
+    JSONPointer(JSONPointer&&) noexcept;
+    JSONPointer(const JSONPointer&);
+    JSONPointer& operator=(JSONPointer&&) noexcept;
+    JSONPointer& operator=(const JSONPointer&);
+    ~JSONPointer();
 
-    std::vector<Token> m_tokens;
+  private:
+    // Private pimpl ctor — used only by the factory
+    explicit JSONPointer(std::unique_ptr<const detail::JSONPointerImpl> impl) noexcept;
+
+    std::unique_ptr<const detail::JSONPointerImpl> m_impl;
 };
 
 } // namespace json_query::json_pointer

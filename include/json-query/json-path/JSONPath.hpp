@@ -5,33 +5,27 @@
 // ────────────────────────────── Qt
 #include <QJsonDocument>
 #include <QJsonValue>
-#include <QJsonObject>
 #include <QJsonArray>
+#include <QString>
 #include <QStringView>
-#include <QVector>
-#include <vector>
 
 // ────────────────────────────── STL / C++23
 #include <expected>
-#include <functional>
-#include <optional>
-#include <variant>
-#include <cstdint>
+#include <memory>
 
 // ────────────────────────────── Project
-#include "JSONPathCompile.hpp"
-#include "json-query/json-path/JSONPathEvaluate.hpp"
-#include "json-query/json-path/JSONPathOption.hpp"
-#include "json-query/json-path/JSONPathHelpers.hpp"
-#include "json-query/utils/JSONQueryUtils.hpp"
 #include "json-query/utils/JSONError.hpp"
-#include "json-query/json-pointer/JSONPointer.hpp"
 
 // ======================================================================
 //  JSONPath
 // ======================================================================
 namespace json_query::json_path
 {
+
+namespace detail
+{
+struct JSONPathImpl; // compiled state (tokens, filters) — internal
+}
 
 /**
  * @brief Compiled RFC 9535 JSONPath query.
@@ -101,33 +95,22 @@ class JSONPath
     // -----------------------------------------------------------------
     //  Other
     // -----------------------------------------------------------------
-    [[nodiscard]] QString to_string() const { return m_originalPath; }
+    /// The path in its original RFC 9535 string form.
+    [[nodiscard]] QString to_string() const;
 
-    //  Move / copy remain defaulted
-    JSONPath(JSONPath&&) noexcept            = default;
-    JSONPath(const JSONPath&)                = default;
-    JSONPath& operator=(JSONPath&&) noexcept = default;
-    JSONPath& operator=(const JSONPath&)     = default;
+    //  Moves are cheap; copies clone the compiled state (defined in .cpp,
+    //  where the pimpl is a complete type)
+    JSONPath(JSONPath&&) noexcept;
+    JSONPath(const JSONPath&);
+    JSONPath& operator=(JSONPath&&) noexcept;
+    JSONPath& operator=(const JSONPath&);
+    ~JSONPath();
 
   private:
-    // -----------------------------------------------------------------
-    //  Private "data" ctor – used only by factory                     ★
-    // -----------------------------------------------------------------
-    JSONPath(json_query::json_path::FunctionType       func,
-             QString                                   original,
-             std::vector<json_query::json_path::Token> tokens,
-             bool                                      definite) noexcept
-        : m_func(func), m_originalPath(std::move(original)), m_tokens(std::move(tokens)), m_definite(definite)
-    {
-    }
+    // Private pimpl ctor — used only by the factory
+    explicit JSONPath(std::unique_ptr<const detail::JSONPathImpl> impl) noexcept;
 
-    // -----------------------------------------------------------------
-    //  Data members
-    // -----------------------------------------------------------------
-    json_query::json_path::FunctionType       m_func{json_query::json_path::FunctionType::None};
-    QString                                   m_originalPath;
-    std::vector<json_query::json_path::Token> m_tokens;
-    bool                                      m_definite{false};
+    std::unique_ptr<const detail::JSONPathImpl> m_impl;
 }; // end class JSONPath
 
 } // namespace json_query::json_path

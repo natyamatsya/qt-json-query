@@ -3,6 +3,7 @@
 #include "json-query/json-path/JSONPath.hpp"
 #include "json-query/json-path/JSONPathEvaluate.hpp"
 #include "json-query/json-path/JSONPathEvalHelpers.hpp"
+#include "json-query/json-path/internal/JSONPathImpl.hpp"
 #include "json-query/utils/BraceSafe.hpp"
 #include "json-query/utils/JSONError.hpp"
 
@@ -10,6 +11,28 @@ namespace json_query::json_path
 {
 
 using detail::normalizeIndex;
+
+// ─────────────────────────────────────────────────────────────────────
+//  Pimpl boilerplate
+// ─────────────────────────────────────────────────────────────────────
+
+JSONPath::JSONPath(std::unique_ptr<const detail::JSONPathImpl> impl) noexcept : m_impl(std::move(impl)) {}
+
+JSONPath::JSONPath(JSONPath&&) noexcept            = default;
+JSONPath& JSONPath::operator=(JSONPath&&) noexcept = default;
+
+JSONPath::JSONPath(const JSONPath& other) : m_impl(std::make_unique<detail::JSONPathImpl>(*other.m_impl)) {}
+
+JSONPath& JSONPath::operator=(const JSONPath& other)
+{
+    if (this != &other)
+        m_impl = std::make_unique<detail::JSONPathImpl>(*other.m_impl);
+    return *this;
+}
+
+JSONPath::~JSONPath() = default;
+
+QString JSONPath::to_string() const { return m_impl->originalPath; }
 
 // ─────────────────────────────────────────────────────────────────────
 //  Definite path inline evaluation — bypasses entire pipeline
@@ -57,17 +80,18 @@ JSONPath::EvalResult JSONPath::evaluateSingle(const QJsonDocument& doc) const
 
 JSONPath::EvalResult JSONPath::evaluateSingle(const QJsonValue& value) const
 {
-    if (m_definite && m_func == FunctionType::None)
+    const auto& d{*m_impl};
+    if (d.definite && d.func == FunctionType::None)
     {
-        if (m_tokens.size() <= 1)
+        if (d.tokens.size() <= 1)
             return value;
-        auto result{evaluateDefiniteValue(m_tokens, value)};
+        auto result{evaluateDefiniteValue(d.tokens, value)};
         if (result.isUndefined())
             return QJsonValue{QJsonArray{}};
         return result;
     }
 
-    json_path::detail::PathEvalCtx ctx{m_tokens, value, m_func};
+    json_path::detail::PathEvalCtx ctx{d.tokens, value, d.func};
 
     return json_path::detail::evaluateSingle(ctx, value)
         .or_else([](const json_path::detail::DetailedEvalError& e) -> EvalResult
@@ -94,15 +118,16 @@ static QJsonArray& reusableSingleElementArray()
 
 JSONPath::EvalArrayResult JSONPath::evaluate(const QJsonValue& value) const
 {
-    if (m_definite && m_func == FunctionType::None)
+    const auto& d{*m_impl};
+    if (d.definite && d.func == FunctionType::None)
     {
-        if (m_tokens.size() <= 1)
+        if (d.tokens.size() <= 1)
         {
             auto& arr{reusableSingleElementArray()};
             arr[0] = value;
             return arr;
         }
-        auto result{evaluateDefiniteValue(m_tokens, value)};
+        auto result{evaluateDefiniteValue(d.tokens, value)};
         if (result.isUndefined())
             return QJsonArray{};
         auto& arr{reusableSingleElementArray()};
@@ -110,7 +135,7 @@ JSONPath::EvalArrayResult JSONPath::evaluate(const QJsonValue& value) const
         return arr;
     }
 
-    json_path::detail::PathEvalCtx ctx{m_tokens, value, m_func};
+    json_path::detail::PathEvalCtx ctx{d.tokens, value, d.func};
 
     return json_path::detail::evaluate(ctx, value)
         .or_else([](const json_path::detail::DetailedEvalError& e) -> EvalArrayResult

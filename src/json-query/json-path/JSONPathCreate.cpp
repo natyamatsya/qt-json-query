@@ -2,7 +2,10 @@
 
 #include "json-query/json-path/JSONPath.hpp"
 #include "json-query/json-path/JSONPathCompile.hpp"
+#include "json-query/json-path/internal/JSONPathImpl.hpp"
 #include "json-query/utils/JSONError.hpp"
+
+#include <memory>
 
 namespace json_query::json_path
 {
@@ -32,7 +35,12 @@ JSONPath::ParseResult JSONPath::create(QStringView rawPath)
                             return true;
                         }()};
 
-    return JSONPath(compileResult->function, rawPath.toString(), std::move(tokens), definite);
+    auto impl{std::make_unique<detail::JSONPathImpl>()};
+    impl->func         = compileResult->function;
+    impl->originalPath = rawPath.toString();
+    impl->tokens       = std::move(tokens);
+    impl->definite     = definite;
+    return JSONPath(std::move(impl));
 }
 
 } // namespace json_query::json_path
