@@ -4,11 +4,12 @@ Tracks the path from "pre-1.0, refactor freely" to production use, starting with
 low-risk use cases in desktop applications. Based on the production-readiness
 review of 2026-07-03.
 
-**Adoption posture until v1.0:** consume as pinned source only
-(`add_subdirectory` / FetchContent at a fixed commit). `find_package` install
-flow is not usable yet (see M2). First production use cases: JSON Schema
-validation of trusted app/config JSON, and JSONPointer/JSONPath extraction from
-app-internal documents.
+**Adoption posture until v1.0:** consume as pinned source
+(`add_subdirectory` / FetchContent at a fixed tag) or as an installed package
+via `find_package(json_query)` (working since 0.3.0). API may still break
+between minor versions. First production use cases: JSON Schema validation of
+trusted app/config JSON, and JSONPointer/JSONPath extraction from app-internal
+documents.
 
 ---
 
@@ -79,11 +80,11 @@ app-internal documents.
       `ParseError::UnresolvedReference`). Note: the convenience `create()`
       overloads force `FormatValidation::Assertion` while `SchemaOptions{}`
       defaults to `Auto` — documented in the header; align at v1.0.
-- [ ] **Specify JSONPath result semantics in headers.**
-      `evaluate`/`evaluateSingle` have no doc comments; `evaluateSingle`
-      returns an empty-array `QJsonValue` sentinel for missing definite nodes
-      (`JSONPath.cpp`). Define and document found-null vs. not-found; consider
-      returning an error or `std::nullopt`-like signal instead of a sentinel.
+- [x] **Specify JSONPath result semantics in headers.** *Resolved 2026-07-03:*
+      `evaluate`/`evaluateSingle` and JSONPointer methods carry full doc
+      comments (nodelist semantics, squash rules and their ambiguity,
+      missing-node behavior, thread-safety). Replacing the empty-array
+      sentinel with a distinct signal remains a candidate API change for v1.0.
 - [x] **Error-code stability policy.** *Resolved 2026-07-03 by ADR-004:*
       numeric error values are declared NOT part of the API (enumerators stay
       freely sortable); consumers must branch on enumerators, never persist
@@ -111,27 +112,29 @@ app-internal documents.
       export set. Also fixed a duplicate-export bug (`json_query` was added
       to the export set twice). The experimental UUID is pinned for the
       CMake 4.3 series; revisit when the feature stabilizes.
-- [ ] **Working install/export.** Wire `configure_package_config_file()` +
-      `write_basic_package_version_file()` (`cmake/cmake.config.in` is
-      currently orphaned and stale — wrong targets file name, missing
-      `Qt6::Network` dependency). CI must exercise
-      `JSON_QUERY_ENABLE_INSTALL=ON` + a `find_package` consumer smoke test.
-- [ ] **Fix installed-header dependencies.** Public headers include
-      `<ctre.hpp>` / `<tl/function_ref.hpp>` but the deps are BUILD_INTERFACE
-      only and never installed — installed headers cannot compile. Either
-      remove third-party includes from public headers (preferred; CTRE usage
-      in `JSONQueryUtils.hpp` / `JSONPathFilterComparison.hpp`) or install and
-      export the dependencies properly.
-- [ ] **Shrink the public surface / ABI.** `JSONPath`/`JSONPointer` expose
-      concrete members and `Token`/filter internals via `JSONPathCompile.hpp`
-      in public headers (unlike the pimpl'd `JSONSchema`). Move internals out
-      of the public include tree; consider pimpl for JSONPath.
-- [ ] **Symbol visibility / shared-lib story.** No export macros,
-      no `CMAKE_CXX_VISIBILITY_PRESET`; shared builds are broken on Windows.
-      Either declare static-only officially or add `generate_export_header`.
-- [ ] **Versioning & releases.** Tag releases, add CHANGELOG, SOVERSION,
-      and an API-stability statement (supersede the AGENTS.md "refactor
-      freely" note when v1.0 is cut).
+- [x] **Working install/export.** *Resolved 2026-07-03 (0.3.0):* generated
+      `json_queryConfig.cmake` (+version file, SameMinorVersion) with
+      `find_dependency(Qt6 Core Network)` and conditional libidn2 handling;
+      stale `cmake.config.in` deleted. `tests/consumer-smoke/` builds and
+      runs against an installed prefix in the new `install-package` CI job.
+- [x] **Fix installed-header dependencies.** *Resolved 2026-07-03 (0.3.0):*
+      after the pimpl, no header reachable from the public umbrella includes
+      any third-party header (verified by include-closure scan: 6 headers,
+      zero third-party). CTRE/function_ref/SRELL are PRIVATE build deps,
+      excluded from the export via `$<BUILD_INTERFACE:...>`.
+- [x] **Shrink the public surface / ABI.** *Resolved 2026-07-03 (0.3.0):*
+      `JSONPath`/`JSONPointer` are pimpl'd (`std::unique_ptr<const Impl>`);
+      the umbrella's include closure shrank to 6 first-party headers.
+      Benchmarked: evaluation unchanged (±0%), `create()` +7–9% (one
+      allocation), copies clone the compiled state (pre-pimpl semantics).
+- [x] **Symbol visibility / shared-lib story.** *Resolved 2026-07-03
+      (0.3.0):* declared static-only officially (`add_library(json_query
+      STATIC ...)`, documented in README); export-macro machinery deferred
+      to v1.0 if shared builds are ever wanted.
+- [x] **Versioning & releases.** *Resolved 2026-07-03:* version 0.3.0,
+      `CHANGELOG.md` added, `v0.3.0` tag; version file enforces
+      SameMinorVersion compatibility (pre-1.0 semantics). SOVERSION is moot
+      (static-only). The AGENTS.md "refactor freely" note stands until v1.0.
 
 ## M3 — Hardening & polish (ongoing)
 

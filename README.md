@@ -49,10 +49,24 @@ See [`tests/README.md`](tests/README.md) for the full list of test targets and C
 
 ## Integration
 
+As a subdirectory (FetchContent or git submodule):
+
 ```cmake
 add_subdirectory(path/to/qt-json-query)
 target_link_libraries(your_target PRIVATE json_query)
 ```
+
+Or installed, via `find_package`:
+
+```cmake
+find_package(json_query 0.3 REQUIRED)
+target_link_libraries(your_target PRIVATE json_query::json_query)
+```
+
+(install with `-DJSON_QUERY_ENABLE_INSTALL=ON` + `cmake --install`; see
+`tests/consumer-smoke/` for a minimal consumer). The library is built as a
+static library only — shared builds are unsupported until a symbol-visibility
+story exists (planned for v1.0).
 
 ### Dependency resolution (vcpkg-friendly)
 

@@ -1,0 +1,53 @@
+# Changelog
+
+Pre-1.0: minor versions may contain breaking changes (see `ROADMAP.md`).
+
+## 0.3.0 — 2026-07-03
+
+First tagged release, following the production-readiness hardening pass.
+
+### Fixed
+- **RFC 9535 violation:** recursive descent (`$..`) no longer drops
+  equal-valued containers at distinct locations (removed value-based dedup);
+  also removed the arbitrary `$..` limits that failed on nodes with more
+  than 100 children (`TooComplex`).
+- **Crash:** unproductive `$ref` cycles (e.g. `{"$ref": "#"}`) no longer
+  stack-overflow validation; they report `EvalError::RefCycleDetected`.
+- **Data race:** concurrent `JSONPath::create()` is now safe (atomic
+  bracket-group counter).
+- Removed leftover uncategorized `qDebug()` output that fired from consumer
+  translation units.
+- `install(EXPORT)` no longer adds `json_query` to the export set twice.
+
+### Added
+- Working `find_package(json_query)` flow: generated package config +
+  version file, consumer smoke test in CI (`tests/consumer-smoke/`).
+- `SchemaOptions::unresolvedRefPolicy` (`AcceptAll` default / `Fail`).
+- SPDX 3.0.1 SBOM generation via CMake ≥ 4.3 `install(SBOM)`
+  (`JSON_QUERY_ENABLE_SBOM`).
+- `JSON_QUERY_ENABLE_SANITIZERS` option and an ASan+UBSan CI job.
+- `fuzz_jsonschema` LibFuzzer target and schema seed corpus.
+- Machine-readable known-failure (xfail) table for the IETF compliance
+  driver — the suite is green in base config (regressions are visible).
+- `find_package`-first dependency resolution (vcpkg `ctre` /
+  `tl-function-ref` ports win over pinned FetchContent fallbacks).
+
+### Changed
+- **License:** dual `Apache-2.0 WITH LLVM-exception OR MIT` (previously
+  Apache-only).
+- **ABI/API surface:** `JSONPath` and `JSONPointer` are pimpl'd
+  (`std::unique_ptr`); public headers no longer expose tokens/filters or any
+  third-party headers (CTRE/function_ref are now private build
+  dependencies). Copies clone the compiled state; evaluation performance is
+  unchanged, `create()` pays one extra allocation (≈7–9%).
+- The library is explicitly **static-only** (no symbol-visibility story yet).
+- Dependencies pinned: CTRE (commit, v3.10.0+), function_ref `v1.0.0`,
+  SRELL SHA256.
+- Error-code numeric values declared not part of the API (ADR-004).
+- Documented JSONPath/JSONPointer evaluation semantics (nodelist rules,
+  `evaluateSingle` squash ambiguity, thread-safety guarantees).
+
+## 0.2 — 2026-02/03 (untagged)
+
+Initial development snapshots: RFC 6901 / RFC 9535 / JSON Schema 2020-12
+implementation against the official compliance suites.
