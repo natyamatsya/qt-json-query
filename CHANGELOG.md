@@ -2,7 +2,7 @@
 
 Pre-1.0: minor versions may contain breaking changes (see `ROADMAP.md`).
 
-## Unreleased
+## 0.5.0 — 2026-07-03
 
 ### Changed
 - The IDN backend (`JSON_QUERY_IDN_BACKEND`) now defaults to `ada`
@@ -15,28 +15,6 @@ Pre-1.0: minor versions may contain breaking changes (see `ROADMAP.md`).
   ada-idna's leaked `INTERFACE /WX /W3 /sdl` MSVC options are stripped so the
   dependency cannot force warnings-as-errors onto consumers.
 
-### Fixed
-- Warning hygiene: five signed/unsigned comparisons (`qsizetype` vs
-  `std::vector::size()`, MSVC C4018 at /W3) now use `std::ssize`;
-  the schema-registry test asserts every `add()`/`create()` result instead of
-  discarding `[[nodiscard]]` values (MSVC C4834); GoogleTest's own build
-  suppresses clang 21's `-Wcharacter-conversion` alongside the existing
-  `-Wundef`.
-
-### Infrastructure
-- CI is green again: the Linux legs now install the Qt `icu` archive (the
-  Linux Qt binaries link the bundled ICU, which broke every Linux link), the
-  clang leg uses clang 20 (clang < 19 cannot use libstdc++'s C++23
-  `<expected>`), the Test Report workflow downloads the artifact names ci
-  actually uploads, and the benchmark steps run the binary from its real
-  location so benchmark artifacts are no longer silently empty.
-- Actions bumped off deprecated Node 20 runtimes: checkout v7,
-  upload-artifact v7, setup-python v6, gha-setup-ninja v6, dorny/test-reporter
-  v3.
-
-## 0.5.0 — 2026-07-03
-
-### Changed
 - `ArrayPool` is now a lock-free `thread_local` pool (was a mutex-guarded
   global singleton with negative scaling — measured 4.6× faster 8-thread
   concurrent evaluation).
@@ -52,7 +30,27 @@ Pre-1.0: minor versions may contain breaking changes (see `ROADMAP.md`).
 - Dead `ArenaAllocator` (unreferenced) and the broken
   `memory_optimization_test` perf tool (referenced removed APIs).
 
+### Fixed
+- Warning hygiene (all platforms now build warning-free): five
+  signed/unsigned comparisons (`qsizetype` vs `std::vector::size()`, MSVC
+  C4018 at /W3) now use `std::ssize`; the schema-registry test asserts every
+  `add()`/`create()` result instead of discarding `[[nodiscard]]` values
+  (MSVC C4834); the `alignas(32)` `ContainerCursor` is passed by reference
+  to silence gcc's `-Wpsabi` note; GoogleTest's own build suppresses
+  clang 21's `-Wcharacter-conversion` alongside the existing `-Wundef`,
+  probed via `check_cxx_compiler_flag` so AppleClang does not raise
+  `-Wunknown-warning-option`.
+
 ### Infrastructure
+- CI is green again: the Linux legs now install the Qt `icu` archive (the
+  Linux Qt binaries link the bundled ICU, which broke every Linux link), the
+  clang leg uses clang 20 (clang < 19 cannot use libstdc++'s C++23
+  `<expected>`), the Test Report workflow downloads the artifact names ci
+  actually uploads, and the benchmark steps run the binary from its real
+  location so benchmark artifacts are no longer silently empty.
+- Actions bumped off deprecated Node 20 runtimes: checkout v7,
+  upload-artifact v7, setup-python v6, gha-setup-ninja v6, dorny/test-reporter
+  v3.
 - CI: LLVM clang leg on Linux; on-demand (`workflow_dispatch`) fuzz job
   running all four LibFuzzer targets. `docs/adr` merged into `doc/adr`
   (thread-local cache ADR renumbered 006); `apple-clang.cmake` no longer
