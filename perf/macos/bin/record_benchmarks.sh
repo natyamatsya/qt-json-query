@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# record_benchmarks.sh — Run Google Benchmark and update performance_baseline.md
+# record_benchmarks.sh — Run Google Benchmark and archive the results
 #
 # Usage:
 #   ./perf/macos/bin/record_benchmarks.sh [build-dir]
@@ -9,9 +9,16 @@
 #
 # The script:
 #   1. Builds json_benchmark in Release mode (if needed)
-#   2. Runs the benchmark with JSON output
+#   2. Runs the benchmark with the baseline methodology
+#      (5 repetitions, logging disabled, JSON output)
 #   3. Archives the raw JSON to perf/results/
-#   4. Regenerates perf/performance_baseline.md with current + previous comparison
+#   4. Prints the median tables and overhead ratios in the
+#      perf/performance_baseline.md format
+#
+# It deliberately does NOT rewrite performance_baseline.md: since the
+# 2026-07-03 re-baseline that file is a curated dual-platform (Windows +
+# macOS) document. Update its macOS columns from the printed tables and
+# check the surrounding prose still holds.
 
 set -euo pipefail
 
@@ -19,40 +26,10 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 BUILD_DIR="${1:-build-release}"
 RESULTS_DIR="$PROJECT_ROOT/perf/results"
-BASELINE_MD="$PROJECT_ROOT/perf/performance_baseline.md"
 BENCHMARK_BIN="$PROJECT_ROOT/$BUILD_DIR/benchmarks/json_benchmark"
-
-# ── Helpers ──────────────────────────────────────────────────────────────
+REPETITIONS=5
 
 die() { echo "ERROR: $*" >&2; exit 1; }
-
-# Extract a benchmark's real_time from the JSON output (in ns).
-# $1 = JSON file, $2 = benchmark name
-bench_ns() {
-    python3 -c "
-import json, sys
-with open('$1') as f:
-    data = json.load(f)
-for b in data['benchmarks']:
-    if b['name'] == '$2':
-        print(int(b['real_time']))
-        sys.exit(0)
-print('—')
-"
-}
-
-# Format nanoseconds as a human-readable string (ns, µs, or ms).
-fmt_ns() {
-    python3 -c "
-v = $1
-if v >= 1_000_000:
-    print(f'{v/1_000_000:.1f} ms')
-elif v >= 1_000:
-    print(f'{v/1_000:.1f} µs')
-else:
-    print(f'{v} ns')
-"
-}
 
 # ── 1. Build ─────────────────────────────────────────────────────────────
 
@@ -71,325 +48,108 @@ fi
 
 mkdir -p "$RESULTS_DIR"
 
-TIMESTAMP="$(date +%Y-%m-%d_%H%M%S)"
 DATE_HUMAN="$(date +%Y-%m-%d)"
-JSON_OUT="$RESULTS_DIR/benchmark_${TIMESTAMP}.json"
+JSON_OUT="$RESULTS_DIR/benchmark_${DATE_HUMAN}_macos-appleclang.json"
+if [[ -e "$JSON_OUT" ]]; then
+    JSON_OUT="$RESULTS_DIR/benchmark_$(date +%Y-%m-%d_%H%M%S)_macos-appleclang.json"
+fi
 
-echo "Running benchmarks …"
+echo "Running benchmarks ($REPETITIONS repetitions) …"
 QT_LOGGING_RULES="*=false" "$BENCHMARK_BIN" \
     --benchmark_format=json \
     --benchmark_out="$JSON_OUT" \
-    --benchmark_repetitions=1 \
-    2>&1 | grep -v '^$'
+    --benchmark_repetitions="$REPETITIONS" \
+    > /dev/null
 
 echo "Raw results saved to $JSON_OUT"
+echo ""
 
-# ── 3. Detect compiler & system info ────────────────────────────────────
+# ── 3. Report medians in the performance_baseline.md format ────────────
 
-COMPILER=$("${CXX:-c++}" --version 2>&1 | head -1)
-QT_VERSION=$(python3 -c "
-import re, pathlib
-cml = pathlib.Path('$PROJECT_ROOT/$BUILD_DIR/CMakeCache.txt')
-if cml.exists():
-    txt = cml.read_text()
-    # Try Qt6_VERSION:STRING first
-    m = re.search(r'Qt6_VERSION:STRING=(.+)', txt)
-    if not m:
-        # Extract from Qt6_DIR path (e.g., /path/to/qt-6.8.3/6.8.3/macos/...)
-        m = re.search(r'Qt6_DIR:PATH=.*/(\d+\.\d+\.\d+)/', txt)
-    print(m.group(1) if m else 'unknown')
-else:
-    print('unknown')
-")
-ARCH="$(uname -m)"
-OS="$(uname -s)"
+python3 - "$JSON_OUT" << 'EOF'
+import json, sys
 
-# ── 4. Find previous baseline for comparison ────────────────────────────
-
-PREV_JSON=""
-for f in $(ls -t "$RESULTS_DIR"/benchmark_*.json 2>/dev/null); do
-    if [[ "$f" != "$JSON_OUT" ]]; then
-        PREV_JSON="$f"
-        break
-    fi
-done
-
-# ── 5. Generate performance_baseline.md ─────────────────────────────────
-
-BENCHMARKS=(
-    "BM_JSONPointer_Simple"
-    "BM_JSONPointer_Nested"
-    "BM_JSONPointer_Array"
-    "BM_JSONPointer_Complex"
-    "BM_JSONPointer_Creation"
-    "BM_Plain_Simple"
-    "BM_Plain_Nested"
-    "BM_Plain_Array"
-    "BM_Plain_Filter"
-    "BM_Plain_Recursive"
-    "BM_JSONPath_Simple"
-    "BM_JSONPath_Nested"
-    "BM_JSONPath_Array"
-    "BM_JSONPath_Filter"
-    "BM_JSONPath_Recursive"
-    "BM_JSONPath_Creation"
-)
-
-echo "Generating $BASELINE_MD …"
-
-cat > "$BASELINE_MD" << HEADER
-# Performance Baseline
-
-**Date**: $DATE_HUMAN
-**Compiler**: $COMPILER
-**Build**: Release (-O2 -DNDEBUG)
-**Qt**: $QT_VERSION
-**Architecture**: $ARCH ($OS)
-**Logging**: Disabled (QT_LOGGING_RULES="\*=false")
-
-## Benchmark Results
-
-### JSONPointer
-
-| Benchmark | Time | Iterations |$(if [[ -n "$PREV_JSON" ]]; then echo " vs Previous |"; fi)
-|---|---|---|$(if [[ -n "$PREV_JSON" ]]; then echo "---|"; fi)
-HEADER
-
-# Helper to write a section of benchmarks
-write_section() {
-    local prefix="$1"
-    shift
-    for name in "$@"; do
-        local ns
-        ns=$(bench_ns "$JSON_OUT" "$name")
-        if [[ "$ns" == "—" ]]; then continue; fi
-        local time_str
-        time_str=$(fmt_ns "$ns")
-        local iters
-        iters=$(python3 -c "
-import json
-with open('$JSON_OUT') as f:
+with open(sys.argv[1]) as f:
     data = json.load(f)
-for b in data['benchmarks']:
-    if b['name'] == '$name':
-        print(f\"{b['iterations']:,}\")
-        break
-")
-        local short_name="${name#BM_${prefix}_}"
 
-        if [[ -n "$PREV_JSON" ]]; then
-            local prev_ns
-            prev_ns=$(bench_ns "$PREV_JSON" "$name")
-            local delta=""
-            if [[ "$prev_ns" != "—" && "$prev_ns" -gt 0 ]]; then
-                delta=$(python3 -c "
-cur = $ns
-prev = $prev_ns
-pct = ((cur - prev) / prev) * 100
-if abs(pct) < 1:
-    print('~stable')
-elif pct < 0:
-    print(f'**{pct:+.1f}%** faster')
-else:
-    print(f'{pct:+.1f}% slower')
-")
-            fi
-            echo "| $short_name | $time_str | $iters | $delta |" >> "$BASELINE_MD"
-        else
-            echo "| $short_name | $time_str | $iters |" >> "$BASELINE_MD"
-        fi
-    done
-}
+medians = {b['run_name']: b['real_time']
+           for b in data['benchmarks']
+           if b.get('aggregate_name') == 'median'}
 
-write_section "JSONPointer" \
-    "BM_JSONPointer_Simple" \
-    "BM_JSONPointer_Nested" \
-    "BM_JSONPointer_Array" \
-    "BM_JSONPointer_Complex" \
-    "BM_JSONPointer_Creation"
 
-cat >> "$BASELINE_MD" << 'EVAL_PTR_HEADER'
+def fmt(v):
+    if v >= 100_000:
+        return f"{v/1000:.0f} µs"
+    if v >= 1000:
+        return f"{v/1000:.1f} µs"
+    return f"{v:.0f} ns"
 
-### JSONPointer (eval only, pre-compiled)
 
-EVAL_PTR_HEADER
+SECTIONS = [
+    ("JSONPointer (create + eval)", "BM_JSONPointer_", [
+        "Simple", "Nested", "Array", "Complex", "Creation"]),
+    ("JSONPointer (eval only, pre-compiled)", "BM_JSONPointer_Eval_", [
+        "Simple", "Nested", "Array", "Complex"]),
+    ("Plain Qt JSON (manual traversal, reference baseline)", "BM_Plain_", [
+        "Simple", "Nested", "Array", "Filter", "Recursive"]),
+    ("JSONPath (create + eval)", "BM_JSONPath_", [
+        "Simple", "Nested", "Array", "Filter", "Recursive", "Creation"]),
+    ("JSONPath (eval only, pre-compiled)", "BM_JSONPath_Eval_", [
+        "Simple", "Nested", "Array", "Filter", "Recursive"]),
+    ("JSONPath evaluateSingle (eval only, pre-compiled, no QJsonArray)",
+     "BM_JSONPath_EvalSingle_", ["Simple", "Nested", "Array"]),
+]
 
-echo "| Benchmark | Time | Iterations |$(if [[ -n "$PREV_JSON" ]]; then echo " vs Previous |"; fi)" >> "$BASELINE_MD"
-echo "|---|---|---|$(if [[ -n "$PREV_JSON" ]]; then echo "---|"; fi)" >> "$BASELINE_MD"
+missing = []
+for title, prefix, names in SECTIONS:
+    print(f"### {title}\n")
+    print("| Benchmark | Time |")
+    print("|---|---|")
+    for name in names:
+        key = prefix + name
+        if key not in medians:
+            missing.append(key)
+            continue
+        print(f"| {name} | {fmt(medians[key])} |")
+    print()
 
-write_section "JSONPointer_Eval" \
-    "BM_JSONPointer_Eval_Simple" \
-    "BM_JSONPointer_Eval_Nested" \
-    "BM_JSONPointer_Eval_Array" \
-    "BM_JSONPointer_Eval_Complex"
+OVERHEADS = [
+    ("create + eval", "BM_JSONPath_{}",
+     ["Simple", "Nested", "Array", "Filter", "Recursive"]),
+    ("eval only", "BM_JSONPath_Eval_{}",
+     ["Simple", "Nested", "Array", "Filter", "Recursive"]),
+    ("evaluateSingle", "BM_JSONPath_EvalSingle_{}",
+     ["Simple", "Nested", "Array"]),
+]
 
-cat >> "$BASELINE_MD" << 'PLAIN_HEADER'
+for title, pattern, names in OVERHEADS:
+    print(f"## JSONPath vs Plain Qt Overhead ({title})\n")
+    print("| Operation | Plain Qt | JSONPath | Overhead |")
+    print("|---|---|---|---|")
+    for name in names:
+        plain, path = medians.get(f"BM_Plain_{name}"), medians.get(pattern.format(name))
+        if plain is None or path is None:
+            continue
+        print(f"| {name} | {fmt(plain)} | {fmt(path)} | {path/plain:.1f}x |")
+    print()
 
-### Plain Qt JSON (manual traversal, reference baseline)
+# Repetition spread of the plain-Qt controls — a large spread means the
+# machine was busy and the run should be repeated (see the interleaved-run
+# note in perf/performance_baseline.md history).
+print("Control spread across repetitions (re-run if any exceeds ~5%):")
+for name in ["BM_Plain_Simple", "BM_Plain_Nested", "BM_Plain_Array",
+             "BM_Plain_Filter", "BM_Plain_Recursive"]:
+    reps = [b['real_time'] for b in data['benchmarks']
+            if b['run_name'] == name and b.get('run_type') == 'iteration']
+    if reps:
+        spread = (max(reps) / min(reps) - 1) * 100
+        print(f"  {name:24s} {spread:5.1f}%")
 
-PLAIN_HEADER
-
-echo "| Benchmark | Time | Iterations |$(if [[ -n "$PREV_JSON" ]]; then echo " vs Previous |"; fi)" >> "$BASELINE_MD"
-echo "|---|---|---|$(if [[ -n "$PREV_JSON" ]]; then echo "---|"; fi)" >> "$BASELINE_MD"
-
-write_section "Plain" \
-    "BM_Plain_Simple" \
-    "BM_Plain_Nested" \
-    "BM_Plain_Array" \
-    "BM_Plain_Filter" \
-    "BM_Plain_Recursive"
-
-cat >> "$BASELINE_MD" << 'PATH_HEADER'
-
-### JSONPath
-
-PATH_HEADER
-
-echo "| Benchmark | Time | Iterations |$(if [[ -n "$PREV_JSON" ]]; then echo " vs Previous |"; fi)" >> "$BASELINE_MD"
-echo "|---|---|---|$(if [[ -n "$PREV_JSON" ]]; then echo "---|"; fi)" >> "$BASELINE_MD"
-
-write_section "JSONPath" \
-    "BM_JSONPath_Simple" \
-    "BM_JSONPath_Nested" \
-    "BM_JSONPath_Array" \
-    "BM_JSONPath_Filter" \
-    "BM_JSONPath_Recursive" \
-    "BM_JSONPath_Creation"
-
-cat >> "$BASELINE_MD" << 'EVAL_PATH_HEADER'
-
-### JSONPath (eval only, pre-compiled)
-
-EVAL_PATH_HEADER
-
-echo "| Benchmark | Time | Iterations |$(if [[ -n "$PREV_JSON" ]]; then echo " vs Previous |"; fi)" >> "$BASELINE_MD"
-echo "|---|---|---|$(if [[ -n "$PREV_JSON" ]]; then echo "---|"; fi)" >> "$BASELINE_MD"
-
-write_section "JSONPath_Eval" \
-    "BM_JSONPath_Eval_Simple" \
-    "BM_JSONPath_Eval_Nested" \
-    "BM_JSONPath_Eval_Array" \
-    "BM_JSONPath_Eval_Filter" \
-    "BM_JSONPath_Eval_Recursive"
-
-cat >> "$BASELINE_MD" << 'EVAL_SINGLE_HEADER'
-
-### JSONPath evaluateSingle (eval only, pre-compiled, no QJsonArray)
-
-EVAL_SINGLE_HEADER
-
-echo "| Benchmark | Time | Iterations |$(if [[ -n "$PREV_JSON" ]]; then echo " vs Previous |"; fi)" >> "$BASELINE_MD"
-echo "|---|---|---|$(if [[ -n "$PREV_JSON" ]]; then echo "---|"; fi)" >> "$BASELINE_MD"
-
-write_section "JSONPath_EvalSingle" \
-    "BM_JSONPath_EvalSingle_Simple" \
-    "BM_JSONPath_EvalSingle_Nested" \
-    "BM_JSONPath_EvalSingle_Array"
-
-# ── 6. Overhead summary ─────────────────────────────────────────────────
-
-cat >> "$BASELINE_MD" << 'OVERHEAD_HEADER'
-
-## JSONPath vs Plain Qt Overhead (create + eval)
-
-OVERHEAD_HEADER
-
-echo "| Operation | Plain Qt | JSONPath | Overhead |" >> "$BASELINE_MD"
-echo "|---|---|---|---|" >> "$BASELINE_MD"
-
-OVERHEAD_PAIRS=(
-    "Simple:BM_Plain_Simple:BM_JSONPath_Simple"
-    "Nested:BM_Plain_Nested:BM_JSONPath_Nested"
-    "Array:BM_Plain_Array:BM_JSONPath_Array"
-    "Filter:BM_Plain_Filter:BM_JSONPath_Filter"
-    "Recursive:BM_Plain_Recursive:BM_JSONPath_Recursive"
-)
-
-for pair in "${OVERHEAD_PAIRS[@]}"; do
-    IFS=: read -r label plain_name path_name <<< "$pair"
-    local_plain=$(bench_ns "$JSON_OUT" "$plain_name")
-    local_path=$(bench_ns "$JSON_OUT" "$path_name")
-    if [[ "$local_plain" == "—" || "$local_path" == "—" ]]; then continue; fi
-    overhead=$(python3 -c "print(f'{$local_path / $local_plain:.1f}x')")
-    plain_str=$(fmt_ns "$local_plain")
-    path_str=$(fmt_ns "$local_path")
-    echo "| $label | $plain_str | $path_str | ${overhead} |" >> "$BASELINE_MD"
-done
-
-cat >> "$BASELINE_MD" << 'EVAL_OVERHEAD_HEADER'
-
-## JSONPath vs Plain Qt Overhead (eval only)
-
-EVAL_OVERHEAD_HEADER
-
-echo "| Operation | Plain Qt | JSONPath Eval | Overhead |" >> "$BASELINE_MD"
-echo "|---|---|---|---|" >> "$BASELINE_MD"
-
-EVAL_OVERHEAD_PAIRS=(
-    "Simple:BM_Plain_Simple:BM_JSONPath_Eval_Simple"
-    "Nested:BM_Plain_Nested:BM_JSONPath_Eval_Nested"
-    "Array:BM_Plain_Array:BM_JSONPath_Eval_Array"
-    "Filter:BM_Plain_Filter:BM_JSONPath_Eval_Filter"
-    "Recursive:BM_Plain_Recursive:BM_JSONPath_Eval_Recursive"
-)
-
-for pair in "${EVAL_OVERHEAD_PAIRS[@]}"; do
-    IFS=: read -r label plain_name path_name <<< "$pair"
-    local_plain=$(bench_ns "$JSON_OUT" "$plain_name")
-    local_path=$(bench_ns "$JSON_OUT" "$path_name")
-    if [[ "$local_plain" == "—" || "$local_path" == "—" ]]; then continue; fi
-    overhead=$(python3 -c "print(f'{$local_path / $local_plain:.1f}x')")
-    plain_str=$(fmt_ns "$local_plain")
-    path_str=$(fmt_ns "$local_path")
-    echo "| $label | $plain_str | $path_str | ${overhead} |" >> "$BASELINE_MD"
-done
-
-cat >> "$BASELINE_MD" << 'EVAL_SINGLE_OVERHEAD_HEADER'
-
-## JSONPath vs Plain Qt Overhead (evaluateSingle)
-
-EVAL_SINGLE_OVERHEAD_HEADER
-
-echo "| Operation | Plain Qt | evaluateSingle | Overhead |" >> "$BASELINE_MD"
-echo "|---|---|---|---|" >> "$BASELINE_MD"
-
-EVAL_SINGLE_OVERHEAD_PAIRS=(
-    "Simple:BM_Plain_Simple:BM_JSONPath_EvalSingle_Simple"
-    "Nested:BM_Plain_Nested:BM_JSONPath_EvalSingle_Nested"
-    "Array:BM_Plain_Array:BM_JSONPath_EvalSingle_Array"
-)
-
-for pair in "${EVAL_SINGLE_OVERHEAD_PAIRS[@]}"; do
-    IFS=: read -r label plain_name path_name <<< "$pair"
-    local_plain=$(bench_ns "$JSON_OUT" "$plain_name")
-    local_path=$(bench_ns "$JSON_OUT" "$path_name")
-    if [[ "$local_plain" == "—" || "$local_path" == "—" ]]; then continue; fi
-    overhead=$(python3 -c "print(f'{$local_path / $local_plain:.1f}x')")
-    plain_str=$(fmt_ns "$local_plain")
-    path_str=$(fmt_ns "$local_path")
-    echo "| $label | $plain_str | $path_str | ${overhead} |" >> "$BASELINE_MD"
-done
-
-# ── 7. Historical note ──────────────────────────────────────────────────
-
-if [[ -n "$PREV_JSON" ]]; then
-    PREV_DATE=$(basename "$PREV_JSON" | sed 's/benchmark_\(.*\)_.*/\1/')
-    cat >> "$BASELINE_MD" << EOF
-
-## Previous Baseline
-
-Compared against: \`$(basename "$PREV_JSON")\` ($PREV_DATE)
-EOF
-fi
-
-cat >> "$BASELINE_MD" << EOF
-
-## Raw Data
-
-Results are archived as JSON in \`perf/results/\` for historical comparison.
-Run \`perf/macos/bin/record_benchmarks.sh\` to update this file.
+if missing:
+    print(f"\nWARNING: benchmarks missing from the run: {', '.join(missing)}")
 EOF
 
 echo ""
-echo "✓ Updated $BASELINE_MD"
 echo "✓ Raw JSON archived at $JSON_OUT"
+echo "→ Update the macOS columns in perf/performance_baseline.md from the"
+echo "  tables above (and perf/PERFORMANCE_ROADMAP.md if ratios shifted)."
