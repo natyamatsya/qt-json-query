@@ -31,8 +31,16 @@ The goal is to design a great, well-thought-out API for the initial public relea
 
 ### Build Commands
 
+```pwsh
+# Windows/MSVC: dot-source first for a build-ready shell (VS dev env + Qt on
+# PATH + CMAKE_PREFIX_PATH). Respects a preconfigured environment (superbuild);
+# qt.user.json can be generated via: python scripts/init_qt_config.py
+. .\Init-DevEnv.ps1
+cmake --preset debug-msvc
+```
+
 ```bash
-# Configure (MSVC)
+# Configure (MSVC, manual alternative)
 cmake -B build-debug-msvc -S . -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_PREFIX_PATH=<Qt6_DIR>
 
 # Build library
@@ -234,14 +242,16 @@ ctest --test-dir build-debug-msvc -R RFC9535
 
 ## MSVC-Specific Notes
 
-- Template depth may need to be increased for complex CTRE patterns
-- This is handled in `src/json-query/CMakeLists.txt`:
+- Template depth may need to be increased for complex CTRE patterns (cl
+  19.51+ exceeds the default of 1000 with error C2999)
+- This is handled in `src/json-query/CMakeLists.txt` (compiler-ID guard, not
+  `if(MSVC)`, so clang-cl keeps taking the Clang `-ftemplate-depth` branch):
 
 ```cmake
-if(MSVC)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
   set_source_files_properties(
-    json-path/JSONPathParseUtils.cpp
-    PROPERTIES COMPILE_OPTIONS "/templateDepth:2000")
+    json-path/JSONPathParseUtils.cpp PROPERTIES COMPILE_OPTIONS
+                                                "/templateDepth:2000")
 endif()
 ```
 

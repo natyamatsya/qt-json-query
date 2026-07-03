@@ -40,6 +40,29 @@ cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Debug \
 cmake --build build
 ```
 
+### Windows (MSVC) quick start
+
+Dot-source the init script in PowerShell to get a build-ready shell (imports
+the Visual Studio developer environment, resolves a Qt MSVC kit, and exports
+`CMAKE_PREFIX_PATH`):
+
+```pwsh
+. .\Init-DevEnv.ps1
+cmake --preset debug-msvc
+cmake --build --preset debug-msvc
+ctest --test-dir build-debug-msvc
+```
+
+Qt is resolved from (in order): the `-QtDir` parameter, an already-configured
+environment (`Qt6_DIR` / `CMAKE_PREFIX_PATH` — e.g. set by a superbuild that
+consumes this repo — is respected, never overridden), the git-ignored
+`qt.user.json`, or auto-discovery. To generate `qt.user.json` from the Qt
+installations found on your machine:
+
+```pwsh
+python scripts/init_qt_config.py         # see --print / --force
+```
+
 Run tests:
 
 ```bash

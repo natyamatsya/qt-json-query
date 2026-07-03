@@ -43,8 +43,8 @@ set(JSON_QUERY_SOURCES
 add_library(json_query STATIC ${JSON_QUERY_SOURCES})
 
 # Static-library hygiene for shared-library consumers: hidden visibility keeps
-# json_query symbols private to any .so/.dylib that embeds this archive, so
-# two shared libraries each embedding json_query cannot interpose each other's
+# json_query symbols private to any .so/.dylib that embeds this archive, so two
+# shared libraries each embedding json_query cannot interpose each other's
 # copies. Complements the versioned inline ABI namespace (doc/adr/005).
 set_target_properties(json_query PROPERTIES CXX_VISIBILITY_PRESET hidden
                                             VISIBILITY_INLINES_HIDDEN ON)
@@ -69,6 +69,14 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
                                                 "-ftemplate-depth=2000")
 endif()
 
+# MSVC: same mitigation - cl 19.51+ exceeds the default depth of 1000 on the
+# slice-selector pattern (error C2999). Lives here (not in a preset toolchain
+# file) so it also applies when the library is consumed via add_subdirectory.
+if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+  set_source_files_properties(json-path/JSONPathParseUtils.cpp
+                              PROPERTIES COMPILE_OPTIONS "/templateDepth:2000")
+endif()
+
 # Compile-time control over debug logging (category-based)
 option(JSON_QUERY_ENABLE_DEBUG_LOGS "Enable debug logs in the library" OFF)
 if(NOT JSON_QUERY_ENABLE_DEBUG_LOGS)
@@ -80,15 +88,16 @@ endif()
 # pimpl, no header reachable from the public umbrella includes <ctre.hpp> —
 # consumers do not need CTRE at all.
 if(TARGET ctre_interface)
-  # BUILD_INTERFACE: header-only — nothing to link downstream, keep the
-  # target out of the install export requirements
+  # BUILD_INTERFACE: header-only — nothing to link downstream, keep the target
+  # out of the install export requirements
   target_link_libraries(json_query PRIVATE $<BUILD_INTERFACE:ctre_interface>)
 endif()
 
 # Link function_ref header-only interface. PRIVATE: <tl/function_ref.hpp> is
 # only used by internal headers, not the public umbrella surface.
 if(TARGET function_ref_interface)
-  target_link_libraries(json_query PRIVATE $<BUILD_INTERFACE:function_ref_interface>)
+  target_link_libraries(json_query
+                        PRIVATE $<BUILD_INTERFACE:function_ref_interface>)
 endif()
 
 # Optional: SRELL for ECMA-262 regex format validation (header-only —

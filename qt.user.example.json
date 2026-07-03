@@ -1,0 +1,8 @@
+{
+    "userFileVersion": 1,
+    "//": "Copy to qt.user.json (git-ignored) and list your Qt MSVC prefixes; Init-DevEnv.ps1 uses the first one that exists.",
+    "qtPrefixes": [
+        "D:/dev/sdk/qt/qt-6.8.5/6.8.5/msvc2022_64",
+        "C:/Qt/6.8.5/msvc2022_64"
+    ]
+}

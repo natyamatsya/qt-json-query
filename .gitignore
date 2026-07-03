@@ -2,5 +2,8 @@
 /build*
 CMakeUserPresets.json
 
+# machine-specific Qt paths for Init-DevEnv.ps1 (see qt.user.example.json)
+qt.user.json
+
 # jetbrains
 .idea
