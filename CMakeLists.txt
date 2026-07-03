@@ -53,7 +53,9 @@ FetchContent_Declare(
   ctre
   GIT_REPOSITORY
     https://github.com/hanickadot/compile-time-regular-expressions.git
-  GIT_TAG main # any reasonably recent tag
+  # v3.10.0 + 2 commits (includes a GCC warning fix); pinned for reproducible
+  # builds — CTRE is a public compile-time dependency baked into our headers
+  GIT_TAG 6225211806c48230e5d17a1e555ef69e7325051c
   SOURCE_SUBDIR single-header)
 FetchContent_MakeAvailable(ctre)
 
@@ -70,7 +72,7 @@ endif()
 FetchContent_Declare(
   function_ref
   GIT_REPOSITORY https://github.com/TartanLlama/function_ref.git
-  GIT_TAG master)
+  GIT_TAG v1.0.0)
 
 # Disable function_ref tests to avoid build issues
 set(FUNCTION_REF_ENABLE_TESTS
@@ -95,8 +97,11 @@ option(JSON_QUERY_FORMAT_ECMA_REGEX
 
 if(JSON_QUERY_FORMAT_ECMA_REGEX)
   FetchContent_Declare(
-    srell URL https://www.akenotsuki.com/misc/srell/releases/srell4_140.zip
-              DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+    srell
+    URL https://www.akenotsuki.com/misc/srell/releases/srell4_140.zip
+    URL_HASH
+      SHA256=c2cd1bc13a01e4518be59d247287e72ce1f9d697ae82fcf26320bf6f35821cb8
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
   FetchContent_MakeAvailable(srell)
 
   if(NOT TARGET srell_interface)

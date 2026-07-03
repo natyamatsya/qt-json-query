@@ -20,7 +20,7 @@ A modern C++23 library providing [JSON Pointer (RFC 6901)](https://www.rfc-edito
 |---|---|
 | **C++23 compiler** | Clang 16+, GCC 13+, or MSVC 17.8+ |
 | **Qt** | 6.7+ |
-| **CTRE** | v3.9.0 (fetched automatically via CMake FetchContent) |
+| **CTRE** | v3.10.0 (pinned commit, fetched automatically via CMake FetchContent) |
 | **GoogleTest** | (fetched automatically for tests) |
 
 ### Optional Dependencies
