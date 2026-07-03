@@ -28,6 +28,8 @@
 #include "json-query/json-schema/JSONSchema.hpp"
 #include "json-query/utils/QtStringLiterals.hpp"
 
+#include "KnownFailures.hpp"
+
 using namespace json_query::json_schema;
 using json_query::literals::operator""_qt_s;
 
@@ -199,6 +201,26 @@ static QList<SchemaTestCase> collectAllTestCases()
     return all;
 }
 
+// ----------------------------------------------------------------------------
+// Known-failure (xfail) lookup ------------------------------------------------
+// ----------------------------------------------------------------------------
+// Buckets apply only when the resolving optional feature is absent from the
+// build; the hostname bucket applies always (strict-ASCII validator).
+bool isKnownFailure(const SchemaTestCase& tc)
+{
+    if (matchesKnownFailure(kKnownFailuresHostname, tc.fileName, tc.groupDesc, tc.testDesc))
+        return true;
+#ifndef JSON_QUERY_TEST_HAS_ECMA_REGEX
+    if (matchesKnownFailure(kKnownFailuresNoEcmaRegex, tc.fileName, tc.groupDesc, tc.testDesc))
+        return true;
+#endif
+#ifndef JSON_QUERY_TEST_HAS_IDN
+    if (matchesKnownFailure(kKnownFailuresNoIdn, tc.fileName, tc.groupDesc, tc.testDesc))
+        return true;
+#endif
+    return false;
+}
+
 } // anonymous namespace
 
 // ----------------------------------------------------------------------------
@@ -218,6 +240,13 @@ TEST_P(IETFJsonSchemaTest, ValidatesPerSpec)
     auto                schemaResult{JSONSchema::create(tc.schema, fetcher, opts)};
     if (!schemaResult)
     {
+        if (isKnownFailure(tc))
+        {
+            GTEST_SKIP() << "Known failure (optional-feature gap, schema does not compile — see "
+                            "KnownFailures.hpp): "
+                         << tc.fileName.toStdString() << " / " << tc.groupDesc.toStdString() << " / "
+                         << tc.testDesc.toStdString();
+        }
         FAIL() << "Schema compilation failed for: " << tc.groupDesc.toStdString()
                << "\nError: " << to_std_sv(schemaResult.error()).data();
         return;
@@ -249,6 +278,19 @@ TEST_P(IETFJsonSchemaTest, ValidatesPerSpec)
             qDebug() << "===========================";
         }
     }
+
+    const bool knownFailure{isKnownFailure(tc)};
+
+    if (isValid != tc.expectedValid && knownFailure)
+    {
+        GTEST_SKIP() << "Known failure (optional-feature gap, see KnownFailures.hpp): "
+                     << tc.fileName.toStdString() << " / " << tc.groupDesc.toStdString() << " / "
+                     << tc.testDesc.toStdString();
+    }
+
+    ASSERT_FALSE(isValid == tc.expectedValid && knownFailure)
+        << "Stale KnownFailures.hpp entry — this test now PASSES; remove it: " << tc.fileName.toStdString() << " / "
+        << tc.groupDesc.toStdString() << " / " << tc.testDesc.toStdString();
 
     EXPECT_EQ(isValid, tc.expectedValid)
         << "Test: " << tc.testDesc.toStdString() << "\nGroup: " << tc.groupDesc.toStdString()

@@ -48,11 +48,13 @@ app-internal documents.
 
 ## M1 — Correctness & robustness (shortly after first adoption)
 
-- [ ] **Machine-readable known-failure list for compliance drivers.**
-      The ~62 base-config IETF schema failures (optional regex/IDN features)
-      are hard `EXPECT` failures with no xfail table — CI cannot distinguish a
-      new regression from the documented backlog. Add an expected-failure
-      table keyed by test name; green CI must mean "no regressions".
+- [x] **Machine-readable known-failure list for compliance drivers.**
+      *Resolved 2026-07-03:* `KnownFailures.hpp` next to the IETF driver holds
+      exact (file, group, test) xfail triples in three buckets (no-SRELL
+      regex, no-IDN, strict-ASCII hostname), selected by build features.
+      Known mismatches → GTEST_SKIP; unknown mismatches → failure; stale
+      entries that pass → failure. Suite is now green in base config
+      (1932 passed / 62 skipped / 0 failed).
 - [ ] **ASan/UBSan CI leg.** Sanitizers currently exist only bundled behind
       `ENABLE_FUZZ_TESTS`; no sanitizer runs in CI. Add a standalone
       ASan+UBSan option and a CI job (at least Linux, Debug).

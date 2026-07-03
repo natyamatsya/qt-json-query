@@ -31,6 +31,19 @@ function(add_ietf_json_schema_draft_2020_12_tests)
       ietf_json_schema_draft_2020_12_compliance_tests
       PRIVATE JSON_QUERY_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 
+    # Feature flags select which known-failure (xfail) buckets apply — see
+    # KnownFailures.hpp next to the test driver
+    if(JSON_QUERY_FORMAT_ECMA_REGEX)
+      target_compile_definitions(
+        ietf_json_schema_draft_2020_12_compliance_tests
+        PRIVATE JSON_QUERY_TEST_HAS_ECMA_REGEX)
+    endif()
+    if(JSON_QUERY_FORMAT_IDN)
+      target_compile_definitions(
+        ietf_json_schema_draft_2020_12_compliance_tests
+        PRIVATE JSON_QUERY_TEST_HAS_IDN)
+    endif()
+
     target_compile_features(ietf_json_schema_draft_2020_12_compliance_tests
                             PRIVATE cxx_std_23)
 
