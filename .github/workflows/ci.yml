@@ -63,9 +63,8 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install Ninja
-        uses: seanmiddleditch/gha-setup-ninja@v6
-
+      # Ninja is preinstalled on all GitHub-hosted images (ubuntu, macOS,
+      # Windows); no setup action needed.
       - name: Install Qt 6
         uses: jurplel/install-qt-action@v4
         with:
@@ -152,9 +151,8 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install Ninja
-        uses: seanmiddleditch/gha-setup-ninja@v6
-
+      # Ninja is preinstalled on all GitHub-hosted images (ubuntu, macOS,
+      # Windows); no setup action needed.
       - name: Install Qt 6
         uses: jurplel/install-qt-action@v4
         with:
@@ -192,9 +190,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Install Ninja
-        uses: seanmiddleditch/gha-setup-ninja@v6
-
+      # Ninja is preinstalled on all GitHub-hosted images (ubuntu, macOS,
+      # Windows); no setup action needed.
       - name: Install Qt 6
         uses: jurplel/install-qt-action@v4
         with:
@@ -232,9 +229,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Install Ninja
-        uses: seanmiddleditch/gha-setup-ninja@v6
-
+      # Ninja is preinstalled on all GitHub-hosted images (ubuntu, macOS,
+      # Windows); no setup action needed.
       - name: Install Qt 6
         uses: jurplel/install-qt-action@v4
         with:
