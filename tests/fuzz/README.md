@@ -7,10 +7,9 @@ This directory contains LibFuzzer-based fuzz tests for comprehensive robustness 
 Fuzz testing helps discover edge cases, crashes, and security vulnerabilities by feeding randomly generated or mutated inputs to the library. Our fuzz tests target the most critical components of the qt-json-query library:
 
 - **JSONPath expression parsing** (`fuzz_jsonpath_parsing`)
-- **JSON Pointer parsing** (`fuzz_jsonpointer_parsing`) 
+- **JSON Pointer parsing** (`fuzz_jsonpointer_parsing`)
 - **Combined evaluation pipeline** (`fuzz_combined_evaluation`)
-- **ContainerCursor iteration** (`fuzz_container_cursor`)
-- **Filter storage system** (`fuzz_filter_storage`)
+- **JSON Schema compile + validate** (`fuzz_jsonschema`)
 
 ## Requirements
 
@@ -52,8 +51,7 @@ make run_all_fuzzers
 make run_fuzz_jsonpath_parsing
 make run_fuzz_jsonpointer_parsing
 make run_fuzz_combined_evaluation
-make run_fuzz_container_cursor
-make run_fuzz_filter_storage
+make run_fuzz_jsonschema
 ```
 
 ## Fuzz Targets
@@ -103,37 +101,22 @@ make run_fuzz_filter_storage
 - Type confusion in filter predicates
 - Performance issues with pathological inputs
 
-### 4. ContainerCursor Iteration (`fuzz_container_cursor`)
+### 4. JSON Schema (`fuzz_jsonschema`)
 
-**Purpose**: Tests the tagged pointer optimization and STL-compatible iteration.
-
-**Focus Areas**:
-- Tagged pointer type discrimination
-- Cache-aligned memory access
-- Iterator validity with malformed JSON
-- C++23 ranges integration
-
-**Example Issues It May Find**:
-- Tagged pointer corruption
-- Iterator invalidation bugs
-- Cache alignment issues
-- Range-based for loop crashes
-
-### 5. Filter Storage System (`fuzz_filter_storage`)
-
-**Purpose**: Tests the EmbeddedFilter and CompactFilterStorage optimization systems.
+**Purpose**: Tests schema compilation and instance validation with fuzzed
+schema documents and fuzzed instances, under both lenient and strict
+(`FormatValidation::Assertion` + `UnresolvedRefPolicy::Fail`) options.
 
 **Focus Areas**:
-- Small buffer optimization (SBO) edge cases
-- Type erasure with function pointers
-- Move semantics and copy operations
-- Three-tier storage transitions
+- Keyword compilation with malformed schema values
+- `$ref`/`$dynamicRef` resolution, anchors, and the ref-cycle guard
+- Regex compilation in `pattern`/`patternProperties`
+- All keyword validators and error-reporting paths
 
 **Example Issues It May Find**:
-- SBO buffer overflows
-- Function pointer corruption
-- Move semantics violations
-- Memory leaks in heap storage
+- Stack overflow via reference cycles
+- Crashes on malformed keyword values
+- Memory errors in validation error collection
 
 ## Seed Corpus
 
@@ -156,6 +139,12 @@ The fuzz tests use carefully crafted seed inputs to improve fuzzing effectivenes
 - Edge cases (empty keys, unicode, deep nesting)
 - Real-world-like documents
 - Malformed JSON for parser testing
+
+### JSON Schema Seeds (`corpus/jsonschema_seeds.txt`)
+- Schemas exercising each keyword family (type, numeric, string, array,
+  object, combinators, conditionals)
+- `$ref`/`$defs`/`$anchor`/`$dynamicRef` shapes including cycles
+- Format validators and pattern regexes
 
 ## Configuration
 

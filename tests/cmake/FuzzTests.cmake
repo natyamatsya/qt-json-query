@@ -36,7 +36,8 @@ endif()
 set(FUZZ_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/fuzz_jsonpath_parsing.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/fuzz_jsonpointer_parsing.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/fuzz_combined_evaluation.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/fuzz_combined_evaluation.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/fuzz_jsonschema.cpp)
 
 # Common fuzz test configuration
 function(configure_fuzz_target target_name source_file)
@@ -102,11 +103,15 @@ function(add_fuzz_tests)
     fuzz_combined_evaluation
     ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/fuzz_combined_evaluation.cpp)
 
+  # JSON Schema compile + validate fuzzer (fuzzed schema + fuzzed instance)
+  configure_fuzz_target(fuzz_jsonschema
+                        ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/fuzz_jsonschema.cpp)
+
   # Create aggregate target for running all fuzzers
   add_custom_target(
     run_all_fuzzers
     DEPENDS run_fuzz_jsonpath_parsing run_fuzz_jsonpointer_parsing
-            run_fuzz_combined_evaluation
+            run_fuzz_combined_evaluation run_fuzz_jsonschema
     COMMENT "Running all fuzz tests")
 
   # Create target for quick fuzz testing (30 seconds each)

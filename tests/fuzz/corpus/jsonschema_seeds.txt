@@ -1,0 +1,42 @@
+# JSON Schema seed inputs for fuzz_jsonschema (one per line)
+# Format note: the fuzzer splits raw input into schema|instance at a
+# data-dependent point; these seeds are representative schema documents.
+{"type": "object"}
+{"type": "string", "minLength": 1, "maxLength": 10}
+{"type": "integer", "minimum": 0, "maximum": 100, "multipleOf": 5}
+{"type": "number", "exclusiveMinimum": 0.5, "exclusiveMaximum": 9.5}
+{"type": "array", "items": {"type": "string"}, "minItems": 1, "maxItems": 3, "uniqueItems": true}
+{"type": "object", "required": ["a"], "properties": {"a": {"type": "boolean"}}, "additionalProperties": false}
+{"type": "object", "minProperties": 1, "maxProperties": 4, "propertyNames": {"pattern": "^[a-z]+$"}}
+{"enum": ["red", "green", 1, null, [1, 2], {"k": "v"}]}
+{"const": {"nested": [true, false]}}
+{"pattern": "^a+b*c?$"}
+{"patternProperties": {"^s_": {"type": "string"}, "^i_": {"type": "integer"}}}
+{"allOf": [{"type": "integer"}, {"minimum": 3}]}
+{"anyOf": [{"type": "string"}, {"type": "number"}]}
+{"oneOf": [{"multipleOf": 3}, {"multipleOf": 5}]}
+{"not": {"type": "null"}}
+{"if": {"type": "string"}, "then": {"minLength": 2}, "else": {"minimum": 0}}
+{"$defs": {"s": {"type": "string"}}, "$ref": "#/$defs/s"}
+{"$defs": {"a": {"$ref": "#/$defs/b"}, "b": {"$ref": "#/$defs/a"}}, "$ref": "#/$defs/a"}
+{"$ref": "#"}
+{"type": "object", "properties": {"child": {"$ref": "#"}}}
+{"$id": "https://example.com/root", "$defs": {"x": {"$anchor": "px", "type": "integer"}}, "$ref": "#px"}
+{"$defs": {"list": {"$dynamicAnchor": "items", "type": "array"}}, "$dynamicRef": "#items"}
+{"$ref": "https://example.invalid/unresolvable.json"}
+{"format": "email", "type": "string"}
+{"format": "date-time", "type": "string"}
+{"format": "hostname", "type": "string"}
+{"format": "ipv6", "type": "string"}
+{"format": "uri", "type": "string"}
+{"type": "string", "contentEncoding": "base64"}
+{"unevaluatedProperties": false, "properties": {"a": true}}
+{"unevaluatedItems": false, "prefixItems": [{"type": "string"}]}
+{"dependentRequired": {"a": ["b"]}}
+{"dependentSchemas": {"a": {"required": ["c"]}}}
+{"contains": {"type": "integer"}, "minContains": 1, "maxContains": 2}
+{"prefixItems": [{"type": "string"}, {"type": "number"}], "items": false}
+true
+false
+{}
+{"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object"}

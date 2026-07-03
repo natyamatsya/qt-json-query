@@ -177,4 +177,4 @@ On macOS with homebrew LLVM, you may also need to set `CMAKE_AR` and `CMAKE_RANL
 -DCMAKE_RANLIB=/opt/homebrew/opt/llvm/bin/llvm-ranlib
 ```
 
-**Known issue**: Homebrew LLVM 21 ships a `libclang_rt.fuzzer_osx.a` compiled against a different libc++ ABI, causing `__hash_memory` linker errors. This is a toolchain bug — fuzz tests work on Linux and in CI environments with consistent LLVM toolchains.
+**Resolved (2026-07-03)**: Homebrew LLVM 21 shipped a `libclang_rt.fuzzer_osx.a` compiled against a different libc++ ABI, causing `__hash_memory` linker errors. The `cmake/toolchains/llvm-clang.cmake` toolchain now injects Homebrew LLVM's own libc++ into the link (`-L`/`-rpath`), which resolves this — fuzz targets build and run on macOS with Homebrew LLVM 22 via `-DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/llvm-clang.cmake -DENABLE_FUZZ_TESTS=ON`. Do not ship binaries produced with this toolchain (developer-machine rpath).

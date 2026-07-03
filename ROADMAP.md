@@ -89,9 +89,13 @@ app-internal documents.
       freely sortable); consumers must branch on enumerators, never persist
       `Error::numeric()` / `Error::code` / `toJson()` code fields. A stable
       wire format, if ever needed, will be an explicit symbolic mapping.
-- [ ] **Schema fuzz target + fuzz hygiene.** No fuzzer covers the schema
-      compiler/validator. Add one; fix `tests/fuzz/README.md` (documents two
-      nonexistent targets); commit a seed corpus; add an on-demand CI fuzz job.
+- [x] **Schema fuzz target + fuzz hygiene.** *Resolved 2026-07-03:*
+      `fuzz_jsonschema` compiles fuzzed schemas (lenient + strict options) and
+      validates fuzzed instances; schema seed corpus added; fuzz README fixed
+      (removed two nonexistent targets, documented the new one); smoke-tested
+      on macOS (11.9M execs/45s under ASan+UBSan, zero crashes — Homebrew
+      LLVM 22 + llvm-clang toolchain now links fuzzers). Remaining: an
+      on-demand CI fuzz job (Linux clang) — tracked in M3.
 
 ## M2 — Packaging & release engineering (before consuming as installed package)
 
