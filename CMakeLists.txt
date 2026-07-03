@@ -48,6 +48,14 @@ include(FetchContent)
 
 # ---------------------------------------------------------------------------
 # Header-only CTRE (compile-time regular expressions)
+#
+# Resolution order (package-manager friendly, e.g. vcpkg):
+#   1. find_package(ctre CONFIG) — satisfied by vcpkg's `ctre` port or any
+#      system install, letting consumers control the version
+#   2. FetchContent fallback pinned below
+# Consumers can also override the fetched version by calling
+# FetchContent_Declare(ctre ...) before add_subdirectory of this project
+# (first declaration wins), or by setting FETCHCONTENT_SOURCE_DIR_CTRE.
 # ---------------------------------------------------------------------------
 FetchContent_Declare(
   ctre
@@ -56,23 +64,36 @@ FetchContent_Declare(
   # v3.10.0 + 2 commits (includes a GCC warning fix); pinned for reproducible
   # builds — CTRE is a public compile-time dependency baked into our headers
   GIT_TAG 6225211806c48230e5d17a1e555ef69e7325051c
-  SOURCE_SUBDIR single-header)
+  SOURCE_SUBDIR single-header
+  FIND_PACKAGE_ARGS NAMES ctre)
 FetchContent_MakeAvailable(ctre)
 
-# Create an interface target for the single-header library if none provided
+# Bridge target used throughout the build: forwards to the package target
+# when find_package satisfied the dependency, to the fetched tree otherwise.
 if(NOT TARGET ctre_interface)
   add_library(ctre_interface INTERFACE)
-  target_include_directories(ctre_interface
-                             INTERFACE ${ctre_SOURCE_DIR}/single-header)
+  if(TARGET ctre::ctre)
+    target_link_libraries(ctre_interface INTERFACE ctre::ctre)
+  else()
+    target_include_directories(
+      ctre_interface
+      INTERFACE $<BUILD_INTERFACE:${ctre_SOURCE_DIR}/single-header>)
+  endif()
 endif()
 
 # ---------------------------------------------------------------------------
 # Header-only function_ref (lightweight non-owning function reference)
+#
+# Resolution order: find_package(tl-function-ref CONFIG) first (vcpkg's
+# `tl-function-ref` port provides tl::function_ref), FetchContent fallback.
+# Override via an earlier FetchContent_Declare(function_ref ...) or
+# FETCHCONTENT_SOURCE_DIR_FUNCTION_REF.
 # ---------------------------------------------------------------------------
 FetchContent_Declare(
   function_ref
   GIT_REPOSITORY https://github.com/TartanLlama/function_ref.git
-  GIT_TAG v1.0.0)
+  GIT_TAG v1.0.0
+  FIND_PACKAGE_ARGS NAMES tl-function-ref)
 
 # Disable function_ref tests to avoid build issues
 set(FUNCTION_REF_ENABLE_TESTS
@@ -81,11 +102,17 @@ set(FUNCTION_REF_ENABLE_TESTS
 
 FetchContent_MakeAvailable(function_ref)
 
-# Create an interface target for function_ref if none provided
+# Bridge target: tl::function_ref exists both when the package was found and
+# when the fetched project defined it; fall back to a raw include dir.
 if(NOT TARGET function_ref_interface)
   add_library(function_ref_interface INTERFACE)
-  target_include_directories(function_ref_interface
-                             INTERFACE ${function_ref_SOURCE_DIR}/include)
+  if(TARGET tl::function_ref)
+    target_link_libraries(function_ref_interface INTERFACE tl::function_ref)
+  else()
+    target_include_directories(
+      function_ref_interface
+      INTERFACE $<BUILD_INTERFACE:${function_ref_SOURCE_DIR}/include>)
+  endif()
 endif()
 
 # ---------------------------------------------------------------------------
@@ -95,18 +122,33 @@ endif()
 option(JSON_QUERY_FORMAT_ECMA_REGEX
        "Enable ECMA-262 regex format validation (fetches SRELL)" OFF)
 
-if(JSON_QUERY_FORMAT_ECMA_REGEX)
-  FetchContent_Declare(
-    srell
-    URL https://www.akenotsuki.com/misc/srell/releases/srell4_140.zip
-    URL_HASH
-      SHA256=c2cd1bc13a01e4518be59d247287e72ce1f9d697ae82fcf26320bf6f35821cb8
-    DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
-  FetchContent_MakeAvailable(srell)
+# SRELL has no official vcpkg port; consumers can point this at their own
+# copy (e.g. a vcpkg overlay port) to skip the download.
+set(JSON_QUERY_SRELL_INCLUDE_DIR
+    ""
+    CACHE PATH "Directory containing srell.hpp (overrides the download)")
 
-  if(NOT TARGET srell_interface)
-    add_library(srell_interface INTERFACE)
-    target_include_directories(srell_interface INTERFACE ${srell_SOURCE_DIR})
+if(JSON_QUERY_FORMAT_ECMA_REGEX)
+  if(JSON_QUERY_SRELL_INCLUDE_DIR)
+    if(NOT TARGET srell_interface)
+      add_library(srell_interface INTERFACE)
+      target_include_directories(srell_interface
+                                 INTERFACE ${JSON_QUERY_SRELL_INCLUDE_DIR})
+    endif()
+    message(STATUS "SRELL: using ${JSON_QUERY_SRELL_INCLUDE_DIR}")
+  else()
+    FetchContent_Declare(
+      srell
+      URL https://www.akenotsuki.com/misc/srell/releases/srell4_140.zip
+      URL_HASH
+        SHA256=c2cd1bc13a01e4518be59d247287e72ce1f9d697ae82fcf26320bf6f35821cb8
+      DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+    FetchContent_MakeAvailable(srell)
+
+    if(NOT TARGET srell_interface)
+      add_library(srell_interface INTERFACE)
+      target_include_directories(srell_interface INTERFACE ${srell_SOURCE_DIR})
+    endif()
   endif()
 endif()
 

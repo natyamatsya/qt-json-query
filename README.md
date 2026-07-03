@@ -54,6 +54,29 @@ add_subdirectory(path/to/qt-json-query)
 target_link_libraries(your_target PRIVATE json_query)
 ```
 
+### Dependency resolution (vcpkg-friendly)
+
+Internal dependencies are resolved with `find_package` first and fetched via
+FetchContent only as a fallback, so package managers control the versions:
+
+| Dependency | `find_package` name | vcpkg port | FetchContent fallback |
+|---|---|---|---|
+| **CTRE** | `ctre` | `ctre` | pinned commit (v3.10.0+) |
+| **function_ref** | `tl-function-ref` | `tl-function-ref` | `v1.0.0` |
+| **SRELL** (optional) | — | — (set `JSON_QUERY_SRELL_INCLUDE_DIR`) | `srell4_140.zip` (SHA256-pinned) |
+
+Override mechanisms, in order of preference:
+
+- **vcpkg / system package:** just make the package findable (vcpkg toolchain
+  file, `CMAKE_PREFIX_PATH`); it wins over the fetch automatically.
+- **Different source version:** call `FetchContent_Declare(ctre ...)` (or
+  `function_ref`) with your own tag *before* `add_subdirectory` of this
+  project — the first declaration wins.
+- **Local checkout:** set `FETCHCONTENT_SOURCE_DIR_CTRE` /
+  `FETCHCONTENT_SOURCE_DIR_FUNCTION_REF` to a source directory.
+- **Force the pinned fetch** (ignore installed packages): configure with
+  `-DFETCHCONTENT_TRY_FIND_PACKAGE_MODE=NEVER`.
+
 Then include the umbrella header:
 
 ```cpp

@@ -81,6 +81,12 @@ app-internal documents.
 
 ## M2 — Packaging & release engineering (before consuming as installed package)
 
+- [x] **find_package-first dependency resolution (vcpkg support).**
+      *Resolved 2026-07-03:* CTRE and function_ref declarations use
+      `FIND_PACKAGE_ARGS` (vcpkg ports `ctre` / `tl-function-ref` win over the
+      pinned FetchContent fallback); bridge targets forward to the imported
+      targets; SRELL overridable via `JSON_QUERY_SRELL_INCLUDE_DIR`; consumer
+      override mechanisms documented in README "Dependency resolution".
 - [ ] **Working install/export.** Wire `configure_package_config_file()` +
       `write_basic_package_version_file()` (`cmake/cmake.config.in` is
       currently orphaned and stale — wrong targets file name, missing

@@ -46,7 +46,6 @@ target_include_directories(
   json_query
   PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
          $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include/json-query>
-         $<BUILD_INTERFACE:${ctre_SOURCE_DIR}/single-header>
          $<INSTALL_INTERFACE:include>)
 
 # Link QtCore (Qt JSON classes live here) and QtNetwork (for QHostAddress)
@@ -67,14 +66,16 @@ if(NOT JSON_QUERY_ENABLE_DEBUG_LOGS)
   target_compile_definitions(json_query PRIVATE QT_NO_DEBUG_OUTPUT)
 endif()
 
-# Link CTRE header-only interface when available
+# Link CTRE header-only interface. PUBLIC: our public headers include
+# <ctre.hpp>, so consumers need the include path transitively.
 if(TARGET ctre_interface)
-  target_link_libraries(json_query PRIVATE ctre_interface)
+  target_link_libraries(json_query PUBLIC ctre_interface)
 endif()
 
-# Link function_ref header-only interface when available
+# Link function_ref header-only interface. PUBLIC: the public
+# stdcompat/function_ref.hpp header includes <tl/function_ref.hpp>.
 if(TARGET function_ref_interface)
-  target_link_libraries(json_query PRIVATE function_ref_interface)
+  target_link_libraries(json_query PUBLIC function_ref_interface)
 endif()
 
 # Optional: SRELL for ECMA-262 regex format validation
