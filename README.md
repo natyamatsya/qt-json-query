@@ -1,9 +1,11 @@
 # qt-json-query
 
-!!! DISCLAIMER: This project is "vibe-engineered", unstable and currently not used in production.
-    It is an experiment to see how agentic development can be guided by compliance acceptance test
-    suites. The covered JSON specs seem useful to have in a Qt context. This library needs careful
-    evaluation before serious use. !!!
+!!! DISCLAIMER: This project is agentically engineered — an experiment in guiding agentic
+    development with compliance acceptance test suites (the engineering record lives in
+    ROADMAP.md, CHANGELOG.md, and doc/adr/). The covered JSON specs seem useful to have in a
+    Qt context. Pre-1.0: APIs can change between minor versions until v1.0 — breaking changes
+    are recorded in CHANGELOG.md, and the versioned ABI namespace (doc/adr/005) keeps
+    differently-versioned binaries from colliding. !!!
 
 A modern C++23 library providing [JSON Pointer (RFC 6901)](https://www.rfc-editor.org/rfc/rfc6901), [JSONPath (RFC 9535)](https://www.rfc-editor.org/rfc/rfc9535), and [JSON Schema (Draft 2020-12)](https://json-schema.org/draft/2020-12/json-schema-core) for Qt.
 
