@@ -212,7 +212,9 @@ class ContextAwareContainerCursor
     // Construction
     constexpr ContextAwareContainerCursor() noexcept = default;
 
-    constexpr ContextAwareContainerCursor(ContainerCursor cursor, Provider provider) noexcept
+    // ContainerCursor is alignas(32); by-reference avoids gcc's -Wpsabi note
+    // about the pre-4.6 parameter-passing ABI for over-aligned by-value types.
+    constexpr ContextAwareContainerCursor(const ContainerCursor& cursor, Provider provider) noexcept
         : cursor_(cursor), provider_(std::move(provider))
     {
     }
@@ -345,4 +347,4 @@ template <ContextProvider Provider>
     return cursor.end();
 }
 
-} // namespace json_query::json_path::internal
+} // namespace json_query::inline JSON_QUERY_ABI_NS::json_path::internal

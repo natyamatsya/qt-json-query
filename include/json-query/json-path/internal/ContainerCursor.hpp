@@ -214,7 +214,7 @@ static_assert(alignof(ContainerCursor) == 32, "Cursor must be 32‑byte aligned"
 static_assert(alignof(QJsonObject) % 2 == 0, "Pointer LSB is available");
 static_assert(alignof(QJsonArray) % 2 == 0, "Pointer LSB is available");
 
-} // namespace json_query::json_path::internal
+} // namespace json_query::inline JSON_QUERY_ABI_NS::json_path::internal
 
 #ifdef JSON_QUERY_ENABLE_RANGES
 // ── Optional C++23 ranges support ──────────────────────────────────────────
@@ -239,7 +239,8 @@ class json_values_view : public std::ranges::view_interface<json_values_view>
     json_path::internal::ContainerCursor cursor_;
 
   public:
-    constexpr json_values_view(json_path::internal::ContainerCursor cursor) noexcept : cursor_(cursor) {}
+    // by-reference: ContainerCursor is alignas(32), by-value triggers -Wpsabi
+    constexpr json_values_view(const json_path::internal::ContainerCursor& cursor) noexcept : cursor_(cursor) {}
 
     constexpr auto begin() const noexcept { return cursor_.begin(); }
     constexpr auto end() const noexcept { return cursor_.end(); }
@@ -266,6 +267,6 @@ inline constexpr auto json_values = []<typename T>(T&& container)
         return json_values_view{json_path::internal::ContainerCursor::array(container)};
     }
 };
-} // namespace json_query::ranges
+} // namespace json_query::inline JSON_QUERY_ABI_NS::ranges
 
 #endif // JSON_QUERY_ENABLE_RANGES

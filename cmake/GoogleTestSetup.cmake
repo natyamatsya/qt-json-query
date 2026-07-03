@@ -17,11 +17,24 @@ FetchContent_MakeAvailable(googletest)
 
 # Suppress warnings from GoogleTest's own strict build when using Clang: -Wundef
 # (config macros) and -Wcharacter-conversion (char8_t in gtest-printers.h, first
-# diagnosed by clang 21; unknown -Wno- options are silently ignored by older
-# clangs)
+# diagnosed by clang 21). The latter group does not exist in older
+# clangs/AppleClang, where the -Wno- form would itself raise
+# -Wunknown-warning-option whenever another diagnostic fires — so probe it.
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  include(CheckCXXCompilerFlag)
+  # Clang accepts unknown -W flags with only a warning; promote it to an error
+  # so the probe actually fails on unsupported groups.
+  set(CMAKE_REQUIRED_FLAGS "-Werror=unknown-warning-option")
+  check_cxx_compiler_flag(-Wcharacter-conversion
+                          JSON_QUERY_HAVE_WCHARACTER_CONVERSION)
+  unset(CMAKE_REQUIRED_FLAGS)
+
+  set(_gtest_warning_opts -Wno-undef)
+  if(JSON_QUERY_HAVE_WCHARACTER_CONVERSION)
+    list(APPEND _gtest_warning_opts -Wno-character-conversion)
+  endif()
   foreach(gtest_target gtest gtest_main gmock gmock_main)
-    target_compile_options(${gtest_target} PRIVATE -Wno-undef
-                                                   -Wno-character-conversion)
+    target_compile_options(${gtest_target} PRIVATE ${_gtest_warning_opts})
   endforeach()
+  unset(_gtest_warning_opts)
 endif()
