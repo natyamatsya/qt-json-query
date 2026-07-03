@@ -70,6 +70,23 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   # On macOS use libc++
   set(CMAKE_CXX_FLAGS_INIT "-stdlib=libc++")
   set(CMAKE_C_FLAGS_INIT "")
+
+  # Ensure the linker finds Homebrew LLVM's libc++ (not the system SDK's older
+  # copy) so that symbols like std::__1::__hash_memory resolve correctly.
+  # Homebrew LLVM stores libc++ under <prefix>/lib/c++/.
+  get_filename_component(_LLVM_BIN_DIR "${LLVM_CLANG_CXX}" REALPATH)
+  get_filename_component(_LLVM_BIN_DIR "${_LLVM_BIN_DIR}" DIRECTORY)
+  get_filename_component(_LLVM_PREFIX "${_LLVM_BIN_DIR}" DIRECTORY)
+  set(_LLVM_LIBCXX_DIR "${_LLVM_PREFIX}/lib/c++")
+  if(EXISTS "${_LLVM_LIBCXX_DIR}/libc++.dylib")
+    set(CMAKE_EXE_LINKER_FLAGS_INIT
+        "${CMAKE_EXE_LINKER_FLAGS_INIT} -L${_LLVM_LIBCXX_DIR} -Wl,-rpath,${_LLVM_LIBCXX_DIR}"
+    )
+    set(CMAKE_SHARED_LINKER_FLAGS_INIT
+        "${CMAKE_SHARED_LINKER_FLAGS_INIT} -L${_LLVM_LIBCXX_DIR} -Wl,-rpath,${_LLVM_LIBCXX_DIR}"
+    )
+    message(STATUS "LLVM libc++ library path: ${_LLVM_LIBCXX_DIR}")
+  endif()
 else()
   # On Linux use system default (typically libstdc++)
   set(CMAKE_CXX_FLAGS_INIT "")
