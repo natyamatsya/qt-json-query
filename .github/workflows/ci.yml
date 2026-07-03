@@ -37,12 +37,20 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+        compiler: [default]
         include:
           - os: windows-latest
+            compiler: default
             qt_arch: win64_msvc2022_64
           - os: macos-latest
+            compiler: default
             qt_arch: ""
           - os: ubuntu-latest
+            compiler: default
+            qt_arch: linux_gcc_64
+          # Second compiler leg: LLVM clang + libstdc++ on Linux
+          - os: ubuntu-latest
+            compiler: clang
             qt_arch: linux_gcc_64
 
     steps:
@@ -66,6 +74,13 @@ jobs:
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
 
+      - name: Select clang (clang leg only)
+        if: matrix.compiler == 'clang'
+        shell: bash
+        run: |
+          echo "CC=clang" >> "$GITHUB_ENV"
+          echo "CXX=clang++" >> "$GITHUB_ENV"
+
       - name: Configure CMake
         shell: bash
         run: |
@@ -79,7 +94,7 @@ jobs:
 
       - name: Run unit tests
         working-directory: build
-        run: ctest --output-on-failure --output-junit tests-${{ matrix.os }}.xml
+        run: ctest --output-on-failure --output-junit tests-${{ matrix.os }}-${{ matrix.compiler }}.xml
 
       # --- Benchmarks ---
       - name: Build benchmarks
@@ -107,14 +122,14 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results-${{ matrix.os }}
+          name: test-results-${{ matrix.os }}-${{ matrix.compiler }}
           path: build/tests-*.xml
 
       - name: Upload benchmark results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: benchmark-${{ matrix.os }}
+          name: benchmark-${{ matrix.os }}-${{ matrix.compiler }}
           path: benchmarks-${{ matrix.os }}.json
 
   # ---------------------------------------------------------------------------
@@ -197,3 +212,61 @@ jobs:
                 -DCMAKE_PREFIX_PATH="$GITHUB_WORKSPACE/prefix"
           cmake --build consumer-build
           ./consumer-build/consumer_smoke
+
+  # ---------------------------------------------------------------------------
+  # Fuzzing (on demand via workflow_dispatch; short LibFuzzer runs per target)
+  # ---------------------------------------------------------------------------
+  fuzz:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v4
+
+      - name: Install Qt 6
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: 6.8.3
+          cache: true
+          archives: "qtbase"
+          arch: linux_gcc_64
+
+      - name: Configure (clang + LibFuzzer)
+        env:
+          CC: clang
+          CXX: clang++
+        run: |
+          cmake -S . -B build -G Ninja \
+                -DCMAKE_BUILD_TYPE=Debug \
+                -DBUILD_TESTING=ON \
+                -DBUILD_BENCHMARKING=OFF \
+                -DJSON_QUERY_BUILD_EXAMPLES=OFF \
+                -DJSON_QUERY_BUILD_PERF=OFF \
+                -DENABLE_FUZZ_TESTS=ON
+
+      - name: Build fuzz targets
+        run: cmake --build build --parallel --target fuzz_jsonpath_parsing fuzz_jsonpointer_parsing fuzz_combined_evaluation fuzz_jsonschema
+
+      - name: Run fuzzers (120s each)
+        working-directory: build/fuzz
+        run: |
+          status=0
+          for f in fuzz_jsonpath_parsing fuzz_jsonpointer_parsing fuzz_combined_evaluation fuzz_jsonschema; do
+            echo "=== $f"
+            ./"$f" "corpus/$f" -max_total_time=120 -rss_limit_mb=2048 -print_final_stats=1 || status=1
+          done
+          if find . -maxdepth 1 -name 'crash-*' | grep -q .; then
+            echo "::error::fuzzing produced crash artifacts"
+            status=1
+          fi
+          exit $status
+
+      - name: Upload crash artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-crashes
+          path: build/fuzz/crash-*

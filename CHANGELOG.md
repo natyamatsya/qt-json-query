@@ -2,6 +2,30 @@
 
 Pre-1.0: minor versions may contain breaking changes (see `ROADMAP.md`).
 
+## Unreleased
+
+### Changed
+- `ArrayPool` is now a lock-free `thread_local` pool (was a mutex-guarded
+  global singleton with negative scaling — measured 4.6× faster 8-thread
+  concurrent evaluation).
+- `JSONPointer` no longer uses a pimpl: its internals are first-party, so the
+  inline `std::vector<Token>` member restores the allocation-free-of-overhead
+  `create()` while the umbrella stays free of third-party headers.
+  `JSONPath` keeps its pimpl (the CTRE firewall).
+- Exception policy documented on both `create()` factories: the library never
+  throws (errors via `std::expected`); `noexcept` means OOM is fatal.
+  `JSONPath::create` is now also `noexcept` for consistency.
+
+### Removed
+- Dead `ArenaAllocator` (unreferenced) and the broken
+  `memory_optimization_test` perf tool (referenced removed APIs).
+
+### Infrastructure
+- CI: LLVM clang leg on Linux; on-demand (`workflow_dispatch`) fuzz job
+  running all four LibFuzzer targets. `docs/adr` merged into `doc/adr`
+  (thread-local cache ADR renumbered 006); `apple-clang.cmake` no longer
+  hardcodes x86_64.
+
 ## 0.4.0 — 2026-07-03
 
 ### Changed
