@@ -1,11 +1,12 @@
 # qt-json-query
 
-!!! DISCLAIMER: This project is agentically engineered — an experiment in guiding agentic
-    development with compliance acceptance test suites (the engineering record lives in
-    ROADMAP.md, CHANGELOG.md, and doc/adr/). The covered JSON specs seem useful to have in a
-    Qt context. Pre-1.0: APIs can change between minor versions until v1.0 — breaking changes
-    are recorded in CHANGELOG.md, and the versioned ABI namespace (doc/adr/005) keeps
-    differently-versioned binaries from colliding. !!!
+> **Disclaimer:** This project is agentically engineered — an experiment in guiding agentic
+> development with compliance acceptance test suites (the engineering record lives in
+> [ROADMAP.md](ROADMAP.md), [CHANGELOG.md](CHANGELOG.md), and [doc/adr/](doc/adr/)). The
+> covered JSON specs seem useful to have in a Qt context. **Pre-1.0:** APIs can change
+> between minor versions until v1.0 — breaking changes are recorded in CHANGELOG.md, and
+> the versioned ABI namespace (doc/adr/005) keeps differently-versioned binaries from
+> colliding.
 
 A modern C++23 library providing [JSON Pointer (RFC 6901)](https://www.rfc-editor.org/rfc/rfc6901), [JSONPath (RFC 9535)](https://www.rfc-editor.org/rfc/rfc9535), and [JSON Schema (Draft 2020-12)](https://json-schema.org/draft/2020-12/json-schema-core) for Qt.
 
@@ -22,8 +23,9 @@ A modern C++23 library providing [JSON Pointer (RFC 6901)](https://www.rfc-edito
 |---|---|
 | **C++23 compiler** | Clang 16+, GCC 13+, or MSVC 17.8+ |
 | **Qt** | 6.8+ |
-| **CTRE** | v3.10.0 (pinned commit, fetched automatically via CMake FetchContent) |
-| **GoogleTest** | (fetched automatically for tests) |
+| **CTRE** | v3.10.0+2 (pinned commit, fetched automatically via CMake FetchContent) |
+| **GoogleTest** | v1.14.0 (fetched automatically for tests) |
+| **Google Benchmark** | v1.8.3 (fetched automatically for benchmarks, opt-in) |
 
 ### Optional Dependencies
 
@@ -72,6 +74,28 @@ cmake --build build --target rfc9535_compliance_tests      # specific suite
 
 See [`tests/README.md`](tests/README.md) for the full list of test targets and CMake options.
 
+### Benchmarks and performance tools
+
+Google-Benchmark microbenchmarks are opt-in (`BUILD_BENCHMARKING`, default
+`OFF`) and should be run on a Release build:
+
+```bash
+cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_BENCHMARKING=ON ...
+cmake --build build --target json_benchmark
+./build/json_benchmark
+```
+
+CI builds and runs the benchmarks on every platform leg (best-effort) and
+uploads the JSON results as per-platform artifacts.
+
+`perf/` additionally contains profiling/allocation-analysis tools
+(`JSON_QUERY_BUILD_PERF`, default `ON`) and the measurement record:
+`perf/performance_baseline.md` (re-baselined 2026-07-03 on Windows/MSVC,
+raw JSON archived in `perf/results/`) and `perf/PERFORMANCE_ROADMAP.md`
+(current optimization priorities). Highlights: pre-compiled evaluation runs
+at ≈1x plain-Qt traversal speed (`evaluateSingle`: 0.3–0.4x); recursive
+descent (`$..`) is the known optimization target.
+
 ## Integration
 
 As a subdirectory (FetchContent or git submodule):
@@ -106,7 +130,7 @@ FetchContent only as a fallback, so package managers control the versions:
 
 | Dependency | `find_package` name | vcpkg port | FetchContent fallback |
 |---|---|---|---|
-| **CTRE** | `ctre` | `ctre` | pinned commit (v3.10.0+) |
+| **CTRE** | `ctre` | `ctre` | pinned commit `6225211` (v3.10.0+2) |
 | **function_ref** | `tl-function-ref` | `tl-function-ref` | `v1.0.0` |
 | **SRELL** (optional) | — | — (set `JSON_QUERY_SRELL_INCLUDE_DIR`) | `srell4_140.zip` (SHA256-pinned) |
 
@@ -141,7 +165,9 @@ their versions. Requires CMake 4.3+; the experimental feature UUID pinned in
 `CMakeLists.txt` matches the CMake 4.3 series and must be bumped when the
 feature changes or stabilizes.
 
-Then include the umbrella header:
+## Usage
+
+Include the umbrella header:
 
 ```cpp
 #include "json-query/JSONQuery"
@@ -149,8 +175,6 @@ using namespace json_query;
 ```
 
 This provides `JSONPointer`, `JSONPath`, and `JSONSchema` in the `json_query` namespace.
-
-## Usage
 
 ### JSON Pointer
 
@@ -292,8 +316,9 @@ if (!result)
 
 ## Test Status
 
-*Last verified: 2026-07-03 — AppleClang, macOS (arm64), Qt 6.8.3, C++23;
-also exercised in CI on Linux (GCC + clang, incl. ASan/UBSan) and Windows (MSVC)*
+*Last verified: 2026-07-03 — AppleClang, macOS (arm64), Qt 6.8.3 and
+MSVC (cl 19.51, x64), Windows 11, Qt 6.8.5, both C++23; also exercised in CI
+on Linux (GCC + clang, incl. ASan/UBSan), macOS, and Windows (MSVC), Qt 6.8.3*
 
 | Test Suite | Passed | Skipped | Failed |
 |---|---|---|---|

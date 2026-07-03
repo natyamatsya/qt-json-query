@@ -2,7 +2,8 @@
 
 Tracks the path from "pre-1.0, refactor freely" to production use, starting with
 low-risk use cases in desktop applications. Based on the production-readiness
-review of 2026-07-03.
+review of 2026-07-03. **Status:** M0–M2 complete, M3 ongoing (as of 0.5.0);
+remaining API-level work is consolidated in [Toward v1.0](#toward-v10-deferred-items-consolidated).
 
 **Adoption posture until v1.0:** consume as pinned source
 (`add_subdirectory` / FetchContent at a fixed tag) or as an installed package
@@ -161,14 +162,58 @@ documents.
       the host architecture; the `llvm-clang.cmake` rpath workaround stays
       (it is what makes macOS fuzzing link, documented in `tests/README.md`)
       with the standing rule: never use these toolchains for distributables.
+- [x] Windows developer experience: *resolved 2026-07-03* — `Init-DevEnv.ps1`
+      bootstraps a build-ready MSVC shell (VS dev environment via vswhere,
+      CMake PATH-order guard, Qt kit resolution honoring superbuild-provided
+      `Qt6_DIR`/`CMAKE_PREFIX_PATH`); `scripts/init_qt_config.py` generates
+      the git-ignored `qt.user.json`. Also fixed cl 19.51+ exceeding the
+      default template-instantiation depth on the CTRE slice-selector pattern
+      (`/templateDepth:2000` on `JSONPathParseUtils.cpp`, mirroring the Clang
+      branch); verified 2687 tests green and superbuild consumption via
+      `add_subdirectory` with parent-scope option overrides.
+- [x] **Re-baseline performance documentation.** *Resolved 2026-07-03:*
+      new baseline measured on Windows/MSVC (Release, 5-repetition medians,
+      raw JSON archived in `perf/results/`); `performance_baseline.md` and
+      `PERFORMANCE_ROADMAP.md` rewritten. Key finding: the historical
+      "recursive descent 0.2x (faster than plain Qt)" figure was an artifact
+      of the depth/result caps + dedup removed in M1 — the old benchmark
+      measured a silently truncated traversal. Corrected cost: 11.5x
+      (eval-only), making recursive+key token fusion the top perf priority
+      (tracked in `perf/PERFORMANCE_ROADMAP.md` M3). Also added
+      `perf/src/allocation_probe.cpp` (global operator-new counter):
+      `JSONPointer::create` = 1 allocation (the pimpl), `JSONPath::create`
+      = 6, copies = 2 (filter tokens shared_ptr-shared). A fresh macOS run
+      is still pending; eval-only overhead is ≈1x plain Qt on
+      Simple/Nested/Array, `evaluateSingle` 0.3–0.4x.
 
 ---
 
-## Usage rules for early adopters (until M1 lands)
+## Toward v1.0 (deferred items, consolidated)
 
-- Pin this repo (and its deps) to exact commits; clone `--recursive`.
-- Share compiled `JSONPath`/`JSONPointer`/`JSONSchema` objects across threads
-  for *evaluation* only; do not call `create()` concurrently (see M0 race).
+Candidate API/infrastructure changes explicitly deferred while resolving
+M0–M3, collected here so they are not lost in the resolved entries above:
+
+- **JSONPath result signaling:** replace the empty-array sentinel from
+  `evaluate()` with a distinct "no match" signal (see M1, result semantics).
+- **Align `create()` format-validation defaults:** the convenience
+  `JSONSchema::create()` overloads force `FormatValidation::Assertion` while
+  `SchemaOptions{}` defaults to `Auto` (documented in the header; see M1).
+- **Shared-library story:** export-macro machinery and symbol-visibility
+  design if shared builds are ever wanted (currently static-only by design;
+  see M2).
+- **SBOM feature UUID:** revisit when CMake's `install(SBOM)` stabilizes
+  (pinned to the CMake 4.3 series; see M2).
+- **Code coverage reporting** in CI (optional; see M3).
+- **API freeze:** on v1.0, breaking changes move to major versions only and
+  the AGENTS.md "refactor freely" note is retired.
+
+## Standing usage rules
+
+- Pin this repo (and its deps) to exact commits or a release tag.
+- Compiled `JSONPath`/`JSONPointer`/`JSONSchema` objects are immutable and
+  safe to share across threads; `create()` is also safe to call concurrently
+  (the former parser race was fixed in M0 — the old "evaluation only" rule
+  is retired).
 - Set `FormatValidation` explicitly if you expect `format` to be enforced
   (2020-12 default is annotation-only).
 - Keep `JSON_QUERY_FORMAT_IDN` off, or use the `ada` backend — libidn2 is

@@ -12,6 +12,19 @@ if(TARGET function_ref_interface)
   target_link_libraries(memory_allocation_test PRIVATE function_ref_interface)
 endif()
 
+# Allocation probe: counts global operator new calls around create/copy/
+# evaluate entry points (pimpl, shared_ptr control blocks). Feeds the allocation
+# table in performance_baseline.md.
+add_executable(allocation_probe src/allocation_probe.cpp)
+target_link_libraries(allocation_probe PRIVATE json_query Qt6::Core)
+target_include_directories(
+  allocation_probe PRIVATE ${PROJECT_SOURCE_DIR}/include
+                           ${PROJECT_SOURCE_DIR}/include/json-query)
+target_compile_features(allocation_probe PRIVATE cxx_std_23)
+if(TARGET function_ref_interface)
+  target_link_libraries(allocation_probe PRIVATE function_ref_interface)
+endif()
+
 # Qt memory tracker for Qt-specific memory analysis
 add_executable(qt_memory_tracker src/qt_memory_tracker.cpp)
 target_link_libraries(qt_memory_tracker PRIVATE json_query Qt6::Core)
