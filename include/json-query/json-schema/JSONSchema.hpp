@@ -79,9 +79,28 @@ enum class FormatValidation
     Annotation ///< Never validate format (annotation-only)
 };
 
+/**
+ * @brief Policy for `$ref`s that remain unresolved after compilation
+ *
+ * A `$ref` stays unresolved when it points to a remote URI and no
+ * SchemaFetcher was supplied (or the fetcher returned std::nullopt).
+ */
+enum class UnresolvedRefPolicy
+{
+    AcceptAll, ///< Treat unresolved refs as always-valid subschemas (spec-lenient default)
+    Fail       ///< Fail create() with ParseError::UnresolvedReference (fail-closed)
+};
+
+/**
+ * @note The convenience create() overloads that omit SchemaOptions currently
+ * compile with FormatValidation::Assertion, whereas a default-constructed
+ * SchemaOptions{} means FormatValidation::Auto (annotation-only for standard
+ * 2020-12). Pass SchemaOptions explicitly when the distinction matters.
+ */
 struct SchemaOptions
 {
-    FormatValidation formatValidation{FormatValidation::Auto};
+    FormatValidation    formatValidation{FormatValidation::Auto};
+    UnresolvedRefPolicy unresolvedRefPolicy{UnresolvedRefPolicy::AcceptAll};
 };
 
 class JSONSchema

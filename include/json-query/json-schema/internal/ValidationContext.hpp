@@ -5,7 +5,9 @@
 #include "json-query/json-schema/JSONSchemaValidate.hpp"
 #include "json-query/json-schema/internal/SchemaNode.hpp"
 
+#include <algorithm>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 namespace json_query::json_schema::internal
@@ -72,6 +74,20 @@ struct ValidateContext
     /// Dynamic scope stack for $dynamicRef resolution
     std::vector<DynamicScopeEntry> dynamicScope{};
 
+    /// Active $ref/$dynamicRef expansions as (target node index, instance
+    /// path) pairs. Re-entering the same pair means the reference cycle
+    /// consumes no instance input — i.e. infinite recursion.
+    std::vector<std::pair<std::size_t, QString>> activeRefs{};
+
+    /// True if expanding `target` at `instancePath` would re-enter an
+    /// already-active reference expansion (unproductive cycle).
+    [[nodiscard]] bool isRefActive(std::size_t target, const QString& instancePath) const
+    {
+        return std::any_of(activeRefs.begin(),
+                           activeRefs.end(),
+                           [&](const auto& p) { return p.first == target && p.second == instancePath; });
+    }
+
     /**
      * @brief Check if validation should continue
      *
@@ -98,6 +114,24 @@ struct ValidateContext
         }
         return std::nullopt;
     }
+};
+
+/**
+ * @brief RAII guard marking a $ref/$dynamicRef expansion as active
+ */
+struct ActiveRefGuard
+{
+    std::vector<std::pair<std::size_t, QString>>& stack;
+
+    ActiveRefGuard(std::vector<std::pair<std::size_t, QString>>& s, std::size_t target, const QString& instancePath)
+        : stack{s}
+    {
+        stack.emplace_back(target, instancePath);
+    }
+    ~ActiveRefGuard() { stack.pop_back(); } // NOLINT(modernize-use-equals-default)
+
+    ActiveRefGuard(const ActiveRefGuard&)            = delete;
+    ActiveRefGuard& operator=(const ActiveRefGuard&) = delete;
 };
 
 /**

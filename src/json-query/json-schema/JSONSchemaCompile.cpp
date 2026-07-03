@@ -969,6 +969,21 @@ compileSchema(const QJsonValue& schemaValue, SchemaFetcher fetcher, SchemaOption
     // Phase 3: Reference Resolution (Linking)
     phase3_LinkReferences(*compiled, ctx.anchors, schemaValue, ctx);
 
+    // Fail-closed policy: reject the schema if any $ref/$dynamicRef is still
+    // unresolved (validation would otherwise treat those subschemas as
+    // accept-all)
+    if (options.unresolvedRefPolicy == UnresolvedRefPolicy::Fail)
+    {
+        for (const auto& node : compiled->nodes)
+        {
+            if (const auto* refNode{std::get_if<internal::RefSchema>(&node)}; refNode && !refNode->isResolved())
+                return std::unexpected(Error(ParseError::UnresolvedReference));
+            if (const auto* dynRefNode{std::get_if<internal::DynamicRefSchema>(&node)};
+                dynRefNode && !dynRefNode->isResolved())
+                return std::unexpected(Error(ParseError::UnresolvedReference));
+        }
+    }
+
     // Phase 4: Build per-resource dynamic anchor maps and per-node anchor name map
     for (const auto& [resourceUri, anchorName, nodeIndex] : ctx.pendingDynamicAnchors)
     {

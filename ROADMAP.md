@@ -65,10 +65,17 @@ app-internal documents.
       containers at distinct locations after recursive descent. Dedup removed
       (CTS still 443/443); scale + duplicate-preservation regression tests
       added in `JSONPathGTest.cpp`.
-- [ ] **Unresolved remote `$ref` policy.** Currently validates as
-      "accept all" silently (`JSONSchemaValidate.cpp`). Add an option (or
-      default) to fail compilation/validation on unresolved refs; document.
-      Verify cycle behavior for `$ref` chains that don't consume instance depth.
+- [x] **Unresolved remote `$ref` policy + `$ref` cycle crash fixed.**
+      *Resolved 2026-07-03:* verification found that `$ref` cycles consuming
+      no instance input (e.g. `{"$ref": "#"}`) crashed validation with a
+      stack overflow. Validation now tracks active (target, instance-location)
+      ref expansions and reports `EvalError::RefCycleDetected` instead;
+      productive recursion (tree schemas) is unaffected (IETF still
+      1932/1994). Added `SchemaOptions::unresolvedRefPolicy`
+      (`AcceptAll` default / `Fail` = create() fails with
+      `ParseError::UnresolvedReference`). Note: the convenience `create()`
+      overloads force `FormatValidation::Assertion` while `SchemaOptions{}`
+      defaults to `Auto` — documented in the header; align at v1.0.
 - [ ] **Specify JSONPath result semantics in headers.**
       `evaluate`/`evaluateSingle` have no doc comments; `evaluateSingle`
       returns an empty-array `QJsonValue` sentinel for missing definite nodes

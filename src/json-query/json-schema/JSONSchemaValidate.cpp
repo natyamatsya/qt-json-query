@@ -169,7 +169,20 @@ void validateNode(ValidateContext&  ctx,
             if constexpr (std::is_same_v<T, RefSchema>)
             {
                 if (!schemaVariant.isResolved())
-                    return; // Unresolved remote $ref — treat as true (accept all)
+                    return; // Unresolved remote $ref — treat as true (accept all;
+                            // see SchemaOptions::unresolvedRefPolicy to fail at compile)
+
+                // Unproductive cycle: re-expanding the same target at the same
+                // instance location would recurse forever (e.g. {"$ref": "#"})
+                if (ctx.isRefActive(schemaVariant.targetIndex, instancePath))
+                {
+                    ctx.result.addError(instancePath,
+                                        schemaPath,
+                                        u"Infinite $ref recursion detected in schema"_qt_s,
+                                        EvalError::RefCycleDetected);
+                    return;
+                }
+                ActiveRefGuard refGuard{ctx.activeRefs, schemaVariant.targetIndex, instancePath};
 
                 const auto& rdaMap{ctx.schema.resourceDynamicAnchors};
 
@@ -205,6 +218,17 @@ void validateNode(ValidateContext&  ctx,
                             targetIndex = *resolved;
                     }
                 }
+
+                // Unproductive cycle guard (see RefSchema above)
+                if (ctx.isRefActive(targetIndex, instancePath))
+                {
+                    ctx.result.addError(instancePath,
+                                        schemaPath,
+                                        u"Infinite $ref recursion detected in schema"_qt_s,
+                                        EvalError::RefCycleDetected);
+                    return;
+                }
+                ActiveRefGuard refGuard{ctx.activeRefs, targetIndex, instancePath};
 
                 validateWithResourceScope(ctx, targetIndex, instance, instancePath, schemaPath);
                 return;

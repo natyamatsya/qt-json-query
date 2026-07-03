@@ -366,3 +366,96 @@ TEST_F(JSONSchemaRefTest, RefWithAdditionalKeywords)
     tooShort[u"name"_qt_s] = u"Jo"_qt_s;
     EXPECT_FALSE(schemaResult->validate(tooShort).isValid());
 }
+
+// ============================================================================
+// $ref Cycle Detection (unproductive recursion must not overflow the stack)
+// ============================================================================
+
+TEST_F(JSONSchemaRefTest, RootSelfRefDoesNotCrash)
+{
+    auto schemaResult{JSONSchema::create(parseSchema(R"({"$ref": "#"})"))};
+    ASSERT_TRUE(schemaResult.has_value());
+
+    // Must terminate (formerly stack overflow) and report the cycle
+    auto result{schemaResult->validate(QJsonValue{42})};
+    EXPECT_FALSE(result.isValid());
+    ASSERT_FALSE(result.errors().empty());
+    EXPECT_EQ(result.errors().front().code, json_query::Error{EvalError::RefCycleDetected});
+}
+
+TEST_F(JSONSchemaRefTest, MutualDefsCycleDoesNotCrash)
+{
+    auto schemaResult{JSONSchema::create(parseSchema(R"({
+        "$defs": {
+            "a": {"$ref": "#/$defs/b"},
+            "b": {"$ref": "#/$defs/a"}
+        },
+        "$ref": "#/$defs/a"
+    })"))};
+    ASSERT_TRUE(schemaResult.has_value());
+    EXPECT_FALSE(schemaResult->isValid(QJsonValue{42}));
+}
+
+TEST_F(JSONSchemaRefTest, ProductiveRecursionStillValidates)
+{
+    // Legal recursive schema: the $ref consumes instance depth via properties
+    auto schemaResult{JSONSchema::create(parseSchema(R"({
+        "type": "object",
+        "properties": {
+            "child": {"$ref": "#"}
+        },
+        "additionalProperties": false
+    })"))};
+    ASSERT_TRUE(schemaResult.has_value());
+
+    const auto nested{parseSchema(R"({"child": {"child": {"child": {}}}})")};
+    EXPECT_TRUE(schemaResult->validate(nested).isValid());
+
+    const auto bad{parseSchema(R"({"child": {"oops": 1}})")};
+    EXPECT_FALSE(schemaResult->validate(bad).isValid());
+}
+
+// ============================================================================
+// UnresolvedRefPolicy
+// ============================================================================
+
+TEST_F(JSONSchemaRefTest, UnresolvedRemoteRefAcceptsAllByDefault)
+{
+    auto schemaResult{JSONSchema::create(parseSchema(R"({
+        "$ref": "https://example.invalid/nope.json"
+    })"))};
+    ASSERT_TRUE(schemaResult.has_value());
+    // Spec-lenient default: unresolved subschema accepts anything
+    EXPECT_TRUE(schemaResult->isValid(QJsonValue{42}));
+    EXPECT_TRUE(schemaResult->isValid(QJsonValue{u"str"_qt_s}));
+}
+
+TEST_F(JSONSchemaRefTest, UnresolvedRemoteRefFailsWithFailPolicy)
+{
+    SchemaOptions options{};
+    options.unresolvedRefPolicy = UnresolvedRefPolicy::Fail;
+
+    auto schemaResult{JSONSchema::create(QJsonValue{parseSchema(R"({
+        "$ref": "https://example.invalid/nope.json"
+    })")},
+                                         nullptr,
+                                         options)};
+    ASSERT_FALSE(schemaResult.has_value());
+    EXPECT_EQ(schemaResult.error(), json_query::Error{ParseError::UnresolvedReference});
+}
+
+TEST_F(JSONSchemaRefTest, ResolvedRefsPassWithFailPolicy)
+{
+    SchemaOptions options{};
+    options.unresolvedRefPolicy = UnresolvedRefPolicy::Fail;
+
+    auto schemaResult{JSONSchema::create(QJsonValue{parseSchema(R"({
+        "$defs": {"s": {"type": "string"}},
+        "$ref": "#/$defs/s"
+    })")},
+                                         nullptr,
+                                         options)};
+    ASSERT_TRUE(schemaResult.has_value());
+    EXPECT_TRUE(schemaResult->isValid(QJsonValue{u"ok"_qt_s}));
+    EXPECT_FALSE(schemaResult->isValid(QJsonValue{42}));
+}

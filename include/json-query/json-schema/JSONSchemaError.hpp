@@ -61,6 +61,7 @@ enum class EvalError : std::uint8_t
     DependentSchemasFailed,
     ContainsViolation,
     PropertyNameInvalid,
+    RefCycleDetected, ///< $ref/$dynamicRef cycle that consumes no instance input
 };
 
 // JSON Schema parse error messages
@@ -78,7 +79,7 @@ inline constexpr auto json_schema_parse_errors = utils::detail::ErrorMap<ParseEr
     {ParseError::EmptySchema, DEFINE_ERROR_STRING("Schema document is empty")}};
 
 // JSON Schema evaluation error messages
-inline constexpr auto json_schema_eval_errors = utils::detail::ErrorMap<EvalError, 32>{
+inline constexpr auto json_schema_eval_errors = utils::detail::ErrorMap<EvalError, 33>{
     {EvalError::TypeMismatch, DEFINE_ERROR_STRING("Value does not match expected type")},
     {EvalError::RequiredMissing, DEFINE_ERROR_STRING("Required property is missing")},
     {EvalError::AdditionalPropertiesInvalid, DEFINE_ERROR_STRING("Additional properties are not allowed")},
@@ -110,7 +111,8 @@ inline constexpr auto json_schema_eval_errors = utils::detail::ErrorMap<EvalErro
     {EvalError::DependentRequiredMissing, DEFINE_ERROR_STRING("Dependent required property is missing")},
     {EvalError::DependentSchemasFailed, DEFINE_ERROR_STRING("Dependent schema validation failed")},
     {EvalError::ContainsViolation, DEFINE_ERROR_STRING("Array does not contain required item")},
-    {EvalError::PropertyNameInvalid, DEFINE_ERROR_STRING("Property name does not match schema")}};
+    {EvalError::PropertyNameInvalid, DEFINE_ERROR_STRING("Property name does not match schema")},
+    {EvalError::RefCycleDetected, DEFINE_ERROR_STRING("Infinite $ref recursion detected in schema")}};
 
 /**
  * @brief Convert a ParseError to a human-readable string view
