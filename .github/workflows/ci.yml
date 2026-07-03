@@ -81,9 +81,14 @@ jobs:
       - name: Select clang (clang leg only)
         if: matrix.compiler == 'clang'
         shell: bash
+        # The image's default clang 18 defines __cpp_concepts=201907L, which
+        # hides libstdc++'s C++23 <expected>; clang >= 19 is required.
         run: |
-          echo "CC=clang" >> "$GITHUB_ENV"
-          echo "CXX=clang++" >> "$GITHUB_ENV"
+          wget -q https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 20
+          echo "CC=clang-20" >> "$GITHUB_ENV"
+          echo "CXX=clang++-20" >> "$GITHUB_ENV"
 
       - name: Configure CMake
         shell: bash
@@ -238,10 +243,18 @@ jobs:
           archives: "icu qtbase"
           arch: linux_gcc_64
 
+      - name: Install clang 20
+        # Same reason as the build-and-test clang leg: the default clang 18
+        # cannot use libstdc++'s C++23 <expected>.
+        run: |
+          wget -q https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 20
+
       - name: Configure (clang + LibFuzzer)
         env:
-          CC: clang
-          CXX: clang++
+          CC: clang-20
+          CXX: clang++-20
         run: |
           cmake -S . -B build -G Ninja \
                 -DCMAKE_BUILD_TYPE=Debug \
