@@ -224,7 +224,7 @@ jobs:
 
       - name: Verify SBOM was installed
         run: |
-          sbom=$(find "$GITHUB_WORKSPACE/prefix" -iname '*.spdx*' -o -iname '*sbom*' | head -n1)
+          sbom=$(find "$GITHUB_WORKSPACE/prefix" -type f -iname '*.spdx*' | head -n1)
           if [ -z "$sbom" ]; then
             echo "::error::no SPDX SBOM found in the install prefix"
             find "$GITHUB_WORKSPACE/prefix" -type f | sort
