@@ -2,7 +2,7 @@
 
 Pre-1.0: minor versions may contain breaking changes (see `ROADMAP.md`).
 
-## Unreleased
+## 0.5.0 — 2026-07-03
 
 ### Changed
 - `ArrayPool` is now a lock-free `thread_local` pool (was a mutex-guarded
@@ -25,6 +25,11 @@ Pre-1.0: minor versions may contain breaking changes (see `ROADMAP.md`).
   running all four LibFuzzer targets. `docs/adr` merged into `doc/adr`
   (thread-local cache ADR renumbered 006); `apple-clang.cmake` no longer
   hardcodes x86_64.
+- Documentation refreshed for publication: README test-status table reflects
+  the green xfail state (2,624 passing / 0 failing), stated Qt requirement is
+  now 6.8+, AGENTS.md aligned with the tagged-release reality (including the
+  ADR-001 brace-init exception), historical compliance/perf docs
+  banner-marked, disclaimer reworded to the pre-1.0 API policy.
 
 ## 0.4.0 — 2026-07-03
 

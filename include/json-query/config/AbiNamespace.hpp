@@ -20,4 +20,4 @@
  * policy of the CMake package — bump it whenever the project's
  * <major>.<minor> version changes (e.g. project VERSION 0.5.0 -> v0_5).
  */
-#define JSON_QUERY_ABI_NS v0_4
+#define JSON_QUERY_ABI_NS v0_5
