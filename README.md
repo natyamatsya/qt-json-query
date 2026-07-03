@@ -90,10 +90,11 @@ uploads the JSON results as per-platform artifacts.
 
 `perf/` additionally contains profiling/allocation-analysis tools
 (`JSON_QUERY_BUILD_PERF`, default `ON`) and the measurement record:
-`perf/performance_baseline.md` (re-baselined 2026-07-03 on Windows/MSVC,
-raw JSON archived in `perf/results/`) and `perf/PERFORMANCE_ROADMAP.md`
-(current optimization priorities). Highlights: pre-compiled evaluation runs
-at ≈1x plain-Qt traversal speed (`evaluateSingle`: 0.3–0.4x); recursive
+`perf/performance_baseline.md` (re-baselined 2026-07-03 on Windows/MSVC and
+macOS/AppleClang, raw JSON archived in `perf/results/`) and
+`perf/PERFORMANCE_ROADMAP.md` (current optimization priorities). Highlights:
+pre-compiled evaluation runs at ≈1–3x plain-Qt traversal speed depending on
+platform (`evaluateSingle`: at or below a hand-written traversal); recursive
 descent (`$..`) is the known optimization target.
 
 ## Integration

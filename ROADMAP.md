@@ -181,10 +181,13 @@ documents.
       (eval-only), making recursive+key token fusion the top perf priority
       (tracked in `perf/PERFORMANCE_ROADMAP.md` M3). Also added
       `perf/src/allocation_probe.cpp` (global operator-new counter):
-      `JSONPointer::create` = 1 allocation (the pimpl), `JSONPath::create`
-      = 6, copies = 2 (filter tokens shared_ptr-shared). A fresh macOS run
-      is still pending; eval-only overhead is ≈1x plain Qt on
-      Simple/Nested/Array, `evaluateSingle` 0.3–0.4x.
+      `JSONPointer::create` = 1 allocation (the token vector), `JSONPath::create`
+      = 6, copies = 2 (filter tokens shared_ptr-shared; counts vary with
+      the STL, see the baseline's per-platform table). macOS (arm64,
+      AppleClang) re-measured the same day: overhead ratios are
+      platform-dependent — eval-only ≈1x plain Qt on Windows vs 1.8–2.9x
+      on macOS, `evaluateSingle` 0.3–0.4x vs ≈1.0x, recursive descent
+      11.5x vs 20.0x (the top optimization target on both).
 
 ---
 
