@@ -138,7 +138,10 @@ documents.
 
 ## M3 — Hardening & polish (ongoing)
 
-- [ ] Widen CI: LLVM-clang leg, a second Qt version, Debug builds, coverage.
+- [x] Widen CI *(partially, 2026-07-03)*: LLVM clang leg on Linux; Debug is
+      covered by the sanitize job; on-demand fuzz job added. A second Qt
+      version was ruled out (only Qt 6.8 is relevant). Still open if ever
+      wanted: code coverage reporting.
 - [x] `ArrayPool`: *resolved 2026-07-03* — converted to lock-free
       `thread_local` pools; measured 4.6x faster 8-thread evaluation (the
       global mutex had produced negative scaling).
