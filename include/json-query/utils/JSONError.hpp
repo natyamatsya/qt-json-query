@@ -181,7 +181,9 @@ struct Error
     {
     }
 
-    // Stable numeric code: high byte = domain, low byte = enum's underlying value
+    // Compact numeric code: high byte = domain, low byte = enum's underlying
+    // value. NOT stable across library versions — enumerator values are an
+    // implementation detail (see doc/adr/004). Do not persist or transmit.
     [[nodiscard]] constexpr std::uint16_t numeric() const noexcept
     {
         return static_cast<std::uint16_t>((static_cast<std::uint16_t>(domain) << 8) | code);

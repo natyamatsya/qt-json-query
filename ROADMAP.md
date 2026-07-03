@@ -71,10 +71,11 @@ app-internal documents.
       returns an empty-array `QJsonValue` sentinel for missing definite nodes
       (`JSONPath.cpp`). Define and document found-null vs. not-found; consider
       returning an error or `std::nullopt`-like signal instead of a sentinel.
-- [ ] **Stabilize error codes.** `Error::numeric()` values depend on
-      enumerator order (no explicit values in `JSONPathError.hpp` /
-      `JSONSchemaError.hpp`) and leak into `ValidationError::toJson()`. Assign
-      explicit enumerator values; declare append-only policy.
+- [x] **Error-code stability policy.** *Resolved 2026-07-03 by ADR-004:*
+      numeric error values are declared NOT part of the API (enumerators stay
+      freely sortable); consumers must branch on enumerators, never persist
+      `Error::numeric()` / `Error::code` / `toJson()` code fields. A stable
+      wire format, if ever needed, will be an explicit symbolic mapping.
 - [ ] **Schema fuzz target + fuzz hygiene.** No fuzzer covers the schema
       compiler/validator. Add one; fix `tests/fuzz/README.md` (documents two
       nonexistent targets); commit a seed corpus; add an on-demand CI fuzz job.
@@ -138,4 +139,6 @@ app-internal documents.
   (2020-12 default is annotation-only).
 - Keep `JSON_QUERY_FORMAT_IDN` off, or use the `ada` backend — libidn2 is
   LGPL-3.0 (relevant for statically-linked proprietary apps).
-- Don't persist `Error::numeric()` codes until they're stabilized (M1).
+- Never persist or transmit `Error::numeric()` / `Error::code` values —
+  they are not stable across library versions (ADR-004). Branch on the
+  enumerators instead.
