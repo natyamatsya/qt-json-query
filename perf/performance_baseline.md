@@ -1,3 +1,9 @@
+> **Historical baseline (2026-02-08) — superseded.** Measurements predate the
+> 2026-07-03 changes: thread_local ArrayPool (concurrent evaluation ~4.6x
+> faster at 8 threads), JSONPath pimpl (+1 allocation in create()), and the
+> removal of recursive-descent dedup/limits. Re-baseline before drawing
+> conclusions from these numbers.
+
 # Performance Baseline
 
 **Date**: 2026-02-08

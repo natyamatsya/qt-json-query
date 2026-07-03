@@ -1,3 +1,10 @@
+> **Historical roadmap document** (final state reached 2026-07-03). The
+> numbers below remain accurate, but the remaining base-config failures are
+> now machine-tracked as an expected-failure table
+> (`tests/rfc-compliance-suite/ietf-json-schema-draft-2020-12/KnownFailures.hpp`)
+> — the suite runs green (1932 passed / 62 skipped / 0 failed) and a tracked
+> entry that starts passing fails the suite.
+
 # JSON Schema Compliance Roadmap
 
 ## Current Score

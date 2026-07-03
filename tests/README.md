@@ -20,12 +20,12 @@ ctest --test-dir build
 
 | Target | Suite | Tests | Description |
 |---|---|---|---|
-| `json_query_core_tests` | Core | 15 | JSONPath and JSONPointer basic functionality |
+| `json_query_core_tests` | Core | 20 | JSONPath and JSONPointer basic functionality |
 | `json_query_internal_tests` | Internal | 74 | Internal components (cursors, filter storage) |
 | `rfc9535_compliance_tests` | RFC 9535 | 443 | JSONPath compliance (official CTS) |
 | `rfc6901_compliance_tests` | RFC 6901 | 33 | JSON Pointer compliance |
-| `json_schema_tests` | Schema | 116 | JSON Schema validation unit tests |
-| `ietf_json_schema_draft_2020_12_compliance_tests` | IETF Draft 2020-12 | 1932+ | JSON Schema compliance (IETF test suite) |
+| `json_schema_tests` | Schema | 122 | JSON Schema validation unit tests |
+| `ietf_json_schema_draft_2020_12_compliance_tests` | IETF Draft 2020-12 | 1932 (+62 tracked xfail skips) | JSON Schema compliance (IETF test suite) |
 
 ### Build a specific target
 
@@ -141,6 +141,7 @@ Fuzz tests use [LibFuzzer](https://llvm.org/docs/LibFuzzer.html) and require Cla
 | `fuzz_jsonpath_parsing` | Random bytes → JSONPath parsing + evaluation |
 | `fuzz_jsonpointer_parsing` | Random bytes → JSONPointer parsing + evaluation |
 | `fuzz_combined_evaluation` | Fuzzed JSONPath expression + fuzzed JSON document |
+| `fuzz_jsonschema` | Fuzzed schema (compile, lenient + strict options) + fuzzed instance (validate) |
 
 ### Building
 
@@ -152,7 +153,7 @@ cmake -B build-fuzz -S . -G Ninja -DCMAKE_BUILD_TYPE=Debug \
     -DENABLE_FUZZ_TESTS=ON \
     -DCMAKE_CXX_COMPILER=clang++ \
     -DCMAKE_C_COMPILER=clang
-ninja -C build-fuzz fuzz_jsonpath_parsing fuzz_jsonpointer_parsing fuzz_combined_evaluation
+ninja -C build-fuzz fuzz_jsonpath_parsing fuzz_jsonpointer_parsing fuzz_combined_evaluation fuzz_jsonschema
 ```
 
 ### Running

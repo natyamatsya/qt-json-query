@@ -4,11 +4,13 @@ Guidelines for AI agents working on this codebase.
 
 ## Project Overview
 
-**qt-json-query** is a C++23 library providing JSONPath (RFC 9535) and JSON Pointer (RFC 6901) implementations for Qt. It also includes JSON Schema validation support.
+**qt-json-query** is a C++23 library providing JSON Pointer (RFC 6901), JSONPath (RFC 9535), and JSON Schema (Draft 2020-12) for Qt, validated against the official compliance suites.
+
+Key documents: `ROADMAP.md` (production-readiness state), `CHANGELOG.md`, `doc/adr/` (architecture decisions).
 
 ## API Design Philosophy
 
-**This library is unreleased and pre-1.0. Backwards compatibility is not a concern.**
+**This library is pre-1.0 (tagged 0.x releases exist). Backwards compatibility is not yet a hard constraint, but breaking changes must now be recorded in `CHANGELOG.md`, and minor-version bumps require bumping `JSON_QUERY_ABI_NS` in `include/json-query/config/AbiNamespace.hpp` (see `doc/adr/005`).**
 
 The goal is to design a great, well-thought-out API for the initial public release. This means:
 
@@ -24,7 +26,7 @@ The goal is to design a great, well-thought-out API for the initial public relea
 
 - **CMake** with Ninja generator
 - **C++23** standard required
-- **Qt 6.7+** dependency
+- **Qt 6.8+** dependency
 - **CTRE** (compile-time regular expressions) for performance
 
 ### Build Commands
@@ -36,16 +38,21 @@ cmake -B build-debug-msvc -S . -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_PREFIX_
 # Build library
 cmake --build build-debug-msvc --target json_query
 
-# Build and run tests
-cmake --build build-debug-msvc --target json_query_tests
-./build-debug-msvc/tests/json_query_tests
+# Build and run tests (see tests/README.md for the full target list)
+cmake --build build-debug-msvc --target json_query_core_tests
+./build-debug-msvc/tests/json_query_core_tests
 ```
 
 ## Code Style Requirements
 
-### 1. Brace-Initialization (Mandatory)
+### 1. Brace-Initialization (Mandatory — with one exception)
 
-Always use brace-initialization `{}` instead of `=` assignment:
+Always use brace-initialization `{}` instead of `=` assignment.
+
+**Exception (ADR-001, doc/adr/001):** never brace-init a Qt JSON container
+from another container — `QJsonArray arr{someArray}` selects the
+`initializer_list` constructor and produces an array *containing* the array.
+Use copy-init there: `const QJsonArray arr = value.toArray();`
 
 ```cpp
 // ✅ Correct
@@ -265,6 +272,22 @@ if (!result.isValid()) {
 
 | Dependency | Purpose | Source |
 |------------|---------|--------|
-| Qt 6.7+ | JSON types, regex | External |
-| CTRE v3.9.0 | Compile-time regex | FetchContent |
+| Qt 6.8+ (Core, Network) | JSON types, regex, QHostAddress | External |
+| CTRE v3.10.0 (pinned commit) | Compile-time regex | find_package, FetchContent fallback |
+| tl::function_ref v1.0.0 | Non-owning callable refs | find_package, FetchContent fallback |
 | GoogleTest | Unit testing | FetchContent |
+| SRELL (optional) | ECMA-262 regex formats | FetchContent (SHA256-pinned) |
+| libidn2/ada (optional) | IDN formats | System / FetchContent |
+
+## Additional Ground Rules
+
+- **Exception policy**: the library never throws; all recoverable errors go
+  through `std::expected`. `noexcept` means "OOM is fatal" (documented on the
+  `create()` factories).
+- **Error enums** (ADR-004): numeric values are not API — keep enumerators
+  sortable, never rely on or persist their values.
+- **Compliance xfails**: expected IETF suite failures live in
+  `tests/rfc-compliance-suite/ietf-json-schema-draft-2020-12/KnownFailures.hpp`;
+  a fixed test must be removed from the table (the driver enforces this).
+- **License headers**: `// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT`
+  on every new file.

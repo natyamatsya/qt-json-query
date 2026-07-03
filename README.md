@@ -9,7 +9,7 @@ A modern C++23 library providing [JSON Pointer (RFC 6901)](https://www.rfc-edito
 
 - Full **JSON Pointer (RFC 6901)** compliance (33/33 tests)
 - Full **JSONPath (RFC 9535)** compliance (443/444 tests, 1 skipped)
-- **JSON Schema (Draft 2020-12)** validation — 1932/1994 IETF tests (96.9%)
+- **JSON Schema (Draft 2020-12)** validation — 1932/1994 IETF tests (96.9% base config; the rest are tracked optional-feature gaps)
 - Unified **`Error`** type with `std::expected` across all modules
 - Compile-time regular expressions (**CTRE**) for fast parsing
 - Clean integration with Qt JSON types (`QJsonValue`, `QJsonDocument`, etc.)
@@ -19,7 +19,7 @@ A modern C++23 library providing [JSON Pointer (RFC 6901)](https://www.rfc-edito
 | Dependency | Version |
 |---|---|
 | **C++23 compiler** | Clang 16+, GCC 13+, or MSVC 17.8+ |
-| **Qt** | 6.7+ |
+| **Qt** | 6.8+ |
 | **CTRE** | v3.10.0 (pinned commit, fetched automatically via CMake FetchContent) |
 | **GoogleTest** | (fetched automatically for tests) |
 
@@ -59,7 +59,7 @@ target_link_libraries(your_target PRIVATE json_query)
 Or installed, via `find_package`:
 
 ```cmake
-find_package(json_query 0.3 REQUIRED)
+find_package(json_query 0.4 REQUIRED)
 target_link_libraries(your_target PRIVATE json_query::json_query)
 ```
 
@@ -267,20 +267,27 @@ if (!result)
 
 ## Test Status
 
-*Last verified: 2026-02-08 — Homebrew clang 21.1.8 (LLVM), macOS, Qt 6.8.3, C++23*
+*Last verified: 2026-07-03 — AppleClang, macOS (arm64), Qt 6.8.3, C++23;
+also exercised in CI on Linux (GCC + clang, incl. ASan/UBSan) and Windows (MSVC)*
 
-| Test Suite | Passed | Total | Rate |
+| Test Suite | Passed | Skipped | Failed |
 |---|---|---|---|
-| **Core unit tests** | 18 | 18 | 100% |
-| **Internal unit tests** | 60 | 60 | 100% |
-| **RFC 6901 — JSON Pointer** | 33 | 33 | 100% |
-| **RFC 9535 — JSONPath CTS** | 443 | 444 | 99.8% |
-| **JSON Schema unit tests** | 116 | 116 | 100% |
-| **IETF JSON Schema Draft 2020-12** | 1932 | 1994 | 96.9% |
+| **Core unit tests** | 20 | — | 0 |
+| **Internal unit tests** | 74 | — | 0 |
+| **RFC 6901 — JSON Pointer** | 33 | — | 0 |
+| **RFC 9535 — JSONPath CTS** | 443 | 1¹ | 0 |
+| **JSON Schema unit tests** | 122 | — | 0 |
+| **IETF JSON Schema Draft 2020-12** | 1932 | 62² | 0 |
 
-**Totals: 2602 / 2665 tests passing (97.6%)**
+**Totals: 2,624 passing, 0 failing.**
 
-Remaining IETF failures are in `ecmascript-regex.json` (ECMA-262 Unicode semantics — requires SRELL), `hostname.json` (Unicode hostnames), and `idn-hostname.json` / `idn-email.json` (IDN — requires libidn2).
+¹ One CTS case skipped due to a documented upstream test-suite bug.
+² Known optional-feature gaps, tracked as an exact expected-failure table
+(`tests/rfc-compliance-suite/ietf-json-schema-draft-2020-12/KnownFailures.hpp`):
+ECMA-262 regex semantics (closed by `JSON_QUERY_FORMAT_ECMA_REGEX`/SRELL),
+IDN hostnames/emails (closed by `JSON_QUERY_FORMAT_IDN`), and strict-ASCII
+hostname validation. A tracked entry that unexpectedly passes fails the
+suite, so the table cannot go stale — green CI means no regressions.
 
 ## License
 
