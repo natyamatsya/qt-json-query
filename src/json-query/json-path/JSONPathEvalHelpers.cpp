@@ -242,7 +242,9 @@ std::expected<QJsonArray, EvalError> processBranchUniqueSelection(
         }
     }
 
-    return deduplicateJsonValues(results);
+    // Equal values at distinct locations are distinct nodes (RFC 9535) — no
+    // value-based dedup.
+    return std::move(results);
 }
 
 bool addsMultiplicity(const Token& tk)
@@ -362,36 +364,6 @@ processSingleUnionToken(const PathEvalCtx& ctx, qsizetype tokenIdx, const QJsonA
     if (anySuccess)
         return {.success = true, .results = std::move(results), .error = EvalError::KeyNotFound};
     return {.success = false, .results = QJsonArray{}, .error = lastError};
-}
-
-// Helper: Deduplicate JSON values using hash-based approach
-// Primitives are always kept; objects/arrays are deduplicated by content hash.
-QJsonArray deduplicateJsonValues(const QJsonArray& input)
-{
-    QSet<uint> seen;
-    seen.reserve(input.size());
-
-    auto  pooledDedup{acquirePooledArray()};
-    auto& dedup = *pooledDedup;
-
-    for (const auto& v : input)
-    {
-        if (!v.isObject() && !v.isArray())
-        {
-            dedup.append(v);
-            continue;
-        }
-
-        const auto h{v.isObject() ? qHash(QJsonDocument(v.toObject()).toJson())
-                                  : qHash(QJsonDocument(v.toArray()).toJson())};
-
-        if (!seen.contains(h))
-        {
-            seen.insert(h);
-            dedup.append(v);
-        }
-    }
-    return std::move(dedup);
 }
 
 } // namespace json_query::json_path::detail

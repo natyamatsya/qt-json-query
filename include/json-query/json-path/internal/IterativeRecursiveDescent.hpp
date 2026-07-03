@@ -20,17 +20,21 @@ namespace json_query::json_path::internal
  *
  * Uses an explicit std::vector<QJsonValue> stack with pop-emit-push
  * (no "processed" flag, no pool allocator, no pointer indirection).
+ *
+ * Deliberately unbounded: the traversal is iterative (no C++ call-stack
+ * growth), visits each node of the already-parsed document exactly once,
+ * and the result holds COW references — peak memory and output size are
+ * O(document node count), i.e. bounded by input the caller already holds.
+ * Qt's own JSON parser additionally caps nesting at 1024 levels.
  */
 struct RecursiveDescent
 {
-    static constexpr std::size_t kMaxResults{10000};
-    static constexpr std::size_t kMaxStackDepth{100};
-
     /**
-     * @brief Emit every value in depth-first order with safety limits.
+     * @brief Emit every value in depth-first (document) order.
      *
      * Used for $..* and generic recursive descent. The next token in the
      * pipeline (via fanOut) handles key/index selection from the result set.
+     * Never fails; the expected return type is kept for interface uniformity.
      */
     static std::expected<QJsonArray, EvalError> evaluateAll(const QJsonValue& root)
     {
@@ -41,18 +45,12 @@ struct RecursiveDescent
         stack.clear();
         stack.push_back(root);
 
-        std::size_t resultCount{0};
-
         while (!stack.empty())
         {
-            if (stack.size() > kMaxStackDepth || resultCount > kMaxResults)
-                return std::unexpected(EvalError::TooComplex);
-
             const auto current{std::move(stack.back())};
             stack.pop_back();
 
             result.append(current);
-            ++resultCount;
 
             if (current.isObject())
             {

@@ -69,10 +69,10 @@ static std::expected<QJsonArray, EvalError> processToken(const PathEvalCtx& ctx,
     if (result->empty())
         return emptyResult();
 
-    // Deduplicate containers after recursive descent
-    if (prevRecursive)
-        return deduplicateJsonValues(*result);
-
+    // No dedup after recursive descent: the descendant list holds each node
+    // once, and fan-out emits each node once as its parent's child. Equal
+    // values at distinct locations are distinct nodes per RFC 9535 and must
+    // all be kept.
     return std::move(*result);
 }
 

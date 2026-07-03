@@ -70,7 +70,6 @@ std::expected<QJsonArray, EvalError> processUnionTokens(const PathEvalCtx&      
 
 // Branch selection helpers
 KeyCollectionResult collectKeysFromTokens(const PathEvalCtx& ctx, qsizetype startIndex);
-QJsonArray          deduplicateJsonValues(const QJsonArray& input);
 
 std::expected<QJsonArray, EvalError> processBranchUniqueSelection(
     const PathEvalCtx& ctx, qsizetype& i, const QJsonArray& working, const QJsonValue& root, bool isLeaf);

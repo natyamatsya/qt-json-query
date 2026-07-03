@@ -56,12 +56,15 @@ app-internal documents.
 - [ ] **ASan/UBSan CI leg.** Sanitizers currently exist only bundled behind
       `ENABLE_FUZZ_TESTS`; no sanitizer runs in CI. Add a standalone
       ASan+UBSan option and a CI job (at least Linux, Debug).
-- [ ] **Document and revisit recursive-descent limits.**
-      `IterativeRecursiveDescent.hpp`: `kMaxStackDepth{100}` bounds the *work
-      stack*, not nesting depth — any node with >100 children makes `$..`
-      return `TooComplex`; `kMaxResults{10000}` caps totals. Failing loudly is
-      right, but the limits are too low for real data and undocumented. Track
-      true depth, raise/make configurable, document.
+- [x] **Recursive-descent limits removed; container-dedup RFC bug fixed.**
+      *Resolved 2026-07-03:* the `kMaxStackDepth{100}`/`kMaxResults{10000}`
+      caps were removed — the traversal is iterative (no call-stack risk) and
+      output is O(document node count), so the caps only broke `$..` on nodes
+      with >100 children. Removing them exposed a real RFC 9535 violation the
+      caps had been masking: `deduplicateJsonValues` dropped equal-valued
+      containers at distinct locations after recursive descent. Dedup removed
+      (CTS still 443/443); scale + duplicate-preservation regression tests
+      added in `JSONPathGTest.cpp`.
 - [ ] **Unresolved remote `$ref` policy.** Currently validates as
       "accept all" silently (`JSONSchemaValidate.cpp`). Add an option (or
       default) to fail compilation/validation on unresolved refs; document.
@@ -133,8 +136,6 @@ app-internal documents.
 - Pin this repo (and its deps) to exact commits; clone `--recursive`.
 - Share compiled `JSONPath`/`JSONPointer`/`JSONSchema` objects across threads
   for *evaluation* only; do not call `create()` concurrently (see M0 race).
-- Avoid `$..` recursive descent on documents where any node may exceed ~100
-  children or results exceed 10,000 (returns `TooComplex`).
 - Set `FormatValidation` explicitly if you expect `format` to be enforced
   (2020-12 default is annotation-only).
 - Keep `JSON_QUERY_FORMAT_IDN` off, or use the `ada` backend — libidn2 is
