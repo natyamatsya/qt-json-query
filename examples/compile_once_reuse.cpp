@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT
 
 // compile_once_reuse.cpp – Compile paths and schemas once, apply to many documents
 //

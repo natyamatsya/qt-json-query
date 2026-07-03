@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT
 //
 // Built-in JSON Schema 2020-12 meta-schemas.
 // Source: https://json-schema.org/draft/2020-12/schema

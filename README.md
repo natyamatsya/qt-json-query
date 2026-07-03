@@ -264,4 +264,7 @@ Remaining IETF failures are in `ecmascript-regex.json` (ECMA-262 Unicode semanti
 
 ## License
 
-Apache-2.0 WITH LLVM-exception
+Dual-licensed: **Apache-2.0 WITH LLVM-exception OR MIT** — use either
+license, at your option. See [`LICENSE-APACHE.txt`](LICENSE-APACHE.txt) and
+[`LICENSE-MIT.txt`](LICENSE-MIT.txt). Contributions are accepted under the
+same dual license.

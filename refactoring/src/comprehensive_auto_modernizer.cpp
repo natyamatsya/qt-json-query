@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT
 
 // Comprehensive Auto Modernization Tool
 // Systematically replaces explicit types with 'auto' where safe and beneficial

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT
 
 // flagship_pipeline.cpp – The complete qt-json-query experience
 //

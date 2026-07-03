@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT
 
 // JSONPathErrorGTest.cpp - Tests adhering to RFC 9535 error semantics
 // Ensures the library rejects invalid JSONPath constructs per spec.

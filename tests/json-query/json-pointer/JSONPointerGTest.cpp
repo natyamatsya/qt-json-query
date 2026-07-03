@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT
 
 // JSONPointerGTest.cpp - GoogleTest port of functional JSONPointer tests
 #include <gtest/gtest.h>

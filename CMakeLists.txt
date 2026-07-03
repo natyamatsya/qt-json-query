@@ -288,7 +288,7 @@ if(JSON_QUERY_ENABLE_INSTALL)
       SBOM json_query
       EXPORT json_queryTargets
       VERSION ${PROJECT_VERSION}
-      LICENSE "Apache-2.0 WITH LLVM-exception"
+      LICENSE "Apache-2.0 WITH LLVM-exception OR MIT"
       DESCRIPTION
         "JSON Pointer (RFC 6901), JSONPath (RFC 9535), and JSON Schema (Draft 2020-12) for Qt"
       HOMEPAGE_URL "https://github.com/natyamatsya/qt-json-query")

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT
 
 // JSONSchemaTestSuiteRunner.cpp - Parameterised Google-Test runner for JSON Schema
 // Draft 2020-12 compliance test-suite.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT
 
 // RFC6901ComplianceGTest.cpp - Parameterised Google-Test runner for JSON Pointer RFC 6901
 // compliance test-suite (rfc6901-tests.json file).

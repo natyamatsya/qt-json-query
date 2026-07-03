@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT
 
 // JSONPathGTest.cpp - comprehensive GoogleTest suite (formerly JSONPathTestGTest)
 #include <gtest/gtest.h>
