@@ -116,3 +116,45 @@ jobs:
         with:
           name: benchmark-${{ matrix.os }}
           path: benchmarks-${{ matrix.os }}.json
+
+  # ---------------------------------------------------------------------------
+  # Sanitizers: ASan + UBSan (Debug, Linux)
+  # ---------------------------------------------------------------------------
+  sanitize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v4
+
+      - name: Install Qt 6
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: 6.8.3
+          cache: true
+          archives: "qtbase"
+          arch: linux_gcc_64
+
+      - name: Configure CMake (ASan + UBSan)
+        run: |
+          cmake -S . -B build -G Ninja \
+                -DCMAKE_BUILD_TYPE=Debug \
+                -DBUILD_TESTING=ON \
+                -DBUILD_BENCHMARKING=OFF \
+                -DJSON_QUERY_BUILD_EXAMPLES=OFF \
+                -DJSON_QUERY_BUILD_PERF=OFF \
+                -DJSON_QUERY_ENABLE_SANITIZERS=ON
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Run tests under ASan + UBSan
+        working-directory: build
+        env:
+          ASAN_OPTIONS: detect_stack_use_after_return=1:strict_string_checks=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: ctest --output-on-failure

@@ -55,9 +55,10 @@ app-internal documents.
       Known mismatches → GTEST_SKIP; unknown mismatches → failure; stale
       entries that pass → failure. Suite is now green in base config
       (1932 passed / 62 skipped / 0 failed).
-- [ ] **ASan/UBSan CI leg.** Sanitizers currently exist only bundled behind
-      `ENABLE_FUZZ_TESTS`; no sanitizer runs in CI. Add a standalone
-      ASan+UBSan option and a CI job (at least Linux, Debug).
+- [x] **ASan/UBSan CI leg.** *Resolved 2026-07-03:* new
+      `JSON_QUERY_ENABLE_SANITIZERS` option (ASan+UBSan, independent of
+      `ENABLE_FUZZ_TESTS`) and a `sanitize` CI job (Linux, Debug, full ctest
+      with `detect_stack_use_after_return`).
 - [x] **Recursive-descent limits removed; container-dedup RFC bug fixed.**
       *Resolved 2026-07-03:* the `kMaxStackDepth{100}`/`kMaxResults{10000}`
       caps were removed — the traversal is iterative (no call-stack risk) and

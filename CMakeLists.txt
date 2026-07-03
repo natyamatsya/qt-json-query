@@ -23,12 +23,16 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(WITH_REFACTORING_TOOLS "Build C++ modernization refactoring tools" OFF)
 
 # ---------------------------------------------------------------------------
-# Sanitizer instrumentation for fuzz testing
+# Sanitizer instrumentation
 # ---------------------------------------------------------------------------
-# When fuzz testing is enabled, the entire project (including the library) must
-# be compiled with ASan/UBSan so that fuzz targets can link against it.
+# JSON_QUERY_ENABLE_SANITIZERS builds everything with ASan+UBSan (standalone
+# memory-safety validation, e.g. the CI sanitizer job). When fuzz testing is
+# enabled, the entire project (including the library) must also be compiled
+# with ASan/UBSan so that fuzz targets can link against it.
+option(JSON_QUERY_ENABLE_SANITIZERS
+       "Build with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 option(ENABLE_FUZZ_TESTS "Enable LibFuzzer-based fuzz testing" OFF)
-if(ENABLE_FUZZ_TESTS)
+if(JSON_QUERY_ENABLE_SANITIZERS OR ENABLE_FUZZ_TESTS)
   add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
   add_link_options(-fsanitize=address,undefined)
 endif()
