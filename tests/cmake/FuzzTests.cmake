@@ -45,7 +45,7 @@ function(configure_fuzz_target target_name source_file)
   add_executable(${target_name} ${source_file})
 
   # Link against the main library and Qt
-  target_link_libraries(${target_name} PRIVATE json_query Qt6::Core)
+  target_link_libraries(${target_name} PRIVATE json_query::json_query Qt6::Core)
 
   # Link CTRE interface if available
   if(TARGET ctre_interface)

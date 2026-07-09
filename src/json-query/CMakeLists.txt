@@ -42,6 +42,10 @@ set(JSON_QUERY_SOURCES
 # until v1.0 revisits this.
 add_library(json_query STATIC ${JSON_QUERY_SOURCES})
 
+# Namespaced alias so add_subdirectory consumers can link the same
+# json_query::json_query name that the installed package exports.
+add_library(json_query::json_query ALIAS json_query)
+
 # Static-library hygiene for shared-library consumers: hidden visibility keeps
 # json_query symbols private to any .so/.dylib that embeds this archive, so two
 # shared libraries each embedding json_query cannot interpose each other's

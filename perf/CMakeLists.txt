@@ -3,7 +3,8 @@
 
 # Memory allocation test for tracking allocations
 add_executable(memory_allocation_test src/memory_allocation_test.cpp)
-target_link_libraries(memory_allocation_test PRIVATE json_query Qt6::Core)
+target_link_libraries(memory_allocation_test PRIVATE json_query::json_query
+                                                     Qt6::Core)
 target_include_directories(
   memory_allocation_test PRIVATE ${PROJECT_SOURCE_DIR}/include
                                  ${PROJECT_SOURCE_DIR}/include/json-query)
@@ -16,7 +17,7 @@ endif()
 # evaluate entry points (pimpl, shared_ptr control blocks). Feeds the allocation
 # table in performance_baseline.md.
 add_executable(allocation_probe src/allocation_probe.cpp)
-target_link_libraries(allocation_probe PRIVATE json_query Qt6::Core)
+target_link_libraries(allocation_probe PRIVATE json_query::json_query Qt6::Core)
 target_include_directories(
   allocation_probe PRIVATE ${PROJECT_SOURCE_DIR}/include
                            ${PROJECT_SOURCE_DIR}/include/json-query)
@@ -27,7 +28,8 @@ endif()
 
 # Qt memory tracker for Qt-specific memory analysis
 add_executable(qt_memory_tracker src/qt_memory_tracker.cpp)
-target_link_libraries(qt_memory_tracker PRIVATE json_query Qt6::Core)
+target_link_libraries(qt_memory_tracker PRIVATE json_query::json_query
+                                                Qt6::Core)
 target_include_directories(
   qt_memory_tracker PRIVATE ${PROJECT_SOURCE_DIR}/include
                             ${PROJECT_SOURCE_DIR}/include/json-query)
@@ -38,7 +40,8 @@ endif()
 
 # Allocation hotspot analyzer for identifying performance bottlenecks
 add_executable(allocation_hotspot_analyzer src/allocation_hotspot_analyzer.cpp)
-target_link_libraries(allocation_hotspot_analyzer PRIVATE json_query Qt6::Core)
+target_link_libraries(allocation_hotspot_analyzer PRIVATE json_query::json_query
+                                                          Qt6::Core)
 target_include_directories(
   allocation_hotspot_analyzer PRIVATE ${PROJECT_SOURCE_DIR}/include
                                       ${PROJECT_SOURCE_DIR}/include/json-query)
@@ -50,7 +53,7 @@ endif()
 
 # Profiling test for performance analysis
 add_executable(profile_test src/profile_test.cpp)
-target_link_libraries(profile_test PRIVATE json_query Qt6::Core)
+target_link_libraries(profile_test PRIVATE json_query::json_query Qt6::Core)
 target_include_directories(
   profile_test PRIVATE ${PROJECT_SOURCE_DIR}/include
                        ${PROJECT_SOURCE_DIR}/include/json-query)
@@ -102,7 +105,8 @@ endif()
 
 # Cache analysis tool with Google perftools integration
 add_executable(cache_analysis_tool src/cache_analysis_tool.cpp)
-target_link_libraries(cache_analysis_tool PRIVATE json_query Qt6::Core)
+target_link_libraries(cache_analysis_tool PRIVATE json_query::json_query
+                                                  Qt6::Core)
 
 if(TARGET profiler)
   # Prefer fetched profiler target when available

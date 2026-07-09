@@ -8,11 +8,27 @@ project(
   LANGUAGES CXX)
 
 # ---------------------------------------------------------------------------
-# Testing option (enabled by default) and CTest include
+# Testing options and CTest include
 # ---------------------------------------------------------------------------
-# BUILD_TESTING (default ON) is declared by the CTest module itself
 option(JSON_QUERY_BUILD_BENCHMARKS "Build and enable benchmarks" OFF)
-include(CTest)
+
+# Only pull in CTest (which declares BUILD_TESTING, default ON, and writes
+# DartConfiguration.tcl) when json_query is the top-level project; embedding
+# projects keep control of their own test setup.
+if(PROJECT_IS_TOP_LEVEL)
+  include(CTest)
+endif()
+
+# Project-specific test gate: honors the standard BUILD_TESTING toggle for
+# top-level builds, defaults OFF when embedded (opt back in with
+# -DJSON_QUERY_BUILD_TESTS=ON).
+if(PROJECT_IS_TOP_LEVEL AND BUILD_TESTING)
+  set(_json_query_build_tests_default ON)
+else()
+  set(_json_query_build_tests_default OFF)
+endif()
+option(JSON_QUERY_BUILD_TESTS "Build json_query's own tests"
+       ${_json_query_build_tests_default})
 
 # ---------------------------------------------------------------------------
 # Build options
@@ -28,6 +44,16 @@ option(JSON_QUERY_BUILD_REFACTORING_TOOLS
 # Install/export rules (on for top-level builds, off when embedded)
 option(JSON_QUERY_ENABLE_INSTALL "Generate install/export rules for json_query"
        ${PROJECT_IS_TOP_LEVEL})
+if(JSON_QUERY_ENABLE_INSTALL)
+  # Must precede add_subdirectory(src/json-query): its install() destinations
+  # reference the CMAKE_INSTALL_* variables this module defines.
+  include(GNUInstallDirs)
+  # json_query is an arch-dependent static library, so its package files belong
+  # under lib/cmake/ (searched natively by find_package), not share/.
+  set(JSON_QUERY_INSTALL_CMAKEDIR
+      "${CMAKE_INSTALL_LIBDIR}/cmake/json_query"
+      CACHE STRING "Install subdirectory for json_query CMake package files")
+endif()
 
 # ---------------------------------------------------------------------------
 # Sanitizer instrumentation
@@ -40,6 +66,12 @@ option(JSON_QUERY_ENABLE_SANITIZERS
        "Build with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 option(JSON_QUERY_ENABLE_FUZZ_TESTS "Enable LibFuzzer-based fuzz testing" OFF)
 if(JSON_QUERY_ENABLE_SANITIZERS OR JSON_QUERY_ENABLE_FUZZ_TESTS)
+  if(NOT PROJECT_IS_TOP_LEVEL)
+    message(
+      WARNING
+        "json_query sanitizer/fuzz options apply directory-scope compile/link "
+        "flags; prefer enabling sanitizers in the top-level project instead.")
+  endif()
   add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
   add_link_options(-fsanitize=address,undefined)
 endif()
@@ -243,10 +275,12 @@ endif()
 add_subdirectory(src/json-query)
 
 # ---------------------------------------------------------------------------
-# Examples and tests
+# Examples and tests (default ON for top-level builds, OFF when embedded)
 # ---------------------------------------------------------------------------
-option(JSON_QUERY_BUILD_EXAMPLES "Build example executables" ON)
-option(JSON_QUERY_BUILD_PERF "Build performance test executables" ON)
+option(JSON_QUERY_BUILD_EXAMPLES "Build example executables"
+       ${PROJECT_IS_TOP_LEVEL})
+option(JSON_QUERY_BUILD_PERF "Build performance test executables"
+       ${PROJECT_IS_TOP_LEVEL})
 
 if(JSON_QUERY_BUILD_EXAMPLES)
   add_subdirectory(examples)
@@ -257,10 +291,11 @@ if(JSON_QUERY_BUILD_PERF)
 endif()
 
 # Unit tests (GoogleTest)
-if(BUILD_TESTING)
+if(JSON_QUERY_BUILD_TESTS)
+  # GoogleTestSetup calls enable_testing(), covering the embedded opt-in case
+  # where include(CTest) above was skipped
   include(cmake/GoogleTestSetup.cmake)
   add_subdirectory(tests)
-
 endif()
 
 # Benchmarks
@@ -273,7 +308,6 @@ endif()
 # Installation (headers and library)
 # ---------------------------------------------------------------------------
 if(JSON_QUERY_ENABLE_INSTALL)
-  include(GNUInstallDirs)
   # json_query itself is added to the export set in
   # src/json-query/CMakeLists.txt. CTRE/function_ref are PRIVATE build
   # dependencies (not part of the public header surface since the pimpl) and are
@@ -285,14 +319,14 @@ if(JSON_QUERY_ENABLE_INSTALL)
     EXPORT json_queryTargets
     FILE json_queryTargets.cmake
     NAMESPACE json_query::
-    DESTINATION ${CMAKE_INSTALL_DATADIR}/json_query/cmake)
+    DESTINATION ${JSON_QUERY_INSTALL_CMAKEDIR})
 
   # Package config + version file so find_package(json_query) works
   include(CMakePackageConfigHelpers)
   configure_package_config_file(
     cmake/json_queryConfig.cmake.in
     ${CMAKE_CURRENT_BINARY_DIR}/json_queryConfig.cmake
-    INSTALL_DESTINATION ${CMAKE_INSTALL_DATADIR}/json_query/cmake)
+    INSTALL_DESTINATION ${JSON_QUERY_INSTALL_CMAKEDIR})
   # Pre-1.0: minor versions may break API, so compatibility is SameMinorVersion
   write_basic_package_version_file(
     ${CMAKE_CURRENT_BINARY_DIR}/json_queryConfigVersion.cmake
@@ -300,7 +334,7 @@ if(JSON_QUERY_ENABLE_INSTALL)
     COMPATIBILITY SameMinorVersion)
   install(FILES ${CMAKE_CURRENT_BINARY_DIR}/json_queryConfig.cmake
                 ${CMAKE_CURRENT_BINARY_DIR}/json_queryConfigVersion.cmake
-          DESTINATION ${CMAKE_INSTALL_DATADIR}/json_query/cmake)
+          DESTINATION ${JSON_QUERY_INSTALL_CMAKEDIR})
 
   if(JSON_QUERY_FORMAT_IDN AND JSON_QUERY_IDN_BACKEND STREQUAL "ada")
     message(

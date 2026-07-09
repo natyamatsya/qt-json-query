@@ -14,7 +14,7 @@ target_include_directories(json_benchmark PRIVATE ${PROJECT_SOURCE_DIR}/include)
 # Link required libraries
 find_package(Qt6 REQUIRED COMPONENTS Core)
 
-target_link_libraries(json_benchmark PRIVATE json_query Qt6::Core
+target_link_libraries(json_benchmark PRIVATE json_query::json_query Qt6::Core
                                              benchmark::benchmark)
 
 # Link function_ref header-only interface when available

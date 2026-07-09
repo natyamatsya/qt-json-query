@@ -20,8 +20,9 @@ function(add_json_schema_tests)
       json_schema_tests PRIVATE ${PROJECT_SOURCE_DIR}/include
                                 ${PROJECT_SOURCE_DIR}/tests/include)
 
-    target_link_libraries(json_schema_tests PRIVATE json_query GTest::gmock
-                                                    GTest::gtest_main Qt6::Core)
+    target_link_libraries(
+      json_schema_tests PRIVATE json_query::json_query GTest::gmock
+                                GTest::gtest_main Qt6::Core)
 
     target_compile_features(json_schema_tests PRIVATE cxx_std_23)
 

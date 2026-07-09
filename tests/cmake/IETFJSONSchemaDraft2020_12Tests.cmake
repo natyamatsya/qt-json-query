@@ -23,7 +23,7 @@ function(add_ietf_json_schema_draft_2020_12_tests)
 
     target_link_libraries(
       ietf_json_schema_draft_2020_12_compliance_tests
-      PRIVATE json_query GTest::gmock GTest::gtest_main Qt6::Core)
+      PRIVATE json_query::json_query GTest::gmock GTest::gtest_main Qt6::Core)
 
     # Provide project source dir to tests so they can locate compliance JSON
     # files
