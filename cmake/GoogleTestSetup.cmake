@@ -7,11 +7,21 @@
 enable_testing()
 
 include(FetchContent)
+# FIND_PACKAGE_ARGS: prefer a package-manager copy (vcpkg's `gtest` port, a
+# system GTest, or a superbuild's) over the pinned fetch; the fetch is only a
+# fallback. All test modules link the namespaced GTest:: targets, which both
+# resolution paths provide.
 FetchContent_Declare(
   googletest
-  URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip)
+  URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
+      FIND_PACKAGE_ARGS 1.14 NAMES GTest)
 set(gtest_force_shared_crt
     ON
+    CACHE BOOL "" FORCE)
+# Keep the fetched GoogleTest out of our install rules (it would otherwise land
+# in the install prefix alongside json_query)
+set(INSTALL_GTEST
+    OFF
     CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
@@ -33,8 +43,13 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   if(JSON_QUERY_HAVE_WCHARACTER_CONVERSION)
     list(APPEND _gtest_warning_opts -Wno-character-conversion)
   endif()
+  # The bare build targets only exist when FetchContent built GoogleTest from
+  # source; skip when find_package satisfied the dependency with imported
+  # targets (their warnings are not our build's problem).
   foreach(gtest_target gtest gtest_main gmock gmock_main)
-    target_compile_options(${gtest_target} PRIVATE ${_gtest_warning_opts})
+    if(TARGET ${gtest_target})
+      target_compile_options(${gtest_target} PRIVATE ${_gtest_warning_opts})
+    endif()
   endforeach()
   unset(_gtest_warning_opts)
 endif()
