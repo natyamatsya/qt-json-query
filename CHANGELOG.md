@@ -2,6 +2,45 @@
 
 Pre-1.0: minor versions may contain breaking changes (see `ROADMAP.md`).
 
+## Unreleased
+
+### Changed (CMake integration)
+- **Option renames** (no compatibility shims, pre-1.0):
+  `BUILD_BENCHMARKING` → `JSON_QUERY_BUILD_BENCHMARKS`,
+  `ENABLE_FUZZ_TESTS` → `JSON_QUERY_ENABLE_FUZZ_TESTS`,
+  `WITH_REFACTORING_TOOLS` → `JSON_QUERY_BUILD_REFACTORING_TOOLS`. Every
+  user-facing cache variable now carries the `JSON_QUERY_` prefix, so a
+  superbuild cannot collide with them. `BUILD_TESTING` keeps its standard
+  CTest name and is honored for top-level builds via the new
+  `JSON_QUERY_BUILD_TESTS` gate.
+- **Superbuild/`add_subdirectory` hardening:** `include(CTest)` and the
+  examples/perf/tests/install defaults now key off `PROJECT_IS_TOP_LEVEL` —
+  embedding projects get only the library target (each piece can be re-enabled
+  explicitly, e.g. `-DJSON_QUERY_BUILD_TESTS=ON`). New
+  `json_query::json_query` ALIAS so embedded consumers link the same
+  namespaced name the installed package exports (all in-tree consumers and
+  a new CI embed smoke test use it). Fuzz-test paths are superbuild-safe
+  (`PROJECT_SOURCE_DIR`/`PROJECT_BINARY_DIR`). `JSON_QUERY_ENABLE_INSTALL`
+  is now a declared option (default: top-level only).
+- **Install layout:** CMake package files moved from
+  `share/json_query/cmake/` to `lib/cmake/json_query/` (the conventional
+  location for an arch-dependent static library; override with
+  `JSON_QUERY_INSTALL_CMAKEDIR`).
+- **Package-manager friendliness:** the GoogleTest and Google Benchmark
+  fetches now use `FIND_PACKAGE_ARGS` (vcpkg/system copies win over the
+  pinned FetchContent fallback), matching the existing CTRE/function_ref
+  behavior. New `vcpkg.json` manifest (`ctre`, `tl-function-ref`; `tests` and
+  `benchmarks` features) plus a CI job that builds and tests with
+  vcpkg-resolved dependencies.
+
+### Changed (library)
+- Error enums are now grouped by category with banner comments, alphabetical
+  within each group (`json_schema::ParseError`/`EvalError`, `ErrorDomain`,
+  `ConvertError`, and `json_path::EvalError` reordered). Numeric error-code
+  values shift accordingly; per ADR-004 those values are not API. ADR-004's
+  maintenance policy updated to "grouped by category, alphabetical within
+  group".
+
 ## 0.5.0 — 2026-07-03
 
 ### Changed

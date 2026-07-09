@@ -95,7 +95,8 @@ CI builds and runs the benchmarks on every platform leg (best-effort) and
 uploads the JSON results as per-platform artifacts.
 
 `perf/` additionally contains profiling/allocation-analysis tools
-(`JSON_QUERY_BUILD_PERF`, default `ON`) and the measurement record:
+(`JSON_QUERY_BUILD_PERF`, default `ON` for top-level builds, `OFF` when
+embedded) and the measurement record:
 `perf/performance_baseline.md` (re-baselined 2026-07-03 on Windows/MSVC and
 macOS/AppleClang, raw JSON archived in `perf/results/`) and
 `perf/PERFORMANCE_ROADMAP.md` (current optimization priorities). Highlights:
@@ -109,8 +110,12 @@ As a subdirectory (FetchContent or git submodule):
 
 ```cmake
 add_subdirectory(path/to/qt-json-query)
-target_link_libraries(your_target PRIVATE json_query)
+target_link_libraries(your_target PRIVATE json_query::json_query)
 ```
+
+When embedded this way, only the library target is configured — examples,
+perf tools, tests, and install/export rules all default to OFF (each can be
+re-enabled, e.g. `-DJSON_QUERY_BUILD_TESTS=ON`).
 
 Or installed, via `find_package`:
 
@@ -152,6 +157,17 @@ Override mechanisms, in order of preference:
   `FETCHCONTENT_SOURCE_DIR_FUNCTION_REF` to a source directory.
 - **Force the pinned fetch** (ignore installed packages): configure with
   `-DFETCHCONTENT_TRY_FIND_PACKAGE_MODE=NEVER`.
+
+The same applies to the test/benchmark dependencies (GoogleTest via
+`find_package(GTest)`, Google Benchmark via `find_package(benchmark)`).
+A `vcpkg.json` manifest is provided for vcpkg users: `ctre` and
+`tl-function-ref` are direct dependencies, GoogleTest/Benchmark sit behind
+the `tests`/`benchmarks` features (`-DVCPKG_MANIFEST_FEATURES=tests`).
+Qt itself is deliberately **not** in the manifest — supply it via
+`CMAKE_PREFIX_PATH` (vcpkg's qtbase is a heavyweight build). CI exercises
+this path (`vcpkg-deps` job), the installed-package path
+(`install-package`), and the `add_subdirectory` embedding path
+(`tests/embed-smoke`).
 
 ### SBOM generation (CMake ≥ 4.3)
 

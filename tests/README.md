@@ -85,7 +85,10 @@ cmake --build build --target ietf_json_schema_draft_2020_12_compliance_tests
 
 ## CMake Options
 
-All test suites are enabled by default (except fuzz tests):
+The test tree as a whole is gated by `JSON_QUERY_BUILD_TESTS` (default: `ON`
+for top-level builds when `BUILD_TESTING` is on, `OFF` when the project is
+embedded via `add_subdirectory`). Within it, all suites are enabled by
+default (except fuzz tests):
 
 | Option | Default | Description |
 |---|---|---|

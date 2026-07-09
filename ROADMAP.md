@@ -207,6 +207,21 @@ M0–M3, collected here so they are not lost in the resolved entries above:
 - **SBOM feature UUID:** revisit when CMake's `install(SBOM)` stabilizes
   (pinned to the CMake 4.3 series; see M2).
 - **Code coverage reporting** in CI (optional; see M3).
+- **Unify `ConvErrorCode` with `ConvertError`:** `utils/JSONValueUtils.hpp`
+  carries a near-duplicate conversion enum (with its own message path and a
+  `ConvError` struct holding expected/actual kinds) outside the unified
+  `Error` system; folding them needs an API design pass.
+- **Collapse the three-way error-domain wiring:** `error_domain<E>`, the
+  `is_domain_enum_v` chain, and the seven explicit `Error` constructors in
+  `utils/JSONError.hpp` encode the same mapping; the constrained fallback
+  constructor could subsume the explicit ones (changes overload resolution
+  from explicit to implicit — deserves its own change).
+- **Symbolic error codes in `ValidationError::toJson()`:** the `code` field
+  is `Error::numeric()`, which ADR-004 declares unstable; migrate to (or add
+  alongside) a symbolic string name if the JSON output is ever consumed
+  across versions.
+- **vcpkg port:** a real port/overlay recipe (the repo ships a consumer-side
+  `vcpkg.json` manifest only).
 - **API freeze:** on v1.0, breaking changes move to major versions only and
   the AGENTS.md "refactor freely" note is retired.
 
