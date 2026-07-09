@@ -10,7 +10,7 @@ project(
 # ---------------------------------------------------------------------------
 # Testing option (enabled by default) and CTest include
 # ---------------------------------------------------------------------------
-option(BUILD_TESTING "Build and enable tests" ON)
+# BUILD_TESTING (default ON) is declared by the CTest module itself
 option(BUILD_BENCHMARKING "Build and enable benchmarks" OFF)
 include(CTest)
 
@@ -23,6 +23,10 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Refactoring tools option (disabled by default)
 option(WITH_REFACTORING_TOOLS "Build C++ modernization refactoring tools" OFF)
+
+# Install/export rules (on for top-level builds, off when embedded)
+option(JSON_QUERY_ENABLE_INSTALL "Generate install/export rules for json_query"
+       ${PROJECT_IS_TOP_LEVEL})
 
 # ---------------------------------------------------------------------------
 # Sanitizer instrumentation

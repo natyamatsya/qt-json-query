@@ -59,8 +59,9 @@ function(configure_fuzz_target target_name source_file)
   target_link_options(${target_name} PRIVATE -fsanitize=fuzzer)
 
   # Add include directories for the library headers
-  target_include_directories(${target_name} PRIVATE ${CMAKE_SOURCE_DIR}/include
-                                                    ${CMAKE_SOURCE_DIR}/src)
+  target_include_directories(
+    ${target_name} PRIVATE ${PROJECT_SOURCE_DIR}/include
+                           ${PROJECT_SOURCE_DIR}/src)
 
   # Set C++23 standard
   target_compile_features(${target_name} PRIVATE cxx_std_23)
@@ -68,10 +69,10 @@ function(configure_fuzz_target target_name source_file)
   # Add to fuzz tests group
   set_target_properties(
     ${target_name} PROPERTIES FOLDER "FuzzTests" RUNTIME_OUTPUT_DIRECTORY
-                                                 "${CMAKE_BINARY_DIR}/fuzz")
+                                                 "${PROJECT_BINARY_DIR}/fuzz")
 
   # Create corpus directory
-  set(CORPUS_DIR "${CMAKE_BINARY_DIR}/fuzz/corpus/${target_name}")
+  set(CORPUS_DIR "${PROJECT_BINARY_DIR}/fuzz/corpus/${target_name}")
   file(MAKE_DIRECTORY ${CORPUS_DIR})
 
   # Add custom target for running this fuzzer
@@ -80,7 +81,7 @@ function(configure_fuzz_target target_name source_file)
     COMMAND ${target_name} ${CORPUS_DIR} -max_total_time=300
             -print_final_stats=1
     DEPENDS ${target_name}
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/fuzz
+    WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/fuzz
     COMMENT "Running ${target_name} fuzzer for 5 minutes")
 endfunction()
 
@@ -119,18 +120,19 @@ function(add_fuzz_tests)
     fuzz_quick
     COMMAND
       fuzz_jsonpath_parsing
-      ${CMAKE_BINARY_DIR}/fuzz/corpus/fuzz_jsonpath_parsing -max_total_time=30
+      ${PROJECT_BINARY_DIR}/fuzz/corpus/fuzz_jsonpath_parsing
+      -max_total_time=30
     COMMAND
       fuzz_jsonpointer_parsing
-      ${CMAKE_BINARY_DIR}/fuzz/corpus/fuzz_jsonpointer_parsing
+      ${PROJECT_BINARY_DIR}/fuzz/corpus/fuzz_jsonpointer_parsing
       -max_total_time=30
     COMMAND
       fuzz_combined_evaluation
-      ${CMAKE_BINARY_DIR}/fuzz/corpus/fuzz_combined_evaluation
+      ${PROJECT_BINARY_DIR}/fuzz/corpus/fuzz_combined_evaluation
       -max_total_time=30
     DEPENDS fuzz_jsonpath_parsing fuzz_jsonpointer_parsing
             fuzz_combined_evaluation
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/fuzz
+    WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/fuzz
     COMMENT "Running quick fuzz tests (30 seconds each)")
 
   message(

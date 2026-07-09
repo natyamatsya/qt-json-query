@@ -28,8 +28,6 @@ option(JSON_QUERY_ENABLE_RFC9535_TESTS
 option(JSON_QUERY_ENABLE_RFC6901_TESTS
        "Build RFC 6901 JSON Pointer compliance tests" ON)
 
-option(ENABLE_FUZZ_TESTS "Enable LibFuzzer-based fuzz testing" OFF)
-
 option(JSON_QUERY_ENABLE_SCHEMA_TESTS "Build JSON Schema validation tests" ON)
 
 option(JSON_QUERY_ENABLE_IETF_JSON_SCHEMA_DRAFT_2020_12_TESTS
