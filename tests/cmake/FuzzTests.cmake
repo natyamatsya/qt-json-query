@@ -5,11 +5,12 @@
 
 # Option handling: always define add_fuzz_tests to avoid configure errors on
 # unsupported toolchains
-if(NOT ENABLE_FUZZ_TESTS)
+if(NOT JSON_QUERY_ENABLE_FUZZ_TESTS)
   function(add_fuzz_tests)
     message(
       STATUS
-        "Fuzz tests disabled (ENABLE_FUZZ_TESTS=OFF). Skipping fuzz targets.")
+        "Fuzz tests disabled (JSON_QUERY_ENABLE_FUZZ_TESTS=OFF). Skipping fuzz targets."
+    )
   endfunction()
   set(FUZZ_TESTS_CONFIGURED
       FALSE
@@ -53,8 +54,8 @@ function(configure_fuzz_target target_name source_file)
 
   # Add -fsanitize=fuzzer for the LibFuzzer entry point and mutation engine.
   # ASan/UBSan flags are applied globally in the top-level CMakeLists.txt when
-  # ENABLE_FUZZ_TESTS=ON, so the library and fuzz targets share the same
-  # instrumentation.
+  # JSON_QUERY_ENABLE_FUZZ_TESTS=ON, so the library and fuzz targets share the
+  # same instrumentation.
   target_compile_options(${target_name} PRIVATE -fsanitize=fuzzer -g -O1)
   target_link_options(${target_name} PRIVATE -fsanitize=fuzzer)
 
@@ -120,8 +121,7 @@ function(add_fuzz_tests)
     fuzz_quick
     COMMAND
       fuzz_jsonpath_parsing
-      ${PROJECT_BINARY_DIR}/fuzz/corpus/fuzz_jsonpath_parsing
-      -max_total_time=30
+      ${PROJECT_BINARY_DIR}/fuzz/corpus/fuzz_jsonpath_parsing -max_total_time=30
     COMMAND
       fuzz_jsonpointer_parsing
       ${PROJECT_BINARY_DIR}/fuzz/corpus/fuzz_jsonpointer_parsing

@@ -1,8 +1,8 @@
 # CMakeLists.txt for Refactoring Tools Optional compilation of C++ modernization
 # tools used during development
 #
-# Only entered when the top-level WITH_REFACTORING_TOOLS option is ON (the
-# option lives in the top-level CMakeLists.txt, which guards this
+# Only entered when the top-level JSON_QUERY_BUILD_REFACTORING_TOOLS option is
+# ON (the option lives in the top-level CMakeLists.txt, which guards this
 # add_subdirectory).
 
 message(STATUS "Building refactoring tools...")

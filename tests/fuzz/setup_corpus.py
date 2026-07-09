@@ -139,7 +139,7 @@ def main():
     print(f"\nCorpus setup complete!")
     print(f"Total corpus files created: {total_files}")
     print(f"\nTo run fuzz tests:")
-    print(f"  cmake --preset debug-qt -DENABLE_FUZZ_TESTS=ON")
+    print(f"  cmake --preset debug-qt -DJSON_QUERY_ENABLE_FUZZ_TESTS=ON")
     print(f"  cmake --build --preset debug-qt")
     print(f"  make fuzz_quick          # Quick 30-second test of all fuzzers")
     print(f"  make run_all_fuzzers     # Run all fuzzers for 5 minutes each")

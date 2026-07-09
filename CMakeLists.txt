@@ -11,7 +11,7 @@ project(
 # Testing option (enabled by default) and CTest include
 # ---------------------------------------------------------------------------
 # BUILD_TESTING (default ON) is declared by the CTest module itself
-option(BUILD_BENCHMARKING "Build and enable benchmarks" OFF)
+option(JSON_QUERY_BUILD_BENCHMARKS "Build and enable benchmarks" OFF)
 include(CTest)
 
 # ---------------------------------------------------------------------------
@@ -22,7 +22,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Refactoring tools option (disabled by default)
-option(WITH_REFACTORING_TOOLS "Build C++ modernization refactoring tools" OFF)
+option(JSON_QUERY_BUILD_REFACTORING_TOOLS
+       "Build C++ modernization refactoring tools" OFF)
 
 # Install/export rules (on for top-level builds, off when embedded)
 option(JSON_QUERY_ENABLE_INSTALL "Generate install/export rules for json_query"
@@ -37,8 +38,8 @@ option(JSON_QUERY_ENABLE_INSTALL "Generate install/export rules for json_query"
 # ASan/UBSan so that fuzz targets can link against it.
 option(JSON_QUERY_ENABLE_SANITIZERS
        "Build with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
-option(ENABLE_FUZZ_TESTS "Enable LibFuzzer-based fuzz testing" OFF)
-if(JSON_QUERY_ENABLE_SANITIZERS OR ENABLE_FUZZ_TESTS)
+option(JSON_QUERY_ENABLE_FUZZ_TESTS "Enable LibFuzzer-based fuzz testing" OFF)
+if(JSON_QUERY_ENABLE_SANITIZERS OR JSON_QUERY_ENABLE_FUZZ_TESTS)
   add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
   add_link_options(-fsanitize=address,undefined)
 endif()
@@ -263,7 +264,7 @@ if(BUILD_TESTING)
 endif()
 
 # Benchmarks
-if(BUILD_BENCHMARKING)
+if(JSON_QUERY_BUILD_BENCHMARKS)
   include(cmake/GoogleBenchmarkSetup.cmake)
   add_subdirectory(benchmarks)
 endif()
@@ -349,6 +350,6 @@ endif()
 # ---------------------------------------------------------------------------
 # Refactoring tools (optional)
 # ---------------------------------------------------------------------------
-if(WITH_REFACTORING_TOOLS)
+if(JSON_QUERY_BUILD_REFACTORING_TOOLS)
   add_subdirectory(refactoring)
 endif()

@@ -82,11 +82,11 @@ See [`tests/README.md`](tests/README.md) for the full list of test targets and C
 
 ### Benchmarks and performance tools
 
-Google-Benchmark microbenchmarks are opt-in (`BUILD_BENCHMARKING`, default
+Google-Benchmark microbenchmarks are opt-in (`JSON_QUERY_BUILD_BENCHMARKS`, default
 `OFF`) and should be run on a Release build:
 
 ```bash
-cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_BENCHMARKING=ON ...
+cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release -DJSON_QUERY_BUILD_BENCHMARKS=ON ...
 cmake --build build --target json_benchmark
 ./build/json_benchmark
 ```

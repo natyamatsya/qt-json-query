@@ -95,7 +95,7 @@ All test suites are enabled by default (except fuzz tests):
 | `JSON_QUERY_ENABLE_RFC6901_TESTS` | `ON` | RFC 6901 JSON Pointer compliance |
 | `JSON_QUERY_ENABLE_SCHEMA_TESTS` | `ON` | JSON Schema unit tests |
 | `JSON_QUERY_ENABLE_IETF_JSON_SCHEMA_DRAFT_2020_12_TESTS` | `ON` | IETF Draft 2020-12 compliance |
-| `ENABLE_FUZZ_TESTS` | `OFF` | LibFuzzer-based fuzz testing |
+| `JSON_QUERY_ENABLE_FUZZ_TESTS` | `OFF` | LibFuzzer-based fuzz testing |
 
 To disable a suite:
 
@@ -145,12 +145,12 @@ Fuzz tests use [LibFuzzer](https://llvm.org/docs/LibFuzzer.html) and require Cla
 
 ### Building
 
-`ENABLE_FUZZ_TESTS=ON` adds ASan/UBSan instrumentation globally (library + fuzz targets):
+`JSON_QUERY_ENABLE_FUZZ_TESTS=ON` adds ASan/UBSan instrumentation globally (library + fuzz targets):
 
 ```bash
 cmake -B build-fuzz -S . -G Ninja -DCMAKE_BUILD_TYPE=Debug \
     -DCMAKE_PREFIX_PATH=/path/to/qt/6.x/platform \
-    -DENABLE_FUZZ_TESTS=ON \
+    -DJSON_QUERY_ENABLE_FUZZ_TESTS=ON \
     -DCMAKE_CXX_COMPILER=clang++ \
     -DCMAKE_C_COMPILER=clang
 ninja -C build-fuzz fuzz_jsonpath_parsing fuzz_jsonpointer_parsing fuzz_combined_evaluation fuzz_jsonschema
@@ -178,4 +178,4 @@ On macOS with homebrew LLVM, you may also need to set `CMAKE_AR` and `CMAKE_RANL
 -DCMAKE_RANLIB=/opt/homebrew/opt/llvm/bin/llvm-ranlib
 ```
 
-**Resolved (2026-07-03)**: Homebrew LLVM 21 shipped a `libclang_rt.fuzzer_osx.a` compiled against a different libc++ ABI, causing `__hash_memory` linker errors. The `cmake/toolchains/llvm-clang.cmake` toolchain now injects Homebrew LLVM's own libc++ into the link (`-L`/`-rpath`), which resolves this — fuzz targets build and run on macOS with Homebrew LLVM 22 via `-DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/llvm-clang.cmake -DENABLE_FUZZ_TESTS=ON`. Do not ship binaries produced with this toolchain (developer-machine rpath).
+**Resolved (2026-07-03)**: Homebrew LLVM 21 shipped a `libclang_rt.fuzzer_osx.a` compiled against a different libc++ ABI, causing `__hash_memory` linker errors. The `cmake/toolchains/llvm-clang.cmake` toolchain now injects Homebrew LLVM's own libc++ into the link (`-L`/`-rpath`), which resolves this — fuzz targets build and run on macOS with Homebrew LLVM 22 via `-DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/llvm-clang.cmake -DJSON_QUERY_ENABLE_FUZZ_TESTS=ON`. Do not ship binaries produced with this toolchain (developer-machine rpath).

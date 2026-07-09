@@ -59,7 +59,7 @@ documents.
       (1932 passed / 62 skipped / 0 failed).
 - [x] **ASan/UBSan CI leg.** *Resolved 2026-07-03:* new
       `JSON_QUERY_ENABLE_SANITIZERS` option (ASan+UBSan, independent of
-      `ENABLE_FUZZ_TESTS`) and a `sanitize` CI job (Linux, Debug, full ctest
+      `JSON_QUERY_ENABLE_FUZZ_TESTS`) and a `sanitize` CI job (Linux, Debug, full ctest
       with `detect_stack_use_after_return`).
 - [x] **Recursive-descent limits removed; container-dedup RFC bug fixed.**
       *Resolved 2026-07-03:* the `kMaxStackDepth{100}`/`kMaxResults{10000}`
@@ -156,7 +156,7 @@ documents.
       longer reachable from the public umbrella since the pimpl).
 - [x] Repo hygiene: *resolved 2026-07-03* — `docs/adr` merged into
       `doc/adr` (renumbered 006), stale `src/Plan.md` deleted earlier,
-      `refactoring/` tooling kept (opt-in via `WITH_REFACTORING_TOOLS`),
+      `refactoring/` tooling kept (opt-in via `JSON_QUERY_BUILD_REFACTORING_TOOLS`),
       broken `memory_optimization_test` perf tool deleted.
 - [x] Toolchain files: *resolved 2026-07-03* — `apple-clang.cmake` now uses
       the host architecture; the `llvm-clang.cmake` rpath workaround stays

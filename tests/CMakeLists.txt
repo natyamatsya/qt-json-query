@@ -62,7 +62,7 @@ if(JSON_QUERY_ENABLE_RFC6901_TESTS)
 endif()
 
 # Fuzz tests (optional)
-if(ENABLE_FUZZ_TESTS)
+if(JSON_QUERY_ENABLE_FUZZ_TESTS)
   include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FuzzTests.cmake)
   add_fuzz_tests()
 endif()
@@ -107,7 +107,7 @@ if(JSON_QUERY_CREATE_AGGREGATE_TARGET)
     list(APPEND ALL_TEST_TARGETS rfc6901_compliance_tests)
   endif()
 
-  if(ENABLE_FUZZ_TESTS AND TARGET json_query_fuzz_tests)
+  if(JSON_QUERY_ENABLE_FUZZ_TESTS AND TARGET json_query_fuzz_tests)
     list(APPEND ALL_TEST_TARGETS json_query_fuzz_tests)
   endif()
 
@@ -136,7 +136,7 @@ message(STATUS "Core Tests:      ${JSON_QUERY_ENABLE_CORE_TESTS}")
 message(STATUS "Internal Tests:  ${JSON_QUERY_ENABLE_INTERNAL_TESTS}")
 message(STATUS "RFC 9535 Tests:  ${JSON_QUERY_ENABLE_RFC9535_TESTS}")
 message(STATUS "RFC 6901 Tests:  ${JSON_QUERY_ENABLE_RFC6901_TESTS}")
-message(STATUS "Fuzz Tests:      ${ENABLE_FUZZ_TESTS}")
+message(STATUS "Fuzz Tests:      ${JSON_QUERY_ENABLE_FUZZ_TESTS}")
 message(STATUS "Schema Tests:    ${JSON_QUERY_ENABLE_SCHEMA_TESTS}")
 message(
   STATUS

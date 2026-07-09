@@ -141,8 +141,8 @@ the per-platform columns.
 ## Raw Data
 
 Results are archived as JSON in `perf/results/` for historical comparison.
-On macOS, run from a Release build (`-DBUILD_BENCHMARKING=ON`):
+On macOS, run from a Release build (`-DJSON_QUERY_BUILD_BENCHMARKS=ON`):
 `QT_LOGGING_RULES="*=false" ./build-release/benchmarks/json_benchmark
 --benchmark_repetitions=5 --benchmark_format=json --benchmark_out=…`.
 On Windows, run the same command from a Release build
-(`. .\Init-DevEnv.ps1`, preset `release-msvc`, `-DBUILD_BENCHMARKING=ON`).
+(`. .\Init-DevEnv.ps1`, preset `release-msvc`, `-DJSON_QUERY_BUILD_BENCHMARKS=ON`).

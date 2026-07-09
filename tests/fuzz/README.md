@@ -24,7 +24,7 @@ Fuzz testing helps discover edge cases, crashes, and security vulnerabilities by
 
 ```bash
 # Configure with fuzz testing enabled
-cmake --preset debug-qt -DENABLE_FUZZ_TESTS=ON
+cmake --preset debug-qt -DJSON_QUERY_ENABLE_FUZZ_TESTS=ON
 
 # Build the fuzz targets
 cmake --build --preset debug-qt
@@ -152,7 +152,7 @@ The fuzz tests use carefully crafted seed inputs to improve fuzzing effectivenes
 
 ```cmake
 # Enable fuzz testing
--DENABLE_FUZZ_TESTS=ON
+-DJSON_QUERY_ENABLE_FUZZ_TESTS=ON
 
 # Fuzz tests are automatically configured with:
 # - LibFuzzer instrumentation (-fsanitize=fuzzer)
@@ -220,7 +220,7 @@ When a crash is found:
 - name: Fuzz Testing
   if: matrix.compiler == 'clang'
   run: |
-    cmake --preset debug-qt -DENABLE_FUZZ_TESTS=ON
+    cmake --preset debug-qt -DJSON_QUERY_ENABLE_FUZZ_TESTS=ON
     cmake --build --preset debug-qt
     
     # Set up corpus

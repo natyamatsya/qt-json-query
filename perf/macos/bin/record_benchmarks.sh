@@ -37,7 +37,7 @@ if [[ ! -x "$BENCHMARK_BIN" ]]; then
     echo "Building json_benchmark in $BUILD_DIR …"
     if [[ ! -d "$PROJECT_ROOT/$BUILD_DIR" ]]; then
         cmake -S "$PROJECT_ROOT" -B "$PROJECT_ROOT/$BUILD_DIR" -G Ninja \
-              -DCMAKE_BUILD_TYPE=Release -DBUILD_BENCHMARKING=ON \
+              -DCMAKE_BUILD_TYPE=Release -DJSON_QUERY_BUILD_BENCHMARKS=ON \
               -DCMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH:-}" 2>&1 | tail -3
     fi
     cmake --build "$PROJECT_ROOT/$BUILD_DIR" --target json_benchmark --parallel \
