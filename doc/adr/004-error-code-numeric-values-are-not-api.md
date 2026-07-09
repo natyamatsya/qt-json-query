@@ -1,6 +1,8 @@
 # ADR-004: Error-Code Numeric Values Are Not API
 
-- **Status:** Accepted
+- **Status:** Accepted (amended 2026-07-10: ordering policy changed from
+  "alphanumerically sorted" to "grouped by category, alphabetical within
+  group")
 - **Date:** 2026-07-03
 - **Context:** Production-readiness review flagged that `Error::numeric()`
   values depend on enumerator order
@@ -33,7 +35,9 @@ options were considered:
 **Numeric error-code values are not part of the library's API contract.**
 
 - Enumerators may be reordered, inserted, or renamed between library versions;
-  maintainers keep them alphanumerically sorted where practical.
+  maintainers keep them grouped by category (banner comments where a group
+  structure exists), alphabetical within each group. New enumerators are
+  inserted into their natural group, not appended at the end.
 - Consumers MUST NOT persist, transmit, or hard-code numeric error values
   (`Error::numeric()`, `Error::code`, the `code` field of
   `ValidationError::toJson()` output). These values are only meaningful within
@@ -48,7 +52,7 @@ options were considered:
 ## Consequences
 
 - Enum declarations stay clean and sortable; adding an error in its natural
-  alphabetical position is a non-breaking change.
+  group/alphabetical position is a non-breaking change.
 - Any future need for stable wire codes must be met by an explicit mapping
   layer (e.g. name-string output), not by the enum values. If
   `ValidationError::toJson()` output is ever consumed across versions, its

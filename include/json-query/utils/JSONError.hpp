@@ -19,11 +19,12 @@
 namespace json_query::inline JSON_QUERY_ABI_NS
 {
 
+// Alphabetical (ADR-004: numeric values are not API)
 enum class ConvertError : std::uint8_t
 {
-    TypeMismatch,
+    NumericNotIntegral,
     NumericOutOfRange,
-    NumericNotIntegral
+    TypeMismatch
 };
 
 /**
@@ -37,12 +38,12 @@ constexpr std::string_view to_std_sv(ConvertError e) noexcept
     using enum ConvertError;
     switch (e)
     {
-    case TypeMismatch:
-        return "type mismatch during conversion";
-    case NumericOutOfRange:
-        return "numeric conversion out of range";
     case NumericNotIntegral:
         return "expected integral number";
+    case NumericOutOfRange:
+        return "numeric conversion out of range";
+    case TypeMismatch:
+        return "type mismatch during conversion";
     default:
         return "unknown conversion error";
     }
@@ -58,12 +59,12 @@ constexpr QStringView to_qt_sv(ConvertError e) noexcept
     using enum ConvertError;
     switch (e)
     {
-    case TypeMismatch:
-        return QStringLiteral("type mismatch during conversion");
-    case NumericOutOfRange:
-        return QStringLiteral("numeric conversion out of range");
     case NumericNotIntegral:
         return QStringLiteral("expected integral number");
+    case NumericOutOfRange:
+        return QStringLiteral("numeric conversion out of range");
+    case TypeMismatch:
+        return QStringLiteral("type mismatch during conversion");
     default:
         return QStringLiteral("unknown conversion error");
     }
@@ -71,15 +72,23 @@ constexpr QStringView to_qt_sv(ConvertError e) noexcept
 
 // -----------------------------------------------------------------------------
 
+// Grouped by module, parse before eval (ADR-004: numeric values are not API)
 enum class ErrorDomain : std::uint8_t
 {
-    PathParse,    // JSONPath parse errors
+    // --- JSONPath ---
+    PathParse, // JSONPath parse errors
+    PathEval,  // JSONPath evaluation errors
+
+    // --- JSON Pointer ---
     PointerParse, // JSONPointer parse errors
-    PathEval,     // JSONPath evaluation errors
     PointerEval,  // JSONPointer evaluation errors
-    Convert,      // General conversion errors
-    SchemaParse,  // JSON Schema parse/compilation errors
-    SchemaEval    // JSON Schema validation errors
+
+    // --- JSON Schema ---
+    SchemaParse, // JSON Schema parse/compilation errors
+    SchemaEval,  // JSON Schema validation errors
+
+    // --- Conversions ---
+    Convert // General conversion errors
 };
 
 // Compile-time mapping from enum type -> domain
@@ -294,4 +303,4 @@ inline QString Error::formatted_message() const
     return QString(u"%1 (at token %2)").arg(base).arg(detail);
 }
 
-} // namespace json_query
+} // namespace json_query::inline JSON_QUERY_ABI_NS
