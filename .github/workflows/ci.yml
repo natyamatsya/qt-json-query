@@ -246,6 +246,66 @@ jobs:
           cmake --build consumer-build
           ./consumer-build/consumer_smoke
 
+      # Proves the add_subdirectory embedding path: only the library target is
+      # configured (no test/example/perf leakage) and the namespaced alias
+      # exists. Qt is found via the environment set up by install-qt-action.
+      - name: Build and run add_subdirectory embed smoke
+        run: |
+          cmake -S tests/embed-smoke -B embed-build -G Ninja \
+                -DCMAKE_BUILD_TYPE=Release
+          cmake --build embed-build --parallel
+          ./embed-build/embed_smoke
+
+  # ---------------------------------------------------------------------------
+  # vcpkg: dependencies resolved via find_package from vcpkg ports, not
+  # FetchContent (exercises the FIND_PACKAGE_ARGS resolution path)
+  # ---------------------------------------------------------------------------
+  vcpkg-deps:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install Qt 6
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: 6.8.3
+          cache: true
+          archives: "icu qtbase"
+          arch: linux_gcc_64
+
+      # vcpkg is preinstalled on GitHub-hosted runners; manifest mode picks up
+      # vcpkg.json (ctre + tl-function-ref, gtest via the 'tests' feature).
+      # Qt is deliberately not a vcpkg dependency (supplied above).
+      - name: Configure with vcpkg-provided dependencies
+        run: |
+          cmake -S . -B build -G Ninja \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" \
+                -DVCPKG_MANIFEST_FEATURES=tests \
+                -DJSON_QUERY_BUILD_EXAMPLES=OFF \
+                -DJSON_QUERY_BUILD_PERF=OFF
+
+      - name: Assert dependencies came from vcpkg, not FetchContent
+        run: |
+          status=0
+          for dep in ctre function_ref googletest; do
+            if [ -d "build/_deps/${dep}-src" ]; then
+              echo "::error::${dep} was fetched via FetchContent instead of being found via vcpkg"
+              status=1
+            fi
+          done
+          exit $status
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Run tests
+        working-directory: build
+        run: ctest --output-on-failure
+
   # ---------------------------------------------------------------------------
   # Fuzzing (on demand via workflow_dispatch; short LibFuzzer runs per target)
   # ---------------------------------------------------------------------------
