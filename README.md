@@ -8,9 +8,13 @@
 > the versioned ABI namespace (doc/adr/005) keeps differently-versioned binaries from
 > colliding.
 
-A modern C++23 library providing [JSON Pointer (RFC 6901)](https://www.rfc-editor.org/rfc/rfc6901), [JSONPath (RFC 9535)](https://www.rfc-editor.org/rfc/rfc9535), and [JSON Schema (Draft 2020-12)](https://json-schema.org/draft/2020-12/json-schema-core) for Qt.
+A modern C++23 library providing [JSON Pointer (RFC 6901)](https://www.rfc-editor.org/rfc/rfc6901) with write support, [JSON Patch (RFC 6902)](https://www.rfc-editor.org/rfc/rfc6902), [JSON Merge Patch (RFC 7386)](https://www.rfc-editor.org/rfc/rfc7386), [JSONPath (RFC 9535)](https://www.rfc-editor.org/rfc/rfc9535), and [JSON Schema (Draft 2020-12)](https://json-schema.org/draft/2020-12/json-schema-core) for Qt.
 
-- Full **JSON Pointer (RFC 6901)** compliance (33/33 tests)
+- Full **JSON Pointer (RFC 6901)** compliance (83/83 tests) — read **and write**
+  (`add`/`replace`/`remove`/`set`, strong error guarantee)
+- Full **JSON Patch (RFC 6902)** compliance (community json-patch-tests suite,
+  108/108 enabled cases) — atomic multi-operation patches
+- **JSON Merge Patch (RFC 7386)** — complete Appendix A table
 - Full **JSONPath (RFC 9535)** compliance (443/444 tests, 1 skipped)
 - **JSON Schema (Draft 2020-12)** validation — 1932/1994 IETF tests (96.9% base config; the rest are tracked optional-feature gaps)
 - Unified **`Error`** type with `std::expected` across all modules
@@ -120,7 +124,7 @@ re-enabled, e.g. `-DJSON_QUERY_BUILD_TESTS=ON`).
 Or installed, via `find_package`:
 
 ```cmake
-find_package(json_query 0.5 REQUIRED)
+find_package(json_query 0.6 REQUIRED)
 target_link_libraries(your_target PRIVATE json_query::json_query)
 ```
 
@@ -130,7 +134,7 @@ static library only — shared builds are unsupported until a symbol-visibility
 story exists (planned for v1.0).
 
 Safe to embed in multiple libraries within one application: all symbols live
-in a versioned inline ABI namespace (`json_query::v0_5::…`, transparent to
+in a versioned inline ABI namespace (`json_query::v0_6::…`, transparent to
 source code — you still write `json_query::JSONPath`) and the archive is
 built with hidden visibility, so different embedded versions cannot collide
 or interpose each other (see `doc/adr/005`).
@@ -197,7 +201,7 @@ Include the umbrella header:
 using namespace json_query;
 ```
 
-This provides `JSONPointer`, `JSONPath`, and `JSONSchema` in the `json_query` namespace.
+This provides `JSONPointer`, `JSONPatch`, `JSONPath`, and `JSONSchema` in the `json_query` namespace.
 
 ### JSON Pointer
 
@@ -226,6 +230,78 @@ if (result)
     qDebug() << "Result:" << *result; // QJsonValue(double, 42)
 else
     qWarning() << "Eval error:" << result.error().formatted_message();
+```
+
+### Writing with JSON Pointers
+
+All write methods mutate the passed document in place and give the **strong
+guarantee**: on any error the document is left untouched (no half-applied
+writes). `add`/`replace`/`remove` follow RFC 6902 §4 operation semantics;
+`set` is an upsert that can optionally create missing intermediate containers
+(the settings-backend shape).
+
+```cpp
+#include "json-query/JSONQuery"
+#include <QJsonDocument>
+
+using namespace json_query;
+
+QJsonDocument doc; // may start empty
+
+// Upsert a deep value, creating {"ui":{"theme":{...}}} on the way
+auto accent{JSONPointer::create("/ui/theme/accent")};
+if (auto r{accent->set(doc, "teal", {.createIntermediates = true})}; !r)
+    qWarning() << r.error().formatted_message();
+
+// RFC 6902 add: "-" appends to an array
+auto tags{JSONPointer::create("/ui/tags/-")};
+if (auto r{tags->set(doc, "dark", {.createIntermediates = true})}; !r)
+    qWarning() << r.error().formatted_message();
+
+// replace: the target must already exist
+auto theme{JSONPointer::create("/ui/theme/accent")};
+if (auto r{theme->replace(doc, "crimson")}; !r)
+    qWarning() << r.error().formatted_message();
+
+// remove returns the removed value ("take")
+if (auto removed{theme->remove(doc)})
+    qDebug() << "was:" << *removed;
+```
+
+### JSON Patch (RFC 6902)
+
+Compiled patches apply **atomically** (all-or-nothing): `apply()` works on a
+copy and returns the result only if every operation succeeded.
+
+```cpp
+#include "json-query/JSONQuery"
+#include <QJsonArray>
+#include <QJsonObject>
+
+using namespace json_query;
+
+const QJsonArray patchJson{
+    QJsonObject{{"op", "test"},    {"path", "/name"},  {"value", "old"}},
+    QJsonObject{{"op", "replace"}, {"path", "/name"},  {"value", "new"}},
+    QJsonObject{{"op", "add"},     {"path", "/tags/-"}, {"value", "renamed"}},
+};
+
+auto patch{JSONPatch::create(patchJson)}; // eager validation
+if (!patch)
+    qWarning() << patch.error().formatted_message(); // "(at operation N)"
+
+if (auto result{patch->apply(doc)})
+    doc = *result;               // or: patch->applyInPlace(doc)
+else
+    qWarning() << result.error().formatted_message();
+```
+
+RFC 7386 Merge Patch is available as a free function (total — no error path):
+
+```cpp
+#include "json-query/json-patch/JSONMergePatch.hpp"
+// {"a":{"b":1,"c":2}} + {"a":{"c":null},"d":3} -> {"a":{"b":1},"d":3}
+doc = json_patch::merge_patch(doc, patchDoc);
 ```
 
 ### JSONPath
@@ -339,20 +415,23 @@ if (!result)
 
 ## Test Status
 
-*Last verified: 2026-07-03 — AppleClang, macOS (arm64), Qt 6.8.3 and
-MSVC (cl 19.51, x64), Windows 11, Qt 6.8.5, both C++23; also exercised in CI
-on Linux (GCC + clang, incl. ASan/UBSan), macOS, and Windows (MSVC), Qt 6.8.3*
+*Last verified: 2026-07-10 — MSVC (cl 19.51, x64), Windows 11, Qt 6.8.5,
+C++23 (previous full verification 2026-07-03 additionally covered AppleClang,
+macOS (arm64), Qt 6.8.3; CI exercises Linux (GCC + clang, incl. ASan/UBSan),
+macOS, and Windows (MSVC), Qt 6.8.3)*
 
 | Test Suite | Passed | Skipped | Failed |
 |---|---|---|---|
-| **Core unit tests** | 20 | — | 0 |
+| **Core unit tests** | 39 | — | 0 |
 | **Internal unit tests** | 74 | — | 0 |
-| **RFC 6901 — JSON Pointer** | 33 | — | 0 |
+| **RFC 6901 — JSON Pointer (read + write)** | 83 | — | 0 |
+| **RFC 6902 — JSON Patch (json-patch-tests + unit)** | 122 | — | 0 |
+| **RFC 7386 — JSON Merge Patch** | 20 | — | 0 |
 | **RFC 9535 — JSONPath CTS** | 443 | 1¹ | 0 |
 | **JSON Schema unit tests** | 122 | — | 0 |
 | **IETF JSON Schema Draft 2020-12** | 1932 | 62² | 0 |
 
-**Totals: 2,624 passing, 0 failing.**
+**Totals: 2,878 passing, 0 failing.**
 
 ¹ One CTS case skipped due to a documented upstream test-suite bug.
 ² Known optional-feature gaps, tracked as an exact expected-failure table

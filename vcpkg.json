@@ -1,6 +1,6 @@
 {
   "name": "qt-json-query",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "JSON Pointer (RFC 6901), JSONPath (RFC 9535), and JSON Schema (Draft 2020-12) for Qt",
   "homepage": "https://github.com/natyamatsya/qt-json-query",
   "license": "Apache-2.0 WITH LLVM-exception OR MIT",

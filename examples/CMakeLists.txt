@@ -44,6 +44,13 @@ if(TARGET function_ref_interface)
   target_link_libraries(compile_once_reuse PRIVATE function_ref_interface)
 endif()
 
+add_executable(pointer_writes_and_patch pointer_writes_and_patch.cpp)
+target_link_libraries(pointer_writes_and_patch PRIVATE json_query::json_query
+                                                       Qt6::Core)
+if(TARGET function_ref_interface)
+  target_link_libraries(pointer_writes_and_patch PRIVATE function_ref_interface)
+endif()
+
 install(
   TARGETS simple_pointer
           simple_path
@@ -52,4 +59,5 @@ install(
           simple_schema
           flagship_pipeline
           compile_once_reuse
+          pointer_writes_and_patch
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}/examples)

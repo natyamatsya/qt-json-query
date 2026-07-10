@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.24)
 # include/json-query/config/AbiNamespace.hpp (see doc/adr/005)
 project(
   json_query
-  VERSION 0.5.0
+  VERSION 0.6.0
   LANGUAGES CXX)
 
 # ---------------------------------------------------------------------------

@@ -1,5 +1,46 @@
 # Performance Baseline
 
+## 2026-07-10 addendum — write support is read-path-neutral (Windows/MSVC)
+
+Verification record for ADR-007's "no compile-time read/write gate" decision.
+Same machine as the 2026-07-03 Windows column below; A/B comparison of
+`main` (pre-write, 0.5.0) vs the write-support branch (0.6.0), both Release,
+`--benchmark_repetitions=10`, medians:
+
+| Benchmark | 0.5.0 (main) | 0.6.0 (write branch) | Delta |
+|---|---|---|---|
+| Pointer Eval_Simple (pre-compiled) | 68.1 ns | 68.1 ns | ±0 |
+| Pointer Eval_Nested | 115 ns | 115 ns | ±0 |
+| Pointer Eval_Array | 119 ns | 119 ns | ±0 |
+| Pointer Eval_Complex | 170 ns | 169 ns | noise |
+| Pointer Simple (create+eval) | 181 ns | 165 ns | −9% |
+| Pointer Nested (create+eval) | 306 ns | 283 ns | −8% |
+| Pointer Array (create+eval) | 394 ns | 353 ns | −10% |
+| Pointer Complex (create+eval) | 504 ns | 465 ns | −8% |
+
+The pre-compiled eval path is bit-for-bit unaffected; the create+eval path got
+*faster* because the container-relative parse fix removed the all-digit
+rescan branch. New write-operation numbers (0.6.0, same run):
+
+| Benchmark | Median |
+|---|---|
+| Set_Shallow (`/name`) | 477 ns |
+| Set_Deep (`/inventory/15/author/name`) | 1339 ns |
+| Add_ArrayAppend (`/inventory/-`) | 701 ns |
+| Remove_Nested (`/inventory/5/categories/0`) | 1002 ns |
+| Plain hand-written write-back ladder (same deep write) | 1194 ns |
+| JSONPatch Apply_Small (test+replace+add) | 1622 ns |
+| JSONPatch Apply_MoveHeavy (copy+move+remove) | 2864 ns |
+
+A pre-compiled deep pointer `set` costs ≈1.12× the equivalent hand-written
+extract→modify→write-back ladder (with error handling and the strong
+guarantee included). Note the create+eval and eval-only numbers in the
+2026-07-03 tables below predate this change; the eval-only Windows deltas
+between the two records (e.g. Complex 178→170 ns) reflect run-to-run machine
+variance, not code changes.
+
+---
+
 **Date**: 2026-07-03 (both platforms)
 **Method**: `json_benchmark --benchmark_repetitions=5`, medians reported.
 **Logging**: Disabled (`QT_LOGGING_RULES="*=false"`)

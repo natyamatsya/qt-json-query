@@ -4,6 +4,47 @@ Pre-1.0: minor versions may contain breaking changes (see `ROADMAP.md`).
 
 ## Unreleased
 
+### Added
+- **Writable JSON Pointers.** `JSONPointer` gains `add()`, `replace()`,
+  `remove()` (RFC 6902 §4 primitive semantics: `-`/index==size append,
+  replace/remove require the target, remove returns the removed value) and a
+  `set()` upsert with `WriteOptions::createIntermediates` (creates missing
+  containers — type chosen by the next token, JSON null counts as empty,
+  scalars are never overwritten, arrays never null-padded). All write methods
+  give the strong guarantee: on any error the document is untouched. The
+  engine is a validate-then-rebuild walk over Qt's COW containers in its own
+  translation unit, so non-writing consumers link zero write code
+  (ADR-007). New `EvalError::CannotRemoveRoot` and
+  `EvalError::DocumentRootNotContainer`. New data-driven write compliance
+  suite (seeded from RFC 6902 Appendix A), unit tests, libFuzzer target, and
+  benchmarks.
+- **RFC 6902 JSON Patch module** (`json-patch/`, `json_query::JSONPatch`):
+  eagerly validated `create(QJsonArray|QJsonDocument)`, functional + atomic
+  `apply(QJsonDocument|QJsonValue)` (all-or-nothing per RFC 6902 §5), and an
+  `applyInPlace()` convenience. `test` compares numbers numerically per
+  §4.6. Errors carry the failing operation index in `Error::detail`
+  (ADR-008); new `ErrorDomain::PatchParse`/`PatchEval`. Validated against
+  the community json-patch-tests suite (new pinned submodule
+  `compliance/json-patch-tests`): all 108 enabled cases pass, KnownFailures
+  table empty.
+- **RFC 7386 JSON Merge Patch**: `json_query::json_patch::merge_patch()`
+  free function (total, no error path) with a `QJsonDocument` overload;
+  data-driven test suite containing the complete RFC 7386 Appendix A table.
+
+### Fixed
+- **RFC 6901 container-relative token semantics.** Tokens are now
+  interpreted relative to the container they meet at evaluation time
+  (RFC 6901 §4): numeric tokens (`/foo/5`) resolve object members, and
+  leading-zero/overflowing-digit tokens are valid pointers that only fail
+  against arrays (previously rejected at parse time). Escape-sequence
+  validation now runs for every token.
+
+### Removed
+- `json_pointer::ParseError::ArrayIndexOverflow`, `::NonDecimalArrayIndex`,
+  and `::EmptyNonTerminalToken` — unreachable after the container-relative
+  fix (the latter two were already unused). Pre-1.0 breaking change; the
+  numeric values were never API (ADR-004).
+
 ### Changed (CMake integration)
 - **Option renames** (no compatibility shims, pre-1.0):
   `BUILD_BENCHMARKING` → `JSON_QUERY_BUILD_BENCHMARKS`,

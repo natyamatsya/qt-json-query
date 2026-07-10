@@ -2,15 +2,18 @@
 
 Tracks the path from "pre-1.0, refactor freely" to production use, starting with
 low-risk use cases in desktop applications. Based on the production-readiness
-review of 2026-07-03. **Status:** M0–M2 complete, M3 ongoing (as of 0.5.0);
+review of 2026-07-03. **Status:** M0–M2 complete, M3 ongoing (as of 0.6.0);
 remaining API-level work is consolidated in [Toward v1.0](#toward-v10-deferred-items-consolidated).
 
 **Adoption posture until v1.0:** consume as pinned source
 (`add_subdirectory` / FetchContent at a fixed tag) or as an installed package
 via `find_package(json_query)` (working since 0.3.0). API may still break
 between minor versions. First production use cases: JSON Schema validation of
-trusted app/config JSON, and JSONPointer/JSONPath extraction from app-internal
-documents.
+trusted app/config JSON, JSONPointer/JSONPath extraction from app-internal
+documents, and — since 0.6.0 — pointer-driven document *mutation*
+(`JSONPointer::add/replace/remove/set`, `JSONPatch`, `merge_patch`; requested
+by the first downstream consumer to replace hand-written write-back ladders
+and a bespoke settings-backend pointer engine — see ADR-007/ADR-008).
 
 ---
 
@@ -212,7 +215,8 @@ M0–M3, collected here so they are not lost in the resolved entries above:
   `ConvError` struct holding expected/actual kinds) outside the unified
   `Error` system; folding them needs an API design pass.
 - **Collapse the three-way error-domain wiring:** `error_domain<E>`, the
-  `is_domain_enum_v` chain, and the seven explicit `Error` constructors in
+  `is_domain_enum_v` chain, and the (now nine, after the 0.6.0
+  `PatchParse`/`PatchEval` domains) explicit `Error` constructors in
   `utils/JSONError.hpp` encode the same mapping; the constrained fallback
   constructor could subsume the explicit ones (changes overload resolution
   from explicit to implicit — deserves its own change).
