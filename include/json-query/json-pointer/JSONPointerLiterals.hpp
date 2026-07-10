@@ -47,12 +47,17 @@ template <PointerLiteral Lit>
     // syntax was proven in the consteval constructor above.
     static const JSONPointer compiled = []
     {
-        QString text;
         if constexpr (sizeof(Lit.value[0]) == 1)
-            text = QString::fromUtf8(reinterpret_cast<const char*>(Lit.value), static_cast<qsizetype>(Lit.size()));
+        {
+            const QString text{
+                QString::fromUtf8(reinterpret_cast<const char*>(Lit.value), static_cast<qsizetype>(Lit.size()))};
+            return JSONPointer::create(text).value();
+        }
         else
-            text = QString::fromUtf16(Lit.value, static_cast<qsizetype>(Lit.size()));
-        return JSONPointer::create(text).value();
+        {
+            // char16_t literals view directly into the NTTP array
+            return JSONPointer::create(QStringView{Lit.value, static_cast<qsizetype>(Lit.size())}).value();
+        }
     }();
     return compiled;
 }
