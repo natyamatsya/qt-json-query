@@ -2,7 +2,7 @@
 
 Pre-1.0: minor versions may contain breaking changes (see `ROADMAP.md`).
 
-## Unreleased (0.7.0)
+## 0.7.0 — 2026-07-10
 
 The 0.7.0 milestone is the AC-3033 first-consumer ergonomics track
 (API surface over unchanged spec semantics).
