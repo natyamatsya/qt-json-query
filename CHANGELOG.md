@@ -2,7 +2,7 @@
 
 Pre-1.0: minor versions may contain breaking changes (see `ROADMAP.md`).
 
-## Unreleased (0.8.0)
+## 0.8.0 — 2026-07-10
 
 ### Added
 - **Compile-time-validated pointer literals** (AC-3033 #4e, the last item
