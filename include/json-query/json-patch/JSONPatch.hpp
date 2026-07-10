@@ -89,6 +89,16 @@ class JSONPatch
     [[nodiscard]] std::expected<void, json_query::Error> applyInPlace(QJsonObject& root) const noexcept;
     [[nodiscard]] std::expected<void, json_query::Error> applyInPlace(QJsonArray& root) const noexcept;
 
+    /**
+     * @brief The compiled patch in RFC 6902 wire format.
+     *
+     * Pointers re-encode canonically (to_string()), so
+     * `JSONPatch::create(patch.toJson())` reproduces an equivalent patch —
+     * useful for persisting or transmitting patches built programmatically
+     * (see JSONPatchBuilder).
+     */
+    [[nodiscard]] QJsonArray toJson() const;
+
     /// Number of operations in the compiled patch.
     [[nodiscard]] qsizetype size() const noexcept { return static_cast<qsizetype>(m_ops.size()); }
     /// True if the patch contains no operations (applies as a no-op).

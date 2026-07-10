@@ -238,6 +238,43 @@ using detail::Op;
 
 } // namespace
 
+QJsonArray JSONPatch::toJson() const
+{
+    const auto opName = [](Op::Kind kind)
+    {
+        switch (kind)
+        {
+        case Op::Kind::Add:
+            return QLatin1String("add");
+        case Op::Kind::Copy:
+            return QLatin1String("copy");
+        case Op::Kind::Move:
+            return QLatin1String("move");
+        case Op::Kind::Remove:
+            return QLatin1String("remove");
+        case Op::Kind::Replace:
+            return QLatin1String("replace");
+        case Op::Kind::Test:
+            return QLatin1String("test");
+        }
+        return QLatin1String("");
+    };
+
+    QJsonArray out;
+    for (const Op& op : m_ops)
+    {
+        QJsonObject entry;
+        entry.insert(QLatin1String("op"), opName(op.kind));
+        entry.insert(QLatin1String("path"), op.path.to_string());
+        if (op.from)
+            entry.insert(QLatin1String("from"), op.from->to_string());
+        if (op.kind == Op::Kind::Add || op.kind == Op::Kind::Replace || op.kind == Op::Kind::Test)
+            entry.insert(QLatin1String("value"), op.value);
+        out.append(entry);
+    }
+    return out;
+}
+
 JSONPatch::ParseResult JSONPatch::create(const QJsonArray& patch) noexcept
 {
     JSONPatch jp;

@@ -2,7 +2,9 @@
 
 #pragma once
 
+#include "json-patch/JSONMergePatch.hpp"
 #include "json-patch/JSONPatch.hpp"
+#include "json-patch/JSONPatchBuilder.hpp"
 #include "json-path/JSONPath.hpp"
 #include "json-pointer/JSONPointer.hpp"
 #include "json-schema/JSONSchema.hpp"
@@ -13,7 +15,8 @@
 namespace json_query::inline JSON_QUERY_ABI_NS
 {
 
-using JSONPatch   = json_patch::JSONPatch;
+using JSONPatch        = json_patch::JSONPatch;
+using JSONPatchBuilder = json_patch::JSONPatchBuilder;
 using JSONPath    = json_path::JSONPath;
 using JSONPointer = json_pointer::JSONPointer;
 using JSONSchema  = json_schema::JSONSchema;

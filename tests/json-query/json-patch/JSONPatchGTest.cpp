@@ -313,4 +313,86 @@ TEST(JSONPatchApply, ScalarRootResultNeedsValueOverload)
     EXPECT_EQ(*viaValue, QJsonValue{42});
 }
 
+// ---------------------------------------------------------------------------
+// JSONPatchBuilder and toJson() round-trips
+// ---------------------------------------------------------------------------
+
+TEST(JSONPatchBuilder, FluentBuildEqualsHandWrittenWireFormat)
+{
+    using json_query::JSONPatchBuilder;
+    using json_query::json_pointer::JSONPointer;
+
+    const auto mappings{JSONPointer::create(u"/dynamic/dynamic_mappings").value()};
+    const auto built{JSONPatchBuilder{}
+                         .test(u"/version", 3)
+                         .replace(u"/name", QStringLiteral("new"))
+                         .add(mappings / u"-", QJsonObject{{"stream", 1}})
+                         .build()};
+    ASSERT_TRUE(built.has_value()) << describe(built);
+
+    const QJsonArray wire = parsePatchJson(R"([
+        {"op": "test",    "path": "/version", "value": 3},
+        {"op": "replace", "path": "/name",    "value": "new"},
+        {"op": "add",     "path": "/dynamic/dynamic_mappings/-", "value": {"stream": 1}}
+    ])");
+    EXPECT_EQ(built->toJson(), wire);
+
+    QJsonDocument doc(QJsonObject{
+        {"version", 3}, {"name", "old"}, {"dynamic", QJsonObject{{"dynamic_mappings", QJsonArray{}}}}});
+    ASSERT_TRUE(built->applyInPlace(doc).has_value());
+    EXPECT_EQ(doc.object().value("name"), QJsonValue{QStringLiteral("new")});
+    EXPECT_EQ(doc.object().value("dynamic").toObject().value("dynamic_mappings").toArray().size(), 1);
+}
+
+TEST(JSONPatchBuilder, StringPointerValidationHappensAtBuild)
+{
+    using json_query::JSONPatchBuilder;
+
+    const auto result{JSONPatchBuilder{}
+                          .add(u"/ok", 1)
+                          .remove(u"no-leading-slash") // invalid pointer, second op
+                          .build()};
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error().domain, ErrorDomain::PatchParse);
+    EXPECT_EQ(result.error().detail, 1);
+}
+
+TEST(JSONPatchBuilder, MoveCopyCarryFrom)
+{
+    using json_query::JSONPatchBuilder;
+
+    const auto built{JSONPatchBuilder{}.copy(u"/src", u"/dup").move(u"/src", u"/dst").build()};
+    ASSERT_TRUE(built.has_value()) << describe(built);
+
+    auto result{built->apply(QJsonValue{QJsonObject{{"src", 7}}})};
+    ASSERT_TRUE(result.has_value());
+    const auto obj{result->toObject()};
+    EXPECT_EQ(obj.value(QStringLiteral("dup")), QJsonValue{7});
+    EXPECT_EQ(obj.value(QStringLiteral("dst")), QJsonValue{7});
+    EXPECT_FALSE(obj.contains(QStringLiteral("src")));
+}
+
+TEST(JSONPatchToJson, RoundTripsThroughCreate)
+{
+    const QJsonArray wire = parsePatchJson(R"([
+        {"op": "add",     "path": "/a", "value": null},
+        {"op": "move",    "from": "/a", "path": "/b"},
+        {"op": "copy",    "from": "/b", "path": "/c"},
+        {"op": "test",    "path": "/c", "value": null},
+        {"op": "replace", "path": "/c", "value": 2},
+        {"op": "remove",  "path": "/b"}
+    ])");
+    auto compiled{JSONPatch::create(wire)};
+    ASSERT_TRUE(compiled.has_value()) << describe(compiled);
+
+    // Serialized form re-compiles to a patch with identical behavior
+    const auto serialized{compiled->toJson()};
+    auto       recompiled{JSONPatch::create(serialized)};
+    ASSERT_TRUE(recompiled.has_value()) << describe(recompiled);
+    EXPECT_EQ(recompiled->toJson(), serialized);
+
+    const QJsonDocument doc(QJsonObject{});
+    EXPECT_EQ(compiled->apply(doc).value(), recompiled->apply(doc).value());
+}
+
 } // anonymous namespace
