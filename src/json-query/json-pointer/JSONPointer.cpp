@@ -63,6 +63,37 @@ JSONPointer::EvalResult JSONPointer::evaluate(const QJsonValue& value) const
     return toPublicError(evaluateImpl(m_tokens, value));
 }
 
+// ────────────────────────────────────────────────────────────
+//  Composition
+// ────────────────────────────────────────────────────────────
+
+JSONPointer JSONPointer::appended(QStringView key) const
+{
+    JSONPointer out{*this};
+    QString     decoded{key.toString()};
+
+    // Classify exactly as parsePointer would (single source of truth), so a
+    // composed pointer behaves identically to its parsed to_string() form
+    qsizetype idx{};
+    if (json_pointer::detail::parseArrayIndex(decoded, idx))
+        out.m_tokens.push_back(Token{Token::Kind::Index, idx, std::move(decoded)});
+    else
+        out.m_tokens.push_back(Token{Token::Kind::Key, 0, std::move(decoded)});
+    return out;
+}
+
+JSONPointer JSONPointer::appended(qsizetype index) const
+{
+    JSONPointer out{*this};
+    if (index >= 0)
+        out.m_tokens.push_back(Token{Token::Kind::Index, index, QString::number(index)});
+    else
+        // Container-relative semantics: not a valid array index, so it can
+        // only name an object member (like a parsed non-index token)
+        out.m_tokens.push_back(Token{Token::Kind::Key, 0, QString::number(index)});
+    return out;
+}
+
 QString JSONPointer::to_string() const
 {
     if (m_tokens.empty())

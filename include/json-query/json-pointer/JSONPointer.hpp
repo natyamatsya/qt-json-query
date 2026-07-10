@@ -79,6 +79,32 @@ class JSONPointer
     [[nodiscard]] QString to_string() const;
 
     /**
+     * @brief A new pointer with one more reference token appended.
+     *
+     * Composition is purely programmatic — the key enters as *data*, never
+     * through the parser, so it needs no RFC 6901 escaping and cannot change
+     * the pointer's structure (keys containing '/' or '~' are re-escaped
+     * canonically by to_string()). This keeps the compile-once pattern in
+     * indexed loops:
+     *
+     * @code
+     * const auto interfaces{JSONPointer::create("/adp_information/interfaces").value()};
+     * for (qsizetype i = 0; i < count; ++i)
+     *     if (auto r{(interfaces / i / u"mac_address").replace(doc, mac(i))}; !r)
+     *         ...
+     * @endcode
+     *
+     * A key that forms a valid array index (e.g. "5") is classified exactly
+     * as the parser would classify it, so a composed pointer behaves
+     * identically to its parsed to_string() equivalent — including "-" as
+     * the array append designator. appended(qsizetype) with a negative index
+     * stores the decimal string as a member name (container-relative
+     * semantics, like a parsed non-index token).
+     */
+    [[nodiscard]] JSONPointer appended(QStringView key) const;
+    [[nodiscard]] JSONPointer appended(qsizetype index) const;
+
+    /**
      * @brief Insert @p value at the pointer target (RFC 6902 "add" semantics).
      *
      * The parent of the target must exist. On an object the member is
@@ -164,5 +190,9 @@ class JSONPointer
 
     std::vector<Token> m_tokens;
 };
+
+/// Composition sugar for appended(): `prefix / i / u"key"`.
+[[nodiscard]] inline JSONPointer operator/(const JSONPointer& base, QStringView key) { return base.appended(key); }
+[[nodiscard]] inline JSONPointer operator/(const JSONPointer& base, qsizetype index) { return base.appended(index); }
 
 } // namespace json_query::json_pointer
