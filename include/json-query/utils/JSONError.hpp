@@ -96,63 +96,43 @@ enum class ErrorDomain : std::uint8_t
     Convert // General conversion errors
 };
 
+// ─────────────────────────────────────────────────────────────────────────
+// The single enum-type -> ErrorDomain mapping. Everything else — the
+// error_domain trait, the is_domain_enum_v concept, the Error constructor,
+// and the message-dispatch switches — is generated from this list. Adding a
+// module's error enum means adding ONE line here (plus the ErrorDomain
+// enumerator above).
+// ─────────────────────────────────────────────────────────────────────────
+#define JSON_QUERY_ERROR_DOMAIN_LIST(X)                                                                               \
+    X(json_path::ParseError, PathParse)                                                                               \
+    X(json_path::EvalError, PathEval)                                                                                 \
+    X(json_pointer::ParseError, PointerParse)                                                                         \
+    X(json_pointer::EvalError, PointerEval)                                                                           \
+    X(json_patch::ParseError, PatchParse)                                                                             \
+    X(json_patch::EvalError, PatchEval)                                                                               \
+    X(json_schema::ParseError, SchemaParse)                                                                           \
+    X(json_schema::EvalError, SchemaEval)                                                                             \
+    X(ConvertError, Convert)
+
 // Compile-time mapping from enum type -> domain
 template <class E>
 struct error_domain;
 
-template <>
-struct error_domain<json_path::ParseError>
-{
-    static constexpr ErrorDomain value = ErrorDomain::PathParse;
-};
-template <>
-struct error_domain<json_pointer::ParseError>
-{
-    static constexpr ErrorDomain value = ErrorDomain::PointerParse;
-};
-template <>
-struct error_domain<json_path::EvalError>
-{
-    static constexpr ErrorDomain value = ErrorDomain::PathEval;
-};
-template <>
-struct error_domain<json_pointer::EvalError>
-{
-    static constexpr ErrorDomain value = ErrorDomain::PointerEval;
-};
-template <>
-struct error_domain<json_patch::ParseError>
-{
-    static constexpr ErrorDomain value = ErrorDomain::PatchParse;
-};
-template <>
-struct error_domain<json_patch::EvalError>
-{
-    static constexpr ErrorDomain value = ErrorDomain::PatchEval;
-};
-template <>
-struct error_domain<ConvertError>
-{
-    static constexpr ErrorDomain value = ErrorDomain::Convert;
-};
-template <>
-struct error_domain<json_schema::ParseError>
-{
-    static constexpr ErrorDomain value = ErrorDomain::SchemaParse;
-};
-template <>
-struct error_domain<json_schema::EvalError>
-{
-    static constexpr ErrorDomain value = ErrorDomain::SchemaEval;
-};
+#define JSON_QUERY_DEFINE_ERROR_DOMAIN(EnumType, DomainValue)                                                         \
+    template <>                                                                                                       \
+    struct error_domain<EnumType>                                                                                     \
+    {                                                                                                                 \
+        static constexpr ErrorDomain value = ErrorDomain::DomainValue;                                                \
+    };
+JSON_QUERY_ERROR_DOMAIN_LIST(JSON_QUERY_DEFINE_ERROR_DOMAIN)
+#undef JSON_QUERY_DEFINE_ERROR_DOMAIN
 
+// True exactly for the enums in JSON_QUERY_ERROR_DOMAIN_LIST (any type with
+// an error_domain specialization)
+template <class E, class = void>
+inline constexpr bool is_domain_enum_v = false;
 template <class E>
-inline constexpr bool is_domain_enum_v =
-    std::is_same_v<E, json_path::ParseError> || std::is_same_v<E, json_pointer::ParseError> ||
-    std::is_same_v<E, json_path::EvalError> || std::is_same_v<E, json_pointer::EvalError> ||
-    std::is_same_v<E, json_patch::ParseError> || std::is_same_v<E, json_patch::EvalError> ||
-    std::is_same_v<E, ConvertError> || std::is_same_v<E, json_schema::ParseError> ||
-    std::is_same_v<E, json_schema::EvalError>;
+inline constexpr bool is_domain_enum_v<E, std::void_t<decltype(error_domain<E>::value)>> = true;
 
 // The compact, unified error type
 struct Error
@@ -164,57 +144,13 @@ struct Error
     constexpr Error() = default;
     constexpr Error(ErrorDomain d, std::uint8_t c, std::uint16_t detail = 0) : domain(d), code(c), detail(detail) {}
 
-    // Explicit constructors for each domain error type
-    constexpr explicit Error(json_path::ParseError e, std::uint16_t d = 0) noexcept
-        : domain(ErrorDomain::PathParse), code(static_cast<std::uint8_t>(e)), detail(d)
-    {
-    }
-
-    constexpr explicit Error(json_pointer::ParseError e, std::uint16_t d = 0) noexcept
-        : domain(ErrorDomain::PointerParse), code(static_cast<std::uint8_t>(e)), detail(d)
-    {
-    }
-
-    constexpr explicit Error(json_path::EvalError e, std::uint16_t d = 0) noexcept
-        : domain(ErrorDomain::PathEval), code(static_cast<std::uint8_t>(e)), detail(d)
-    {
-    }
-
-    constexpr explicit Error(json_pointer::EvalError e, std::uint16_t d = 0) noexcept
-        : domain(ErrorDomain::PointerEval), code(static_cast<std::uint8_t>(e)), detail(d)
-    {
-    }
-
-    constexpr explicit Error(json_patch::ParseError e, std::uint16_t d = 0) noexcept
-        : domain(ErrorDomain::PatchParse), code(static_cast<std::uint8_t>(e)), detail(d)
-    {
-    }
-
-    constexpr explicit Error(json_patch::EvalError e, std::uint16_t d = 0) noexcept
-        : domain(ErrorDomain::PatchEval), code(static_cast<std::uint8_t>(e)), detail(d)
-    {
-    }
-
-    constexpr explicit Error(ConvertError e) noexcept
-        : domain(ErrorDomain::Convert), code(static_cast<std::uint8_t>(e))
-    {
-    }
-
-    constexpr explicit Error(json_schema::ParseError e) noexcept
-        : domain(ErrorDomain::SchemaParse), code(static_cast<std::uint8_t>(e))
-    {
-    }
-
-    constexpr explicit Error(json_schema::EvalError e) noexcept
-        : domain(ErrorDomain::SchemaEval), code(static_cast<std::uint8_t>(e))
-    {
-    }
-
-    // Fallback template for any other enum type that maps to a domain
+    // The one constructor for every domain error enum (the mapping comes
+    // from JSON_QUERY_ERROR_DOMAIN_LIST via error_domain<E>). Implicit on
+    // purpose: a bare enumerator has exactly one Error meaning.
     template <class E>
         requires is_domain_enum_v<E>
-    constexpr Error(E e) noexcept
-        : domain(error_domain<E>::value), code(static_cast<std::uint8_t>(std::to_underlying(e)))
+    constexpr Error(E e, std::uint16_t d = 0) noexcept
+        : domain(error_domain<E>::value), code(static_cast<std::uint8_t>(std::to_underlying(e))), detail(d)
     {
     }
 
@@ -264,27 +200,14 @@ static_assert(sizeof(Error) == 4, "Error should remain compact (4 bytes).");
  */
 [[nodiscard]] constexpr std::string_view to_std_sv(Error e) noexcept
 {
-    using enum ErrorDomain;
     switch (e.domain)
     {
-    case PathParse:
-        return json_path::to_std_sv(static_cast<json_path::ParseError>(e.code));
-    case PointerParse:
-        return json_pointer::to_std_sv(static_cast<json_pointer::ParseError>(e.code));
-    case PathEval:
-        return json_path::to_std_sv(static_cast<json_path::EvalError>(e.code));
-    case PointerEval:
-        return json_pointer::to_std_sv(static_cast<json_pointer::EvalError>(e.code));
-    case PatchParse:
-        return json_patch::to_std_sv(static_cast<json_patch::ParseError>(e.code));
-    case PatchEval:
-        return json_patch::to_std_sv(static_cast<json_patch::EvalError>(e.code));
-    case Convert:
-        return to_std_sv(static_cast<ConvertError>(e.code));
-    case SchemaParse:
-        return json_schema::to_std_sv(static_cast<json_schema::ParseError>(e.code));
-    case SchemaEval:
-        return json_schema::to_std_sv(static_cast<json_schema::EvalError>(e.code));
+        // Per-domain overloads resolve via ADL on the enum type
+#define JSON_QUERY_TO_STD_SV_CASE(EnumType, DomainValue)                                                              \
+    case ErrorDomain::DomainValue:                                                                                    \
+        return to_std_sv(static_cast<EnumType>(e.code));
+        JSON_QUERY_ERROR_DOMAIN_LIST(JSON_QUERY_TO_STD_SV_CASE)
+#undef JSON_QUERY_TO_STD_SV_CASE
     default:
         break;
     }
@@ -299,27 +222,14 @@ static_assert(sizeof(Error) == 4, "Error should remain compact (4 bytes).");
  */
 [[nodiscard]] constexpr QStringView to_qt_sv(Error e) noexcept
 {
-    using enum ErrorDomain;
     switch (e.domain)
     {
-    case PathParse:
-        return json_path::to_qt_sv(static_cast<json_path::ParseError>(e.code));
-    case PointerParse:
-        return json_pointer::to_qt_sv(static_cast<json_pointer::ParseError>(e.code));
-    case PathEval:
-        return json_path::to_qt_sv(static_cast<json_path::EvalError>(e.code));
-    case PointerEval:
-        return json_pointer::to_qt_sv(static_cast<json_pointer::EvalError>(e.code));
-    case PatchParse:
-        return json_patch::to_qt_sv(static_cast<json_patch::ParseError>(e.code));
-    case PatchEval:
-        return json_patch::to_qt_sv(static_cast<json_patch::EvalError>(e.code));
-    case Convert:
-        return to_qt_sv(static_cast<ConvertError>(e.code));
-    case SchemaParse:
-        return json_schema::to_qt_sv(static_cast<json_schema::ParseError>(e.code));
-    case SchemaEval:
-        return json_schema::to_qt_sv(static_cast<json_schema::EvalError>(e.code));
+        // Per-domain overloads resolve via ADL on the enum type
+#define JSON_QUERY_TO_QT_SV_CASE(EnumType, DomainValue)                                                               \
+    case ErrorDomain::DomainValue:                                                                                    \
+        return to_qt_sv(static_cast<EnumType>(e.code));
+        JSON_QUERY_ERROR_DOMAIN_LIST(JSON_QUERY_TO_QT_SV_CASE)
+#undef JSON_QUERY_TO_QT_SV_CASE
     default:
         break;
     }

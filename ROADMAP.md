@@ -214,12 +214,15 @@ M0–M3, collected here so they are not lost in the resolved entries above:
   carries a near-duplicate conversion enum (with its own message path and a
   `ConvError` struct holding expected/actual kinds) outside the unified
   `Error` system; folding them needs an API design pass.
-- **Collapse the three-way error-domain wiring:** `error_domain<E>`, the
-  `is_domain_enum_v` chain, and the (now nine, after the 0.6.0
-  `PatchParse`/`PatchEval` domains) explicit `Error` constructors in
-  `utils/JSONError.hpp` encode the same mapping; the constrained fallback
-  constructor could subsume the explicit ones (changes overload resolution
-  from explicit to implicit — deserves its own change).
+- [x] **Collapse the three-way error-domain wiring.** *Resolved 2026-07-10
+  (0.6.0):* `utils/JSONError.hpp` now derives everything from a single
+  `JSON_QUERY_ERROR_DOMAIN_LIST` X-macro — `error_domain<E>` specializations,
+  `is_domain_enum_v` (specialization-detection instead of a type chain), one
+  constrained `Error(E, detail)` constructor replacing the nine explicit
+  ones (overload resolution moved from explicit to implicit, matching the
+  pre-existing implicit fallback), and both message-dispatch switches.
+  Adding a module's error enum is now one list line plus the `ErrorDomain`
+  enumerator.
 - **Symbolic error codes in `ValidationError::toJson()`:** the `code` field
   is `Error::numeric()`, which ADR-004 declares unstable; migrate to (or add
   alongside) a symbolic string name if the JSON output is ever consumed

@@ -45,6 +45,19 @@ Pre-1.0: minor versions may contain breaking changes (see `ROADMAP.md`).
   fix (the latter two were already unused). Pre-1.0 breaking change; the
   numeric values were never API (ADR-004).
 
+### Changed (internal, no API impact)
+- Post-review consolidation: single `utils/detail/DocumentRoot.hpp` for the
+  QJsonDocument root unwrap/commit used by all document overloads; RFC 6902
+  test-op equality exposed as `json_patch::detail::jsonDeepEquals` (the
+  compliance driver now uses it too); JSONPath's shorthand-name scan unified
+  between `parseDot`/`parseBare`; shared compliance-suite test plumbing.
+- `utils/JSONError.hpp`: the error-domain wiring (trait, concept, nine
+  explicit constructors, two dispatch switches) is now generated from one
+  `JSON_QUERY_ERROR_DOMAIN_LIST` table. The per-enum `Error` constructors
+  are subsumed by one constrained constructor, which is implicit like the
+  previous fallback (was: explicit for the nine listed enums; call sites
+  needing no change were verified by the full suite).
+
 ### Changed (CMake integration)
 - **Option renames** (no compatibility shims, pre-1.0):
   `BUILD_BENCHMARKING` → `JSON_QUERY_BUILD_BENCHMARKS`,
