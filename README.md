@@ -124,7 +124,7 @@ re-enabled, e.g. `-DJSON_QUERY_BUILD_TESTS=ON`).
 Or installed, via `find_package`:
 
 ```cmake
-find_package(json_query 0.9 REQUIRED)
+find_package(json_query 0.10 REQUIRED)
 target_link_libraries(your_target PRIVATE json_query::json_query)
 ```
 
@@ -134,7 +134,7 @@ static library only — shared builds are unsupported until a symbol-visibility
 story exists (planned for v1.0).
 
 Safe to embed in multiple libraries within one application: all symbols live
-in a versioned inline ABI namespace (`json_query::v0_9::…`, transparent to
+in a versioned inline ABI namespace (`json_query::v0_10::…`, transparent to
 source code — you still write `json_query::JSONPath`) and the archive is
 built with hidden visibility, so different embedded versions cannot collide
 or interpose each other (see `doc/adr/005`).
@@ -298,6 +298,11 @@ const auto id{JSONPointer::create("/data/id")
                   .and_then([&](const JSONPointer& p) { return p.evaluate(doc); })
                   .and_then(as<qint64>)
                   .value_or(-1)};
+
+// as_or<T>: terminal default-value adapter — evaluate → convert → default
+// in one expression (falls back on ANY failure along the chain)
+const auto name{"/data/name"_jptr.evaluate(doc) | as_or<QString>()};
+const auto port{"/data/port"_jptr.evaluate(doc) | as_or<int>(8080)};
 ```
 
 ### JSON Patch (RFC 6902)

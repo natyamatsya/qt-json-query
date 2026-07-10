@@ -2,6 +2,19 @@
 
 Pre-1.0: minor versions may contain breaking changes (see `ROADMAP.md`).
 
+## Unreleased (0.10.0)
+
+### Added
+- **`as_or<T>(fallback)` terminal adapter** (AC-3033 follow-up, report §5):
+  ends a monadic chain with a plain `T`, falling back on *any* failure —
+  evaluation error, missing value, or conversion failure:
+  `"/data/name"_jptr.evaluate(doc) | as_or<QString>()`. The default
+  fallback is a value-initialized `T`. Retires the consumers' local
+  `StringAt`/`ArrayAt` one-liner helpers. Chosen over a
+  `JSONPointer::value_or` member deliberately: it lives in the conversion
+  layer next to `as<T>` (no new coupling into the pointer header) and
+  terminates pointer, JSONPath, and plain-value chains alike.
+
 ## 0.9.0 — 2026-07-10
 
 ### Added

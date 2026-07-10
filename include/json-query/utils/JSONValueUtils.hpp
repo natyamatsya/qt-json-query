@@ -215,4 +215,60 @@ template <JsonTarget T>
     return f(QJsonValue(lhs));
 }
 
+//------------------------------------------------------------------------------
+// Terminal default-value adapter: as_or<T>(fallback)
+//   The end of a monadic chain — converts like as<T> but yields T directly,
+//   falling back on ANY failure along the way (evaluation error, missing
+//   value, or conversion failure):
+//
+//     const auto name{"/data/name"_jptr.evaluate(doc) | as_or<QString>()};
+//     const auto port{cfg.evaluate(doc) | as_or<int>(8080)};
+//------------------------------------------------------------------------------
+
+template <JsonTarget T>
+struct AsOrFn
+{
+    T fallback;
+
+    // 1) Plain value: convert or fall back
+    [[nodiscard]] T operator()(const QJsonValue& v) const
+    {
+        auto base{detail::as_core<T>(v)};
+        return base ? *std::move(base) : fallback;
+    }
+
+    // 2) Chaining case: an errored expected falls back too. Templated so it
+    //    is not viable via implicit conversions (mirrors AsFn).
+    template <class E>
+        requires std::same_as<std::remove_cv_t<E>, Error>
+    [[nodiscard]] T operator()(const std::expected<QJsonValue, E>& r) const
+    {
+        return r ? (*this)(*r) : fallback;
+    }
+};
+
+/// Make the terminal adapter; the default fallback is a value-initialized T
+/// (empty QString, 0, empty array, ...).
+template <JsonTarget T>
+[[nodiscard]] AsOrFn<T> as_or(T fallback = T{})
+{
+    return AsOrFn<T>{std::move(fallback)};
+}
+
+// Pipeline sugar: result | as_or<T>(...) — expression-SFINAE like the AsFn
+// overload, so incompatible left-hand sides fail overload resolution cleanly
+template <class LHS, JsonTarget T>
+    requires(!std::is_same_v<std::remove_cvref_t<LHS>, QJsonValueRef>)
+[[nodiscard]] auto operator|(LHS&& lhs, const AsOrFn<T>& f) -> decltype(f(std::forward<LHS>(lhs)))
+{
+    return f(std::forward<LHS>(lhs));
+}
+
+// QJsonValueRef special case (see the AsFn overload above)
+template <JsonTarget T>
+[[nodiscard]] inline auto operator|(QJsonValueRef lhs, const AsOrFn<T>& f) -> T
+{
+    return f(QJsonValue(lhs));
+}
+
 } // namespace json_query
