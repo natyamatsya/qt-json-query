@@ -2,7 +2,7 @@
 
 Pre-1.0: minor versions may contain breaking changes (see `ROADMAP.md`).
 
-## Unreleased (0.9.0)
+## 0.9.0 — 2026-07-10
 
 ### Added
 - **`_jpath` compile-once JSONPath literals** (AC-3033 follow-up, their
