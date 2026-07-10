@@ -302,13 +302,40 @@
       "should_fail": true
     },
     {
-      "name": "invalid_array_index_leading_zero",
-      "description": "Array index with leading zero is an invalid pointer",
+      "name": "leading_zero_token_vs_array",
+      "description": "Token with leading zero is a valid pointer but cannot index an array",
       "pointer": "/foo/01",
       "document": {
         "foo": ["bar", "baz"]
       },
-      "invalid_pointer": true
+      "should_fail": true
+    },
+    {
+      "name": "leading_zero_token_vs_object",
+      "description": "Token with leading zero resolves an object member of that name",
+      "pointer": "/a/01",
+      "document": {
+        "a": {"01": 1}
+      },
+      "expected": 1
+    },
+    {
+      "name": "numeric_token_vs_object",
+      "description": "Numeric token resolves an object member named like the number",
+      "pointer": "/foo/5",
+      "document": {
+        "foo": {"5": "x"}
+      },
+      "expected": "x"
+    },
+    {
+      "name": "dash_token_vs_object",
+      "description": "The - token resolves an ordinary object member named -",
+      "pointer": "/-",
+      "document": {
+        "-": 1
+      },
+      "expected": 1
     },
     {
       "name": "invalid_pointer_no_leading_slash",
@@ -427,13 +454,20 @@
       "expected": "test"
     },
     {
-      "name": "large_array_index",
-      "description": "Very large index should be invalid",
+      "name": "large_numeric_token_vs_object",
+      "description": "Token exceeding the array-index range still resolves an object member",
       "pointer": "/18446744073709551616",
       "document": {
         "18446744073709551616": "test"
       },
-      "invalid_pointer": true
+      "expected": "test"
+    },
+    {
+      "name": "large_numeric_token_vs_array",
+      "description": "Token exceeding the array-index range cannot index an array",
+      "pointer": "/0/18446744073709551616",
+      "document": [["only"]],
+      "should_fail": true
     },
     {
       "name": "unicode_null_char",

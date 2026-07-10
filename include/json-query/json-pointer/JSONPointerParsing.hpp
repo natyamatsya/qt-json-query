@@ -17,6 +17,10 @@
 
 namespace json_query::inline JSON_QUERY_ABI_NS::json_pointer
 {
+// RFC 6901 §4: a token is interpreted relative to the container it meets at
+// evaluation time. `key` is therefore always populated (also for Index tokens,
+// where it holds the decoded decimal string); `kind == Index` additionally
+// records the numeric value usable as an array index.
 struct Token
 {
     enum class Kind : quint8
@@ -121,50 +125,30 @@ namespace json_query::inline JSON_QUERY_ABI_NS::json_pointer::detail
         const auto atEnd{end == -1};
         const auto raw{atEnd ? ptr.sliced(begin) : ptr.sliced(begin, end - begin)};
 
-        const auto decoded{decodeToken(raw)};
-        if (raw.contains(u'~') && decoded.isEmpty() && !raw.isEmpty())
+        // Check for invalid escape sequences in the raw token
+        for (qsizetype i = 0; i < raw.size(); ++i)
         {
-            // decodeToken failing would produce same string; we approximate by checking unsupported escape later
+            if (raw[i] == u'~')
+            {
+                if (i + 1 >= raw.size())
+                    return std::unexpected(InvalidEscapeSequence);
+                const auto next = raw[i + 1];
+                if (next != u'0' && next != u'1')
+                    return std::unexpected(InvalidEscapeSequence);
+                ++i; // Skip the next character as it's part of the escape sequence
+            }
         }
 
+        const auto decoded{decodeToken(raw)};
+
+        // Tokens that do not form a valid array index (leading zeros, overflow,
+        // non-digits) are still valid pointers — they simply cannot step into an
+        // array (RFC 6901 §4 interprets tokens per the container they meet).
         qsizetype idx{};
         if (parseArrayIndex(decoded, idx))
-        {
-            tokens.push_back(Token{Token::Kind::Index, idx, {}});
-        }
+            tokens.push_back(Token{Token::Kind::Index, idx, decoded});
         else
-        {
-            bool digits{!decoded.isEmpty()};
-            for (QChar ch : decoded)
-            {
-                if (ch < u'0' || ch > u'9')
-                {
-                    digits = false;
-                    break;
-                }
-            }
-            if (digits)
-                return std::unexpected(ArrayIndexOverflow);
-
-            // Check for invalid escape sequences in the raw token
-            for (qsizetype i = 0; i < raw.size(); ++i)
-            {
-                if (raw[i] == u'~')
-                {
-                    if (i + 1 >= raw.size())
-                        return std::unexpected(InvalidEscapeSequence);
-                    const auto next = raw[i + 1];
-                    if (next != u'0' && next != u'1')
-                        return std::unexpected(InvalidEscapeSequence);
-                    ++i; // Skip the next character as it's part of the escape sequence
-                }
-            }
-
-            if (decoded.isEmpty() && !raw.isEmpty())
-                return std::unexpected(InvalidEscapeSequence);
-
             tokens.push_back(Token{Token::Kind::Key, 0, decoded});
-        }
 
         if (atEnd)
             break;

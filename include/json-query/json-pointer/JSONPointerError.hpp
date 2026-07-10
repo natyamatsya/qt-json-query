@@ -16,11 +16,8 @@ namespace json_query::inline JSON_QUERY_ABI_NS::json_pointer
 // Parse-time errors
 enum class ParseError : std::uint8_t
 {
-    ArrayIndexOverflow,
-    EmptyNonTerminalToken,
     InvalidEscapeSequence,
     MissingLeadingSlash,
-    NonDecimalArrayIndex,
 };
 
 // Evaluation-time errors
@@ -33,14 +30,10 @@ enum class EvalError : std::uint8_t
 };
 
 // JSON Pointer parse error messages
-inline constexpr auto json_pointer_parse_errors = utils::detail::ErrorMap<ParseError, 5>{
-    {ParseError::ArrayIndexOverflow, DEFINE_ERROR_STRING("Array index is too large to be represented")},
-    {ParseError::EmptyNonTerminalToken, DEFINE_ERROR_STRING("Non-terminal token in JSON Pointer cannot be empty")},
+inline constexpr auto json_pointer_parse_errors = utils::detail::ErrorMap<ParseError, 2>{
     {ParseError::InvalidEscapeSequence,
      DEFINE_ERROR_STRING("Invalid escape sequence in JSON Pointer (only ~0 and ~1 are valid)")},
-    {ParseError::MissingLeadingSlash, DEFINE_ERROR_STRING("JSON Pointer must start with a leading slash")},
-    {ParseError::NonDecimalArrayIndex,
-     DEFINE_ERROR_STRING("Array index contains non-decimal characters or leading zeros")}};
+    {ParseError::MissingLeadingSlash, DEFINE_ERROR_STRING("JSON Pointer must start with a leading slash")}};
 
 // JSON Pointer evaluation error messages
 inline constexpr auto json_pointer_eval_errors = utils::detail::ErrorMap<EvalError, 4>{

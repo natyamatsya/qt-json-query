@@ -64,8 +64,8 @@ struct DetailedEvalError
         switch (current.type())
         {
         case QJsonValue::Object:
-            if (tk.kind != Token::Kind::Key)
-                return std::unexpected(DetailedEvalError{EvalError::TypeMismatchObject, i});
+            // Container-relative (RFC 6901 §4): any token — including numeric
+            // ones — names an object member; Token::key is always populated.
             if (!stepObject(current, tk.key))
                 return std::unexpected(DetailedEvalError{EvalError::KeyNotFound, i});
             break;
