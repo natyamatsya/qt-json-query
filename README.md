@@ -397,7 +397,7 @@ if (schema->isValid(QJsonValue{person}))
 
 ### Unified Error Handling
 
-All three modules return `std::expected<T, Error>`. The `Error` type is a compact 4-byte struct:
+All modules return `std::expected<T, Error>`. The `Error` type is a compact 4-byte struct:
 
 ```cpp
 auto result{pointer->evaluate(doc)};
@@ -409,9 +409,26 @@ if (!result)
     err.formatted_message();  // QString — includes "at token N" context
     err.domain;               // ErrorDomain enum
     err.code;                 // uint8_t error code
-    err.detail;               // uint16_t token index (for eval errors)
+    err.detail;               // uint16_t token index (pointer/path eval) or
+                              // operation index (patch errors)
 }
 ```
+
+### Examples
+
+Runnable example programs live in [`examples/`](examples/) (built by default
+in top-level builds; each is a standalone executable):
+
+| Example | Shows |
+|---|---|
+| [`simple_pointer.cpp`](examples/simple_pointer.cpp) | JSON Pointer basics: evaluation, escaping (`~0`/`~1`), error cases |
+| [`pointer_writes_and_patch.cpp`](examples/pointer_writes_and_patch.cpp) | **Document mutation**: pointer `add`/`replace`/`remove`, settings-style `set` with `createIntermediates`, atomic RFC 6902 patches, RFC 7386 merge patch |
+| [`simple_path.cpp`](examples/simple_path.cpp) | JSONPath basics: selectors, filters, nodelists |
+| [`simple_schema.cpp`](examples/simple_schema.cpp) | JSON Schema validation basics |
+| [`as_function_demo.cpp`](examples/as_function_demo.cpp) | Typed extraction with the `as<T>()` conversion helpers |
+| [`compile_once_reuse.cpp`](examples/compile_once_reuse.cpp) | Compile paths/schemas once, apply to many documents |
+| [`flagship_pipeline.cpp`](examples/flagship_pipeline.cpp) | End-to-end pipeline: validate → query → extract |
+| [`refactor_potential.cpp`](examples/refactor_potential.cpp) | Plain Qt JSON code vs. the library, side by side |
 
 ## Test Status
 
