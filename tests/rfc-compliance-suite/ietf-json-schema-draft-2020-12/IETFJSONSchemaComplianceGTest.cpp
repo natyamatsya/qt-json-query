@@ -138,7 +138,7 @@ static QList<SchemaTestCase> loadTestFile(const QString& filePath)
         if (!groupValue.isObject())
             continue;
 
-        const auto groupObj{groupValue.toObject()};
+        const QJsonObject groupObj = groupValue.toObject(); // ADR-001: copy-init
         const auto groupDesc{groupObj[u"description"_qt_s].toString()};
         const auto schema{groupObj[u"schema"_qt_s]};
 
@@ -148,7 +148,7 @@ static QList<SchemaTestCase> loadTestFile(const QString& filePath)
             if (!testValue.isObject())
                 continue;
 
-            const auto testObj{testValue.toObject()};
+            const QJsonObject testObj = testValue.toObject(); // ADR-001: copy-init
 
             SchemaTestCase tc{};
             tc.fileName      = fileName;

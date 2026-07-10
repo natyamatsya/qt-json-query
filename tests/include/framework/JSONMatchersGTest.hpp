@@ -198,7 +198,7 @@ MATCHER_P(JsonObjContains, kvPairs, "object contains key/value pairs")
 {
     if (!arg.isObject())
         return false;
-    const auto obj{arg.toObject()};
+    const QJsonObject obj = arg.toObject(); // ADR-001: copy-init
     for (const auto& pair : kvPairs)
     {
         const QString&    key = pair.first;

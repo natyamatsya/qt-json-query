@@ -22,6 +22,23 @@ repos:
           )$
         args: [--style=file, --fallback-style=none]
 
+  # ADR-001 guard: brace-initializing a QJsonArray from an array-producing
+  # expression (or any Qt JSON container from a bare same-type variable)
+  # selects the initializer_list constructor on GCC/clang — wrapping the
+  # container — while MSVC copies. Such code passes local MSVC builds and
+  # fails only on the GCC/clang CI legs. Copy-init instead:
+  #   const QJsonArray arr = expr.toArray();
+  # (auto x{expr.toObject()} is not flagged: QJsonObject has no viable
+  # single-element initializer_list path — see ADR-001's affected-types table)
+  - repo: local
+    hooks:
+      - id: adr-001-no-qt-json-brace-init
+        name: "ADR-001: no brace-init of Qt JSON containers from expressions"
+        language: pygrep
+        entry: '(auto\s+&?\w+\{[^{};]*(toArray|toJson|\.array)\(\)\})|((QJsonArray|QJsonObject)\s+&?\w+\{\s*[A-Za-z_]\w*\s*\})'
+        types_or: [c++]
+        exclude: ^compliance/
+
   # General code quality hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0

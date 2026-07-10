@@ -26,6 +26,12 @@ The 0.7.0 milestone is the AC-3033 first-consumer ergonomics track
   fractional/overflow report `NumericNotIntegral`/`NumericOutOfRange`.
 
 ### Changed
+- **ADR-001 is now machine-enforced**: a pre-commit pygrep hook rejects
+  brace-initializing a QJsonArray from an array-producing expression (and
+  any Qt JSON container from a bare same-type variable) — the pattern
+  copies on MSVC but wraps on GCC/clang, so it passes local Windows
+  builds and fails only on CI. The handful of benign `auto x{...toObject()}`
+  sites the sweep touched were converted to copy-init.
 - **Conversion errors unified** (tracked ROADMAP item): the parallel
   `ConvErrorCode`/`ConvError` system in `JSONValueUtils.hpp` is gone;
   `as<T>` produces unified `Error`s (Convert domain) with the

@@ -238,7 +238,7 @@ TEST(JSONPointerWriteTypedRoot, RootReplaceWithMatchingKindWorks)
 TEST(JSONPointerWriteTypedRoot, RootKindChangeIsRootTypeMismatch)
 {
     QJsonObject       root{{"a", 1}};
-    const QJsonObject before{root};
+    const QJsonObject before = root; // ADR-001: copy-init
 
     auto r{ptr(u"").replace(root, QJsonArray{1, 2})};
     ASSERT_FALSE(r.has_value());
@@ -246,7 +246,8 @@ TEST(JSONPointerWriteTypedRoot, RootKindChangeIsRootTypeMismatch)
     EXPECT_EQ(root, before); // strong guarantee
 
     QJsonArray       arr{1};
-    const QJsonArray arrBefore{arr};
+    // Copy-init, not brace-init (ADR-001: same-type braces wrap on GCC/clang)
+    const QJsonArray arrBefore = arr;
     auto             r2{ptr(u"").add(arr, QJsonObject{{"a", 1}})};
     ASSERT_FALSE(r2.has_value());
     expectError(r2.error(), EvalError::RootTypeMismatch, 0);
@@ -256,7 +257,7 @@ TEST(JSONPointerWriteTypedRoot, RootKindChangeIsRootTypeMismatch)
 TEST(JSONPointerWriteTypedRoot, FailedWriteLeavesTypedRootUntouched)
 {
     QJsonObject       root{{"a", 1}};
-    const QJsonObject before{root};
+    const QJsonObject before = root; // ADR-001: copy-init
     ASSERT_FALSE(ptr(u"/x/y").add(root, 1).has_value());
     EXPECT_EQ(root, before);
 }

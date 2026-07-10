@@ -426,7 +426,7 @@ void extractRootMetadata(const QJsonObject& rootObj, internal::CompiledSchema& c
     if (!defsValue.isObject())
         return {};
 
-    const auto defsObj{defsValue.toObject()};
+    const QJsonObject defsObj = defsValue.toObject(); // ADR-001: copy-init
     for (auto it = defsObj.begin(); it != defsObj.end(); ++it)
     {
         auto defResult{compileSchemaNode(ctx, it.value())};
@@ -566,7 +566,7 @@ QString percentDecode(const QString& input)
                         // If the resolved schema has $id, reuse the existing compiled node
                         if (resolved->isObject())
                         {
-                            const auto resolvedObj{resolved->toObject()};
+                            const QJsonObject resolvedObj = resolved->toObject(); // ADR-001: copy-init
                             if (resolvedObj.contains(u"$id"_qt_s) && resolvedObj[u"$id"_qt_s].isString())
                             {
                                 const auto resolvedId{resolvedObj[u"$id"_qt_s].toString()};
@@ -838,7 +838,7 @@ phase1_BuildSymbolTable(internal::CompiledSchema& compiled, CompileContext& ctx,
     if (!schemaValue.isObject())
         return {};
 
-    const auto rootObj{schemaValue.toObject()};
+    const QJsonObject rootObj = schemaValue.toObject(); // ADR-001: copy-init
 
     // Extract root metadata ($id, $schema)
     extractRootMetadata(rootObj, compiled);
@@ -946,7 +946,7 @@ compileSchema(const QJsonValue& schemaValue, SchemaFetcher fetcher, SchemaOption
                 const auto vocabObj{metaSchema->toObject().value(u"$vocabulary"_qt_s)};
                 if (vocabObj.isObject())
                 {
-                    const auto vocabObject{vocabObj.toObject()};
+                    const QJsonObject vocabObject = vocabObj.toObject(); // ADR-001: copy-init
                     ctx.validationVocabActive =
                         vocabObject.contains(u"https://json-schema.org/draft/2020-12/vocab/validation"_qt_s);
                     // Auto mode: derive format assertion from vocabulary

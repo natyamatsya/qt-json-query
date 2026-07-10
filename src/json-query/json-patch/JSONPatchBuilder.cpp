@@ -16,12 +16,24 @@ namespace
 
 // The builder assembles wire-format op objects; compiled pointers re-encode
 // canonically via to_string(), raw strings pass through and are validated by
-// JSONPatch::create() in build().
-[[nodiscard]] QJsonObject makeOp(QLatin1String op, const QString& path)
+// JSONPatch::create() in build(). Two shapes cover all six operations:
+// path (+ optional value), and from + path.
+
+[[nodiscard]] QJsonObject valueOp(QLatin1String op, QStringView path, const QJsonValue& value)
 {
     QJsonObject entry;
     entry.insert(QLatin1String("op"), op);
-    entry.insert(QLatin1String("path"), path);
+    entry.insert(QLatin1String("path"), path.toString());
+    entry.insert(QLatin1String("value"), value);
+    return entry;
+}
+
+[[nodiscard]] QJsonObject fromOp(QLatin1String op, QStringView from, QStringView path)
+{
+    QJsonObject entry;
+    entry.insert(QLatin1String("op"), op);
+    entry.insert(QLatin1String("path"), path.toString());
+    entry.insert(QLatin1String("from"), from.toString());
     return entry;
 }
 
@@ -34,9 +46,7 @@ JSONPatchBuilder& JSONPatchBuilder::add(const json_pointer::JSONPointer& path, c
 
 JSONPatchBuilder& JSONPatchBuilder::add(QStringView path, const QJsonValue& value)
 {
-    auto entry{makeOp(QLatin1String("add"), path.toString())};
-    entry.insert(QLatin1String("value"), value);
-    m_ops.append(entry);
+    m_ops.append(valueOp(QLatin1String("add"), path, value));
     return *this;
 }
 
@@ -47,9 +57,7 @@ JSONPatchBuilder& JSONPatchBuilder::replace(const json_pointer::JSONPointer& pat
 
 JSONPatchBuilder& JSONPatchBuilder::replace(QStringView path, const QJsonValue& value)
 {
-    auto entry{makeOp(QLatin1String("replace"), path.toString())};
-    entry.insert(QLatin1String("value"), value);
-    m_ops.append(entry);
+    m_ops.append(valueOp(QLatin1String("replace"), path, value));
     return *this;
 }
 
@@ -60,7 +68,10 @@ JSONPatchBuilder& JSONPatchBuilder::remove(const json_pointer::JSONPointer& path
 
 JSONPatchBuilder& JSONPatchBuilder::remove(QStringView path)
 {
-    m_ops.append(makeOp(QLatin1String("remove"), path.toString()));
+    QJsonObject entry;
+    entry.insert(QLatin1String("op"), QLatin1String("remove"));
+    entry.insert(QLatin1String("path"), path.toString());
+    m_ops.append(entry);
     return *this;
 }
 
@@ -71,9 +82,7 @@ JSONPatchBuilder& JSONPatchBuilder::move(const json_pointer::JSONPointer& from, 
 
 JSONPatchBuilder& JSONPatchBuilder::move(QStringView from, QStringView path)
 {
-    auto entry{makeOp(QLatin1String("move"), path.toString())};
-    entry.insert(QLatin1String("from"), from.toString());
-    m_ops.append(entry);
+    m_ops.append(fromOp(QLatin1String("move"), from, path));
     return *this;
 }
 
@@ -84,9 +93,7 @@ JSONPatchBuilder& JSONPatchBuilder::copy(const json_pointer::JSONPointer& from, 
 
 JSONPatchBuilder& JSONPatchBuilder::copy(QStringView from, QStringView path)
 {
-    auto entry{makeOp(QLatin1String("copy"), path.toString())};
-    entry.insert(QLatin1String("from"), from.toString());
-    m_ops.append(entry);
+    m_ops.append(fromOp(QLatin1String("copy"), from, path));
     return *this;
 }
 
@@ -97,9 +104,7 @@ JSONPatchBuilder& JSONPatchBuilder::test(const json_pointer::JSONPointer& path, 
 
 JSONPatchBuilder& JSONPatchBuilder::test(QStringView path, const QJsonValue& value)
 {
-    auto entry{makeOp(QLatin1String("test"), path.toString())};
-    entry.insert(QLatin1String("value"), value);
-    m_ops.append(entry);
+    m_ops.append(valueOp(QLatin1String("test"), path, value));
     return *this;
 }
 

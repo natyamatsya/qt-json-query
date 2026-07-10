@@ -16,9 +16,11 @@
 #include <QString>
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <expected>
 #include <limits>
+#include <optional>
 #include <utility>
 
 #include "json-query/config/AbiNamespace.hpp"
@@ -32,6 +34,39 @@ namespace
 [[nodiscard]] std::uint16_t clampOpIndex(qsizetype i) noexcept
 {
     return static_cast<std::uint16_t>(std::min<qsizetype>(i, std::numeric_limits<std::uint16_t>::max()));
+}
+
+// Single source of truth for the RFC 6902 §4 operation names, used by both
+// parsePatch (name -> kind) and JSONPatch::toJson (kind -> name)
+struct OpName
+{
+    QLatin1String name;
+    Op::Kind      kind;
+};
+
+inline constexpr std::array<OpName, 6> kOpNames{{
+    {QLatin1String("add"), Op::Kind::Add},
+    {QLatin1String("copy"), Op::Kind::Copy},
+    {QLatin1String("move"), Op::Kind::Move},
+    {QLatin1String("remove"), Op::Kind::Remove},
+    {QLatin1String("replace"), Op::Kind::Replace},
+    {QLatin1String("test"), Op::Kind::Test},
+}};
+
+[[nodiscard]] std::optional<Op::Kind> kindFromName(const QString& name) noexcept
+{
+    for (const auto& entry : kOpNames)
+        if (name == entry.name)
+            return entry.kind;
+    return std::nullopt;
+}
+
+[[nodiscard]] QLatin1String nameFromKind(Op::Kind kind) noexcept
+{
+    for (const auto& entry : kOpNames)
+        if (kind == entry.kind)
+            return entry.name;
+    return QLatin1String("");
 }
 
 } // namespace
@@ -109,22 +144,10 @@ std::expected<void, DetailedParseError> parsePatch(const QJsonArray& patch, std:
         if (!opValue.isString())
             return std::unexpected(DetailedParseError{MissingOp, errIndex});
 
-        Op::Kind   kind{};
-        const auto opName{opValue.toString()};
-        if (opName == QLatin1String("add"))
-            kind = Op::Kind::Add;
-        else if (opName == QLatin1String("copy"))
-            kind = Op::Kind::Copy;
-        else if (opName == QLatin1String("move"))
-            kind = Op::Kind::Move;
-        else if (opName == QLatin1String("remove"))
-            kind = Op::Kind::Remove;
-        else if (opName == QLatin1String("replace"))
-            kind = Op::Kind::Replace;
-        else if (opName == QLatin1String("test"))
-            kind = Op::Kind::Test;
-        else
+        const auto kindLookup{kindFromName(opValue.toString())};
+        if (!kindLookup)
             return std::unexpected(DetailedParseError{InvalidOperationName, errIndex});
+        const Op::Kind kind{*kindLookup};
 
         const auto pathValue{opObj.value(QLatin1String("path"))};
         if (!pathValue.isString())
@@ -240,31 +263,11 @@ using detail::Op;
 
 QJsonArray JSONPatch::toJson() const
 {
-    const auto opName = [](Op::Kind kind)
-    {
-        switch (kind)
-        {
-        case Op::Kind::Add:
-            return QLatin1String("add");
-        case Op::Kind::Copy:
-            return QLatin1String("copy");
-        case Op::Kind::Move:
-            return QLatin1String("move");
-        case Op::Kind::Remove:
-            return QLatin1String("remove");
-        case Op::Kind::Replace:
-            return QLatin1String("replace");
-        case Op::Kind::Test:
-            return QLatin1String("test");
-        }
-        return QLatin1String("");
-    };
-
     QJsonArray out;
     for (const Op& op : m_ops)
     {
         QJsonObject entry;
-        entry.insert(QLatin1String("op"), opName(op.kind));
+        entry.insert(QLatin1String("op"), detail::nameFromKind(op.kind));
         entry.insert(QLatin1String("path"), op.path.to_string());
         if (op.from)
             entry.insert(QLatin1String("from"), op.from->to_string());

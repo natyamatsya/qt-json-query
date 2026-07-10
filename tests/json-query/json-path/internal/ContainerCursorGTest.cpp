@@ -585,7 +585,7 @@ TEST_F(ContainerCursorTest, PerformanceBenchmark)
     {
         if (item.isObject())
         {
-            auto obj{item.toObject()};
+            QJsonObject obj = item.toObject(); // ADR-001: copy-init
             idSum += obj["id"].toInt();
             ++count;
         }

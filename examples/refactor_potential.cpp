@@ -43,7 +43,7 @@ static QStringList titlesAbovePrice_plain(const QJsonDocument& doc, double thres
     QStringList result;
 
     const auto root{doc.object()};
-    const auto inventory{root.value("inventory").toArray()};
+    const QJsonArray inventory = root.value("inventory").toArray(); // ADR-001: copy-init
 
     for (const auto& v : inventory)
     {
@@ -67,7 +67,7 @@ static QStringList titlesAbovePrice_plain(const QJsonDocument& doc, double thres
     if (!root.contains("inventory"))
         return std::nullopt;
 
-    const auto inventory{root.value("inventory").toArray()};
+    const QJsonArray inventory = root.value("inventory").toArray(); // ADR-001: copy-init
     if (index < 0 || index >= inventory.size())
         return std::nullopt;
 

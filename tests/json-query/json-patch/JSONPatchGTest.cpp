@@ -183,7 +183,7 @@ TEST(JSONPatchApply, CopyIntoOwnDescendantIsAllowed)
     const QJsonDocument doc(QJsonObject{{"a", QJsonObject{{"x", 1}}}});
     auto                result{compiled->apply(doc)};
     ASSERT_TRUE(result.has_value());
-    const auto a{result->object().value(QStringLiteral("a")).toObject()};
+    const QJsonObject a = result->object().value(QStringLiteral("a")).toObject(); // ADR-001: copy-init
     EXPECT_EQ(a.value(QStringLiteral("x")), QJsonValue{1});
     EXPECT_EQ(a.value(QStringLiteral("b")).toObject(), (QJsonObject{{"x", 1}}));
 }
@@ -284,7 +284,7 @@ TEST(JSONPatchApply, ApplyInPlaceTypedRoots)
     const QJsonArray kindChange = parsePatchJson(R"([{"op": "add", "path": "", "value": [1]}])");
     auto             changer{JSONPatch::create(kindChange)};
     ASSERT_TRUE(changer.has_value()) << describe(changer);
-    const QJsonObject before{obj};
+    const QJsonObject before = obj; // ADR-001: copy-init
     auto              r{changer->applyInPlace(obj)};
     ASSERT_FALSE(r.has_value());
     EXPECT_EQ(r.error().domain, ErrorDomain::PointerEval);
@@ -366,7 +366,7 @@ TEST(JSONPatchBuilder, MoveCopyCarryFrom)
 
     auto result{built->apply(QJsonValue{QJsonObject{{"src", 7}}})};
     ASSERT_TRUE(result.has_value());
-    const auto obj{result->toObject()};
+    const QJsonObject obj = result->toObject(); // ADR-001: copy-init
     EXPECT_EQ(obj.value(QStringLiteral("dup")), QJsonValue{7});
     EXPECT_EQ(obj.value(QStringLiteral("dst")), QJsonValue{7});
     EXPECT_FALSE(obj.contains(QStringLiteral("src")));
@@ -386,7 +386,8 @@ TEST(JSONPatchToJson, RoundTripsThroughCreate)
     ASSERT_TRUE(compiled.has_value()) << describe(compiled);
 
     // Serialized form re-compiles to a patch with identical behavior
-    const auto serialized{compiled->toJson()};
+    // (copy-init: auto x{qjsonarray-expr} wraps on GCC/clang — ADR-001)
+    const QJsonArray serialized = compiled->toJson();
     auto       recompiled{JSONPatch::create(serialized)};
     ASSERT_TRUE(recompiled.has_value()) << describe(recompiled);
     EXPECT_EQ(recompiled->toJson(), serialized);
