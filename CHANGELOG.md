@@ -2,7 +2,7 @@
 
 Pre-1.0: minor versions may contain breaking changes (see `ROADMAP.md`).
 
-## Unreleased (0.10.0)
+## 0.10.0 — 2026-07-10
 
 ### Added
 - **`as_or<T>(fallback)` terminal adapter** (AC-3033 follow-up, report §5):
