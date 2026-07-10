@@ -6,6 +6,7 @@
 # ---------------------------------------------------------------------------
 set(JSON_QUERY_SOURCES
     json-pointer/JSONPointer.cpp
+    json-pointer/JSONPointerWrite.cpp
     json-path/JSONPath.cpp
     json-path/JSONPathBracketRules.cpp
     json-path/JSONPathCompile.cpp

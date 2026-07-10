@@ -285,6 +285,85 @@ static void BM_JSONPointer_Eval_Complex(benchmark::State& state)
 }
 BENCHMARK(BM_JSONPointer_Eval_Complex);
 
+// ----------------------------
+// JSONPointer write benchmarks (pre-compiled pointer; each iteration writes
+// into a fresh COW copy so the document does not grow across iterations)
+// ----------------------------
+static void BM_JSONPointer_Set_Shallow(benchmark::State& state)
+{
+    const auto doc{prepareTestDocument()};
+    const auto ptr{JSONPointer::create(QStringLiteral("/name")).value()};
+    for (auto _ : state)
+    {
+        QJsonDocument target{doc};
+        benchmark::DoNotOptimize(ptr.set(target, QStringLiteral("Renamed Bookstore")));
+        benchmark::DoNotOptimize(target);
+    }
+}
+BENCHMARK(BM_JSONPointer_Set_Shallow);
+
+static void BM_JSONPointer_Set_Deep(benchmark::State& state)
+{
+    const auto doc{prepareTestDocument()};
+    const auto ptr{JSONPointer::create(QStringLiteral("/inventory/15/author/name")).value()};
+    for (auto _ : state)
+    {
+        QJsonDocument target{doc};
+        benchmark::DoNotOptimize(ptr.set(target, QStringLiteral("New Author")));
+        benchmark::DoNotOptimize(target);
+    }
+}
+BENCHMARK(BM_JSONPointer_Set_Deep);
+
+static void BM_JSONPointer_Add_ArrayAppend(benchmark::State& state)
+{
+    const auto doc{prepareTestDocument()};
+    const auto ptr{JSONPointer::create(QStringLiteral("/inventory/-")).value()};
+    const auto book{QJsonObject{{"id", "bookN"}, {"title", "Appended"}, {"price", 12.5}}};
+    for (auto _ : state)
+    {
+        QJsonDocument target{doc};
+        benchmark::DoNotOptimize(ptr.add(target, book));
+        benchmark::DoNotOptimize(target);
+    }
+}
+BENCHMARK(BM_JSONPointer_Add_ArrayAppend);
+
+static void BM_JSONPointer_Remove_Nested(benchmark::State& state)
+{
+    const auto doc{prepareTestDocument()};
+    const auto ptr{JSONPointer::create(QStringLiteral("/inventory/5/categories/0")).value()};
+    for (auto _ : state)
+    {
+        QJsonDocument target{doc};
+        benchmark::DoNotOptimize(ptr.remove(target));
+        benchmark::DoNotOptimize(target);
+    }
+}
+BENCHMARK(BM_JSONPointer_Remove_Nested);
+
+// Baseline: the hand-written extract→modify→write-back ladder the write API
+// replaces (deep write, same location as BM_JSONPointer_Set_Deep)
+static void BM_Plain_WriteBack_Deep(benchmark::State& state)
+{
+    const auto doc{prepareTestDocument()};
+    for (auto _ : state)
+    {
+        QJsonDocument target{doc};
+        QJsonObject   root{target.object()};
+        QJsonArray    inventory = root.value(QLatin1String("inventory")).toArray();
+        QJsonObject   book{inventory.at(15).toObject()};
+        QJsonObject   author{book.value(QLatin1String("author")).toObject()};
+        author.insert(QLatin1String("name"), QStringLiteral("New Author"));
+        book.insert(QLatin1String("author"), author);
+        inventory.replace(15, book);
+        root.insert(QLatin1String("inventory"), inventory);
+        target.setObject(root);
+        benchmark::DoNotOptimize(target);
+    }
+}
+BENCHMARK(BM_Plain_WriteBack_Deep);
+
 static void BM_JSONPath_Eval_Simple(benchmark::State& state)
 {
     const auto doc{prepareTestDocument()};

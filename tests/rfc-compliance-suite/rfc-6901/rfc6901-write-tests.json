@@ -1,0 +1,424 @@
+{
+  "description": "Write-operation tests for RFC 6901 JSON Pointers with RFC 6902 section 4 operation semantics (add/replace/remove) plus the set() upsert with intermediate creation. Cases named rfc6902_a* mirror the corresponding RFC 6902 Appendix A examples.",
+  "tests": [
+    {
+      "name": "rfc6902_a1_add_object_member",
+      "description": "RFC 6902 A.1: add an object member",
+      "op": "add",
+      "pointer": "/baz",
+      "document": {"foo": "bar"},
+      "value": "qux",
+      "expected_document": {"baz": "qux", "foo": "bar"}
+    },
+    {
+      "name": "rfc6902_a2_add_array_element",
+      "description": "RFC 6902 A.2: add inserts into an array, shifting right",
+      "op": "add",
+      "pointer": "/foo/1",
+      "document": {"foo": ["bar", "baz"]},
+      "value": "qux",
+      "expected_document": {"foo": ["bar", "qux", "baz"]}
+    },
+    {
+      "name": "rfc6902_a3_remove_object_member",
+      "description": "RFC 6902 A.3: remove an object member",
+      "op": "remove",
+      "pointer": "/baz",
+      "document": {"baz": "qux", "foo": "bar"},
+      "expected_document": {"foo": "bar"},
+      "expected_removed": "qux"
+    },
+    {
+      "name": "rfc6902_a4_remove_array_element",
+      "description": "RFC 6902 A.4: remove an array element, shifting left",
+      "op": "remove",
+      "pointer": "/foo/1",
+      "document": {"foo": ["bar", "qux", "baz"]},
+      "expected_document": {"foo": ["bar", "baz"]},
+      "expected_removed": "qux"
+    },
+    {
+      "name": "rfc6902_a5_replace_value",
+      "description": "RFC 6902 A.5: replace an existing value",
+      "op": "replace",
+      "pointer": "/baz",
+      "document": {"baz": "qux", "foo": "bar"},
+      "value": "boo",
+      "expected_document": {"baz": "boo", "foo": "bar"}
+    },
+    {
+      "name": "rfc6902_a10_add_nested_object",
+      "description": "RFC 6902 A.10: add a nested member object",
+      "op": "add",
+      "pointer": "/child",
+      "document": {"foo": "bar"},
+      "value": {"grandchild": {}},
+      "expected_document": {"foo": "bar", "child": {"grandchild": {}}}
+    },
+    {
+      "name": "rfc6902_a12_add_to_nonexistent_target",
+      "description": "RFC 6902 A.12: add fails when the parent does not exist",
+      "op": "add",
+      "pointer": "/baz/bat",
+      "document": {"foo": "bar"},
+      "value": "qux",
+      "should_fail": true
+    },
+    {
+      "name": "rfc6902_a16_add_array_value",
+      "description": "RFC 6902 A.16: a whole array is added as a single value",
+      "op": "add",
+      "pointer": "/foo/-",
+      "document": {"foo": ["bar"]},
+      "value": ["abc", "def"],
+      "expected_document": {"foo": ["bar", ["abc", "def"]]}
+    },
+    {
+      "name": "add_replaces_existing_member",
+      "description": "RFC 6902 4.1: add on an existing object member replaces its value",
+      "op": "add",
+      "pointer": "/foo",
+      "document": {"foo": "old"},
+      "value": "new",
+      "expected_document": {"foo": "new"}
+    },
+    {
+      "name": "add_root_replaces_document",
+      "description": "RFC 6902 4.1: the empty pointer replaces the whole document",
+      "op": "add",
+      "pointer": "",
+      "document": {"old": true},
+      "value": {"new": true},
+      "expected_document": {"new": true}
+    },
+    {
+      "name": "replace_root_replaces_document",
+      "description": "Replace with the empty pointer targets the root, which always exists",
+      "op": "replace",
+      "pointer": "",
+      "document": {"old": true},
+      "value": [1, 2],
+      "expected_document": [1, 2]
+    },
+    {
+      "name": "remove_root_fails",
+      "description": "The root cannot be removed",
+      "op": "remove",
+      "pointer": "",
+      "document": {"a": 1},
+      "should_fail": true
+    },
+    {
+      "name": "add_array_append_via_dash",
+      "description": "The - token appends to an array",
+      "op": "add",
+      "pointer": "/arr/-",
+      "document": {"arr": [1, 2]},
+      "value": 3,
+      "expected_document": {"arr": [1, 2, 3]}
+    },
+    {
+      "name": "add_array_append_via_size_index",
+      "description": "Index == size appends to an array",
+      "op": "add",
+      "pointer": "/arr/2",
+      "document": {"arr": [1, 2]},
+      "value": 3,
+      "expected_document": {"arr": [1, 2, 3]}
+    },
+    {
+      "name": "add_array_index_past_end_fails",
+      "description": "Index > size is out of range for add",
+      "op": "add",
+      "pointer": "/arr/3",
+      "document": {"arr": [1, 2]},
+      "value": 3,
+      "should_fail": true
+    },
+    {
+      "name": "add_array_leading_zero_index_fails",
+      "description": "A leading-zero token cannot index an array",
+      "op": "add",
+      "pointer": "/arr/01",
+      "document": {"arr": [1, 2]},
+      "value": 3,
+      "should_fail": true
+    },
+    {
+      "name": "add_dash_as_object_member",
+      "description": "Container-relative: on an object, - is an ordinary member name",
+      "op": "add",
+      "pointer": "/obj/-",
+      "document": {"obj": {}},
+      "value": 1,
+      "expected_document": {"obj": {"-": 1}}
+    },
+    {
+      "name": "add_numeric_object_member",
+      "description": "Container-relative: a numeric token names an object member",
+      "op": "add",
+      "pointer": "/obj/5",
+      "document": {"obj": {"5": "old"}},
+      "value": "new",
+      "expected_document": {"obj": {"5": "new"}}
+    },
+    {
+      "name": "replace_missing_member_fails",
+      "description": "RFC 6902 4.3: replace requires the target to exist",
+      "op": "replace",
+      "pointer": "/missing",
+      "document": {"foo": "bar"},
+      "value": 1,
+      "should_fail": true
+    },
+    {
+      "name": "replace_array_element",
+      "description": "Replace an existing array element in place",
+      "op": "replace",
+      "pointer": "/arr/1",
+      "document": {"arr": [1, 2, 3]},
+      "value": 99,
+      "expected_document": {"arr": [1, 99, 3]}
+    },
+    {
+      "name": "replace_dash_fails",
+      "description": "The - token designates a nonexistent element; replace must fail",
+      "op": "replace",
+      "pointer": "/arr/-",
+      "document": {"arr": [1, 2]},
+      "value": 3,
+      "should_fail": true
+    },
+    {
+      "name": "replace_index_out_of_range_fails",
+      "description": "Replace past the end of an array fails",
+      "op": "replace",
+      "pointer": "/arr/2",
+      "document": {"arr": [1, 2]},
+      "value": 3,
+      "should_fail": true
+    },
+    {
+      "name": "remove_dash_fails",
+      "description": "The - token designates a nonexistent element; remove must fail",
+      "op": "remove",
+      "pointer": "/arr/-",
+      "document": {"arr": [1, 2]},
+      "should_fail": true
+    },
+    {
+      "name": "remove_missing_member_fails",
+      "description": "RFC 6902 4.2: remove requires the target to exist",
+      "op": "remove",
+      "pointer": "/missing",
+      "document": {"foo": "bar"},
+      "should_fail": true
+    },
+    {
+      "name": "remove_index_out_of_range_fails",
+      "description": "Remove past the end of an array fails",
+      "op": "remove",
+      "pointer": "/arr/2",
+      "document": {"arr": [1, 2]},
+      "should_fail": true
+    },
+    {
+      "name": "remove_nested_value",
+      "description": "Remove deep in a mixed object/array structure",
+      "op": "remove",
+      "pointer": "/a/1/b",
+      "document": {"a": [{"b": 0}, {"b": 1, "c": 2}]},
+      "expected_document": {"a": [{"b": 0}, {"c": 2}]},
+      "expected_removed": 1
+    },
+    {
+      "name": "add_deep_nested",
+      "description": "Add deep in a mixed object/array structure keeps siblings intact",
+      "op": "add",
+      "pointer": "/a/0/list/-",
+      "document": {"a": [{"list": [1]}], "sibling": {"x": true}},
+      "value": 2,
+      "expected_document": {"a": [{"list": [1, 2]}], "sibling": {"x": true}}
+    },
+    {
+      "name": "add_through_scalar_fails",
+      "description": "A scalar in the path cannot be traversed",
+      "op": "add",
+      "pointer": "/a/b",
+      "document": {"a": 42},
+      "value": 1,
+      "should_fail": true
+    },
+    {
+      "name": "add_escaped_member",
+      "description": "Escape sequences are decoded before writing",
+      "op": "add",
+      "pointer": "/a~1b/m~0n",
+      "document": {"a/b": {}},
+      "value": 1,
+      "expected_document": {"a/b": {"m~n": 1}}
+    },
+    {
+      "name": "add_empty_key_member",
+      "description": "The empty token names the empty-string member",
+      "op": "add",
+      "pointer": "/",
+      "document": {"a": 1},
+      "value": 2,
+      "expected_document": {"a": 1, "": 2}
+    },
+    {
+      "name": "root_array_add",
+      "description": "Writes work on documents with an array root",
+      "op": "add",
+      "pointer": "/1",
+      "document": ["a", "c"],
+      "value": "b",
+      "expected_document": ["a", "b", "c"]
+    },
+    {
+      "name": "root_array_remove",
+      "description": "Remove from an array-rooted document",
+      "op": "remove",
+      "pointer": "/0",
+      "document": ["a", "b"],
+      "expected_document": ["b"],
+      "expected_removed": "a"
+    },
+    {
+      "name": "set_defaults_to_add",
+      "description": "set without options behaves exactly like add",
+      "op": "set",
+      "pointer": "/baz",
+      "document": {"foo": "bar"},
+      "value": "qux",
+      "expected_document": {"baz": "qux", "foo": "bar"}
+    },
+    {
+      "name": "set_without_create_fails_on_missing_parent",
+      "description": "set without createIntermediates keeps RFC 6902 add semantics",
+      "op": "set",
+      "pointer": "/a/b/c",
+      "document": {},
+      "value": 1,
+      "should_fail": true
+    },
+    {
+      "name": "set_create_object_chain",
+      "description": "createIntermediates builds missing object levels",
+      "op": "set",
+      "pointer": "/a/b/c",
+      "document": {},
+      "value": 1,
+      "create_intermediates": true,
+      "expected_document": {"a": {"b": {"c": 1}}}
+    },
+    {
+      "name": "set_create_array_for_index_zero",
+      "description": "A created intermediate becomes an array when the next token is index 0",
+      "op": "set",
+      "pointer": "/a/0/name",
+      "document": {},
+      "value": "first",
+      "create_intermediates": true,
+      "expected_document": {"a": [{"name": "first"}]}
+    },
+    {
+      "name": "set_create_array_for_dash",
+      "description": "A created intermediate becomes an array when the next token is -",
+      "op": "set",
+      "pointer": "/a/-",
+      "document": {},
+      "value": 1,
+      "create_intermediates": true,
+      "expected_document": {"a": [1]}
+    },
+    {
+      "name": "set_create_numeric_key_makes_object",
+      "description": "A nonzero numeric next token creates an object (no null-padding of arrays)",
+      "op": "set",
+      "pointer": "/a/3",
+      "document": {},
+      "value": 1,
+      "create_intermediates": true,
+      "expected_document": {"a": {"3": 1}}
+    },
+    {
+      "name": "set_create_appends_to_existing_array",
+      "description": "createIntermediates may extend an existing array at the append position",
+      "op": "set",
+      "pointer": "/a/1/name",
+      "document": {"a": [{"name": "first"}]},
+      "value": "second",
+      "create_intermediates": true,
+      "expected_document": {"a": [{"name": "first"}, {"name": "second"}]}
+    },
+    {
+      "name": "set_create_index_gap_fails",
+      "description": "createIntermediates never null-pads arrays; a gap index fails",
+      "op": "set",
+      "pointer": "/a/2/name",
+      "document": {"a": [{"name": "first"}]},
+      "value": "third",
+      "create_intermediates": true,
+      "should_fail": true
+    },
+    {
+      "name": "set_create_replaces_null",
+      "description": "A JSON null in the path counts as empty and is replaced by a container",
+      "op": "set",
+      "pointer": "/a/b",
+      "document": {"a": null},
+      "value": 1,
+      "create_intermediates": true,
+      "expected_document": {"a": {"b": 1}}
+    },
+    {
+      "name": "set_create_never_overwrites_scalar",
+      "description": "createIntermediates must not overwrite an existing scalar in the path",
+      "op": "set",
+      "pointer": "/a/b",
+      "document": {"a": "scalar"},
+      "value": 1,
+      "create_intermediates": true,
+      "should_fail": true
+    },
+    {
+      "name": "set_create_dash_mid_path_appends",
+      "description": "With createIntermediates, - as an intermediate step appends a created container",
+      "op": "set",
+      "pointer": "/a/-/b",
+      "document": {"a": [{"b": 1}]},
+      "value": 2,
+      "create_intermediates": true,
+      "expected_document": {"a": [{"b": 1}, {"b": 2}]}
+    },
+    {
+      "name": "add_dash_mid_path_fails",
+      "description": "Without createIntermediates, - designates a nonexistent element and cannot be traversed",
+      "op": "add",
+      "pointer": "/a/-/b",
+      "document": {"a": [{"b": 1}]},
+      "value": 2,
+      "should_fail": true
+    },
+    {
+      "name": "add_null_value",
+      "description": "Adding an explicit JSON null stores null",
+      "op": "add",
+      "pointer": "/n",
+      "document": {},
+      "value": null,
+      "expected_document": {"n": null}
+    },
+    {
+      "name": "replace_with_container",
+      "description": "Replace a scalar leaf with a container value",
+      "op": "replace",
+      "pointer": "/a",
+      "document": {"a": 1},
+      "value": {"b": [true]},
+      "expected_document": {"a": {"b": [true]}}
+    }
+  ]
+}

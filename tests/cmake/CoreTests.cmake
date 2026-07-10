@@ -10,7 +10,8 @@ set(CORE_JSONPATH_SOURCES
 
 # Core JSONPointer tests
 set(CORE_JSONPOINTER_SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-pointer/JSONPointerGTest.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-pointer/JSONPointerGTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-pointer/JSONPointerWriteGTest.cpp)
 
 # Combined core test sources
 set(CORE_TEST_SOURCES ${CORE_JSONPATH_SOURCES} ${CORE_JSONPOINTER_SOURCES})

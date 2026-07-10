@@ -6,6 +6,7 @@
 # RFC 6901 compliance test sources
 set(RFC6901_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/rfc-compliance-suite/rfc-6901/RFC6901ComplianceGTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/rfc-compliance-suite/rfc-6901/RFC6901WriteComplianceGTest.cpp
 )
 
 function(add_rfc6901_tests)
