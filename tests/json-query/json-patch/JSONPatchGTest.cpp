@@ -24,7 +24,14 @@ QJsonArray parsePatchJson(const char* json)
     const auto      doc{QJsonDocument::fromJson(QByteArray{json}, &perr)};
     EXPECT_EQ(perr.error, QJsonParseError::NoError) << perr.errorString().toStdString();
     EXPECT_TRUE(doc.isArray()) << "test patch must be a JSON array";
-    return doc.array();
+    const QJsonArray patch = doc.array();
+    // Guard the guard: every op entry must round-trip as an object before the
+    // patch is handed to create() (diagnoses container-level mishaps directly)
+    for (qsizetype i = 0; i < patch.size(); ++i)
+        EXPECT_TRUE(patch.at(i).isObject())
+            << "op " << i << " is not an object; array: "
+            << QJsonDocument{patch}.toJson(QJsonDocument::Compact).toStdString();
+    return patch;
 }
 
 // Failure formatter: what create()/apply() actually returned, for assertion
