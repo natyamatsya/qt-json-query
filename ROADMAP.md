@@ -216,21 +216,54 @@ semantics and pass the filter as proposed.
   mechanism, clearly non-portable, and gated behind an explicit opt-in.
   Alternative: keep the library unchanged and document the consumer-side
   pattern (static queries + code-side matching) as the sanctioned approach.
-- **`QJsonObject&`/`QJsonArray&` write overloads** (#4a): consumers holding a
-  typed root currently round-trip through `QJsonValue` for every write.
-- **Pointer composition / index-parameterized pointers** (#4b): keep the
-  compile-once pattern in indexed loops (`prefix / i / u"key"` or a compiled
-  template with placeholders).
-- **Patch builder or prefix-rooted write cursor** (#4c): make batched writes
-  under one prefix the easy path (today: N independent root walks, or
-  hand-building a QJson ops array for JSONPatch).
-- **`as<qint64>`** (#4d): JsonTarget lacks Qt's native 64-bit JSON integer
-  width; consumers narrow through `as<int>`.
-- **Compile-time-validated pointer/path literals** (#4e): UDL or `consteval`
-  factory to remove assert-and-unwrap helpers for known-good literals.
-- **C++17 consumer facade** (their #3): optional `std::expected` shim (e.g.
-  tl::expected via `JSON_QUERY_EXPECTED_COMPAT`) for consumers pinned to
-  C++17 in public headers.
+- **`QJsonObject&`/`QJsonArray&` write overloads** (#4a). Consumers holding a
+  typed root (`MilanDeviceEntity::m_jsonObject`) currently round-trip through
+  `QJsonValue` for every write. Shape: `add/replace/remove/set` overloads on
+  `JSONPointer` (and `JSONPatch::applyInPlace`) taking `QJsonObject&` /
+  `QJsonArray&`, implemented as thin wrappers over the existing engine via
+  `utils/detail/DocumentRoot.hpp`-style unwrap/commit. One semantic to pin
+  down: a root-replacing write (`""` pointer) whose result is not the fixed
+  container kind must fail with the document untouched — same gap class as
+  `DocumentRootNotContainer`, likely a sibling error code (the strong
+  guarantee carries over unchanged). Smallest of the five; mostly tests.
+- **Pointer composition for indexed loops** (#4b). Loops currently rebuild
+  `QString("/interfaces/%1/mac_address").arg(i)` and re-parse per iteration.
+  Shape: `appended(qsizetype index)` / `appended(QStringView key)` returning
+  a new compiled `JSONPointer` (token-vector copy + one token — no re-parse),
+  with `operator/` sugar (`prefix / i / u"mac_address"`). Standards note:
+  composition is purely programmatic construction of an RFC 6901 pointer —
+  keys enter as *data* (stored decoded, re-escaped canonically by
+  `to_string()`), never through the parser, so this is also the
+  injection-free answer for dynamic keys that #2 wanted for JSONPath
+  filters. Cost per iteration: O(depth) token copy, no string parsing.
+- **Patch builder** (#4c). Batched writes under one prefix today mean N
+  independent `set()` walks from the root, or hand-assembling a QJson ops
+  array for `JSONPatch::create`. Shape: a fluent eagerly-validating builder
+  — `JSONPatchBuilder{}.add(ptr, v).replace(ptr, v).test(ptr, v).build()` →
+  a regular `JSONPatch`, plus `toJson()` so built patches round-trip through
+  the RFC 6902 wire format. Pure sugar over the existing spec-faithful
+  module; a single-walk apply optimization for shared prefixes can land
+  later inside `apply()` without any API change. The alternative
+  prefix-rooted *write cursor* is deliberately deferred: it raises
+  lifetime/aliasing questions against COW documents for the same payoff.
+- **`as<qint64>`** (#4d). `JsonTarget` lacks Qt's native 64-bit JSON integer
+  width, so consumers narrow through `as<int>` and widen back. Extend the
+  target set with `qint64` (and consider `uint`): succeed for integral
+  in-range numbers, else the existing `NumericNotIntegral` /
+  `NumericOutOfRange`. Needs boundary tests around 2^53 (doubles) vs Qt's
+  int64-backed integers. Should ride with (or after) the tracked
+  `ConvErrorCode`/`ConvertError` unification to avoid touching that seam
+  twice.
+- **Compile-time-validated pointer literals** (#4e). Known-good literals
+  currently need assert-and-unwrap helpers around `create()`. Realistic
+  C++23 shape: compile-time *validation*, runtime construction — a
+  `consteval`-checked factory or UDL (`"/a/b"_jptr` in an opt-in literals
+  namespace) that rejects invalid RFC 6901 syntax at compile time and
+  builds the (QString-token) pointer once at first use. Main risk to manage:
+  the compile-time validator must share its rules with `parsePointer`
+  (single source of truth) or the two will drift — the same divergence class
+  the `scanShorthandName` unification just fixed in JSONPath. Trickiest of
+  the five; last in line.
 
 Resolved from the same feedback in 0.6.0: `/templateDepth` now gated on
 `MSVC_VERSION >= 1951` (older cl warned D9002); README notes when to use
