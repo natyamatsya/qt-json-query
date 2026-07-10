@@ -1,0 +1,25 @@
+{
+  "description": "RFC 7386 JSON Merge Patch test cases. Cases a01-a15 are the complete Appendix A example table, in order; the rest are additional edge cases.",
+  "tests": [
+    { "name": "a01_replace_member",        "target": {"a": "b"},              "patch": {"a": "c"},                       "expected": {"a": "c"} },
+    { "name": "a02_add_member",            "target": {"a": "b"},              "patch": {"b": "c"},                       "expected": {"a": "b", "b": "c"} },
+    { "name": "a03_null_removes",          "target": {"a": "b"},              "patch": {"a": null},                      "expected": {} },
+    { "name": "a04_null_removes_keeps_rest", "target": {"a": "b", "b": "c"},  "patch": {"a": null},                      "expected": {"b": "c"} },
+    { "name": "a05_scalar_replaces_array", "target": {"a": ["b"]},            "patch": {"a": "c"},                       "expected": {"a": "c"} },
+    { "name": "a06_array_replaces_scalar", "target": {"a": "c"},              "patch": {"a": ["b"]},                     "expected": {"a": ["b"]} },
+    { "name": "a07_recursive_merge",       "target": {"a": {"b": "c"}},       "patch": {"a": {"b": "d", "c": null}},     "expected": {"a": {"b": "d"}} },
+    { "name": "a08_array_replaced_wholesale", "target": {"a": [{"b": "c"}]},  "patch": {"a": [1]},                       "expected": {"a": [1]} },
+    { "name": "a09_array_replaces_array",  "target": ["a", "b"],              "patch": ["c", "d"],                       "expected": ["c", "d"] },
+    { "name": "a10_array_replaces_object", "target": {"a": "b"},              "patch": ["c"],                            "expected": ["c"] },
+    { "name": "a11_null_replaces_object",  "target": {"a": "foo"},            "patch": null,                             "expected": null },
+    { "name": "a12_string_replaces_object", "target": {"a": "foo"},           "patch": "bar",                            "expected": "bar" },
+    { "name": "a13_null_member_untouched", "target": {"e": null},             "patch": {"a": 1},                         "expected": {"e": null, "a": 1} },
+    { "name": "a14_object_replaces_array_removes_null", "target": [1, 2],     "patch": {"a": "b", "c": null},            "expected": {"a": "b"} },
+    { "name": "a15_null_removal_in_created_object", "target": {},             "patch": {"a": {"bb": {"ccc": null}}},     "expected": {"a": {"bb": {}}} },
+    { "name": "empty_patch_object_is_noop", "target": {"a": {"b": 1}},        "patch": {},                               "expected": {"a": {"b": 1}} },
+    { "name": "number_replaces_object",    "target": {"a": 1},                "patch": 42,                               "expected": 42 },
+    { "name": "boolean_target_merged_into", "target": true,                   "patch": {"a": 1},                         "expected": {"a": 1} },
+    { "name": "null_target_merged_into",   "target": null,                    "patch": {"a": 1},                         "expected": {"a": 1} },
+    { "name": "deep_recursive_merge",      "target": {"a": {"b": {"keep": 1, "drop": 2}}}, "patch": {"a": {"b": {"drop": null, "add": 3}}}, "expected": {"a": {"b": {"keep": 1, "add": 3}}} }
+  ]
+}

@@ -5,6 +5,7 @@
 # Source files
 # ---------------------------------------------------------------------------
 set(JSON_QUERY_SOURCES
+    json-patch/JSONMergePatch.cpp
     json-patch/JSONPatch.cpp
     json-pointer/JSONPointer.cpp
     json-pointer/JSONPointerWrite.cpp

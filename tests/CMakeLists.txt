@@ -31,6 +31,9 @@ option(JSON_QUERY_ENABLE_RFC6901_TESTS
 option(JSON_QUERY_ENABLE_RFC6902_TESTS
        "Build RFC 6902 JSON Patch compliance and unit tests" ON)
 
+option(JSON_QUERY_ENABLE_RFC7386_TESTS
+       "Build RFC 7386 JSON Merge Patch compliance tests" ON)
+
 option(JSON_QUERY_ENABLE_SCHEMA_TESTS "Build JSON Schema validation tests" ON)
 
 option(JSON_QUERY_ENABLE_IETF_JSON_SCHEMA_DRAFT_2020_12_TESTS
@@ -68,6 +71,12 @@ endif()
 if(JSON_QUERY_ENABLE_RFC6902_TESTS)
   include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/RFC6902Tests.cmake)
   add_rfc6902_tests()
+endif()
+
+# RFC 7386 JSON Merge Patch compliance tests
+if(JSON_QUERY_ENABLE_RFC7386_TESTS)
+  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/RFC7386Tests.cmake)
+  add_rfc7386_tests()
 endif()
 
 # Fuzz tests (optional)
@@ -120,6 +129,10 @@ if(JSON_QUERY_CREATE_AGGREGATE_TARGET)
     list(APPEND ALL_TEST_TARGETS rfc6902_compliance_tests)
   endif()
 
+  if(JSON_QUERY_ENABLE_RFC7386_TESTS AND TARGET rfc7386_compliance_tests)
+    list(APPEND ALL_TEST_TARGETS rfc7386_compliance_tests)
+  endif()
+
   if(JSON_QUERY_ENABLE_FUZZ_TESTS AND TARGET json_query_fuzz_tests)
     list(APPEND ALL_TEST_TARGETS json_query_fuzz_tests)
   endif()
@@ -150,6 +163,7 @@ message(STATUS "Internal Tests:  ${JSON_QUERY_ENABLE_INTERNAL_TESTS}")
 message(STATUS "RFC 9535 Tests:  ${JSON_QUERY_ENABLE_RFC9535_TESTS}")
 message(STATUS "RFC 6901 Tests:  ${JSON_QUERY_ENABLE_RFC6901_TESTS}")
 message(STATUS "RFC 6902 Tests:  ${JSON_QUERY_ENABLE_RFC6902_TESTS}")
+message(STATUS "RFC 7386 Tests:  ${JSON_QUERY_ENABLE_RFC7386_TESTS}")
 message(STATUS "Fuzz Tests:      ${JSON_QUERY_ENABLE_FUZZ_TESTS}")
 message(STATUS "Schema Tests:    ${JSON_QUERY_ENABLE_SCHEMA_TESTS}")
 message(
