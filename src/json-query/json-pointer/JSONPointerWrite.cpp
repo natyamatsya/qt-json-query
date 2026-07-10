@@ -3,6 +3,7 @@
 #include "json-query/json-pointer/JSONPointer.hpp"
 #include "json-query/json-pointer/JSONPointerWrite.hpp"
 #include "json-query/utils/JSONError.hpp"
+#include "json-query/utils/detail/DocumentRoot.hpp"
 
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -268,23 +269,13 @@ toRemoveResult(std::expected<QJsonValue, DetailedEvalError>&& result) noexcept
                                                                          WriteOp                   op,
                                                                          bool createIntermediates) noexcept
 {
-    QJsonValue root{};
-    if (doc.isObject())
-        root = QJsonValue{doc.object()};
-    else if (doc.isArray())
-        root = QJsonValue{doc.array()};
+    QJsonValue root{utils::detail::unwrapRoot(doc)};
 
     auto result{detail::writePointer(tokens, root, value, op, createIntermediates)};
     if (!result)
         return result;
 
-    if (root.isObject())
-        doc.setObject(root.toObject());
-    else if (root.isArray())
-        doc.setArray(root.toArray());
-    else if (root.isNull())
-        doc = QJsonDocument{};
-    else
+    if (!utils::detail::commitRoot(doc, root))
         return std::unexpected(DetailedEvalError{EvalError::DocumentRootNotContainer, 0});
 
     return result;

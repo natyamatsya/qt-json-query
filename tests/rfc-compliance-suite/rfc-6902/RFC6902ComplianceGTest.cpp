@@ -27,7 +27,9 @@
 #include <QString>
 
 #include "KnownFailures.hpp"
+#include "framework/ComplianceDataGTest.hpp"
 #include "json-query/JSONQuery"
+#include "json-query/json-patch/JSONPatchEquality.hpp"
 
 using json_query::json_patch::JSONPatch;
 
@@ -54,20 +56,9 @@ inline void PrintTo(const RFC6902TestCase& tc, std::ostream* os)
 
 static QList<RFC6902TestCase> loadPatchTestFile(const QString& path, const QString& fileName)
 {
-    QFile f(path);
-    if (!f.open(QIODevice::ReadOnly))
-    {
-        qWarning("Failed to open JSON Patch test file %s", qPrintable(path));
+    const auto doc{compliance_framework::loadComplianceJson(path)};
+    if (!doc.isArray())
         return {};
-    }
-
-    QJsonParseError perr;
-    const auto      doc{QJsonDocument::fromJson(f.readAll(), &perr)};
-    if (perr.error != QJsonParseError::NoError || !doc.isArray())
-    {
-        qWarning("Invalid JSON in JSON Patch test file %s: %s", qPrintable(path), qPrintable(perr.errorString()));
-        return {};
-    }
 
     QList<RFC6902TestCase> out;
     const QJsonArray       cases = doc.array();
@@ -92,44 +83,11 @@ static QList<RFC6902TestCase> loadPatchTestFile(const QString& path, const QStri
     return out;
 }
 
-// RFC 6902 §4.6 value equality for comparing results against the suite's
-// "expected" documents: numbers compare numerically. QJsonValue::operator==
-// distinguishes Qt's integer and double representations, which is stricter
-// than the spec and could turn a representation difference introduced by a
-// future submodule bump into a confusing false failure.
-static bool jsonSpecEquals(const QJsonValue& a, const QJsonValue& b)
-{
-    if (a.isDouble() && b.isDouble())
-        return a.toDouble() == b.toDouble();
-    if (a.type() != b.type())
-        return false;
-    if (a.isObject())
-    {
-        const QJsonObject objA = a.toObject();
-        const QJsonObject objB = b.toObject();
-        if (objA.size() != objB.size())
-            return false;
-        for (auto it = objA.constBegin(); it != objA.constEnd(); ++it)
-        {
-            const auto itB{objB.constFind(it.key())};
-            if (itB == objB.constEnd() || !jsonSpecEquals(it.value(), itB.value()))
-                return false;
-        }
-        return true;
-    }
-    if (a.isArray())
-    {
-        const QJsonArray arrA = a.toArray();
-        const QJsonArray arrB = b.toArray();
-        if (arrA.size() != arrB.size())
-            return false;
-        for (qsizetype i = 0; i < arrA.size(); ++i)
-            if (!jsonSpecEquals(arrA.at(i), arrB.at(i)))
-                return false;
-        return true;
-    }
-    return a == b;
-}
+// Results are compared against the suite's "expected" documents with the
+// library's own RFC 6902 §4.6 equality (numbers compare numerically —
+// QJsonValue::operator== is stricter and could turn a representation
+// difference introduced by a future submodule bump into a false failure).
+using json_query::json_patch::detail::jsonDeepEquals;
 
 static QJsonDocument toDocument(const QJsonValue& v)
 {
@@ -215,7 +173,7 @@ TEST_P(RFC6902JsonPatchTest, AppliesPerSpec)
         }
     }
 
-    const bool passed{tc.expectError ? !ok : (ok && (!tc.hasExpected || jsonSpecEquals(result, tc.expected)))};
+    const bool passed{tc.expectError ? !ok : (ok && (!tc.hasExpected || jsonDeepEquals(result, tc.expected)))};
 
     if (!passed && knownFailure)
         GTEST_SKIP() << "Known tracked failure: " << tc.comment.toStdString();
@@ -237,7 +195,7 @@ TEST_P(RFC6902JsonPatchTest, AppliesPerSpec)
             const QJsonDocument d{v.isArray() ? QJsonDocument{v.toArray()} : QJsonDocument{v.toObject()}};
             return d.toJson(QJsonDocument::Compact).toStdString();
         };
-        EXPECT_TRUE(jsonSpecEquals(result, tc.expected))
+        EXPECT_TRUE(jsonDeepEquals(result, tc.expected))
             << "Result mismatch for '" << tc.comment.toStdString() << "'\n  actual:   " << dump(result)
             << "\n  expected: " << dump(tc.expected);
     }

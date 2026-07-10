@@ -14,6 +14,7 @@
 #include <QJsonObject>
 #include <QString>
 
+#include "framework/ComplianceDataGTest.hpp"
 #include "json-query/JSONQuery"
 #include "json-query/json-patch/JSONMergePatch.hpp"
 
@@ -43,20 +44,9 @@ static QList<RFC7386TestCase> collectAllMergePatchCases()
 {
     const QString path{
         QStringLiteral(JSON_QUERY_SOURCE_DIR "/tests/rfc-compliance-suite/rfc-7386/rfc7386-tests.json")};
-    QFile f(path);
-    if (!f.open(QIODevice::ReadOnly))
-    {
-        qWarning("Failed to open RFC 7386 test file %s", qPrintable(path));
+    const auto doc{compliance_framework::loadComplianceJson(path)};
+    if (doc.isNull())
         return {};
-    }
-
-    QJsonParseError perr;
-    const auto      doc{QJsonDocument::fromJson(f.readAll(), &perr)};
-    if (perr.error != QJsonParseError::NoError || doc.isNull())
-    {
-        qWarning("Invalid JSON in RFC 7386 test file %s: %s", qPrintable(path), qPrintable(perr.errorString()));
-        return {};
-    }
 
     QList<RFC7386TestCase> out;
     const QJsonArray       tests = doc.object().value("tests").toArray();
@@ -111,13 +101,6 @@ INSTANTIATE_TEST_SUITE_P(RFC7386_Compliance,
                          RFC7386MergePatchTest,
                          ::testing::ValuesIn(g_allMergeCases),
                          [](const ::testing::TestParamInfo<RFC7386TestCase>& info)
-                         {
-                             QString n = info.param.name;
-                             for (auto& ch : n)
-                                 if (!ch.isLetterOrNumber())
-                                     ch = QChar('_');
-                             n += QStringLiteral("_") + QString::number(info.index);
-                             return n.toStdString();
-                         });
+                         { return compliance_framework::sanitizeTestName(info.param.name, info.index); });
 
 } // anonymous namespace

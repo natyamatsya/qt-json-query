@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT
 
 #include "json-query/json-patch/JSONMergePatch.hpp"
+#include "json-query/utils/detail/DocumentRoot.hpp"
 
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -36,24 +37,13 @@ QJsonValue merge_patch(const QJsonValue& target, const QJsonValue& patch) noexce
 
 QJsonDocument merge_patch(const QJsonDocument& target, const QJsonDocument& patch) noexcept
 {
-    QJsonValue targetRoot{};
-    if (target.isObject())
-        targetRoot = QJsonValue{target.object()};
-    else if (target.isArray())
-        targetRoot = QJsonValue{target.array()};
-
-    QJsonValue patchRoot{};
-    if (patch.isObject())
-        patchRoot = QJsonValue{patch.object()};
-    else if (patch.isArray())
-        patchRoot = QJsonValue{patch.array()};
-
-    const auto result{merge_patch(targetRoot, patchRoot)};
-    if (result.isObject())
-        return QJsonDocument{result.toObject()};
-    if (result.isArray())
-        return QJsonDocument{result.toArray()};
-    return QJsonDocument{}; // null patch root -> null document
+    const auto result{merge_patch(utils::detail::unwrapRoot(target), utils::detail::unwrapRoot(patch))};
+    QJsonDocument out;
+    // A document-rooted patch is an object, array, or null, so the result is
+    // always representable; the guard is belt-and-suspenders.
+    if (!utils::detail::commitRoot(out, result))
+        return QJsonDocument{};
+    return out;
 }
 
 } // namespace json_query::json_patch

@@ -3,6 +3,7 @@
 #include "json-query/json-pointer/JSONPointer.hpp"
 #include "json-query/utils/JSONQueryUtils.hpp"
 #include "json-query/utils/JSONError.hpp"
+#include "json-query/utils/detail/DocumentRoot.hpp"
 #include "json-query/json-pointer/JSONPointerParsing.hpp"
 #include "json-query/json-pointer/JSONPointerEvaluation.hpp"
 
@@ -41,13 +42,7 @@ auto evaluateImpl(const std::vector<json_pointer::Token>& tokens, const QJsonVal
 
 auto evaluateDocumentImpl(const std::vector<json_pointer::Token>& tokens, const QJsonDocument& doc) noexcept
 {
-    if (doc.isNull())
-        return evaluateImpl(tokens, QJsonValue{});
-    if (doc.isObject())
-        return evaluateImpl(tokens, QJsonValue{doc.object()});
-    if (doc.isArray())
-        return evaluateImpl(tokens, QJsonValue{doc.array()});
-    return evaluateImpl(tokens, QJsonValue{});
+    return evaluateImpl(tokens, utils::detail::unwrapRoot(doc));
 }
 
 JSONPointer::EvalResult toPublicError(const std::expected<QJsonValue, DetailedEvalError>& result)

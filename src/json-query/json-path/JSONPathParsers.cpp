@@ -13,6 +13,26 @@
 namespace json_query::inline JSON_QUERY_ABI_NS::json_path::detail
 {
 
+namespace
+{
+
+// Scan a member-name-shorthand starting at pos, advancing pos to the segment
+// end. The single home for this scan: an empty shorthand must be rejected
+// HERE — indexing the result downstream would read out of bounds (the guard
+// diverging between parseDot and parseBare is exactly how the "$.[" OOB bug
+// happened).
+[[nodiscard]] std::expected<QStringView, ParseError> scanShorthandName(qsizetype& pos, QStringView sv)
+{
+    const auto start{pos};
+    while (pos < sv.size() && sv[pos] != u'.' && sv[pos] != u'[')
+        ++pos;
+    if (pos == start)
+        return std::unexpected(ParseError::EmptySegment);
+    return sv.sliced(start, pos - start);
+}
+
+} // namespace
+
 // ──────────────────────────────────────────────────────────────────────
 //  Dot-Segment Parser Implementation
 // ──────────────────────────────────────────────────────────────────────
@@ -40,21 +60,17 @@ parseDot(qsizetype pos, QStringView sv, KeyBuilder& kb, std::vector<Token>& toke
         tokens.emplace_back(Token{Token::Kind::Wildcard});
         return pos + 1;
     }
-    auto start{pos};
-    while (pos < n && sv[pos] != u'.' && sv[pos] != u'[')
-        ++pos;
-
-    // '.' immediately followed by '[' (e.g. "$.[0]"): RFC 9535 §2.5.1 requires
-    // "." to be followed by a wildcard or member-name-shorthand — and the
-    // identifier below must not be empty (identifier[0] would read out of
-    // bounds; found by fuzzing, visible only in assert-enabled builds).
-    if (pos == start)
-        return std::unexpected(ParseError::EmptySegment);
+    // '.' immediately followed by '[', '.' or end (e.g. "$.[0]") is an empty
+    // shorthand: RFC 9535 §2.5.1 requires "." to be followed by a wildcard or
+    // member-name-shorthand (rejected inside scanShorthandName).
+    auto scanned{scanShorthandName(pos, sv)};
+    if (!scanned)
+        return std::unexpected(scanned.error());
 
     // RFC 9535 validation: member-name-shorthand must follow ABNF grammar
     // name-first = ALPHA / "_" / Unicode, not DIGIT
     // name-char = name-first / DIGIT
-    auto identifier{sv.sliced(start, pos - start)};
+    auto identifier{*scanned};
 
     // Check first character: must be ALPHA, underscore, or Unicode (not digit)
     QChar first = identifier[0];
@@ -92,13 +108,11 @@ parseDot(qsizetype pos, QStringView sv, KeyBuilder& kb, std::vector<Token>& toke
 std::expected<qsizetype, ParseError>
 parseBare(qsizetype pos, QStringView sv, KeyBuilder& kb, std::vector<Token>& tokens)
 {
-    auto start{pos};
-    while (pos < sv.size() && sv[pos] != u'.' && sv[pos] != u'[')
-        ++pos;
-    if (pos == start)
-        return std::unexpected(ParseError::EmptySegment);
+    auto scanned{scanShorthandName(pos, sv)};
+    if (!scanned)
+        return std::unexpected(scanned.error());
 
-    auto identifier{sv.sliced(start, pos - start)};
+    auto identifier{*scanned};
 
     // Special case: if the identifier is exactly '*', create a Wildcard token
     if (identifier == u"*")

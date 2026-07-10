@@ -20,6 +20,7 @@
 #include <QJsonObject>
 #include <QString>
 
+#include "framework/ComplianceDataGTest.hpp"
 #include "json-query/JSONQuery"
 
 using json_query::json_pointer::JSONPointer;
@@ -50,20 +51,9 @@ inline void PrintTo(const RFC6901WriteTestCase& tc, std::ostream* os)
 
 static QList<RFC6901WriteTestCase> loadWriteTestFile(const QString& path)
 {
-    QFile f(path);
-    if (!f.open(QIODevice::ReadOnly))
-    {
-        qWarning("Failed to open RFC 6901 write test file %s", qPrintable(path));
+    const auto doc{compliance_framework::loadComplianceJson(path)};
+    if (doc.isNull())
         return {};
-    }
-
-    QJsonParseError perr;
-    const auto      doc{QJsonDocument::fromJson(f.readAll(), &perr)};
-    if (perr.error != QJsonParseError::NoError || doc.isNull())
-    {
-        qWarning("Invalid JSON in RFC 6901 write test file %s: %s", qPrintable(path), qPrintable(perr.errorString()));
-        return {};
-    }
 
     QList<RFC6901WriteTestCase> out;
     const QJsonArray            tests = doc.object().value("tests").toArray();
@@ -213,13 +203,6 @@ INSTANTIATE_TEST_SUITE_P(RFC6901_Write,
                          RFC6901JsonPointerWriteTest,
                          ::testing::ValuesIn(g_allWriteCases),
                          [](const ::testing::TestParamInfo<RFC6901WriteTestCase>& info)
-                         {
-                             QString n = info.param.name;
-                             for (auto& ch : n)
-                                 if (!ch.isLetterOrNumber())
-                                     ch = QChar('_');
-                             n += QStringLiteral("_") + QString::number(info.index);
-                             return n.toStdString();
-                         });
+                         { return compliance_framework::sanitizeTestName(info.param.name, info.index); });
 
 } // anonymous namespace

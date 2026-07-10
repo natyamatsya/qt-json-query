@@ -27,6 +27,7 @@
 #include <QtDebug>
 #include <QVector>
 
+#include "framework/ComplianceDataGTest.hpp"
 #include "json-query/JSONQuery"
 
 using json_query::json_pointer::JSONPointer;
@@ -64,23 +65,9 @@ inline void PrintTo(const RFC6901TestCase& tc, std::ostream* os)
 // ----------------------------------------------------------------------------
 static QList<RFC6901TestCase> loadRFC6901TestFile(const QString& path)
 {
-    QFile f(path);
-    if (!f.open(QIODevice::ReadOnly))
-    {
-        qWarning("Failed to open RFC 6901 test file %s", qPrintable(path));
-        return {};
-    }
-
-    const QByteArray data = f.readAll();
-    QJsonParseError  perr;
-    auto             doc{QJsonDocument::fromJson(data, &perr)};
-    if (perr.error != QJsonParseError::NoError)
-        qWarning("JSON parse error in RFC 6901 test file %s: %s", qPrintable(path), qPrintable(perr.errorString()));
+    const auto doc{compliance_framework::loadComplianceJson(path)};
     if (doc.isNull())
-    {
-        qWarning("Invalid JSON in RFC 6901 test file %s", qPrintable(path));
         return {};
-    }
 
     const QJsonObject root  = doc.object();
     const QJsonArray  tests = root.value("tests").toArray();
@@ -192,15 +179,6 @@ INSTANTIATE_TEST_SUITE_P(RFC6901_Compliance,
                          RFC6901JsonPointerTest,
                          ::testing::ValuesIn(g_allCases),
                          [](const ::testing::TestParamInfo<RFC6901TestCase>& info)
-                         {
-                             QString n = info.param.name;
-                             // Replace forbidden characters with underscore
-                             for (auto& ch : n)
-                                 if (!ch.isLetterOrNumber())
-                                     ch = QChar('_');
-                             // Append index to guarantee uniqueness
-                             n += QStringLiteral("_") + QString::number(info.index);
-                             return n.toStdString();
-                         });
+                         { return compliance_framework::sanitizeTestName(info.param.name, info.index); });
 
 } // anonymous namespace

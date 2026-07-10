@@ -2,9 +2,11 @@
 
 #include "json-query/json-patch/JSONPatch.hpp"
 #include "json-query/json-patch/JSONPatchError.hpp"
+#include "json-query/json-patch/JSONPatchEquality.hpp"
 #include "json-query/json-patch/JSONPatchParsing.hpp"
 #include "json-query/json-pointer/JSONPointer.hpp"
 #include "json-query/utils/JSONError.hpp"
+#include "json-query/utils/detail/DocumentRoot.hpp"
 
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -32,12 +34,12 @@ namespace
     return static_cast<std::uint16_t>(std::min<qsizetype>(i, std::numeric_limits<std::uint16_t>::max()));
 }
 
-// RFC 6902 §4.6 value equality. QJsonValue::operator== distinguishes the
-// integer and double representations Qt's CBOR backend gives 1 and 1.0; the
-// spec compares numbers "numerically equal", so numbers are compared as
-// doubles here. Recursion depth is bounded by the document depth (Qt's JSON
-// parser enforces its own nesting limit).
-[[nodiscard]] bool jsonDeepEquals(const QJsonValue& a, const QJsonValue& b) noexcept
+} // namespace
+
+// RFC 6902 §4.6 value equality (declared in JSONPatchEquality.hpp; the
+// compliance driver compares against the suite's expected documents with the
+// same semantics the "test" operation uses).
+bool jsonDeepEquals(const QJsonValue& a, const QJsonValue& b) noexcept
 {
     if (a.isDouble() && b.isDouble())
         return a.toDouble() == b.toDouble();
@@ -71,6 +73,9 @@ namespace
     }
     return a == b; // null, bool, string
 }
+
+namespace
+{
 
 // "from is a proper prefix of path" on the canonical string forms.
 // to_string() re-encodes canonically (escaping, decimal indices), so plain
@@ -255,24 +260,15 @@ JSONPatch::ApplyValueResult JSONPatch::apply(const QJsonValue& root) const noexc
 
 JSONPatch::ApplyResult JSONPatch::apply(const QJsonDocument& document) const noexcept
 {
-    QJsonValue root{};
-    if (document.isObject())
-        root = QJsonValue{document.object()};
-    else if (document.isArray())
-        root = QJsonValue{document.array()};
-
-    auto result{applyOps(m_ops, root)};
+    auto result{applyOps(m_ops, utils::detail::unwrapRoot(document))};
     if (!result)
         return std::unexpected(result.error());
 
-    if (result->isObject())
-        return QJsonDocument{result->toObject()};
-    if (result->isArray())
-        return QJsonDocument{result->toArray()};
-    if (result->isNull())
-        return QJsonDocument{};
-    // QJsonDocument cannot hold a scalar root (use the QJsonValue overload)
-    return std::unexpected(Error{json_pointer::EvalError::DocumentRootNotContainer});
+    QJsonDocument out;
+    if (!utils::detail::commitRoot(out, *result))
+        // QJsonDocument cannot hold a scalar root (use the QJsonValue overload)
+        return std::unexpected(Error{json_pointer::EvalError::DocumentRootNotContainer});
+    return out;
 }
 
 std::expected<void, json_query::Error> JSONPatch::applyInPlace(QJsonDocument& document) const noexcept
