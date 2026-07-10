@@ -52,10 +52,10 @@ std::string describe(const Expected& result)
 
 TEST(JSONPatchCreate, RejectsUnknownOperationWithOpIndex)
 {
-    const auto patch{parsePatchJson(R"([
+    const QJsonArray patch = parsePatchJson(R"([
         {"op": "add", "path": "/a", "value": 1},
         {"op": "frobnicate", "path": "/b"}
-    ])")};
+    ])");
     auto result{JSONPatch::create(patch)};
     ASSERT_FALSE(result.has_value());
     EXPECT_EQ(result.error().domain, ErrorDomain::PatchParse) << describe(result);
@@ -66,7 +66,7 @@ TEST(JSONPatchCreate, RejectsMissingValueForAddReplaceTest)
 {
     for (const char* op : {"add", "replace", "test"})
     {
-        const auto patch{QJsonArray{QJsonObject{{"op", op}, {"path", "/a"}}}};
+        const QJsonArray patch = QJsonArray{QJsonObject{{"op", op}, {"path", "/a"}}};
         EXPECT_FALSE(JSONPatch::create(patch).has_value()) << op;
     }
 }
@@ -74,7 +74,7 @@ TEST(JSONPatchCreate, RejectsMissingValueForAddReplaceTest)
 TEST(JSONPatchCreate, AcceptsExplicitNullValue)
 {
     // "value": null must NOT be treated as a missing member
-    const auto patch{parsePatchJson(R"([{"op": "add", "path": "/a", "value": null}])")};
+    const QJsonArray patch = parsePatchJson(R"([{"op": "add", "path": "/a", "value": null}])");
     auto       compiled{JSONPatch::create(patch)};
     ASSERT_TRUE(compiled.has_value()) << describe(compiled);
 
@@ -88,7 +88,7 @@ TEST(JSONPatchCreate, RejectsMissingFromForMoveCopy)
 {
     for (const char* op : {"move", "copy"})
     {
-        const auto patch{QJsonArray{QJsonObject{{"op", op}, {"path", "/a"}}}};
+        const QJsonArray patch = QJsonArray{QJsonObject{{"op", op}, {"path", "/a"}}};
         EXPECT_FALSE(JSONPatch::create(patch).has_value()) << op;
     }
 }
@@ -118,12 +118,12 @@ TEST(JSONPatchCreate, EmptyPatchIsValidNoOp)
 
 TEST(JSONPatchApply, AtomicityFailingMidPatchLeavesInputUntouched)
 {
-    const auto patch{parsePatchJson(R"([
+    const QJsonArray patch = parsePatchJson(R"([
         {"op": "add",     "path": "/a", "value": 1},
         {"op": "add",     "path": "/b", "value": 2},
         {"op": "replace", "path": "/missing", "value": 3},
         {"op": "add",     "path": "/c", "value": 4}
-    ])")};
+    ])");
     auto compiled{JSONPatch::create(patch)};
     ASSERT_TRUE(compiled.has_value()) << describe(compiled);
 
@@ -146,10 +146,10 @@ TEST(JSONPatchApply, AtomicityFailingMidPatchLeavesInputUntouched)
 
 TEST(JSONPatchApply, TestFailureReportsPatchEvalWithOpIndex)
 {
-    const auto patch{parsePatchJson(R"([
+    const QJsonArray patch = parsePatchJson(R"([
         {"op": "test", "path": "/a", "value": 1},
         {"op": "test", "path": "/a", "value": 999}
-    ])")};
+    ])");
     auto compiled{JSONPatch::create(patch)};
     ASSERT_TRUE(compiled.has_value()) << describe(compiled);
 
@@ -162,7 +162,7 @@ TEST(JSONPatchApply, TestFailureReportsPatchEvalWithOpIndex)
 
 TEST(JSONPatchApply, MoveIntoOwnDescendantFails)
 {
-    const auto patch{parsePatchJson(R"([{"op": "move", "from": "/a", "path": "/a/b"}])")};
+    const QJsonArray patch = parsePatchJson(R"([{"op": "move", "from": "/a", "path": "/a/b"}])");
     auto       compiled{JSONPatch::create(patch)};
     ASSERT_TRUE(compiled.has_value()) << describe(compiled);
 
@@ -176,7 +176,7 @@ TEST(JSONPatchApply, CopyIntoOwnDescendantIsAllowed)
 {
     // RFC 6902 forbids moving into a descendant, not copying: the source
     // value is snapshotted before the add
-    const auto patch{parsePatchJson(R"([{"op": "copy", "from": "/a", "path": "/a/b"}])")};
+    const QJsonArray patch = parsePatchJson(R"([{"op": "copy", "from": "/a", "path": "/a/b"}])");
     auto       compiled{JSONPatch::create(patch)};
     ASSERT_TRUE(compiled.has_value()) << describe(compiled);
 
@@ -192,10 +192,10 @@ TEST(JSONPatchApply, MoveToSameLocationIsIdentity)
 {
     // from == path is not a *proper* prefix, so the move is legal; per the
     // spec it is remove-then-add at the same location — an identity
-    const auto patch{parsePatchJson(R"([
+    const QJsonArray patch = parsePatchJson(R"([
         {"op": "move", "from": "/a", "path": "/a"},
         {"op": "move", "from": "/arr/1", "path": "/arr/1"}
-    ])")};
+    ])");
     auto compiled{JSONPatch::create(patch)};
     ASSERT_TRUE(compiled.has_value()) << describe(compiled);
 
@@ -207,11 +207,11 @@ TEST(JSONPatchApply, MoveToSameLocationIsIdentity)
 
 TEST(JSONPatchApply, TestAgainstRootPointer)
 {
-    const auto matching{parsePatchJson(R"([{"op": "test", "path": "", "value": {"a": 1}}])")};
+    const QJsonArray matching = parsePatchJson(R"([{"op": "test", "path": "", "value": {"a": 1}}])");
     const auto doc{QJsonDocument(QJsonObject{{"a", 1}})};
     ASSERT_TRUE(JSONPatch::create(matching)->apply(doc).has_value());
 
-    const auto mismatching{parsePatchJson(R"([{"op": "test", "path": "", "value": {"a": 2}}])")};
+    const QJsonArray mismatching = parsePatchJson(R"([{"op": "test", "path": "", "value": {"a": 2}}])");
     auto       result{JSONPatch::create(mismatching)->apply(doc)};
     ASSERT_FALSE(result.has_value());
     EXPECT_EQ(result.error().domain, ErrorDomain::PatchEval);
@@ -221,7 +221,7 @@ TEST(JSONPatchApply, MoveToSiblingWithSharedNamePrefixIsAllowed)
 {
     // "/ab" is NOT a descendant of "/a" — the prefix check must respect
     // token boundaries
-    const auto patch{parsePatchJson(R"([{"op": "move", "from": "/a", "path": "/ab"}])")};
+    const QJsonArray patch = parsePatchJson(R"([{"op": "move", "from": "/a", "path": "/ab"}])");
     auto       compiled{JSONPatch::create(patch)};
     ASSERT_TRUE(compiled.has_value()) << describe(compiled);
 
@@ -235,7 +235,7 @@ TEST(JSONPatchApply, TestComparesNumbersNumerically)
 {
     // Qt distinguishes integer and double representations; RFC 6902 §4.6
     // compares numbers numerically, so 1 must equal 1.0
-    const auto patch{parsePatchJson(R"([{"op": "test", "path": "/n", "value": 1}])")};
+    const QJsonArray patch = parsePatchJson(R"([{"op": "test", "path": "/n", "value": 1}])");
     auto       compiled{JSONPatch::create(patch)};
     ASSERT_TRUE(compiled.has_value()) << describe(compiled);
 
@@ -246,7 +246,7 @@ TEST(JSONPatchApply, TestComparesNumbersNumerically)
 
 TEST(JSONPatchApply, TestDoesNotCoerceAcrossTypes)
 {
-    const auto patch{parsePatchJson(R"([{"op": "test", "path": "/n", "value": "1"}])")};
+    const QJsonArray patch = parsePatchJson(R"([{"op": "test", "path": "/n", "value": "1"}])");
     auto       compiled{JSONPatch::create(patch)};
     ASSERT_TRUE(compiled.has_value()) << describe(compiled);
     EXPECT_FALSE(compiled->apply(QJsonDocument(QJsonObject{{"n", 1}})).has_value());
@@ -254,10 +254,10 @@ TEST(JSONPatchApply, TestDoesNotCoerceAcrossTypes)
 
 TEST(JSONPatchApply, CopyThenMoveComposition)
 {
-    const auto patch{parsePatchJson(R"([
+    const QJsonArray patch = parsePatchJson(R"([
         {"op": "copy", "from": "/src", "path": "/dup"},
         {"op": "move", "from": "/src", "path": "/dst"}
-    ])")};
+    ])");
     auto compiled{JSONPatch::create(patch)};
     ASSERT_TRUE(compiled.has_value()) << describe(compiled);
 
@@ -272,7 +272,7 @@ TEST(JSONPatchApply, CopyThenMoveComposition)
 
 TEST(JSONPatchApply, ScalarRootResultNeedsValueOverload)
 {
-    const auto patch{parsePatchJson(R"([{"op": "add", "path": "", "value": 42}])")};
+    const QJsonArray patch = parsePatchJson(R"([{"op": "add", "path": "", "value": 42}])");
     auto       compiled{JSONPatch::create(patch)};
     ASSERT_TRUE(compiled.has_value()) << describe(compiled);
 

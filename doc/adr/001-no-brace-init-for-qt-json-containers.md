@@ -1,6 +1,7 @@
 # ADR-001: No Brace-Initialization for QJsonArray and QJsonObject
 
-- **Status:** Accepted
+- **Status:** Accepted (amended 2026-07-10: compiler-divergence note — the
+  footgun can be invisible on MSVC and fire only on GCC/clang)
 - **Date:** 2026-02-07
 - **Context:** Bug investigation during JSON Schema test failures
 
@@ -106,6 +107,18 @@ Currently known affected types:
 `QJsonObject` is not currently affected because a lone `QJsonObject` cannot
 implicitly convert to `QPair<QString, QJsonValue>`. We provide `asObject()`
 anyway for consistency and future-proofing.
+
+### Compiler divergence (2026-07-10 amendment)
+
+For the *same-type* single-element case (`const auto x{exprYieldingQJsonArray}`
+where the element already is a `QJsonArray`), compilers disagree: MSVC applies
+the single-element same-type rule ([dcl.init.list]/3.2, CWG DR 1467) and
+copies, while GCC and clang (Linux and Apple) select the `initializer_list`
+constructor and wrap. Consequence: code violating this ADR can pass every
+local MSVC build and test run and fail only on the GCC/clang CI legs — which
+is exactly how the JSONPatch unit tests failed when first written with
+`const auto patch{parsePatchJson(...)}`. Treat green-on-MSVC as no evidence of
+brace-init safety; only copy-init (or `asArray()`/`asObject()`) is portable.
 
 ## Scope
 
