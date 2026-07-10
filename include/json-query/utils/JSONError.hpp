@@ -28,6 +28,49 @@ enum class ConvertError : std::uint8_t
     TypeMismatch
 };
 
+// Domain-agnostic JSON value kinds, used for conversion diagnostics
+// (Error::detail of Convert-domain errors packs an expected/actual pair)
+enum class JsonKind : std::uint8_t
+{
+    Null,
+    Object,
+    Array,
+    String,
+    Number,
+    Bool,
+    Undefined
+};
+
+inline constexpr std::string_view kind_name(JsonKind k) noexcept
+{
+    switch (k)
+    {
+    case JsonKind::Null:
+        return "null";
+    case JsonKind::Object:
+        return "object";
+    case JsonKind::Array:
+        return "array";
+    case JsonKind::String:
+        return "string";
+    case JsonKind::Number:
+        return "number";
+    case JsonKind::Bool:
+        return "bool";
+    case JsonKind::Undefined:
+        return "undefined";
+    }
+    return "unknown";
+}
+
+// Pack an expected/actual kind pair into Error::detail (biased by 1 so a
+// packed pair is never 0 — detail 0 keeps meaning "no context").
+[[nodiscard]] constexpr std::uint16_t pack_kinds(JsonKind expected, JsonKind actual) noexcept
+{
+    return static_cast<std::uint16_t>(((static_cast<std::uint16_t>(expected) + 1) << 8) |
+                                      (static_cast<std::uint16_t>(actual) + 1));
+}
+
 /**
  * @brief Convert a ConvertError to a human-readable QStringView
  *
@@ -248,6 +291,16 @@ inline QString Error::formatted_message() const
     // callers should prefer this formatting context).
     if (detail > 0 && (is_patch_parse() || is_patch_eval()))
         return QString(u"%1 (at operation %2)").arg(base).arg(detail);
+    // Convert errors pack an expected/actual JsonKind pair (see pack_kinds)
+    if (detail > 0 && is_convert())
+    {
+        const auto expected{kind_name(static_cast<JsonKind>(((detail >> 8) & 0xFF) - 1))};
+        const auto actual{kind_name(static_cast<JsonKind>((detail & 0xFF) - 1))};
+        return QString(u"%1 (expected %2, got %3)")
+            .arg(base)
+            .arg(QLatin1String(expected.data(), static_cast<qsizetype>(expected.size())))
+            .arg(QLatin1String(actual.data(), static_cast<qsizetype>(actual.size())));
+    }
     const auto hasTokenDetail{detail > 0 && (is_path_eval() || is_pointer_eval())};
     if (!hasTokenDetail)
         return base.toString();

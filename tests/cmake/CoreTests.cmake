@@ -13,8 +13,13 @@ set(CORE_JSONPOINTER_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-pointer/JSONPointerGTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/json-query/json-pointer/JSONPointerWriteGTest.cpp)
 
+# Core utils tests (as<T> conversions, unified Convert errors)
+set(CORE_UTILS_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/json-query/utils/JSONValueUtilsGTest.cpp)
+
 # Combined core test sources
-set(CORE_TEST_SOURCES ${CORE_JSONPATH_SOURCES} ${CORE_JSONPOINTER_SOURCES})
+set(CORE_TEST_SOURCES ${CORE_JSONPATH_SOURCES} ${CORE_JSONPOINTER_SOURCES}
+                      ${CORE_UTILS_SOURCES})
 
 function(add_core_tests)
   if(CORE_TEST_SOURCES)

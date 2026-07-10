@@ -21,19 +21,9 @@ namespace json_query::inline JSON_QUERY_ABI_NS
 {
 
 //------------------------------------------------------------------------------
-// Domain-agnostic kinds (for diagnostics inside this file only)
+// Kind of a runtime value (JsonKind + kind_name live in JSONError.hpp so
+// formatted_message() can decode Convert-error diagnostics)
 //------------------------------------------------------------------------------
-
-enum class JsonKind
-{
-    Null,
-    Object,
-    Array,
-    String,
-    Number,
-    Bool,
-    Undefined
-};
 
 inline JsonKind kind_of(const QJsonValue& v) noexcept
 {
@@ -56,158 +46,120 @@ inline JsonKind kind_of(const QJsonValue& v) noexcept
     }
 }
 
-inline constexpr std::string_view kind_name(JsonKind k) noexcept
-{
-    switch (k)
-    {
-    case JsonKind::Null:
-        return "null";
-    case JsonKind::Object:
-        return "object";
-    case JsonKind::Array:
-        return "array";
-    case JsonKind::String:
-        return "string";
-    case JsonKind::Number:
-        return "number";
-    case JsonKind::Bool:
-        return "bool";
-    case JsonKind::Undefined:
-        return "undefined";
-    }
-    return "unknown";
-}
-
-// For local conversion core we use a small internal error,
-// then map it to the unified Error on the API boundary.
-enum class ConvErrorCode
-{
-    TypeMismatch,
-    OutOfRange,
-    NotIntegral
-};
-
-struct ConvError
-{
-    ConvErrorCode code;
-    JsonKind      expected;
-    JsonKind      actual;
-};
-
-inline QString errorMessage(const ConvError& e)
-{
-    using enum ConvErrorCode;
-    switch (e.code)
-    {
-    case TypeMismatch:
-        return QStringLiteral("Type mismatch: expected %1, got %2")
-            .arg(QString::fromUtf8(kind_name(e.expected).data()))
-            .arg(QString::fromUtf8(kind_name(e.actual).data()));
-    case OutOfRange:
-        return QStringLiteral("Numeric conversion out of range");
-    case NotIntegral:
-        return QStringLiteral("Expected an integral number (no fractional part)");
-    }
-    return QStringLiteral("Conversion error");
-}
-
-// Map ConvError -> unified Error (Convert domain)
-inline Error mapConvError(const ConvError& e) noexcept
-{
-    using enum ConvErrorCode;
-    switch (e.code)
-    {
-    case TypeMismatch:
-        return Error{ConvertError::TypeMismatch};
-    case OutOfRange:
-        return Error{ConvertError::NumericOutOfRange};
-    case NotIntegral:
-        return Error{ConvertError::NumericNotIntegral};
-    }
-    // Fallback – shouldn't happen.
-    return Error{ConvertError::TypeMismatch};
-}
-
 //------------------------------------------------------------------------------
 // Targets supported by the conversion core
 //------------------------------------------------------------------------------
 
 template <class T>
 concept JsonTarget = std::same_as<T, QJsonArray> || std::same_as<T, QJsonObject> || std::same_as<T, QString> ||
-                     std::same_as<T, double> || std::same_as<T, int> || std::same_as<T, bool>;
+                     std::same_as<T, double> || std::same_as<T, int> || std::same_as<T, qint64> ||
+                     std::same_as<T, bool>;
 
 //------------------------------------------------------------------------------
-// Core conversions: QJsonValue -> std::expected<T, ConvError>
+// Core conversions: QJsonValue -> std::expected<T, Error>. Conversion errors
+// use the unified Error type directly (ErrorDomain::Convert), with the
+// expected/actual JsonKind pair packed into Error::detail (pack_kinds) so
+// formatted_message() renders "... (expected array, got string)".
 //------------------------------------------------------------------------------
 
 namespace detail
 {
 
+[[nodiscard]] inline Error typeMismatch(JsonKind expected, const QJsonValue& v) noexcept
+{
+    return Error{ConvertError::TypeMismatch, pack_kinds(expected, kind_of(v))};
+}
+
 template <JsonTarget T>
-inline std::expected<T, ConvError> as_core(const QJsonValue& v);
+inline std::expected<T, Error> as_core(const QJsonValue& v);
 
 // Arrays
 template <>
-inline std::expected<QJsonArray, ConvError> as_core(const QJsonValue& v)
+inline std::expected<QJsonArray, Error> as_core(const QJsonValue& v)
 {
     if (v.isArray())
         return v.toArray();
-    return std::unexpected(ConvError{ConvErrorCode::TypeMismatch, JsonKind::Array, kind_of(v)});
+    return std::unexpected(typeMismatch(JsonKind::Array, v));
 }
 
 // Objects
 template <>
-inline std::expected<QJsonObject, ConvError> as_core(const QJsonValue& v)
+inline std::expected<QJsonObject, Error> as_core(const QJsonValue& v)
 {
     if (v.isObject())
         return v.toObject();
-    return std::unexpected(ConvError{ConvErrorCode::TypeMismatch, JsonKind::Object, kind_of(v)});
+    return std::unexpected(typeMismatch(JsonKind::Object, v));
 }
 
 // Strings
 template <>
-inline std::expected<QString, ConvError> as_core(const QJsonValue& v)
+inline std::expected<QString, Error> as_core(const QJsonValue& v)
 {
     if (v.isString())
         return v.toString();
-    return std::unexpected(ConvError{ConvErrorCode::TypeMismatch, JsonKind::String, kind_of(v)});
+    return std::unexpected(typeMismatch(JsonKind::String, v));
 }
 
 // Booleans
 template <>
-inline std::expected<bool, ConvError> as_core(const QJsonValue& v)
+inline std::expected<bool, Error> as_core(const QJsonValue& v)
 {
     if (v.isBool())
         return v.toBool();
-    return std::unexpected(ConvError{ConvErrorCode::TypeMismatch, JsonKind::Bool, kind_of(v)});
+    return std::unexpected(typeMismatch(JsonKind::Bool, v));
 }
 
 // Doubles
 template <>
-inline std::expected<double, ConvError> as_core(const QJsonValue& v)
+inline std::expected<double, Error> as_core(const QJsonValue& v)
 {
     if (v.isDouble())
         return v.toDouble();
-    return std::unexpected(ConvError{ConvErrorCode::TypeMismatch, JsonKind::Number, kind_of(v)});
+    return std::unexpected(typeMismatch(JsonKind::Number, v));
+}
+
+// 64-bit integers (Qt's native JSON integer width). QJsonValue::toInteger is
+// exact for integer-backed values (no round-trip through double, so the full
+// qint64 range converts losslessly); doubles must be integral and in range.
+template <>
+inline std::expected<qint64, Error> as_core(const QJsonValue& v)
+{
+    if (!v.isDouble())
+        return std::unexpected(typeMismatch(JsonKind::Number, v));
+
+    // toInteger returns its default when the value is not representable as a
+    // whole qint64 — two calls with different defaults disambiguate
+    const qint64 a = v.toInteger(0);
+    const qint64 b = v.toInteger(1);
+    if (a == b)
+        return a;
+
+    constexpr auto numberPair{pack_kinds(JsonKind::Number, JsonKind::Number)};
+    const double   d = v.toDouble();
+    if (std::isfinite(d) && std::trunc(d) != d)
+        return std::unexpected(Error{ConvertError::NumericNotIntegral, numberPair});
+    return std::unexpected(Error{ConvertError::NumericOutOfRange, numberPair});
 }
 
 // Ints (range + integrality checks)
 template <>
-inline std::expected<int, ConvError> as_core(const QJsonValue& v)
+inline std::expected<int, Error> as_core(const QJsonValue& v)
 {
+    constexpr auto numberPair{pack_kinds(JsonKind::Number, JsonKind::Number)};
+
     if (!v.isDouble())
-        return std::unexpected(ConvError{ConvErrorCode::TypeMismatch, JsonKind::Number, kind_of(v)});
+        return std::unexpected(typeMismatch(JsonKind::Number, v));
 
     const double d = v.toDouble();
     if (!std::isfinite(d))
-        return std::unexpected(ConvError{ConvErrorCode::OutOfRange, JsonKind::Number, JsonKind::Number});
+        return std::unexpected(Error{ConvertError::NumericOutOfRange, numberPair});
 
     if (d < static_cast<double>(std::numeric_limits<int>::min()) ||
         d > static_cast<double>(std::numeric_limits<int>::max()))
-        return std::unexpected(ConvError{ConvErrorCode::OutOfRange, JsonKind::Number, JsonKind::Number});
+        return std::unexpected(Error{ConvertError::NumericOutOfRange, numberPair});
 
     if (std::trunc(d) != d)
-        return std::unexpected(ConvError{ConvErrorCode::NotIntegral, JsonKind::Number, JsonKind::Number});
+        return std::unexpected(Error{ConvertError::NumericNotIntegral, numberPair});
 
     return static_cast<int>(d);
 }
@@ -226,12 +178,8 @@ inline std::expected<int, ConvError> as_core(const QJsonValue& v)
 template <JsonTarget T>
 struct AsFn
 {
-    // 1) Plain value: domain-agnostic conversion → mapped to Error
-    [[nodiscard]] auto operator()(QJsonValue v) const -> std::expected<T, Error>
-    {
-        auto base = detail::as_core<T>(v);         // expected<T, ConvError>
-        return base.transform_error(mapConvError); // expected<T, Error>
-    }
+    // 1) Plain value (conversion errors are unified Errors directly)
+    [[nodiscard]] auto operator()(QJsonValue v) const -> std::expected<T, Error> { return detail::as_core<T>(v); }
 
     // 2) Chaining case: preserve unified error (Error)
     //    Templated so it doesn't participate in overload resolution
@@ -242,9 +190,7 @@ struct AsFn
     {
         if (!r)
             return std::unexpected(r.error());
-
-        auto base = detail::as_core<T>(*r);        // expected<T, ConvError>
-        return base.transform_error(mapConvError); // expected<T, Error>
+        return detail::as_core<T>(*r);
     }
 };
 

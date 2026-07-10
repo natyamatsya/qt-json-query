@@ -287,10 +287,12 @@ M0–M3, collected here so they are not lost in the resolved entries above:
 - **SBOM feature UUID:** revisit when CMake's `install(SBOM)` stabilizes
   (pinned to the CMake 4.3 series; see M2).
 - **Code coverage reporting** in CI (optional; see M3).
-- **Unify `ConvErrorCode` with `ConvertError`:** `utils/JSONValueUtils.hpp`
-  carries a near-duplicate conversion enum (with its own message path and a
-  `ConvError` struct holding expected/actual kinds) outside the unified
-  `Error` system; folding them needs an API design pass.
+- [x] **Unify `ConvErrorCode` with `ConvertError`.** *Resolved 2026-07-10
+  (0.7.0):* the parallel `ConvErrorCode`/`ConvError` system is gone —
+  `as<T>` conversions produce unified `Error`s (ErrorDomain::Convert)
+  directly, with the expected/actual `JsonKind` pair packed into
+  `Error::detail` (`pack_kinds`) and rendered by `formatted_message()`
+  ("... (expected array, got string)"), so no diagnostics were lost.
 - [x] **Collapse the three-way error-domain wiring.** *Resolved 2026-07-10
   (0.6.0):* `utils/JSONError.hpp` now derives everything from a single
   `JSON_QUERY_ERROR_DOMAIN_LIST` X-macro — `error_domain<E>` specializations,
