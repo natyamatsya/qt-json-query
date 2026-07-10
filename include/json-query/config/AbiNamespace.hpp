@@ -18,6 +18,6 @@
  *
  * RELEASE CHECKLIST: this tag tracks the SameMinorVersion compatibility
  * policy of the CMake package — bump it whenever the project's
- * <major>.<minor> version changes (e.g. project VERSION 0.8.0 -> v0_8).
+ * <major>.<minor> version changes (e.g. project VERSION 0.9.0 -> v0_9).
  */
-#define JSON_QUERY_ABI_NS v0_8
+#define JSON_QUERY_ABI_NS v0_9

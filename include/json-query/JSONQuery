@@ -6,6 +6,7 @@
 #include "json-patch/JSONPatch.hpp"
 #include "json-patch/JSONPatchBuilder.hpp"
 #include "json-path/JSONPath.hpp"
+#include "json-path/JSONPathLiterals.hpp"
 #include "json-pointer/JSONPointer.hpp"
 #include "json-pointer/JSONPointerLiterals.hpp"
 #include "json-schema/JSONSchema.hpp"
@@ -25,6 +26,7 @@ using JSONSchema  = json_schema::JSONSchema;
 // Opt-in literal operators (e.g. "/a/b"_jptr): using namespace json_query::literals;
 namespace literals
 {
+using namespace json_path::literals;
 using namespace json_pointer::literals;
 }
 

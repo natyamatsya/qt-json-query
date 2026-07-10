@@ -2,6 +2,19 @@
 
 Pre-1.0: minor versions may contain breaking changes (see `ROADMAP.md`).
 
+## Unreleased (0.9.0)
+
+### Added
+- **`_jpath` compile-once JSONPath literals** (AC-3033 follow-up, their
+  report §5): `"$[?(@.type=='user')]"_jpath` — no `std::expected`
+  unwrapping, each distinct literal compiled once (function-local static).
+  Deliberately *compile-once, fail-fast* rather than compile-time-validated:
+  full compile-time validation would require a second JSONPath grammar
+  outside the real parser (the drift class ADR-007 forbids), so only the
+  immutable root-identifier rule is a compile error; anything else in an
+  invalid literal is a fatal error at first use. Retires the last
+  consumer-side assert-and-unwrap helper (`CompiledPath`).
+
 ## 0.8.0 — 2026-07-10
 
 ### Added

@@ -124,7 +124,7 @@ re-enabled, e.g. `-DJSON_QUERY_BUILD_TESTS=ON`).
 Or installed, via `find_package`:
 
 ```cmake
-find_package(json_query 0.8 REQUIRED)
+find_package(json_query 0.9 REQUIRED)
 target_link_libraries(your_target PRIVATE json_query::json_query)
 ```
 
@@ -134,7 +134,7 @@ static library only — shared builds are unsupported until a symbol-visibility
 story exists (planned for v1.0).
 
 Safe to embed in multiple libraries within one application: all symbols live
-in a versioned inline ABI namespace (`json_query::v0_8::…`, transparent to
+in a versioned inline ABI namespace (`json_query::v0_9::…`, transparent to
 source code — you still write `json_query::JSONPath`) and the archive is
 built with hidden visibility, so different embedded versions cannot collide
 or interpose each other (see `doc/adr/005`).
@@ -388,6 +388,19 @@ if (expensive)
     if (result)
         qDebug() << "Expensive:" << *result; // ["Book 2", "Book 3"]
 }
+```
+
+For hard-coded queries, the `_jpath` literal removes the unwrap ceremony and
+compiles each distinct literal once. Unlike `_jptr` it is *compile-once*, not
+compile-time-validated: only the root-identifier rule is a compile error;
+full RFC 9535 validation runs at first use and an invalid literal fails fast
+and loud (a programming error — use `create()` for runtime-provided queries):
+
+```cpp
+using namespace json_query::literals;
+
+const auto& users{"$[?(@.type=='user')]"_jpath};
+auto nodes{users.evaluate(doc)};
 ```
 
 ### JSON Schema

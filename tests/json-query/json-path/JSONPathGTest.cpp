@@ -14,6 +14,51 @@
 using json_query::JSONPath;
 using json_query::JSONPointer;
 
+// ---------------------------------------------------------------------------
+// Compile-once literals (_jpath)
+// ---------------------------------------------------------------------------
+
+using namespace json_query::literals;
+
+// The compile-time contract is only the immutable root-identifier rule
+// (everything else validates through the real parser at first use)
+static_assert(json_query::json_path::detail::startsWithRootIdentifier(u"$[?(@.x)]", std::size_t{9}));
+static_assert(!json_query::json_path::detail::startsWithRootIdentifier(u"[?(@.x)]", std::size_t{8}));
+static_assert(!json_query::json_path::detail::startsWithRootIdentifier(u"", std::size_t{0}));
+static_assert(json_query::json_path::detail::startsWithRootIdentifier("$.a", std::size_t{3})); // char form
+
+TEST(JSONPathLiterals, FilterLiteralEvaluatesLikeCreated)
+{
+    // The consumer use case that motivated the feature: a static filter
+    // query with embedded quotes, no assert-and-unwrap helper
+    const QJsonDocument doc(QJsonArray{
+        QJsonObject{{"type", "user"}, {"id", 1}},
+        QJsonObject{{"type", "group"}, {"id", 2}},
+        QJsonObject{{"type", "user"}, {"id", 3}},
+    });
+
+    const auto& users{"$[?(@.type=='user')]"_jpath};
+    auto        result{users.evaluate(doc)};
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(result->size(), 2);
+
+    const auto created{JSONPath::create(u"$[?(@.type=='user')]").value()};
+    EXPECT_EQ(*result, created.evaluate(doc).value());
+}
+
+TEST(JSONPathLiterals, DistinctLiteralCompiledOnce)
+{
+    const auto& first{"$.compiled.once"_jpath};
+    const auto& second{"$.compiled.once"_jpath};
+    EXPECT_EQ(&first, &second); // same function-local static per literal
+
+    // char16_t form works too
+    const auto& utf16{u"$.compiled.once"_jpath};
+    auto        r{utf16.evaluate(QJsonDocument(QJsonObject{}))};
+    ASSERT_TRUE(r.has_value());
+    EXPECT_TRUE(r->isEmpty());
+}
+
 TEST(JSONPathBasic, RootAccess)
 {
     QJsonObject   obj{{"foo", "bar"}};
