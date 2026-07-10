@@ -266,6 +266,25 @@ if (auto r{theme->replace(doc, "crimson")}; !r)
 // remove returns the removed value ("take")
 if (auto removed{theme->remove(doc)})
     qDebug() << "was:" << *removed;
+
+// Typed roots: consumers holding a QJsonObject/QJsonArray write in place
+// (a root-replacing write that would change the kind fails, root untouched)
+QJsonObject settingsObj = doc.object();
+if (auto r{accent->replace(settingsObj, "ocean")}; !r)
+    qWarning() << r.error().formatted_message();
+
+// Composition: keys enter as data (never through the parser — no escaping,
+// no injection surface), keeping the compile-once pattern in indexed loops
+const auto interfaces{JSONPointer::create("/adp_information/interfaces").value()};
+for (qsizetype i = 0; i < macs.size(); ++i)
+    if (auto r{(interfaces / i / u"mac_address").replace(doc, macs[i])}; !r)
+        qWarning() << r.error().formatted_message();
+
+// as<qint64>: Qt's native JSON integer width, exact beyond 2^53
+const auto id{JSONPointer::create("/data/id")
+                  .and_then([&](const JSONPointer& p) { return p.evaluate(doc); })
+                  .and_then(as<qint64>)
+                  .value_or(-1)};
 ```
 
 ### JSON Patch (RFC 6902)
@@ -294,6 +313,19 @@ if (auto result{patch->apply(doc)})
     doc = *result;               // or: patch->applyInPlace(doc)
 else
     qWarning() << result.error().formatted_message();
+```
+
+Or build patches fluently — validated by the same rules as parsed ones, and
+serializable back to the wire format via `toJson()`:
+
+```cpp
+auto patch{JSONPatchBuilder{}
+               .test(u"/version", 3)
+               .replace(u"/name", "new")
+               .add(mappings / u"-", mapping) // composed pointer
+               .build()};
+if (patch)
+    patch->applyInPlace(doc); // QJsonDocument&, QJsonObject&, or QJsonArray&
 ```
 
 RFC 7386 Merge Patch is available as a free function (total — no error path):
@@ -444,16 +476,16 @@ macOS, and Windows (MSVC), Qt 6.8.3)*
 
 | Test Suite | Passed | Skipped | Failed |
 |---|---|---|---|
-| **Core unit tests** | 39 | — | 0 |
+| **Core unit tests** | 56 | — | 0 |
 | **Internal unit tests** | 74 | — | 0 |
-| **RFC 6901 — JSON Pointer (read + write)** | 83 | — | 0 |
-| **RFC 6902 — JSON Patch (json-patch-tests + unit)** | 122 | — | 0 |
-| **RFC 7386 — JSON Merge Patch** | 20 | — | 0 |
-| **RFC 9535 — JSONPath CTS** | 443 | 1¹ | 0 |
+| **RFC 6901 — JSON Pointer (read + write)** | 89 | — | 0 |
+| **RFC 6902 — JSON Patch (json-patch-tests + unit)** | 131 | — | 0 |
+| **RFC 7386 — JSON Merge Patch** | 21 | — | 0 |
+| **RFC 9535 — JSONPath CTS** | 444 | 1¹ | 0 |
 | **JSON Schema unit tests** | 122 | — | 0 |
 | **IETF JSON Schema Draft 2020-12** | 1932 | 62² | 0 |
 
-**Totals: 2,878 passing, 0 failing.**
+**Totals: 2,869 passing, 0 failing.**
 
 ¹ One CTS case skipped due to a documented upstream test-suite bug.
 ² Known optional-feature gaps, tracked as an exact expected-failure table

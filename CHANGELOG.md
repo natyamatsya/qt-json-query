@@ -5,8 +5,33 @@ Pre-1.0: minor versions may contain breaking changes (see `ROADMAP.md`).
 ## Unreleased (0.7.0)
 
 The 0.7.0 milestone is the AC-3033 first-consumer ergonomics track
-(API surface over unchanged spec semantics): typed-root write overloads,
-pointer composition, a patch builder, and `as<qint64>`.
+(API surface over unchanged spec semantics).
+
+### Added
+- **Typed-root write overloads**: `JSONPointer::add/replace/remove/set` and
+  `JSONPatch::applyInPlace` for `QJsonObject&`/`QJsonArray&` — no more
+  QJsonValue round-trip for typed roots. New
+  `EvalError::RootTypeMismatch` when a root-replacing write would change
+  the fixed container kind (strong guarantee holds).
+- **Pointer composition**: `JSONPointer::appended(key|index)` and
+  `operator/` build compiled pointers programmatically (no re-parsing;
+  keys enter as data and re-encode canonically — no escaping at call
+  sites, no injection surface). Classification shares `parseArrayIndex`
+  with the parser, so composed and parsed pointers behave identically.
+- **`JSONPatchBuilder`** (fluent, both compiled-pointer and string
+  overloads; `build()` validates via `JSONPatch::create`) and
+  **`JSONPatch::toJson()`** for RFC 6902 wire-format round-trips.
+- **`as<qint64>`**: exact for integer-backed values across the full
+  qint64 range (no double round-trip); integral doubles convert,
+  fractional/overflow report `NumericNotIntegral`/`NumericOutOfRange`.
+
+### Changed
+- **Conversion errors unified** (tracked ROADMAP item): the parallel
+  `ConvErrorCode`/`ConvError` system in `JSONValueUtils.hpp` is gone;
+  `as<T>` produces unified `Error`s (Convert domain) with the
+  expected/actual `JsonKind` pair packed into `Error::detail` and
+  rendered by `formatted_message()` ("... (expected array, got
+  string)"). `JsonKind`/`kind_name` moved to `utils/JSONError.hpp`.
 
 ## 0.6.0 — 2026-07-10
 

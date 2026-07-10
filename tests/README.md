@@ -20,12 +20,12 @@ ctest --test-dir build
 
 | Target | Suite | Tests | Description |
 |---|---|---|---|
-| `json_query_core_tests` | Core | 39 | JSONPath and JSONPointer basic functionality (incl. pointer write ops) |
+| `json_query_core_tests` | Core | 56 | JSONPath, JSONPointer (incl. write ops + composition), and as<T> conversions |
 | `json_query_internal_tests` | Internal | 74 | Internal components (cursors, filter storage) |
 | `rfc9535_compliance_tests` | RFC 9535 | 443 | JSONPath compliance (official CTS) |
-| `rfc6901_compliance_tests` | RFC 6901 | 83 | JSON Pointer compliance (read + write suites) |
-| `rfc6902_compliance_tests` | RFC 6902 | 122 | JSON Patch compliance (community suite) + JSONPatch unit tests |
-| `rfc7386_compliance_tests` | RFC 7386 | 20 | JSON Merge Patch (complete Appendix A table + edge cases) |
+| `rfc6901_compliance_tests` | RFC 6901 | 89 | JSON Pointer compliance (read + write suites, all overload families) |
+| `rfc6902_compliance_tests` | RFC 6902 | 131 | JSON Patch compliance (community suite) + JSONPatch/builder unit tests |
+| `rfc7386_compliance_tests` | RFC 7386 | 21 | JSON Merge Patch (complete Appendix A table + edge cases) |
 | `json_schema_tests` | Schema | 122 | JSON Schema validation unit tests |
 | `ietf_json_schema_draft_2020_12_compliance_tests` | IETF Draft 2020-12 | 1932 (+62 tracked xfail skips) | JSON Schema compliance (IETF test suite) |
 
