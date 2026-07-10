@@ -12,6 +12,20 @@ using json_query::JSONPath;
 using json_query::json_path::ParseError;
 using namespace ::testing;
 
+// Regression: '.' immediately followed by '[' produced an empty
+// member-name-shorthand and an out-of-bounds QStringView read in parseDot
+// (assert-enabled builds aborted; found by fuzz_jsonpath_parsing). RFC 9535
+// section 2.5.1 requires "." to be followed by a wildcard or a member name,
+// so these must be clean parse errors.
+TEST(RFC9535_JSONPath, DotImmediatelyFollowedByBracketIsError)
+{
+    for (const auto* expr : {u"$.[", u"$.[.", u"$.[0]", u"$..a.["})
+    {
+        auto path{JSONPath::create(expr)};
+        EXPECT_FALSE(path.has_value()) << QString(expr).toStdString();
+    }
+}
+
 // RFC 9535 Test Validation Issue: This test expects @.bar to be invalid syntax,
 // but RFC 9535 grammar explicitly allows it as a valid existence test.
 //

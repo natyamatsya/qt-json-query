@@ -44,6 +44,13 @@ parseDot(qsizetype pos, QStringView sv, KeyBuilder& kb, std::vector<Token>& toke
     while (pos < n && sv[pos] != u'.' && sv[pos] != u'[')
         ++pos;
 
+    // '.' immediately followed by '[' (e.g. "$.[0]"): RFC 9535 §2.5.1 requires
+    // "." to be followed by a wildcard or member-name-shorthand — and the
+    // identifier below must not be empty (identifier[0] would read out of
+    // bounds; found by fuzzing, visible only in assert-enabled builds).
+    if (pos == start)
+        return std::unexpected(ParseError::EmptySegment);
+
     // RFC 9535 validation: member-name-shorthand must follow ABNF grammar
     // name-first = ALPHA / "_" / Unicode, not DIGIT
     // name-char = name-first / DIGIT
