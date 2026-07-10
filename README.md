@@ -124,7 +124,7 @@ re-enabled, e.g. `-DJSON_QUERY_BUILD_TESTS=ON`).
 Or installed, via `find_package`:
 
 ```cmake
-find_package(json_query 0.6 REQUIRED)
+find_package(json_query 0.7 REQUIRED)
 target_link_libraries(your_target PRIVATE json_query::json_query)
 ```
 
@@ -134,7 +134,7 @@ static library only — shared builds are unsupported until a symbol-visibility
 story exists (planned for v1.0).
 
 Safe to embed in multiple libraries within one application: all symbols live
-in a versioned inline ABI namespace (`json_query::v0_6::…`, transparent to
+in a versioned inline ABI namespace (`json_query::v0_7::…`, transparent to
 source code — you still write `json_query::JSONPath`) and the archive is
 built with hidden visibility, so different embedded versions cannot collide
 or interpose each other (see `doc/adr/005`).

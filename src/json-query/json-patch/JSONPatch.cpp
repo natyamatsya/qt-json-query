@@ -280,4 +280,26 @@ std::expected<void, json_query::Error> JSONPatch::applyInPlace(QJsonDocument& do
     return {};
 }
 
+std::expected<void, json_query::Error> JSONPatch::applyInPlace(QJsonObject& root) const noexcept
+{
+    auto result{apply(QJsonValue{root})};
+    if (!result)
+        return std::unexpected(result.error());
+    if (!result->isObject())
+        return std::unexpected(Error{json_pointer::EvalError::RootTypeMismatch});
+    root = result->toObject();
+    return {};
+}
+
+std::expected<void, json_query::Error> JSONPatch::applyInPlace(QJsonArray& root) const noexcept
+{
+    auto result{apply(QJsonValue{root})};
+    if (!result)
+        return std::unexpected(result.error());
+    if (!result->isArray())
+        return std::unexpected(Error{json_pointer::EvalError::RootTypeMismatch});
+    root = result->toArray();
+    return {};
+}
+
 } // namespace json_query::json_patch

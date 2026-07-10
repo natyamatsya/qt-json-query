@@ -194,7 +194,9 @@ and a bespoke settings-backend pointer engine — see ADR-007/ADR-008).
 
 ---
 
-## Next release candidates (AC-3033 first-consumer feedback, 2026-07-10)
+## 0.7.0 milestone (declared 2026-07-10): AC-3033 ergonomics track
+
+0.7.0 = items #4a/#4b/#4c/#4d below, in that order.
 
 Feature asks from the first downstream integration (the AC-3033 spike's
 extension-suggestions write-up, tracked consumer-side); none blocked

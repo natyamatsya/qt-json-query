@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT
 
 #pragma once
+#include <QJsonArray>
 #include <QJsonDocument>
+#include <QJsonObject>
 #include <QJsonValue>
 #include <QString>
 #include <QStringView>
@@ -87,6 +89,11 @@ class JSONPointer
      * All write methods provide the strong guarantee: on error the document
      * is left untouched. An Undefined @p value is stored as JSON null.
      *
+     * Typed-root overloads (QJsonObject& / QJsonArray&) behave identically,
+     * except the root's container kind is fixed: a root-replacing write ("")
+     * whose result is not that kind fails with RootTypeMismatch — and, per
+     * the strong guarantee, leaves the container untouched.
+     *
      * @return Nothing on success, or an Error (ErrorDomain::PointerEval) with
      *         the failing token index in Error::detail.
      *
@@ -98,6 +105,8 @@ class JSONPointer
      */
     [[nodiscard]] WriteResult add(QJsonDocument& doc, const QJsonValue& value) const noexcept;
     [[nodiscard]] WriteResult add(QJsonValue& root, const QJsonValue& value) const noexcept;
+    [[nodiscard]] WriteResult add(QJsonObject& root, const QJsonValue& value) const noexcept;
+    [[nodiscard]] WriteResult add(QJsonArray& root, const QJsonValue& value) const noexcept;
 
     /**
      * @brief Replace the existing value at the pointer target (RFC 6902
@@ -110,6 +119,8 @@ class JSONPointer
      */
     [[nodiscard]] WriteResult replace(QJsonDocument& doc, const QJsonValue& value) const noexcept;
     [[nodiscard]] WriteResult replace(QJsonValue& root, const QJsonValue& value) const noexcept;
+    [[nodiscard]] WriteResult replace(QJsonObject& root, const QJsonValue& value) const noexcept;
+    [[nodiscard]] WriteResult replace(QJsonArray& root, const QJsonValue& value) const noexcept;
 
     /**
      * @brief Remove the value at the pointer target (RFC 6902 "remove"
@@ -123,6 +134,8 @@ class JSONPointer
      */
     [[nodiscard]] RemoveResult remove(QJsonDocument& doc) const noexcept;
     [[nodiscard]] RemoveResult remove(QJsonValue& root) const noexcept;
+    [[nodiscard]] RemoveResult remove(QJsonObject& root) const noexcept;
+    [[nodiscard]] RemoveResult remove(QJsonArray& root) const noexcept;
 
     /**
      * @brief Convenience upsert: add(), optionally creating missing
@@ -139,6 +152,8 @@ class JSONPointer
      */
     [[nodiscard]] WriteResult set(QJsonDocument& doc, const QJsonValue& value, WriteOptions options = {}) const noexcept;
     [[nodiscard]] WriteResult set(QJsonValue& root, const QJsonValue& value, WriteOptions options = {}) const noexcept;
+    [[nodiscard]] WriteResult set(QJsonObject& root, const QJsonValue& value, WriteOptions options = {}) const noexcept;
+    [[nodiscard]] WriteResult set(QJsonArray& root, const QJsonValue& value, WriteOptions options = {}) const noexcept;
 
   private:
     // No pimpl here on purpose: Token is first-party (no third-party headers

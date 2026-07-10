@@ -99,6 +99,65 @@ class RFC6901JsonPointerWriteTest : public ::testing::TestWithParam<RFC6901Write
 {
 };
 
+struct OpOutcome
+{
+    bool       ok{false};
+    QJsonValue removed{QJsonValue::Undefined};
+};
+
+// One dispatch for every overload family the case runs against
+// (QJsonDocument&, QJsonValue&, QJsonObject&, QJsonArray&)
+template <class Target>
+OpOutcome runOp(const JSONPointer& pointer, const RFC6901WriteTestCase& tc, Target& target, const WriteOptions& options)
+{
+    OpOutcome out;
+    if (tc.op == QLatin1String("add"))
+        out.ok = pointer.add(target, tc.value).has_value();
+    else if (tc.op == QLatin1String("replace"))
+        out.ok = pointer.replace(target, tc.value).has_value();
+    else if (tc.op == QLatin1String("remove"))
+    {
+        auto r{pointer.remove(target)};
+        out.ok = r.has_value();
+        if (out.ok)
+            out.removed = *r;
+    }
+    else if (tc.op == QLatin1String("set"))
+        out.ok = pointer.set(target, tc.value, options).has_value();
+    else
+        ADD_FAILURE() << "Unknown op '" << tc.op.toStdString() << "' in test " << tc.name.toStdString();
+    return out;
+}
+
+// Shared assertions: strong guarantee on failure, expected document + COW
+// isolation + removed value on success. toValue converts Target -> QJsonValue
+// for comparison against the case's JSON expectations.
+template <class Target, class ToValue>
+void checkOutcome(const RFC6901WriteTestCase& tc,
+                  const OpOutcome&            out,
+                  const Target&               target,
+                  const Target&               before,
+                  ToValue                     toValue,
+                  const char*                 overloadName)
+{
+    if (tc.shouldFail)
+    {
+        EXPECT_FALSE(out.ok) << overloadName << ": write should have failed: " << tc.name.toStdString();
+        EXPECT_EQ(target, before) << overloadName << ": failed write must leave the target untouched (strong "
+                                  << "guarantee): " << tc.name.toStdString();
+        return;
+    }
+
+    ASSERT_TRUE(out.ok) << overloadName << ": write failed unexpectedly: " << tc.name.toStdString();
+    EXPECT_EQ(toValue(target), tc.expectedDocument)
+        << overloadName << ": document mismatch for " << tc.name.toStdString();
+    EXPECT_EQ(toValue(before), tc.document)
+        << overloadName << ": pre-write copy must be unaffected (COW isolation): " << tc.name.toStdString();
+    if (!tc.expectedRemoved.isUndefined())
+        EXPECT_EQ(out.removed, tc.expectedRemoved)
+            << overloadName << ": remove() returned the wrong value: " << tc.name.toStdString();
+}
+
 TEST_P(RFC6901JsonPointerWriteTest, WritesPerSpec)
 {
     const RFC6901WriteTestCase& tc = GetParam();
@@ -115,81 +174,54 @@ TEST_P(RFC6901JsonPointerWriteTest, WritesPerSpec)
     // ---- QJsonDocument overload -------------------------------------------
     {
         QJsonDocument       doc{toDocument(tc.document)};
-        const QJsonDocument before{doc}; // COW copy for the guarantees below
-
-        bool       ok{false};
-        QJsonValue removed{QJsonValue::Undefined};
-        if (tc.op == QLatin1String("add"))
-            ok = pointer.add(doc, tc.value).has_value();
-        else if (tc.op == QLatin1String("replace"))
-            ok = pointer.replace(doc, tc.value).has_value();
-        else if (tc.op == QLatin1String("remove"))
-        {
-            auto r{pointer.remove(doc)};
-            ok = r.has_value();
-            if (ok)
-                removed = *r;
-        }
-        else if (tc.op == QLatin1String("set"))
-            ok = pointer.set(doc, tc.value, options).has_value();
-        else
-            FAIL() << "Unknown op '" << tc.op.toStdString() << "' in test " << tc.name.toStdString();
-
-        if (tc.shouldFail)
-        {
-            EXPECT_FALSE(ok) << "Write should have failed: " << tc.name.toStdString();
-            EXPECT_EQ(doc, before) << "Failed write must leave the document untouched (strong guarantee): "
-                                   << tc.name.toStdString();
-        }
-        else
-        {
-            ASSERT_TRUE(ok) << "Write failed unexpectedly: " << tc.name.toStdString();
-            const QJsonDocument expected{toDocument(tc.expectedDocument)};
-            EXPECT_EQ(doc, expected) << "Document mismatch for " << tc.name.toStdString() << "\n  actual:   "
-                                     << doc.toJson(QJsonDocument::Compact).toStdString()
-                                     << "\n  expected: " << expected.toJson(QJsonDocument::Compact).toStdString();
-            EXPECT_EQ(before, toDocument(tc.document))
-                << "Pre-write copy must be unaffected by the write (COW isolation): " << tc.name.toStdString();
-            if (!tc.expectedRemoved.isUndefined())
-                EXPECT_EQ(removed, tc.expectedRemoved)
-                    << "remove() returned the wrong value: " << tc.name.toStdString();
-        }
+        const QJsonDocument before{doc};
+        const auto          out{runOp(pointer, tc, doc, options)};
+        const auto          toValue = [](const QJsonDocument& d)
+        { return d.isArray() ? QJsonValue{d.array()} : QJsonValue{d.object()}; };
+        checkOutcome(tc, out, doc, before, toValue, "QJsonDocument");
     }
 
     // ---- QJsonValue overload ----------------------------------------------
     {
         QJsonValue       root{tc.document};
         const QJsonValue before{root};
+        const auto       out{runOp(pointer, tc, root, options)};
+        checkOutcome(tc, out, root, before, [](const QJsonValue& v) { return v; }, "QJsonValue");
+    }
 
-        bool       ok{false};
-        QJsonValue removed{QJsonValue::Undefined};
-        if (tc.op == QLatin1String("add"))
-            ok = pointer.add(root, tc.value).has_value();
-        else if (tc.op == QLatin1String("replace"))
-            ok = pointer.replace(root, tc.value).has_value();
-        else if (tc.op == QLatin1String("remove"))
+    // ---- Typed-root overloads ----------------------------------------------
+    // The typed overload matching the document runs every case; the only
+    // divergence from the QJsonValue overload is a successful root write that
+    // CHANGES the root kind — under a fixed-kind root that must fail with
+    // RootTypeMismatch and leave the target untouched.
+    const bool kindChanges{!tc.shouldFail && tc.expectedDocument.type() != tc.document.type()};
+    if (tc.document.isObject())
+    {
+        // Copy-init, not brace-init (ADR-001)
+        QJsonObject       root = tc.document.toObject();
+        const QJsonObject before = root;
+        const auto        out{runOp(pointer, tc, root, options)};
+        if (kindChanges)
         {
-            auto r{pointer.remove(root)};
-            ok = r.has_value();
-            if (ok)
-                removed = *r;
-        }
-        else if (tc.op == QLatin1String("set"))
-            ok = pointer.set(root, tc.value, options).has_value();
-
-        if (tc.shouldFail)
-        {
-            EXPECT_FALSE(ok);
+            EXPECT_FALSE(out.ok) << "QJsonObject: root-kind change must be RootTypeMismatch";
             EXPECT_EQ(root, before);
         }
         else
+            checkOutcome(tc, out, root, before, [](const QJsonObject& o) { return QJsonValue{o}; }, "QJsonObject");
+    }
+    else
+    {
+        // Copy-init, not brace-init (ADR-001)
+        QJsonArray       root = tc.document.toArray();
+        const QJsonArray before = root;
+        const auto       out{runOp(pointer, tc, root, options)};
+        if (kindChanges)
         {
-            ASSERT_TRUE(ok) << "Value-overload write failed unexpectedly: " << tc.name.toStdString();
-            EXPECT_EQ(root, tc.expectedDocument);
-            EXPECT_EQ(before, tc.document);
-            if (!tc.expectedRemoved.isUndefined())
-                EXPECT_EQ(removed, tc.expectedRemoved);
+            EXPECT_FALSE(out.ok) << "QJsonArray: root-kind change must be RootTypeMismatch";
+            EXPECT_EQ(root, before);
         }
+        else
+            checkOutcome(tc, out, root, before, [](const QJsonArray& a) { return QJsonValue{a}; }, "QJsonArray");
     }
 }
 

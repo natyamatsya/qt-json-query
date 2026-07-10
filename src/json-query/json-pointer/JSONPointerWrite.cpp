@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <expected>
 #include <limits>
+#include <type_traits>
 #include <utility>
 
 #include "json-query/config/AbiNamespace.hpp"
@@ -259,6 +260,38 @@ toRemoveResult(std::expected<QJsonValue, DetailedEvalError>&& result) noexcept
     return std::move(*result);
 }
 
+// Typed-root writes (QJsonObject& / QJsonArray&): the root's container kind
+// is fixed, so a root-replacing write whose result is a different kind is
+// RootTypeMismatch — and, like every other error, leaves the root untouched.
+template <class Container>
+[[nodiscard]] std::expected<QJsonValue, DetailedEvalError> writeTypedRoot(const std::vector<Token>& tokens,
+                                                                          Container&                container,
+                                                                          const QJsonValue&         value,
+                                                                          WriteOp                   op,
+                                                                          bool createIntermediates) noexcept
+{
+    QJsonValue root{container};
+
+    auto result{detail::writePointer(tokens, root, value, op, createIntermediates)};
+    if (!result)
+        return result;
+
+    if constexpr (std::is_same_v<Container, QJsonObject>)
+    {
+        if (!root.isObject())
+            return std::unexpected(DetailedEvalError{EvalError::RootTypeMismatch, 0});
+        container = root.toObject();
+    }
+    else
+    {
+        static_assert(std::is_same_v<Container, QJsonArray>);
+        if (!root.isArray())
+            return std::unexpected(DetailedEvalError{EvalError::RootTypeMismatch, 0});
+        container = root.toArray();
+    }
+    return result;
+}
+
 // Unwrap the document root, run the write, and commit the result back.
 // QJsonDocument can only hold an object/array (or be null): a write that
 // leaves a scalar at the root is reported as DocumentRootNotContainer and —
@@ -321,6 +354,48 @@ JSONPointer::WriteResult JSONPointer::set(QJsonDocument& doc, const QJsonValue& 
 JSONPointer::WriteResult JSONPointer::set(QJsonValue& root, const QJsonValue& value, WriteOptions options) const noexcept
 {
     return toWriteResult(detail::writePointer(m_tokens, root, value, WriteOp::Add, options.createIntermediates));
+}
+
+// ─── Typed-root overloads (QJsonObject& / QJsonArray&) ─────────────────────
+
+JSONPointer::WriteResult JSONPointer::add(QJsonObject& root, const QJsonValue& value) const noexcept
+{
+    return toWriteResult(writeTypedRoot(m_tokens, root, value, WriteOp::Add, false));
+}
+
+JSONPointer::WriteResult JSONPointer::add(QJsonArray& root, const QJsonValue& value) const noexcept
+{
+    return toWriteResult(writeTypedRoot(m_tokens, root, value, WriteOp::Add, false));
+}
+
+JSONPointer::WriteResult JSONPointer::replace(QJsonObject& root, const QJsonValue& value) const noexcept
+{
+    return toWriteResult(writeTypedRoot(m_tokens, root, value, WriteOp::Replace, false));
+}
+
+JSONPointer::WriteResult JSONPointer::replace(QJsonArray& root, const QJsonValue& value) const noexcept
+{
+    return toWriteResult(writeTypedRoot(m_tokens, root, value, WriteOp::Replace, false));
+}
+
+JSONPointer::RemoveResult JSONPointer::remove(QJsonObject& root) const noexcept
+{
+    return toRemoveResult(writeTypedRoot(m_tokens, root, QJsonValue{}, WriteOp::Remove, false));
+}
+
+JSONPointer::RemoveResult JSONPointer::remove(QJsonArray& root) const noexcept
+{
+    return toRemoveResult(writeTypedRoot(m_tokens, root, QJsonValue{}, WriteOp::Remove, false));
+}
+
+JSONPointer::WriteResult JSONPointer::set(QJsonObject& root, const QJsonValue& value, WriteOptions options) const noexcept
+{
+    return toWriteResult(writeTypedRoot(m_tokens, root, value, WriteOp::Add, options.createIntermediates));
+}
+
+JSONPointer::WriteResult JSONPointer::set(QJsonArray& root, const QJsonValue& value, WriteOptions options) const noexcept
+{
+    return toWriteResult(writeTypedRoot(m_tokens, root, value, WriteOp::Add, options.createIntermediates));
 }
 
 } // namespace json_query::json_pointer

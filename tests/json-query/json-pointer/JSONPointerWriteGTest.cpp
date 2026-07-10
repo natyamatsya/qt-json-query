@@ -199,6 +199,69 @@ TEST(JSONPointerWriteCow, UntouchedSiblingsCompareEqualAfterWrite)
 }
 
 // ---------------------------------------------------------------------------
+// Typed-root overloads (QJsonObject& / QJsonArray&)
+// ---------------------------------------------------------------------------
+
+TEST(JSONPointerWriteTypedRoot, ObjectRootWritesInPlace)
+{
+    QJsonObject root{{"a", QJsonObject{{"b", 1}}}};
+    ASSERT_TRUE(ptr(u"/a/b").replace(root, 2).has_value());
+    ASSERT_TRUE(ptr(u"/c").set(root, 3, {.createIntermediates = true}).has_value());
+    EXPECT_EQ(root.value("a").toObject().value("b"), QJsonValue{2});
+    EXPECT_EQ(root.value("c"), QJsonValue{3});
+
+    auto removed{ptr(u"/a").remove(root)};
+    ASSERT_TRUE(removed.has_value());
+    EXPECT_EQ(removed->toObject(), (QJsonObject{{"b", 2}}));
+    EXPECT_FALSE(root.contains(QStringLiteral("a")));
+}
+
+TEST(JSONPointerWriteTypedRoot, ArrayRootWritesInPlace)
+{
+    QJsonArray root{1, 2};
+    ASSERT_TRUE(ptr(u"/-").add(root, 3).has_value());
+    EXPECT_EQ(root, (QJsonArray{1, 2, 3}));
+
+    auto removed{ptr(u"/0").remove(root)};
+    ASSERT_TRUE(removed.has_value());
+    EXPECT_EQ(*removed, QJsonValue{1});
+    EXPECT_EQ(root, (QJsonArray{2, 3}));
+}
+
+TEST(JSONPointerWriteTypedRoot, RootReplaceWithMatchingKindWorks)
+{
+    QJsonObject root{{"old", 1}};
+    ASSERT_TRUE(ptr(u"").replace(root, QJsonObject{{"new", 2}}).has_value());
+    EXPECT_EQ(root, (QJsonObject{{"new", 2}}));
+}
+
+TEST(JSONPointerWriteTypedRoot, RootKindChangeIsRootTypeMismatch)
+{
+    QJsonObject       root{{"a", 1}};
+    const QJsonObject before{root};
+
+    auto r{ptr(u"").replace(root, QJsonArray{1, 2})};
+    ASSERT_FALSE(r.has_value());
+    expectError(r.error(), EvalError::RootTypeMismatch, 0);
+    EXPECT_EQ(root, before); // strong guarantee
+
+    QJsonArray       arr{1};
+    const QJsonArray arrBefore{arr};
+    auto             r2{ptr(u"").add(arr, QJsonObject{{"a", 1}})};
+    ASSERT_FALSE(r2.has_value());
+    expectError(r2.error(), EvalError::RootTypeMismatch, 0);
+    EXPECT_EQ(arr, arrBefore);
+}
+
+TEST(JSONPointerWriteTypedRoot, FailedWriteLeavesTypedRootUntouched)
+{
+    QJsonObject       root{{"a", 1}};
+    const QJsonObject before{root};
+    ASSERT_FALSE(ptr(u"/x/y").add(root, 1).has_value());
+    EXPECT_EQ(root, before);
+}
+
+// ---------------------------------------------------------------------------
 // set() / createIntermediates specifics
 // ---------------------------------------------------------------------------
 

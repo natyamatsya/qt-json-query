@@ -27,6 +27,7 @@ enum class EvalError : std::uint8_t
     DocumentRootNotContainer,
     IndexOutOfRange,
     KeyNotFound,
+    RootTypeMismatch,
     TypeMismatchArray,
     TypeMismatchObject,
 };
@@ -38,12 +39,14 @@ inline constexpr auto json_pointer_parse_errors = utils::detail::ErrorMap<ParseE
     {ParseError::MissingLeadingSlash, DEFINE_ERROR_STRING("JSON Pointer must start with a leading slash")}};
 
 // JSON Pointer evaluation error messages
-inline constexpr auto json_pointer_eval_errors = utils::detail::ErrorMap<EvalError, 6>{
+inline constexpr auto json_pointer_eval_errors = utils::detail::ErrorMap<EvalError, 7>{
     {EvalError::CannotRemoveRoot, DEFINE_ERROR_STRING("Cannot remove the document root")},
     {EvalError::DocumentRootNotContainer,
      DEFINE_ERROR_STRING("QJsonDocument cannot represent a non-container root value")},
     {EvalError::IndexOutOfRange, DEFINE_ERROR_STRING("Array index out of range")},
     {EvalError::KeyNotFound, DEFINE_ERROR_STRING("Key not found in object")},
+    {EvalError::RootTypeMismatch,
+     DEFINE_ERROR_STRING("Write result does not match the fixed root container type")},
     {EvalError::TypeMismatchArray, DEFINE_ERROR_STRING("Type mismatch: expected array")},
     {EvalError::TypeMismatchObject, DEFINE_ERROR_STRING("Type mismatch: expected object")}};
 

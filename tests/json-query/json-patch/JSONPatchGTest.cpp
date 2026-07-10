@@ -270,6 +270,34 @@ TEST(JSONPatchApply, CopyThenMoveComposition)
     EXPECT_EQ(obj.value(QStringLiteral("dst")).toArray(), (QJsonArray{1, 2}));
 }
 
+TEST(JSONPatchApply, ApplyInPlaceTypedRoots)
+{
+    const QJsonArray patch = parsePatchJson(R"([{"op": "add", "path": "/b", "value": 2}])");
+    auto             compiled{JSONPatch::create(patch)};
+    ASSERT_TRUE(compiled.has_value()) << describe(compiled);
+
+    QJsonObject obj{{"a", 1}};
+    ASSERT_TRUE(compiled->applyInPlace(obj).has_value());
+    EXPECT_EQ(obj, (QJsonObject{{"a", 1}, {"b", 2}}));
+
+    // Root-kind change under a typed root is RootTypeMismatch, root untouched
+    const QJsonArray kindChange = parsePatchJson(R"([{"op": "add", "path": "", "value": [1]}])");
+    auto             changer{JSONPatch::create(kindChange)};
+    ASSERT_TRUE(changer.has_value()) << describe(changer);
+    const QJsonObject before{obj};
+    auto              r{changer->applyInPlace(obj)};
+    ASSERT_FALSE(r.has_value());
+    EXPECT_EQ(r.error().domain, ErrorDomain::PointerEval);
+    EXPECT_EQ(obj, before);
+
+    QJsonArray       arr{1, 2};
+    const QJsonArray arrPatchOps = parsePatchJson(R"([{"op": "remove", "path": "/0"}])");
+    auto             arrPatch{JSONPatch::create(arrPatchOps)};
+    ASSERT_TRUE(arrPatch.has_value());
+    ASSERT_TRUE(arrPatch->applyInPlace(arr).has_value());
+    EXPECT_EQ(arr, (QJsonArray{2}));
+}
+
 TEST(JSONPatchApply, ScalarRootResultNeedsValueOverload)
 {
     const QJsonArray patch = parsePatchJson(R"([{"op": "add", "path": "", "value": 42}])");

@@ -3,6 +3,7 @@
 #pragma once
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QJsonObject>
 #include <QJsonValue>
 
 #include <expected>
@@ -78,8 +79,15 @@ class JSONPatch
     /**
      * @brief Convenience wrapper: apply and, on success, assign the result
      *        back into @p document. On error @p document is untouched.
+     *
+     * The typed-root overloads (QJsonObject& / QJsonArray&) additionally
+     * fail with RootTypeMismatch when the patched result is not the fixed
+     * container kind (e.g. an add with path "" replacing the root with an
+     * array while patching a QJsonObject).
      */
     [[nodiscard]] std::expected<void, json_query::Error> applyInPlace(QJsonDocument& document) const noexcept;
+    [[nodiscard]] std::expected<void, json_query::Error> applyInPlace(QJsonObject& root) const noexcept;
+    [[nodiscard]] std::expected<void, json_query::Error> applyInPlace(QJsonArray& root) const noexcept;
 
     /// Number of operations in the compiled patch.
     [[nodiscard]] qsizetype size() const noexcept { return static_cast<qsizetype>(m_ops.size()); }
