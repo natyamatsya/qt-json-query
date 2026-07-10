@@ -7,3 +7,6 @@ qt.user.json
 
 # jetbrains
 .idea
+
+# Local working notes / implementor feedback drops (not part of the repo)
+context/

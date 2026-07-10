@@ -196,9 +196,9 @@ and a bespoke settings-backend pointer engine — see ADR-007/ADR-008).
 
 ## Next release candidates (AC-3033 first-consumer feedback, 2026-07-10)
 
-Feature asks from the first downstream integration
-([context/AC-3033-qt-json-query-extension-suggestions.md](context/AC-3033-qt-json-query-extension-suggestions.md));
-none blocked adoption, all have consumer-side workarounds.
+Feature asks from the first downstream integration (the AC-3033 spike's
+extension-suggestions write-up, tracked consumer-side); none blocked
+adoption, all have consumer-side workarounds.
 
 **Adoption filter: strict standards compliance overrides convenience.**
 Anything that would extend or alter a spec grammar is out; extensions are
