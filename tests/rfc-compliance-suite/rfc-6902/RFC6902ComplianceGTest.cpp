@@ -9,8 +9,11 @@
 //   "error" present    -> the patch must be rejected (at create() or apply())
 //   neither            -> apply must succeed (result unchecked)
 //   "disabled": true   -> skipped during collection
-// Every case additionally checks atomicity: on error the input document
-// compares equal to its pre-apply state.
+// Every case runs against the QJsonValue overload (which can represent any
+// root) and, where the document is a container, additionally against the
+// QJsonDocument overload and applyInPlace() — all three must agree. Atomicity
+// is checked on every path: on error the input compares equal to its
+// pre-apply state.
 // KnownFailures.hpp tracks justified gaps with the self-cleaning contract used
 // by the IETF JSON Schema suite (a stale entry fails the suite).
 // -----------------------------------------------------------------------------
@@ -89,6 +92,50 @@ static QList<RFC6902TestCase> loadPatchTestFile(const QString& path, const QStri
     return out;
 }
 
+// RFC 6902 §4.6 value equality for comparing results against the suite's
+// "expected" documents: numbers compare numerically. QJsonValue::operator==
+// distinguishes Qt's integer and double representations, which is stricter
+// than the spec and could turn a representation difference introduced by a
+// future submodule bump into a confusing false failure.
+static bool jsonSpecEquals(const QJsonValue& a, const QJsonValue& b)
+{
+    if (a.isDouble() && b.isDouble())
+        return a.toDouble() == b.toDouble();
+    if (a.type() != b.type())
+        return false;
+    if (a.isObject())
+    {
+        const QJsonObject objA = a.toObject();
+        const QJsonObject objB = b.toObject();
+        if (objA.size() != objB.size())
+            return false;
+        for (auto it = objA.constBegin(); it != objA.constEnd(); ++it)
+        {
+            const auto itB{objB.constFind(it.key())};
+            if (itB == objB.constEnd() || !jsonSpecEquals(it.value(), itB.value()))
+                return false;
+        }
+        return true;
+    }
+    if (a.isArray())
+    {
+        const QJsonArray arrA = a.toArray();
+        const QJsonArray arrB = b.toArray();
+        if (arrA.size() != arrB.size())
+            return false;
+        for (qsizetype i = 0; i < arrA.size(); ++i)
+            if (!jsonSpecEquals(arrA.at(i), arrB.at(i)))
+                return false;
+        return true;
+    }
+    return a == b;
+}
+
+static QJsonDocument toDocument(const QJsonValue& v)
+{
+    return v.isArray() ? QJsonDocument{v.toArray()} : QJsonDocument{v.toObject()};
+}
+
 #ifndef JSON_QUERY_SOURCE_DIR
 #define JSON_QUERY_SOURCE_DIR "."
 #endif
@@ -132,7 +179,43 @@ TEST_P(RFC6902JsonPatchTest, AppliesPerSpec)
     // A non-array "patch" member can only satisfy an error expectation
     // (ok stays false).
 
-    const bool passed{tc.expectError ? !ok : (ok && (!tc.hasExpected || result == tc.expected))};
+    // ---- QJsonDocument overload + applyInPlace must agree -----------------
+    if (tc.patch.isArray() && (tc.document.isObject() || tc.document.isArray()))
+    {
+        if (auto patch{JSONPatch::create(tc.patch.toArray())})
+        {
+            QJsonDocument       doc{toDocument(tc.document)};
+            const QJsonDocument before{doc};
+
+            const auto docApplied{patch->apply(doc)};
+            EXPECT_EQ(doc, before) << "apply(QJsonDocument) must not mutate its input";
+
+            const auto inPlace{patch->applyInPlace(doc)};
+            EXPECT_EQ(docApplied.has_value(), inPlace.has_value());
+            if (!inPlace.has_value())
+                EXPECT_EQ(doc, before) << "applyInPlace() must be all-or-nothing";
+
+            if (ok && (result.isObject() || result.isArray()))
+            {
+                // Container-root results must be representable and identical
+                // on the document path
+                ASSERT_TRUE(docApplied.has_value())
+                    << "document overload failed where the value overload succeeded: " << tc.comment.toStdString();
+                EXPECT_EQ(*docApplied, toDocument(result));
+                EXPECT_EQ(doc, toDocument(result));
+            }
+            else if (!ok)
+            {
+                EXPECT_FALSE(docApplied.has_value())
+                    << "document overload succeeded where the value overload failed: " << tc.comment.toStdString();
+            }
+            // ok with a null/scalar root: representable only via the value
+            // overload (the document overload reports DocumentRootNotContainer
+            // or yields a null document) — nothing further to compare.
+        }
+    }
+
+    const bool passed{tc.expectError ? !ok : (ok && (!tc.hasExpected || jsonSpecEquals(result, tc.expected)))};
 
     if (!passed && knownFailure)
         GTEST_SKIP() << "Known tracked failure: " << tc.comment.toStdString();
@@ -154,13 +237,18 @@ TEST_P(RFC6902JsonPatchTest, AppliesPerSpec)
             const QJsonDocument d{v.isArray() ? QJsonDocument{v.toArray()} : QJsonDocument{v.toObject()}};
             return d.toJson(QJsonDocument::Compact).toStdString();
         };
-        EXPECT_EQ(result, tc.expected) << "Result mismatch for '" << tc.comment.toStdString()
-                                       << "'\n  actual:   " << dump(result)
-                                       << "\n  expected: " << dump(tc.expected);
+        EXPECT_TRUE(jsonSpecEquals(result, tc.expected))
+            << "Result mismatch for '" << tc.comment.toStdString() << "'\n  actual:   " << dump(result)
+            << "\n  expected: " << dump(tc.expected);
     }
 }
 
 static QList<RFC6902TestCase> g_allPatchCases = collectAllPatchCases();
+
+// A missing/unparseable compliance/json-patch-tests submodule must be a red
+// build, not a silently empty suite (the pinned data currently holds 108
+// enabled cases; adjust the floor deliberately on a submodule bump).
+TEST(RFC6902SuiteIntegrity, CasesWereCollected) { EXPECT_GE(g_allPatchCases.size(), 100); }
 
 INSTANTIATE_TEST_SUITE_P(RFC6902_Compliance,
                          RFC6902JsonPatchTest,

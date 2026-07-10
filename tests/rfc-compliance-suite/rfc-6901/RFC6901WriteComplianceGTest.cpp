@@ -205,6 +205,10 @@ TEST_P(RFC6901JsonPointerWriteTest, WritesPerSpec)
 
 static QList<RFC6901WriteTestCase> g_allWriteCases = collectAllWriteCases();
 
+// A missing/unparseable data file must be a red build, not a silently empty
+// suite (rfc6901-write-tests.json currently holds 50 cases).
+TEST(RFC6901WriteSuiteIntegrity, CasesWereCollected) { EXPECT_GE(g_allWriteCases.size(), 40); }
+
 INSTANTIATE_TEST_SUITE_P(RFC6901_Write,
                          RFC6901JsonPointerWriteTest,
                          ::testing::ValuesIn(g_allWriteCases),

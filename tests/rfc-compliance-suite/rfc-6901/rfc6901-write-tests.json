@@ -403,6 +403,43 @@
       "should_fail": true
     },
     {
+      "name": "set_create_nested_arrays",
+      "description": "createIntermediates chains array creation when consecutive next tokens are 0",
+      "op": "set",
+      "pointer": "/a/0/0",
+      "document": {},
+      "value": 1,
+      "create_intermediates": true,
+      "expected_document": {"a": [[1]]}
+    },
+    {
+      "name": "add_mid_path_index_equal_size_fails",
+      "description": "Without createIntermediates an intermediate index == size does not exist",
+      "op": "add",
+      "pointer": "/a/1/b",
+      "document": {"a": [{}]},
+      "value": 1,
+      "should_fail": true
+    },
+    {
+      "name": "remove_escaped_member",
+      "description": "Escape sequences are decoded for remove targets",
+      "op": "remove",
+      "pointer": "/m~0n/a~1b",
+      "document": {"m~n": {"a/b": 1, "keep": 2}},
+      "expected_document": {"m~n": {"keep": 2}},
+      "expected_removed": 1
+    },
+    {
+      "name": "add_exponent_token_vs_array_fails",
+      "description": "RFC 6902 A.13 shape: a token like 1e0 is not an array index",
+      "op": "add",
+      "pointer": "/arr/1e0",
+      "document": {"arr": [1, 2]},
+      "value": 3,
+      "should_fail": true
+    },
+    {
       "name": "add_null_value",
       "description": "Adding an explicit JSON null stores null",
       "op": "add",

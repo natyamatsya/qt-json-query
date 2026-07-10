@@ -184,6 +184,10 @@ TEST_P(RFC6901JsonPointerTest, EvaluatesPerSpec)
 // Parameter instantiation -----------------------------------------------------
 static QList<RFC6901TestCase> g_allCases = collectAllRFC6901Cases();
 
+// A missing/unparseable data file must be a red build, not a silently empty
+// suite (rfc6901-tests.json currently holds 37 cases).
+TEST(RFC6901SuiteIntegrity, CasesWereCollected) { EXPECT_GE(g_allCases.size(), 30); }
+
 INSTANTIATE_TEST_SUITE_P(RFC6901_Compliance,
                          RFC6901JsonPointerTest,
                          ::testing::ValuesIn(g_allCases),

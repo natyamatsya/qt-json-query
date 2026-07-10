@@ -7,12 +7,17 @@ on:
   pull_request:
     branches: ["**"]
   workflow_dispatch:
+  schedule:
+    # Nightly fuzz run (schedule events only trigger the fuzz job; note
+    # GitHub runs scheduled workflows on the default branch only)
+    - cron: "23 2 * * *"
 
 jobs:
   # ---------------------------------------------------------------------------
   # Lint: formatting and static analysis
   # ---------------------------------------------------------------------------
   lint:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -32,6 +37,7 @@ jobs:
   # Build and test
   # ---------------------------------------------------------------------------
   build-and-test:
+    if: github.event_name != 'schedule'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -144,6 +150,7 @@ jobs:
   # Sanitizers: ASan + UBSan (Debug, Linux)
   # ---------------------------------------------------------------------------
   sanitize:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -185,6 +192,7 @@ jobs:
   # Install + find_package consumer smoke test
   # ---------------------------------------------------------------------------
   install-package:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -261,6 +269,7 @@ jobs:
   # FetchContent (exercises the FIND_PACKAGE_ARGS resolution path)
   # ---------------------------------------------------------------------------
   vcpkg-deps:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -307,10 +316,11 @@ jobs:
         run: ctest --output-on-failure
 
   # ---------------------------------------------------------------------------
-  # Fuzzing (on demand via workflow_dispatch; short LibFuzzer runs per target)
+  # Fuzzing (nightly on the default branch, or on demand via
+  # workflow_dispatch; short LibFuzzer runs per target)
   # ---------------------------------------------------------------------------
   fuzz:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -348,13 +358,13 @@ jobs:
                 -DJSON_QUERY_ENABLE_FUZZ_TESTS=ON
 
       - name: Build fuzz targets
-        run: cmake --build build --parallel --target fuzz_jsonpath_parsing fuzz_jsonpointer_parsing fuzz_combined_evaluation fuzz_jsonschema
+        run: cmake --build build --parallel --target fuzz_jsonpath_parsing fuzz_jsonpointer_parsing fuzz_jsonpointer_write fuzz_jsonpatch_apply fuzz_combined_evaluation fuzz_jsonschema
 
       - name: Run fuzzers (120s each)
         working-directory: build/fuzz
         run: |
           status=0
-          for f in fuzz_jsonpath_parsing fuzz_jsonpointer_parsing fuzz_combined_evaluation fuzz_jsonschema; do
+          for f in fuzz_jsonpath_parsing fuzz_jsonpointer_parsing fuzz_jsonpointer_write fuzz_jsonpatch_apply fuzz_combined_evaluation fuzz_jsonschema; do
             echo "=== $f"
             ./"$f" "corpus/$f" -max_total_time=120 -rss_limit_mb=2048 -print_final_stats=1 || status=1
           done

@@ -102,6 +102,11 @@ TEST_P(RFC7386MergePatchTest, MergesPerSpec)
 
 static QList<RFC7386TestCase> g_allMergeCases = collectAllMergePatchCases();
 
+// A missing/unparseable data file must be a red build, not a silently empty
+// suite (rfc7386-tests.json currently holds 20 cases: the full Appendix A
+// table plus edge cases).
+TEST(RFC7386SuiteIntegrity, CasesWereCollected) { EXPECT_GE(g_allMergeCases.size(), 15); }
+
 INSTANTIATE_TEST_SUITE_P(RFC7386_Compliance,
                          RFC7386MergePatchTest,
                          ::testing::ValuesIn(g_allMergeCases),

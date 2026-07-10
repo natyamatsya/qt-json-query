@@ -8,6 +8,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <string>
 #include "json-query/JSONQuery"
 
 using json_query::Error;
@@ -19,9 +20,23 @@ namespace
 
 QJsonArray parsePatchJson(const char* json)
 {
-    const auto doc{QJsonDocument::fromJson(json)};
+    QJsonParseError perr{};
+    const auto      doc{QJsonDocument::fromJson(QByteArray{json}, &perr)};
+    EXPECT_EQ(perr.error, QJsonParseError::NoError) << perr.errorString().toStdString();
     EXPECT_TRUE(doc.isArray()) << "test patch must be a JSON array";
     return doc.array();
+}
+
+// Failure formatter: what create()/apply() actually returned, for assertion
+// messages (numeric() is high-byte domain / low-byte code, ADR-004)
+template <class Expected>
+std::string describe(const Expected& result)
+{
+    if (result.has_value())
+        return "success";
+    const auto& e{result.error()};
+    return std::string{"error 0x"} + QString::number(e.numeric(), 16).toStdString() + " '" +
+           std::string{e.message()} + "' at detail " + std::to_string(e.detail);
 }
 
 // ---------------------------------------------------------------------------
@@ -36,8 +51,8 @@ TEST(JSONPatchCreate, RejectsUnknownOperationWithOpIndex)
     ])")};
     auto result{JSONPatch::create(patch)};
     ASSERT_FALSE(result.has_value());
-    EXPECT_EQ(result.error().domain, ErrorDomain::PatchParse);
-    EXPECT_EQ(result.error().detail, 1); // second operation
+    EXPECT_EQ(result.error().domain, ErrorDomain::PatchParse) << describe(result);
+    EXPECT_EQ(result.error().detail, 1) << describe(result); // second operation
 }
 
 TEST(JSONPatchCreate, RejectsMissingValueForAddReplaceTest)
@@ -54,7 +69,7 @@ TEST(JSONPatchCreate, AcceptsExplicitNullValue)
     // "value": null must NOT be treated as a missing member
     const auto patch{parsePatchJson(R"([{"op": "add", "path": "/a", "value": null}])")};
     auto       compiled{JSONPatch::create(patch)};
-    ASSERT_TRUE(compiled.has_value());
+    ASSERT_TRUE(compiled.has_value()) << describe(compiled);
 
     QJsonDocument doc(QJsonObject{});
     ASSERT_TRUE(compiled->applyInPlace(doc).has_value());
@@ -80,7 +95,7 @@ TEST(JSONPatchCreate, RejectsNonArrayDocument)
 TEST(JSONPatchCreate, EmptyPatchIsValidNoOp)
 {
     auto compiled{JSONPatch::create(QJsonArray{})};
-    ASSERT_TRUE(compiled.has_value());
+    ASSERT_TRUE(compiled.has_value()) << describe(compiled);
     EXPECT_TRUE(compiled->isEmpty());
     EXPECT_EQ(compiled->size(), 0);
 
@@ -103,7 +118,7 @@ TEST(JSONPatchApply, AtomicityFailingMidPatchLeavesInputUntouched)
         {"op": "add",     "path": "/c", "value": 4}
     ])")};
     auto compiled{JSONPatch::create(patch)};
-    ASSERT_TRUE(compiled.has_value());
+    ASSERT_TRUE(compiled.has_value()) << describe(compiled);
 
     QJsonDocument       doc(QJsonObject{{"orig", true}});
     const QJsonDocument before{doc};
@@ -129,7 +144,7 @@ TEST(JSONPatchApply, TestFailureReportsPatchEvalWithOpIndex)
         {"op": "test", "path": "/a", "value": 999}
     ])")};
     auto compiled{JSONPatch::create(patch)};
-    ASSERT_TRUE(compiled.has_value());
+    ASSERT_TRUE(compiled.has_value()) << describe(compiled);
 
     const QJsonDocument doc(QJsonObject{{"a", 1}});
     auto                result{compiled->apply(doc)};
@@ -142,10 +157,55 @@ TEST(JSONPatchApply, MoveIntoOwnDescendantFails)
 {
     const auto patch{parsePatchJson(R"([{"op": "move", "from": "/a", "path": "/a/b"}])")};
     auto       compiled{JSONPatch::create(patch)};
-    ASSERT_TRUE(compiled.has_value());
+    ASSERT_TRUE(compiled.has_value()) << describe(compiled);
 
     const QJsonDocument doc(QJsonObject{{"a", QJsonObject{{"b", 1}}}});
     auto                result{compiled->apply(doc)};
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error().domain, ErrorDomain::PatchEval);
+}
+
+TEST(JSONPatchApply, CopyIntoOwnDescendantIsAllowed)
+{
+    // RFC 6902 forbids moving into a descendant, not copying: the source
+    // value is snapshotted before the add
+    const auto patch{parsePatchJson(R"([{"op": "copy", "from": "/a", "path": "/a/b"}])")};
+    auto       compiled{JSONPatch::create(patch)};
+    ASSERT_TRUE(compiled.has_value()) << describe(compiled);
+
+    const QJsonDocument doc(QJsonObject{{"a", QJsonObject{{"x", 1}}}});
+    auto                result{compiled->apply(doc)};
+    ASSERT_TRUE(result.has_value());
+    const auto a{result->object().value(QStringLiteral("a")).toObject()};
+    EXPECT_EQ(a.value(QStringLiteral("x")), QJsonValue{1});
+    EXPECT_EQ(a.value(QStringLiteral("b")).toObject(), (QJsonObject{{"x", 1}}));
+}
+
+TEST(JSONPatchApply, MoveToSameLocationIsIdentity)
+{
+    // from == path is not a *proper* prefix, so the move is legal; per the
+    // spec it is remove-then-add at the same location — an identity
+    const auto patch{parsePatchJson(R"([
+        {"op": "move", "from": "/a", "path": "/a"},
+        {"op": "move", "from": "/arr/1", "path": "/arr/1"}
+    ])")};
+    auto compiled{JSONPatch::create(patch)};
+    ASSERT_TRUE(compiled.has_value()) << describe(compiled);
+
+    const QJsonDocument doc(QJsonObject{{"a", 1}, {"arr", QJsonArray{1, 2, 3}}});
+    auto                result{compiled->apply(doc)};
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(*result, doc);
+}
+
+TEST(JSONPatchApply, TestAgainstRootPointer)
+{
+    const auto matching{parsePatchJson(R"([{"op": "test", "path": "", "value": {"a": 1}}])")};
+    const auto doc{QJsonDocument(QJsonObject{{"a", 1}})};
+    ASSERT_TRUE(JSONPatch::create(matching)->apply(doc).has_value());
+
+    const auto mismatching{parsePatchJson(R"([{"op": "test", "path": "", "value": {"a": 2}}])")};
+    auto       result{JSONPatch::create(mismatching)->apply(doc)};
     ASSERT_FALSE(result.has_value());
     EXPECT_EQ(result.error().domain, ErrorDomain::PatchEval);
 }
@@ -156,7 +216,7 @@ TEST(JSONPatchApply, MoveToSiblingWithSharedNamePrefixIsAllowed)
     // token boundaries
     const auto patch{parsePatchJson(R"([{"op": "move", "from": "/a", "path": "/ab"}])")};
     auto       compiled{JSONPatch::create(patch)};
-    ASSERT_TRUE(compiled.has_value());
+    ASSERT_TRUE(compiled.has_value()) << describe(compiled);
 
     const QJsonDocument doc(QJsonObject{{"a", 1}});
     auto                result{compiled->apply(doc)};
@@ -170,7 +230,7 @@ TEST(JSONPatchApply, TestComparesNumbersNumerically)
     // compares numbers numerically, so 1 must equal 1.0
     const auto patch{parsePatchJson(R"([{"op": "test", "path": "/n", "value": 1}])")};
     auto       compiled{JSONPatch::create(patch)};
-    ASSERT_TRUE(compiled.has_value());
+    ASSERT_TRUE(compiled.has_value()) << describe(compiled);
 
     QJsonObject obj;
     obj.insert(QStringLiteral("n"), QJsonValue{1.0}); // stored as double
@@ -181,7 +241,7 @@ TEST(JSONPatchApply, TestDoesNotCoerceAcrossTypes)
 {
     const auto patch{parsePatchJson(R"([{"op": "test", "path": "/n", "value": "1"}])")};
     auto       compiled{JSONPatch::create(patch)};
-    ASSERT_TRUE(compiled.has_value());
+    ASSERT_TRUE(compiled.has_value()) << describe(compiled);
     EXPECT_FALSE(compiled->apply(QJsonDocument(QJsonObject{{"n", 1}})).has_value());
 }
 
@@ -192,7 +252,7 @@ TEST(JSONPatchApply, CopyThenMoveComposition)
         {"op": "move", "from": "/src", "path": "/dst"}
     ])")};
     auto compiled{JSONPatch::create(patch)};
-    ASSERT_TRUE(compiled.has_value());
+    ASSERT_TRUE(compiled.has_value()) << describe(compiled);
 
     const QJsonDocument doc(QJsonObject{{"src", QJsonArray{1, 2}}});
     auto                result{compiled->apply(doc)};
@@ -207,7 +267,7 @@ TEST(JSONPatchApply, ScalarRootResultNeedsValueOverload)
 {
     const auto patch{parsePatchJson(R"([{"op": "add", "path": "", "value": 42}])")};
     auto       compiled{JSONPatch::create(patch)};
-    ASSERT_TRUE(compiled.has_value());
+    ASSERT_TRUE(compiled.has_value()) << describe(compiled);
 
     // Document overload cannot represent a scalar root
     EXPECT_FALSE(compiled->apply(QJsonDocument(QJsonObject{})).has_value());
