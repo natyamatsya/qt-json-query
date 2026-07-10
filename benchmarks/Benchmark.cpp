@@ -12,6 +12,7 @@
 
 #include <utility>
 
+using json_query::JSONPatch;
 using json_query::JSONPath;
 using json_query::JSONPointer;
 
@@ -341,6 +342,39 @@ static void BM_JSONPointer_Remove_Nested(benchmark::State& state)
     }
 }
 BENCHMARK(BM_JSONPointer_Remove_Nested);
+
+// ----------------------------
+// JSONPatch benchmarks (pre-compiled patch, functional apply)
+// ----------------------------
+static void BM_JSONPatch_Apply_Small(benchmark::State& state)
+{
+    const auto doc{prepareTestDocument()};
+    const auto patch{JSONPatch::create(
+                         QJsonArray{
+                             QJsonObject{{"op", "test"}, {"path", "/name"}, {"value", "Test Bookstore"}},
+                             QJsonObject{{"op", "replace"}, {"path", "/location/city"}, {"value", "New City"}},
+                             QJsonObject{{"op", "add"}, {"path", "/inventory/0/price"}, {"value", 10.99}},
+                         })
+                         .value()};
+    for (auto _ : state)
+        benchmark::DoNotOptimize(patch.apply(doc));
+}
+BENCHMARK(BM_JSONPatch_Apply_Small);
+
+static void BM_JSONPatch_Apply_MoveHeavy(benchmark::State& state)
+{
+    const auto doc{prepareTestDocument()};
+    const auto patch{JSONPatch::create(
+                         QJsonArray{
+                             QJsonObject{{"op", "copy"}, {"from", "/inventory/0"}, {"path", "/inventory/-"}},
+                             QJsonObject{{"op", "move"}, {"from", "/inventory/1"}, {"path", "/inventory/-"}},
+                             QJsonObject{{"op", "remove"}, {"path", "/inventory/2"}},
+                         })
+                         .value()};
+    for (auto _ : state)
+        benchmark::DoNotOptimize(patch.apply(doc));
+}
+BENCHMARK(BM_JSONPatch_Apply_MoveHeavy);
 
 // Baseline: the hand-written extract→modify→write-back ladder the write API
 // replaces (deep write, same location as BM_JSONPointer_Set_Deep)

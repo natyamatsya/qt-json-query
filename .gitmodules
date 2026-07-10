@@ -4,3 +4,6 @@
 [submodule "compliance/ietf-json-schema-draft-2020-12"]
 	path = compliance/ietf-json-schema-draft-2020-12
 	url = https://github.com/json-schema-org/JSON-Schema-Test-Suite.git
+[submodule "compliance/json-patch-tests"]
+	path = compliance/json-patch-tests
+	url = https://github.com/json-patch/json-patch-tests.git

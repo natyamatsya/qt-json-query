@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT
 #pragma once
 
+#include "../json-patch/JSONPatchError.hpp"
 #include "../json-path/JSONPathError.hpp"
 #include "../json-pointer/JSONPointerError.hpp"
 #include "../json-schema/JSONSchemaError.hpp"
@@ -83,6 +84,10 @@ enum class ErrorDomain : std::uint8_t
     PointerParse, // JSONPointer parse errors
     PointerEval,  // JSONPointer evaluation errors
 
+    // --- JSON Patch ---
+    PatchParse, // JSONPatch parse errors
+    PatchEval,  // JSONPatch apply errors
+
     // --- JSON Schema ---
     SchemaParse, // JSON Schema parse/compilation errors
     SchemaEval,  // JSON Schema validation errors
@@ -116,6 +121,16 @@ struct error_domain<json_pointer::EvalError>
     static constexpr ErrorDomain value = ErrorDomain::PointerEval;
 };
 template <>
+struct error_domain<json_patch::ParseError>
+{
+    static constexpr ErrorDomain value = ErrorDomain::PatchParse;
+};
+template <>
+struct error_domain<json_patch::EvalError>
+{
+    static constexpr ErrorDomain value = ErrorDomain::PatchEval;
+};
+template <>
 struct error_domain<ConvertError>
 {
     static constexpr ErrorDomain value = ErrorDomain::Convert;
@@ -135,6 +150,7 @@ template <class E>
 inline constexpr bool is_domain_enum_v =
     std::is_same_v<E, json_path::ParseError> || std::is_same_v<E, json_pointer::ParseError> ||
     std::is_same_v<E, json_path::EvalError> || std::is_same_v<E, json_pointer::EvalError> ||
+    std::is_same_v<E, json_patch::ParseError> || std::is_same_v<E, json_patch::EvalError> ||
     std::is_same_v<E, ConvertError> || std::is_same_v<E, json_schema::ParseError> ||
     std::is_same_v<E, json_schema::EvalError>;
 
@@ -166,6 +182,16 @@ struct Error
 
     constexpr explicit Error(json_pointer::EvalError e, std::uint16_t d = 0) noexcept
         : domain(ErrorDomain::PointerEval), code(static_cast<std::uint8_t>(e)), detail(d)
+    {
+    }
+
+    constexpr explicit Error(json_patch::ParseError e, std::uint16_t d = 0) noexcept
+        : domain(ErrorDomain::PatchParse), code(static_cast<std::uint8_t>(e)), detail(d)
+    {
+    }
+
+    constexpr explicit Error(json_patch::EvalError e, std::uint16_t d = 0) noexcept
+        : domain(ErrorDomain::PatchEval), code(static_cast<std::uint8_t>(e)), detail(d)
     {
     }
 
@@ -218,6 +244,8 @@ struct Error
     [[nodiscard]] constexpr bool is_pointer_parse() const noexcept { return domain == ErrorDomain::PointerParse; }
     [[nodiscard]] constexpr bool is_path_eval() const noexcept { return domain == ErrorDomain::PathEval; }
     [[nodiscard]] constexpr bool is_pointer_eval() const noexcept { return domain == ErrorDomain::PointerEval; }
+    [[nodiscard]] constexpr bool is_patch_parse() const noexcept { return domain == ErrorDomain::PatchParse; }
+    [[nodiscard]] constexpr bool is_patch_eval() const noexcept { return domain == ErrorDomain::PatchEval; }
     [[nodiscard]] constexpr bool is_convert() const noexcept { return domain == ErrorDomain::Convert; }
     [[nodiscard]] constexpr bool is_schema_parse() const noexcept { return domain == ErrorDomain::SchemaParse; }
     [[nodiscard]] constexpr bool is_schema_eval() const noexcept { return domain == ErrorDomain::SchemaEval; }
@@ -247,6 +275,10 @@ static_assert(sizeof(Error) == 4, "Error should remain compact (4 bytes).");
         return json_path::to_std_sv(static_cast<json_path::EvalError>(e.code));
     case PointerEval:
         return json_pointer::to_std_sv(static_cast<json_pointer::EvalError>(e.code));
+    case PatchParse:
+        return json_patch::to_std_sv(static_cast<json_patch::ParseError>(e.code));
+    case PatchEval:
+        return json_patch::to_std_sv(static_cast<json_patch::EvalError>(e.code));
     case Convert:
         return to_std_sv(static_cast<ConvertError>(e.code));
     case SchemaParse:
@@ -278,6 +310,10 @@ static_assert(sizeof(Error) == 4, "Error should remain compact (4 bytes).");
         return json_path::to_qt_sv(static_cast<json_path::EvalError>(e.code));
     case PointerEval:
         return json_pointer::to_qt_sv(static_cast<json_pointer::EvalError>(e.code));
+    case PatchParse:
+        return json_patch::to_qt_sv(static_cast<json_patch::ParseError>(e.code));
+    case PatchEval:
+        return json_patch::to_qt_sv(static_cast<json_patch::EvalError>(e.code));
     case Convert:
         return to_qt_sv(static_cast<ConvertError>(e.code));
     case SchemaParse:
@@ -297,6 +333,11 @@ constexpr QStringView      Error::message_qt() const noexcept { return to_qt_sv(
 inline QString Error::formatted_message() const
 {
     const auto base{message_qt()};
+    // Patch errors carry the operation index in detail (JSONPatch::apply also
+    // rewrites the detail of propagated pointer errors to the op index — its
+    // callers should prefer this formatting context).
+    if (detail > 0 && (is_patch_parse() || is_patch_eval()))
+        return QString(u"%1 (at operation %2)").arg(base).arg(detail);
     const auto hasTokenDetail{detail > 0 && (is_path_eval() || is_pointer_eval())};
     if (!hasTokenDetail)
         return base.toString();
