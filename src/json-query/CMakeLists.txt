@@ -79,7 +79,10 @@ endif()
 # MSVC: same mitigation - cl 19.51+ exceeds the default depth of 1000 on the
 # slice-selector pattern (error C2999). Lives here (not in a preset toolchain
 # file) so it also applies when the library is consumed via add_subdirectory.
-if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+# Gated on MSVC_VERSION: older cl neither knows /templateDepth (it warns
+# D9002 "ignoring unknown option", reported by the first superbuild consumer)
+# nor needs the mitigation.
+if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" AND MSVC_VERSION GREATER_EQUAL 1951)
   set_source_files_properties(json-path/JSONPathParseUtils.cpp
                               PROPERTIES COMPILE_OPTIONS "/templateDepth:2000")
 endif()

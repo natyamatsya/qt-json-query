@@ -414,6 +414,11 @@ if (!result)
 }
 ```
 
+Pick the accessor by context: `message()`/`message_qt()` are zero-cost views
+(good for streaming/logging), but QTest macros and `QString` APIs want an
+owning string — use `formatted_message()` there (it also appends the
+token/operation context).
+
 ### Examples
 
 Runnable example programs live in [`examples/`](examples/) (built by default

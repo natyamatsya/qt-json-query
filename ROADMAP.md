@@ -194,6 +194,48 @@ and a bespoke settings-backend pointer engine — see ADR-007/ADR-008).
 
 ---
 
+## Next release candidates (AC-3033 first-consumer feedback, 2026-07-10)
+
+Feature asks from the first downstream integration
+([context/AC-3033-qt-json-query-extension-suggestions.md](context/AC-3033-qt-json-query-extension-suggestions.md));
+none blocked adoption, all have consumer-side workarounds.
+
+**Adoption filter: strict standards compliance overrides convenience.**
+Anything that would extend or alter a spec grammar is out; extensions are
+only considered through the extension points the specs themselves define,
+and behind explicit opt-ins (the same philosophy as the format-validation
+gates). The API-surface asks below add ergonomics over unchanged spec
+semantics and pass the filter as proposed.
+
+- **JSONPath parameter binding** (their #2) — **constrained by the filter.**
+  The proposed `$[?(@.id==$editorId)]` placeholder is non-RFC-9535 grammar
+  and will not be adopted in that shape: a query string must remain exactly
+  the RFC 9535 language. If pursued, the only compliant shape is an RFC 9535
+  §2.4 *function extension* (e.g. `?@.id == param('editorId')` with bindings
+  supplied at evaluation) — syntactically valid per the spec's own extension
+  mechanism, clearly non-portable, and gated behind an explicit opt-in.
+  Alternative: keep the library unchanged and document the consumer-side
+  pattern (static queries + code-side matching) as the sanctioned approach.
+- **`QJsonObject&`/`QJsonArray&` write overloads** (#4a): consumers holding a
+  typed root currently round-trip through `QJsonValue` for every write.
+- **Pointer composition / index-parameterized pointers** (#4b): keep the
+  compile-once pattern in indexed loops (`prefix / i / u"key"` or a compiled
+  template with placeholders).
+- **Patch builder or prefix-rooted write cursor** (#4c): make batched writes
+  under one prefix the easy path (today: N independent root walks, or
+  hand-building a QJson ops array for JSONPatch).
+- **`as<qint64>`** (#4d): JsonTarget lacks Qt's native 64-bit JSON integer
+  width; consumers narrow through `as<int>`.
+- **Compile-time-validated pointer/path literals** (#4e): UDL or `consteval`
+  factory to remove assert-and-unwrap helpers for known-good literals.
+- **C++17 consumer facade** (their #3): optional `std::expected` shim (e.g.
+  tl::expected via `JSON_QUERY_EXPECTED_COMPAT`) for consumers pinned to
+  C++17 in public headers.
+
+Resolved from the same feedback in 0.6.0: `/templateDepth` now gated on
+`MSVC_VERSION >= 1951` (older cl warned D9002); README notes when to use
+`formatted_message()` vs the zero-cost views.
+
 ## Toward v1.0 (deferred items, consolidated)
 
 Candidate API/infrastructure changes explicitly deferred while resolving
