@@ -2,6 +2,23 @@
 
 Pre-1.0: minor versions may contain breaking changes (see `ROADMAP.md`).
 
+## Unreleased (0.8.0)
+
+### Added
+- **Compile-time-validated pointer literals** (AC-3033 #4e, the last item
+  of the ergonomics track): opt in with `using namespace
+  json_query::literals;` and write `"/a/b"_jptr` — the literal's RFC 6901
+  syntax is checked in a consteval context (invalid literal = compile
+  error), so no `std::expected` unwrapping and no assert-and-unwrap
+  helpers for known-good pointers. Each distinct literal compiles once
+  (function-local static). char (UTF-8) and char16_t literal forms.
+
+### Changed
+- `parsePointer` now runs the complete syntax check up front through the
+  same `validatePointerSyntax` the literals use (single source of truth —
+  the rule that prevented the parseDot/parseBare guard divergence), which
+  also simplified its tokenization loop.
+
 ## 0.7.0 — 2026-07-10
 
 The 0.7.0 milestone is the AC-3033 first-consumer ergonomics track

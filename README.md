@@ -124,7 +124,7 @@ re-enabled, e.g. `-DJSON_QUERY_BUILD_TESTS=ON`).
 Or installed, via `find_package`:
 
 ```cmake
-find_package(json_query 0.7 REQUIRED)
+find_package(json_query 0.8 REQUIRED)
 target_link_libraries(your_target PRIVATE json_query::json_query)
 ```
 
@@ -134,7 +134,7 @@ static library only — shared builds are unsupported until a symbol-visibility
 story exists (planned for v1.0).
 
 Safe to embed in multiple libraries within one application: all symbols live
-in a versioned inline ABI namespace (`json_query::v0_7::…`, transparent to
+in a versioned inline ABI namespace (`json_query::v0_8::…`, transparent to
 source code — you still write `json_query::JSONPath`) and the archive is
 built with hidden visibility, so different embedded versions cannot collide
 or interpose each other (see `doc/adr/005`).
@@ -230,6 +230,19 @@ if (result)
     qDebug() << "Result:" << *result; // QJsonValue(double, 42)
 else
     qWarning() << "Eval error:" << result.error().formatted_message();
+```
+
+For hard-coded pointers, the `_jptr` literal validates the RFC 6901 syntax at
+compile time (an invalid literal fails to compile), so there is nothing to
+unwrap — and each distinct literal is compiled exactly once:
+
+```cpp
+using namespace json_query::literals;
+
+const auto& namePtr{"/foo/baz"_jptr};   // no create()/.value() ceremony
+qDebug() << namePtr.evaluate(doc).value_or("?");
+// "foo/baz"_jptr  → compile error: missing leading slash
+// "/a~2b"_jptr    → compile error: invalid escape
 ```
 
 ### Writing with JSON Pointers

@@ -20,7 +20,7 @@ ctest --test-dir build
 
 | Target | Suite | Tests | Description |
 |---|---|---|---|
-| `json_query_core_tests` | Core | 56 | JSONPath, JSONPointer (incl. write ops + composition), and as<T> conversions |
+| `json_query_core_tests` | Core | 60 | JSONPath, JSONPointer (incl. write ops, composition, _jptr literals), and as<T> conversions |
 | `json_query_internal_tests` | Internal | 74 | Internal components (cursors, filter storage) |
 | `rfc9535_compliance_tests` | RFC 9535 | 443 | JSONPath compliance (official CTS) |
 | `rfc6901_compliance_tests` | RFC 6901 | 89 | JSON Pointer compliance (read + write suites, all overload families) |

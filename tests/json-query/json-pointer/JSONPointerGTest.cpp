@@ -82,6 +82,57 @@ TEST(JSONPointerError, NonExistent)
 }
 
 // ---------------------------------------------------------------------------
+// Compile-time-validated literals (_jptr)
+// ---------------------------------------------------------------------------
+
+using namespace json_query::literals;
+namespace jp_detail = json_query::json_pointer::detail;
+
+// The shared validator IS the compile-time contract — pin it with
+// static_asserts (an invalid _jptr literal is rejected through exactly these
+// rules, so ill-formed-literal compile tests are covered here)
+static_assert(!jp_detail::validatePointerSyntax(u"", std::size_t{0}).has_value());
+static_assert(!jp_detail::validatePointerSyntax(u"/a/b", std::size_t{4}).has_value());
+static_assert(!jp_detail::validatePointerSyntax(u"/a~0b~1c", std::size_t{8}).has_value());
+static_assert(jp_detail::validatePointerSyntax(u"a/b", std::size_t{3}).value() ==
+              json_query::json_pointer::ParseError::MissingLeadingSlash);
+static_assert(jp_detail::validatePointerSyntax(u"/a~2b", std::size_t{5}).value() ==
+              json_query::json_pointer::ParseError::InvalidEscapeSequence);
+static_assert(jp_detail::validatePointerSyntax(u"/a~", std::size_t{3}).value() ==
+              json_query::json_pointer::ParseError::InvalidEscapeSequence);
+static_assert(!jp_detail::validatePointerSyntax("/utf8/ok", std::size_t{8}).has_value()); // char form
+
+TEST(JSONPointerLiterals, LiteralEvaluatesLikeCreated)
+{
+    const QJsonDocument doc(QJsonObject{{"data", QJsonObject{{"name", "x"}}}});
+    const auto&         lit{"/data/name"_jptr};
+    EXPECT_EQ(lit.to_string(), QStringLiteral("/data/name"));
+    EXPECT_EQ(lit.evaluate(doc).value(), QJsonValue{QStringLiteral("x")});
+}
+
+TEST(JSONPointerLiterals, EscapesAndUtf16FormsWork)
+{
+    const QJsonDocument doc(QJsonObject{{"a/b", QJsonObject{{"m~n", 1}, {"café", 2}}}});
+    EXPECT_EQ(("/a~1b/m~0n"_jptr).evaluate(doc).value(), QJsonValue{1});
+    EXPECT_EQ((u"/a~1b/café"_jptr).evaluate(doc).value(), QJsonValue{2});
+    EXPECT_EQ(("/a~1b/café"_jptr).evaluate(doc).value(), QJsonValue{2}); // UTF-8 char form
+}
+
+TEST(JSONPointerLiterals, DistinctLiteralCompiledOnce)
+{
+    const auto& first{"/compiled/once"_jptr};
+    const auto& second{"/compiled/once"_jptr};
+    EXPECT_EQ(&first, &second); // same function-local static per literal
+}
+
+TEST(JSONPointerLiterals, LiteralComposesAndWrites)
+{
+    QJsonDocument doc(QJsonObject{{"arr", QJsonArray{1}}});
+    ASSERT_TRUE(("/arr"_jptr / u"-").add(doc, 2).has_value());
+    EXPECT_EQ(doc.object().value("arr").toArray(), (QJsonArray{1, 2}));
+}
+
+// ---------------------------------------------------------------------------
 // Composition: appended() / operator/
 // ---------------------------------------------------------------------------
 

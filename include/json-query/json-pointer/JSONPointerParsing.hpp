@@ -8,9 +8,11 @@
 #include <QString>
 #include <QStringView>
 #include <QVector>
+#include <cstddef>
+#include <cstring>
 #include <expected>
 #include <limits>
-#include <cstring>
+#include <optional>
 #include <vector>
 
 #include "json-query/config/AbiNamespace.hpp"
@@ -36,6 +38,31 @@ struct Token
 
 namespace json_query::inline JSON_QUERY_ABI_NS::json_pointer::detail
 {
+
+// The complete RFC 6901 syntax check, shared between parsePointer (runtime)
+// and the consteval-validated pointer literals (JSONPointerLiterals.hpp) —
+// single source of truth so the two can never drift. After the
+// container-relative token semantics (ADR-007) the grammar has exactly two
+// error conditions: a non-empty pointer must start with '/', and '~' must be
+// followed by '0' or '1'. Works on char (UTF-8) and char16_t: multi-byte/
+// surrogate units never compare equal to the ASCII characters tested.
+template <class CharT>
+[[nodiscard]] constexpr std::optional<ParseError> validatePointerSyntax(const CharT* data, std::size_t size) noexcept
+{
+    if (size == 0)
+        return std::nullopt; // "" addresses the root
+    if (data[0] != CharT('/'))
+        return ParseError::MissingLeadingSlash;
+    for (std::size_t i = 1; i < size; ++i)
+    {
+        if (data[i] != CharT('~'))
+            continue;
+        if (i + 1 >= size || (data[i + 1] != CharT('0') && data[i + 1] != CharT('1')))
+            return ParseError::InvalidEscapeSequence;
+        ++i; // skip the escape's second character
+    }
+    return std::nullopt;
+}
 
 [[nodiscard]] inline QString decodeToken(QStringView token) noexcept
 {
@@ -100,15 +127,16 @@ namespace json_query::inline JSON_QUERY_ABI_NS::json_pointer::detail
 // Parse a JSON Pointer string into a sequence of tokens
 [[nodiscard]] inline std::expected<void, ParseError> parsePointer(QStringView ptr, std::vector<Token>& tokens) noexcept
 {
-    using enum ParseError;
-
     tokens.clear();
+
+    // Complete syntax check up front (shared with the compile-time literal
+    // validation); the tokenization below can assume well-formed input.
+    if (const auto err{validatePointerSyntax(ptr.utf16(), static_cast<std::size_t>(ptr.size()))})
+        return std::unexpected(*err);
+
     constexpr char16_t Slash{u'/'};
     if (ptr.isEmpty())
         return {}; // success (empty pointer is valid)
-
-    if (ptr.front() != Slash)
-        return std::unexpected(MissingLeadingSlash);
 
     if (ptr.size() == 1)
     {
@@ -124,20 +152,6 @@ namespace json_query::inline JSON_QUERY_ABI_NS::json_pointer::detail
         const auto end{ptr.indexOf(Slash, begin)};
         const auto atEnd{end == -1};
         const auto raw{atEnd ? ptr.sliced(begin) : ptr.sliced(begin, end - begin)};
-
-        // Check for invalid escape sequences in the raw token
-        for (qsizetype i = 0; i < raw.size(); ++i)
-        {
-            if (raw[i] == u'~')
-            {
-                if (i + 1 >= raw.size())
-                    return std::unexpected(InvalidEscapeSequence);
-                const auto next = raw[i + 1];
-                if (next != u'0' && next != u'1')
-                    return std::unexpected(InvalidEscapeSequence);
-                ++i; // Skip the next character as it's part of the escape sequence
-            }
-        }
 
         const auto decoded{decodeToken(raw)};
 
