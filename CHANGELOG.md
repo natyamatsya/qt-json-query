@@ -2,7 +2,7 @@
 
 Pre-1.0: minor versions may contain breaking changes (see `ROADMAP.md`).
 
-## Unreleased
+## Unreleased (0.11.0)
 
 ### Added
 - **Nested member paths in JSONPath filters**: a filter operand may now be any
