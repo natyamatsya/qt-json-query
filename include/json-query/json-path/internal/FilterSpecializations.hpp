@@ -79,6 +79,9 @@ class FilterPatternDetector
             // However, exclude wildcard patterns like @.* for now as they need special handling
             if (filterKey.contains('*'))
                 return FilterPattern::Generic;
+            // ...and nested paths (@.a.b, @.a[0]): the fast path looks up a single member
+            if (QStringView{filterKey}.sliced(2).contains(u'.') || filterKey.contains(u'['))
+                return FilterPattern::Generic;
             return FilterPattern::SimpleExistence;
         }
 

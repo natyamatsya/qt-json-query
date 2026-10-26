@@ -5,6 +5,7 @@
 #include "json-query/utils/BraceSafe.hpp"
 #include "json-query/utils/JSONQueryUtils.hpp"
 #include "json-query/json-path/JSONPathLog.hpp"
+#include "json-query/json-path/JSONPathSingularQuery.hpp"
 #include <ctre.hpp>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -915,6 +916,20 @@ std::optional<Token> parseEmbeddedExists(const QString& s)
                 }
                 return false; // Non-arrays don't have indices
             });
+
+        return token;
+    }
+
+    // Any other relative singular query: @.a.b, @['a']['b'], @.path[0].role.
+    // Exists when it selects a node (null included); a missing member, an
+    // out-of-range index or a non-container intermediate selects nothing.
+    if (auto query = SingularQuery::parse(localS))
+    {
+        Token token;
+        token.kind = Token::Kind::Filter;
+        token.key  = localS;
+
+        token.embedFilter([query = std::move(*query)](const QJsonValue& j) { return query.resolve(j).has_value(); });
 
         return token;
     }

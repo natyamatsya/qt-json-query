@@ -2,6 +2,33 @@
 
 Pre-1.0: minor versions may contain breaking changes (see `ROADMAP.md`).
 
+## Unreleased
+
+### Added
+- **Nested member paths in JSONPath filters**: a filter operand may now be any
+  RFC 9535 relative singular query, not only a top-level member —
+  `$..[?(@.ref.object_name=='search_button')]`, `$..[?(@.rect.w > 1000)]`,
+  `@['ref']['object_name']`, `@.path[0].role`, `@.ref.path[-1]`, blanks
+  between segments (`@ .a .b`). They work in comparisons (against a literal on
+  either side, or against another path: `@.rect.w == @.rect.h`), as existence
+  tests (`[?(@.rect.w)]`, `[?(!@.rect.w)]`), and as `length()` / `value()`
+  arguments; previously they failed to compile with `UnsupportedFilter`. A
+  missing member, an out-of-range index or a non-container intermediate makes
+  the operand *Nothing*, never an error: `Nothing == Nothing` holds (so do
+  `<=`, `>=`), Nothing against a value is false except for `!=`; comparisons
+  follow RFC 9535 §2.3.5.2.2 strictly (exact numeric equality, only numbers
+  and strings are ordered, strings by Unicode scalar value). Top-level
+  operands keep their dedicated filters (no measured change in
+  `BM_JSONPath_Eval_Filter`); non-singular operands (`@.a.*`, `@..b`,
+  `@.a[0:2]`) are still rejected.
+
+### Fixed
+- Function comparisons: `<=` / `>=` were split as `<` / `>` (so
+  `length(@.a) >= 2` compared against the string `"= 2"`); `length()` /
+  `value()` of Nothing now yield Nothing instead of `null` (so
+  `length(@.missing) == null` no longer matches), and ordering a function
+  result against Nothing is false.
+
 ## 0.10.0 — 2026-07-10
 
 ### Added

@@ -10,6 +10,7 @@
 #include "json-query/utils/QtStringLiterals.hpp"
 #include "json-query/json-path/JSONPathLog.hpp"
 #include "json-query/json-path/JSONPath.hpp"
+#include "json-query/json-path/JSONPathSingularQuery.hpp"
 #include "json-query/json-path/internal/ContainerCursor.hpp"
 #include "json-query/utils/JSONQueryUtils.hpp"
 #include <QJsonDocument>
@@ -401,6 +402,30 @@ std::optional<Token> parseEmbeddedComparePropToArrayIdx(const QString& s)
     return std::nullopt;
 }
 
+// General comparison of two comparables (RFC 9535 §2.3.5.1) that are
+// literals or relative singular queries: "@.a.b == 'x'", "@['a'][0] > 1",
+// "@.a.b == @.c.d", "1 < @.a.b". Missing members, out-of-range indices and
+// non-container intermediates make an operand Nothing, never an error.
+std::optional<Token> parseEmbeddedComparableCompare(const QString& s)
+{
+    const auto split{splitTopLevelComparison(s)};
+    if (!split)
+        return std::nullopt;
+    auto lhs{Comparable::parse(split->lhs)};
+    if (!lhs)
+        return std::nullopt;
+    auto rhs{Comparable::parse(split->rhs)};
+    if (!rhs)
+        return std::nullopt;
+
+    Token token;
+    token.kind = Token::Kind::Filter;
+    token.key  = s;
+    token.embedFilter([lhs = std::move(*lhs), op = split->op, rhs = std::move(*rhs)](const QJsonValue& j)
+                      { return compareComparables(lhs.evaluate(j), op, rhs.evaluate(j)); });
+    return token;
+}
+
 std::optional<Token> parseEmbeddedCompare(const QString& s)
 {
     QString localS{s}; // Create local copy for modification
@@ -470,6 +495,10 @@ std::optional<Token> parseEmbeddedCompare(const QString& s)
     if (auto t = parseEmbeddedComparePropToArrayIdx<propToArrayIdxPat>(localS))
         return t;
     if (auto t = parseEmbeddedSelfValue<selfPat>(localS))
+        return t;
+    // The general form last, so the top-level shapes above keep their
+    // dedicated filters.
+    if (auto t = parseEmbeddedComparableCompare(localS))
         return t;
 
     return std::nullopt;
@@ -564,7 +593,7 @@ std::optional<Token> parseEmbeddedFunction(const QString& s)
     // Parse function comparison expression into components
     auto parseFunctionExpression = [](const QString& s) -> FunctionExpressionComponents
     {
-        constexpr auto funcCompPat = ctll::fixed_string{R"(^(.*?)\s*(==|!=|<|>|<=|>=)\s*(.*?)$)"};
+        constexpr auto funcCompPat = ctll::fixed_string{R"(^(.*?)\s*(<=|>=|==|!=|<|>)\s*(.*?)$)"};
 
         if (auto m = ctre::match<funcCompPat>(to_sv(s)))
         {
@@ -601,14 +630,16 @@ std::optional<Token> parseEmbeddedFunction(const QString& s)
     {
         if (hasFunc)
             return EvaluationRuleType::FunctionCall;
-        if (expr.startsWith("@."))
+        if (expr.startsWith(u'@'))
             return EvaluationRuleType::PropertyAccess;
         return EvaluationRuleType::LiteralValue;
     };
 
     // Evaluate expression side using appropriate strategy
-    auto evaluateExpressionSide =
-        [&](const QString& expr, bool hasFunc, const QJsonValue& node, const QJsonValue& root) -> SideEvaluationResult
+    // Captures by value: the filter outlives this function.
+    auto evaluateExpressionSide = [determineEvaluationRuleType](
+                                      const QString& expr, bool hasFunc, const QJsonValue& node, const QJsonValue& root)
+        -> SideEvaluationResult
     {
         auto ruleType = determineEvaluationRuleType(expr, hasFunc);
 
@@ -626,10 +657,11 @@ std::optional<Token> parseEmbeddedFunction(const QString& s)
 
         case EvaluationRuleType::PropertyAccess:
         {
-            auto prop   = expr.mid(2);
-            auto val    = node.toObject().value(prop);
-            auto result = val.isUndefined() ? QJsonValue() : val;
-            return {result, result.isUndefined(), true};
+            // A relative singular query (@.a, @.a.b, @['a'][0]); Nothing when
+            // it selects no node.
+            const auto query{SingularQuery::parse(expr)};
+            const auto value{query ? query->resolve(node) : std::nullopt};
+            return {value.value_or(QJsonValue{QJsonValue::Undefined}), !value.has_value(), true};
         }
 
         case EvaluationRuleType::LiteralValue:
@@ -664,36 +696,28 @@ std::optional<Token> parseEmbeddedFunction(const QString& s)
     auto performNothingAwareComparison =
         [](ComparisonRuleType ruleType, const SideEvaluationResult& left, const SideEvaluationResult& right) -> bool
     {
-        switch (ruleType)
-        {
-        case ComparisonRuleType::Equality:
-            if (left.isNothing && right.isNothing)
-                return true; // Nothing == Nothing
-            if (left.isNothing || right.isNothing)
-                return false; // Nothing != any value
-            return left.value == right.value;
-
-        case ComparisonRuleType::Inequality:
-            if (left.isNothing && right.isNothing)
-                return false; // Nothing == Nothing
-            if (left.isNothing || right.isNothing)
-                return true; // Nothing != any value
-            return left.value != right.value;
-
-        case ComparisonRuleType::LessThan:
-            return compareValues(left.value, right.value) < 0;
-
-        case ComparisonRuleType::GreaterThan:
-            return compareValues(left.value, right.value) > 0;
-
-        case ComparisonRuleType::LessEqual:
-            return compareValues(left.value, right.value) <= 0;
-
-        case ComparisonRuleType::GreaterEqual:
-            return compareValues(left.value, right.value) >= 0;
-        }
-
-        return false;
+        const auto operand{[](const SideEvaluationResult& side)
+                           { return side.isNothing ? std::nullopt : std::optional<QJsonValue>{side.value}; }};
+        const auto op{[ruleType]
+                      {
+                          switch (ruleType)
+                          {
+                          case ComparisonRuleType::Equality:
+                              return ComparisonOperator::Equal;
+                          case ComparisonRuleType::Inequality:
+                              return ComparisonOperator::NotEqual;
+                          case ComparisonRuleType::LessThan:
+                              return ComparisonOperator::Less;
+                          case ComparisonRuleType::GreaterThan:
+                              return ComparisonOperator::Greater;
+                          case ComparisonRuleType::LessEqual:
+                              return ComparisonOperator::LessEqual;
+                          case ComparisonRuleType::GreaterEqual:
+                              return ComparisonOperator::GreaterEqual;
+                          }
+                          return ComparisonOperator::Equal;
+                      }()};
+        return compareComparables(operand(left), op, operand(right));
     };
 
     // Function Evaluation Rule Dispatcher
@@ -735,7 +759,7 @@ std::optional<Token> parseEmbeddedFunction(const QString& s)
                 // IMPORTANT: Do NOT match against a temporary std::string, as CTRE's match object
                 // holds views into the provided buffer. Use QStringView backed by the captured
                 // QString to ensure stable storage during this invocation.
-                constexpr auto funcCompPat = ctll::fixed_string{"^(.*?)\\s*(==|!=|<|>|<=|>=)\\s*(.*?)$"};
+                constexpr auto funcCompPat = ctll::fixed_string{"^(.*?)\\s*(<=|>=|==|!=|<|>)\\s*(.*?)$"};
                 auto           m           = ctre::match<funcCompPat>(to_sv(expr));
                 if (!m)
                     return false;

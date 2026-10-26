@@ -4,6 +4,7 @@
 #include "json-query/json-path/JSONPathFilterParsers.hpp"
 #include "json-query/json-path/JSONPath.hpp"
 #include "json-query/json-path/JSONPathHelpers.hpp"
+#include "json-query/json-path/JSONPathSingularQuery.hpp"
 #include "json-query/utils/JSONQueryUtils.hpp"
 #include <QJsonDocument>
 #include <QJsonParseError>
@@ -19,8 +20,12 @@ using json_query::utils::to_qt_s;
 using json_query::utils::to_sv;
 
 // Helper function to evaluate function calls like length(@.a) or value($..c)
+// The RFC 9535 "Nothing" result is QJsonValue::Undefined (a JSON null is a
+// value).
 QJsonValue evaluateFunction(const QString& funcCall, const QJsonValue& context)
 {
+    const QJsonValue nothing{QJsonValue::Undefined};
+
     // Refactored to use explicit error handling for JSONPath evaluation
     auto parseFunctionSyntax = [](const QString& expr) -> std::optional<std::pair<QString, QString>>
     {
@@ -34,75 +39,71 @@ QJsonValue evaluateFunction(const QString& funcCall, const QJsonValue& context)
         return std::make_pair(QString(funcName), QString(args));
     };
 
-    // Evaluate argument value
-    auto evaluateArgument = [&context](const QString& args) -> QJsonValue
+    // A relative singular query argument (@, @.a, @.a.b, @['a'][0]):
+    // Undefined when it selects nothing, std::nullopt when args is no such
+    // query.
+    auto resolveRelative = [&context](const QString& args) -> std::optional<QJsonValue>
     {
-        if (args.startsWith("@."))
-        {
-            const auto prop{args.mid(2)};
-            return context.toObject().value(prop);
-        }
-        else if (args == "@")
-        {
-            return context;
-        }
-        return context; // Default to context
+        const auto query{SingularQuery::parse(args)};
+        if (!query)
+            return std::nullopt;
+        return query->resolve(context).value_or(QJsonValue{QJsonValue::Undefined});
+    };
+
+    // Evaluate argument value
+    auto evaluateArgument = [&context, &resolveRelative](const QString& args) -> QJsonValue
+    {
+        return resolveRelative(args).value_or(context); // Default to context
     };
 
     // Calculate length
-    auto calculateLength = [](const QJsonValue& value) -> QJsonValue
+    auto calculateLength = [&nothing](const QJsonValue& value) -> QJsonValue
     {
         if (value.isUndefined() || value.isNull())
-            return {}; // Return Nothing for undefined/null
+            return nothing; // length of Nothing / null is Nothing
         if (value.isString())
             return QJsonValue{value.toString().length()};
         if (value.isArray())
             return QJsonValue{value.toArray().size()};
         if (value.isObject())
             return QJsonValue{value.toObject().size()};
-        return {}; // Return Nothing for other types (RFC 9535)
+        return nothing; // other types have no length (RFC 9535)
     };
 
     // Evaluate JSONPath value
-    auto evaluateJsonPathValue = [&context](const QString& args) -> QJsonValue
+    auto evaluateJsonPathValue = [&context, &resolveRelative, &nothing](const QString& args) -> QJsonValue
     {
         if (args.startsWith("$"))
         {
             auto pathResult{JSONPath::create(args)};
             if (!pathResult)
-                return {}; // Return null for invalid JSONPath
+                return nothing; // invalid JSONPath
 
             auto evalResult{pathResult->evaluate(context)};
             if (!evalResult)
-                return {}; // Return null for evaluation errors
+                return nothing; // evaluation error
 
             // RFC 9535 "value" function semantics: return the value if single node, return Nothing if empty or
             // multiple nodes
             if (evalResult->isEmpty())
-                return {}; // Return null for no results (RFC 9535 "nothing")
+                return nothing; // no node
 
             if (evalResult->size() == 1)
                 return (*evalResult)[0]; // Return the single value
 
-            return {}; // Return null for multiple results (RFC 9535 "nothing")
+            return nothing; // several nodes
         }
-        else if (args.startsWith("@."))
+        else if (const auto val{resolveRelative(args)})
         {
-            const auto prop{args.mid(2)};
-            auto       val{context.toObject().value(prop)};
-            return val.isUndefined() ? QJsonValue() : val;
+            return *val;
         }
-        else if (args == "@")
-        {
-            return context;
-        }
-        return {}; // Undefined for complex paths
+        return nothing; // unsupported argument
     };
 
     // Main function evaluation
     auto parsed{parseFunctionSyntax(funcCall)};
     if (!parsed)
-        return {}; // Invalid function syntax
+        return nothing; // invalid function syntax
 
     const auto& [funcName, args] = *parsed;
 
@@ -110,7 +111,7 @@ QJsonValue evaluateFunction(const QString& funcCall, const QJsonValue& context)
         return calculateLength(evaluateArgument(args));
     else if (funcName == "value")
         return evaluateJsonPathValue(args);
-    return {}; // Unknown function
+    return nothing; // unknown function
 }
 
 // Helper function for value comparison with type checking

@@ -434,6 +434,22 @@ static void BM_JSONPath_Eval_Filter(benchmark::State& state)
 }
 BENCHMARK(BM_JSONPath_Eval_Filter);
 
+// Filter on a nested member (relative singular query @.author.year); like
+// BM_JSONPath_Eval_Filter, it selects no book
+static void BM_JSONPath_Eval_FilterNested(benchmark::State& state)
+{
+    const auto doc{prepareTestDocument()};
+    const auto path{JSONPath::create(u"$.inventory[?(@.author.year > 2000)].title")};
+    if (!path)
+    {
+        state.SkipWithError("compile fail");
+        return;
+    }
+    for (auto _ : state)
+        benchmark::DoNotOptimize(path->evaluate(doc));
+}
+BENCHMARK(BM_JSONPath_Eval_FilterNested);
+
 static void BM_JSONPath_Eval_Recursive(benchmark::State& state)
 {
     const auto doc{prepareTestDocument()};
